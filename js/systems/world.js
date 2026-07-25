@@ -385,6 +385,7 @@
       function canCapture(e) {
         var tag = e.target && e.target.tagName;
         return W.controlMode() === 'manual' &&
+          !(Game.ending && Game.ending.isActive()) &&
           Game.state && Game.state.world.mode === 'battle' &&
           tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' &&
           !(e.target && e.target.isContentEditable);
@@ -415,6 +416,7 @@
 
     canManualMove: function (hero) {
       return !!hero && Game.player.hasClass() &&
+        !(Game.ending && Game.ending.isActive()) &&
         Game.state.world.mode === 'battle' &&
         hero.state !== 'dead' && hero.state !== 'recover' &&
         hero.state !== 'entrance' && hero.state !== 'warpOut' &&

@@ -84,6 +84,30 @@
       }
     },
 
+    finaleBurst: function (x, y, phase) {
+      var impact = phase === 'impact';
+      var count = impact ? 26 : 38;
+      if (impact) {
+        shapes.push({ kind: 'ring', x: x, y: y + 8, r: 28, color: '#f3d77d', t: 0, life: 0.65 });
+        shapes.push({ kind: 'ring', x: x, y: y + 8, r: 18, color: '#ffffff', t: 0, life: 0.42 });
+      }
+      for (var i = 0; i < count; i++) {
+        var angle = impact ? U.rand(0, Math.PI * 2) : U.rand(-Math.PI * 0.88, -Math.PI * 0.12);
+        var speed = impact ? U.rand(22, 68) : U.rand(12, 38);
+        shapes.push({
+          kind: 'finalp',
+          x: x + U.rand(-8, 8), y: y + U.rand(-12, 12),
+          t: 0, life: U.rand(0.8, impact ? 1.5 : 2.2),
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - (impact ? 0 : U.rand(8, 24)),
+          s: U.chance(0.28) ? 2 : 1,
+          color: impact
+            ? (U.chance(0.55) ? '#f3d77d' : '#fff4c0')
+            : (U.chance(0.68) ? '#a665d8' : '#e0b8ff')
+        });
+      }
+    },
+
     /* ---------- 震屏 ---------- */
     shake: function (power, dur) {
       shake.p = Math.max(shake.p, power);
@@ -280,6 +304,16 @@
           ctx.fillStyle = s.phase === 'out' ? '#a7ecff' : '#f3dc8a';
           ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
           if (s.s > 1) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+          }
+          ctx.globalAlpha = 1;
+        } else if (s.kind === 'finalp') {
+          var fk = 1 - s.t / s.life;
+          ctx.globalAlpha = Math.max(0, fk);
+          ctx.fillStyle = s.color;
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
+          if (s.s > 1 && fk > 0.45) {
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
           }

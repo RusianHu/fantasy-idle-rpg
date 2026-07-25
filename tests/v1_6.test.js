@@ -296,7 +296,7 @@ function runSaveTests() {
   storage.set('firpg_save', '{broken');
   storage.set('firpg_save_backup', JSON.stringify(old));
   const migrated = Game.save.load();
-  assert.equal(migrated.v, 7);
+  assert.equal(migrated.v, 8);
   assert.equal(migrated.world.worldSeed, expectedSeed);
   assert.equal(migrated.world.layoutVersion, 2);
   assert.deepEqual(migrated.world.regionOrder, old.world.regionOrder, 'migration preserves route order');
@@ -331,7 +331,7 @@ function runSaveTests() {
   const primary = JSON.parse(storage.get('firpg_save'));
   const backup = JSON.parse(storage.get('firpg_save_backup'));
   assert.equal(primary.world.worldSeed, expectedSeed);
-  assert.equal(primary.v, 7);
+  assert.equal(primary.v, 8);
   assert.equal(primary.world.layoutVersion, 2);
   assert.deepEqual(primary, backup, 'main and backup slots match');
 
@@ -342,13 +342,13 @@ function runSaveTests() {
   storage.set('firpg_save', JSON.stringify(v6));
   storage.set('firpg_save_backup', JSON.stringify(v6));
   const upgradedV6 = Game.save.load();
-  assert.equal(upgradedV6.v, 7);
+  assert.equal(upgradedV6.v, 8);
   assert.equal(upgradedV6.world.worldSeed, 0x0BADCAFE);
   assert.equal(upgradedV6.world.layoutVersion, 2, 'v6 layout changes exactly once to dense v2');
   Game.save.applyLoaded(upgradedV6);
-  assert.equal(Game.save.serialize().world.layoutVersion, 2, 'v7 reload keeps the migrated layout version');
+  assert.equal(Game.save.serialize().world.layoutVersion, 2, 'v8 reload keeps the migrated layout version');
 }
 
 runSaveTests();
 
-console.log('v1.7 tests passed: ' + matrixCount + ' v1/v2 seeded layouts plus navigation and save migration coverage.');
+console.log('Layout regression tests passed: ' + matrixCount + ' v1/v2 seeded layouts plus navigation and save migration coverage.');

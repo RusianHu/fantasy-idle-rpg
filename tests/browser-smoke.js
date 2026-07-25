@@ -460,6 +460,249 @@ async function run() {
     assert.equal(englishCampFit.fits, true, 'English camp label fits its allocated width');
     assert.equal(englishCampFit.buttonFits, true, 'English camp button has no internal overflow');
 
+    const endingStart = await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('zh-CN');
+      Game.ui.tabs.open('battle');
+      Game.state.settings.effects = true;
+      Game.state.meta.completedAt = null;
+      Game.state.meta.endingAcknowledged = false;
+      Game.state.meta.endingPhase = null;
+      Game.state.meta.endingLine = 0;
+      const order = Game.State.regionOrder();
+      const finalRid = order[order.length - 1];
+      Game.state.world.region = finalRid;
+      Game.world.init(finalRid);
+      const progress = Game.State.regionProg(finalRid);
+      progress.kills = Game.world.region.killTarget;
+      progress.cleared = false;
+      progress.firstKill = false;
+      Game.state.player.hp = Game.player.derived().maxHp;
+      const hero = Game.world.hero;
+      hero.state = 'idle';
+      const boss = Game.world.makeMonster(Game.world.region.boss, true);
+      boss.x = Game.world.layout.bossPoint.x;
+      boss.y = Game.world.layout.bossPoint.y;
+      boss.hp = 0;
+      Game.world.entities.push(boss);
+      Game.world.bossEnt = boss;
+      document.getElementById('toasts').replaceChildren();
+      const playBefore = Game.state.meta.stats.playSec;
+      const timeBefore = Game.state.world.worldTime;
+      Game.world.onEntityKilled(boss, hero);
+      return {
+        finalRid,
+        active: Game.ending.isActive(),
+        pending: Game.ending.isPending(),
+        phase: Game.ending.phase(),
+        root: !!document.getElementById('ending-root'),
+        hudLocked: document.getElementById('hud').inert,
+        stageLocked: document.getElementById('stage-wrap').inert,
+        visual: document.getElementById('ending-root')?.dataset.endingVisual,
+        playBefore,
+        timeBefore
+      };
+    })()`);
+    assert.equal(endingStart.finalRid, 'darkcastle');
+    assert.equal(endingStart.active, true);
+    assert.equal(endingStart.pending, true);
+    assert.equal(endingStart.phase, 'cinematic');
+    assert.equal(endingStart.root, true);
+    assert.equal(endingStart.hudLocked, true);
+    assert.equal(endingStart.stageLocked, true);
+    assert.equal(endingStart.visual, 'impact');
+
+    await delay(1100);
+    const endingEpilogue = await cdp.evaluate(`(() => {
+      Game.ending.advance();
+      Game.ending.advance();
+      Game.ending.advance();
+      Game.ui.ending.advanceStory();
+      const story = document.querySelector('.ending-story');
+      const text = document.querySelector('.ending-story .story-text');
+      return {
+        phase: Game.ending.phase(),
+        line: story?.dataset.storyLine,
+        text: text?.textContent.replace('▼', '').trim(),
+        fits: !!text && text.scrollWidth <= text.clientWidth && text.scrollHeight <= text.clientHeight,
+        noBossToast: !document.getElementById('toasts').textContent.includes(Game.i18n.t('ui.bossFirstKill', { n: Game.F.bossCrystal(8) }))
+      };
+    })()`);
+    assert.equal(endingEpilogue.phase, 'epilogue');
+    assert.equal(endingEpilogue.line, '0');
+    assert.equal(endingEpilogue.text, '最后一击落下——魔王贝利亚尔的身影，终于在破晓的光芒中崩解。');
+    assert.equal(endingEpilogue.noBossToast, true);
+
+    const endingEpilogueCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const endingEpilogueScreenshot = path.join(os.tmpdir(), 'firpg-ending-epilogue-mobile-cdp.png');
+    fs.writeFileSync(endingEpilogueScreenshot, Buffer.from(endingEpilogueCapture.data, 'base64'));
+
+    const endingSummary = await cdp.evaluate(`(() => {
+      for (let i = 0; i < 6; i++) {
+        Game.ui.ending.advanceStory();
+        Game.ui.ending.advanceStory();
+      }
+      const root = document.getElementById('ending-root');
+      const rr = root.getBoundingClientRect();
+      const buttons = Array.from(root.querySelectorAll('.ending-actions .btn')).map((button) => {
+        const r = button.getBoundingClientRect();
+        return { text: button.textContent, width: r.width, height: r.height, fits: button.scrollWidth <= button.clientWidth };
+      });
+      const canvas = document.getElementById('stage');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let warmPixels = 0;
+      for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1200 / 4) * 4)) {
+        if (pixels[i] > pixels[i + 2] && pixels[i] > 70) warmPixels++;
+      }
+      return {
+        phase: Game.ending.phase(),
+        title: document.getElementById('ending-summary-title')?.textContent,
+        subtitle: root.querySelector('.ending-summary-heading p')?.textContent,
+        statCount: root.querySelectorAll('.ending-stat').length,
+        buttons,
+        withinViewport: rr.left >= 0 && rr.top >= 0 && rr.right <= innerWidth && rr.bottom <= innerHeight,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
+        warmPixels,
+        playFrozen: Math.abs(Game.state.meta.stats.playSec - ${JSON.stringify(endingStart.playBefore)}) < 0.2,
+        timeFrozen: Math.abs(Game.state.world.worldTime - ${JSON.stringify(endingStart.timeBefore)}) < 0.2
+      };
+    })()`);
+    assert.equal(endingSummary.phase, 'summary');
+    assert.equal(endingSummary.title, '远征终章');
+    assert.equal(endingSummary.subtitle, '露西亚大陆重新迎来了黎明。');
+    assert.equal(endingSummary.statCount, 5);
+    assert.equal(endingSummary.buttons.length, 2);
+    assert.ok(endingSummary.buttons.every((button) => button.height >= 44 && button.fits));
+    assert.equal(endingSummary.withinViewport, true);
+    assert.equal(endingSummary.noHorizontalOverflow, true);
+    assert.ok(endingSummary.warmPixels > 0, 'ending keeps the live nonblank canvas behind its dawn treatment');
+    assert.equal(endingSummary.playFrozen, true);
+    assert.equal(endingSummary.timeFrozen, true);
+
+    const endingSummaryCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const endingSummaryScreenshot = path.join(os.tmpdir(), 'firpg-ending-summary-mobile-cdp.png');
+    fs.writeFileSync(endingSummaryScreenshot, Buffer.from(endingSummaryCapture.data, 'base64'));
+
+    const englishEndingFit = await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('en');
+      const buttons = Array.from(document.querySelectorAll('.ending-actions .btn')).map((button) => ({
+        text: button.textContent,
+        fits: button.scrollWidth <= button.clientWidth && button.scrollHeight <= button.clientHeight
+      }));
+      return {
+        title: document.getElementById('ending-summary-title')?.textContent,
+        buttons,
+        statsFit: Array.from(document.querySelectorAll('.ending-stat')).every((row) => row.scrollWidth <= row.clientWidth),
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(englishEndingFit.title, "JOURNEY'S END");
+    assert.ok(englishEndingFit.buttons.every((button) => button.fits));
+    assert.equal(englishEndingFit.statsFit, true);
+    assert.equal(englishEndingFit.noHorizontalOverflow, true);
+
+    const restartGuard = await cdp.evaluate(`(() => {
+      document.getElementById('ending-restart').click();
+      const mask = document.querySelector('#modal-root .modal-mask');
+      const text = mask?.querySelector('.modal-body')?.textContent || '';
+      mask?.querySelector('.modal-btns .btn')?.click();
+      return {
+        confirmationShown: !!mask,
+        destructiveCopy: text.includes('permanently erased'),
+        endingStillOpen: !!document.getElementById('ending-root')
+      };
+    })()`);
+    assert.equal(restartGuard.confirmationShown, true);
+    assert.equal(restartGuard.destructiveCopy, true);
+    assert.equal(restartGuard.endingStillOpen, true);
+
+    const continueAndRepeat = await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('zh-CN');
+      document.getElementById('ending-continue').click();
+      const continued = {
+        active: Game.ending.isActive(),
+        acknowledged: Game.state.meta.endingAcknowledged,
+        rootGone: !document.getElementById('ending-root'),
+        heroState: Game.world.hero.state,
+        hudUnlocked: !document.getElementById('hud').inert
+      };
+      const boss = Game.world.makeMonster(Game.world.region.boss, true);
+      boss.x = Game.world.layout.bossPoint.x;
+      boss.y = Game.world.layout.bossPoint.y;
+      boss.hp = 0;
+      Game.world.entities.push(boss);
+      Game.world.bossEnt = boss;
+      Game.world.onEntityKilled(boss, Game.world.hero);
+      continued.repeatStayedInGame = !Game.ending.isActive() && !document.getElementById('ending-root');
+      return continued;
+    })()`);
+    assert.equal(continueAndRepeat.active, false);
+    assert.equal(continueAndRepeat.acknowledged, true);
+    assert.equal(continueAndRepeat.rootGone, true);
+    assert.equal(continueAndRepeat.heroState, 'idle');
+    assert.equal(continueAndRepeat.hudUnlocked, true);
+    assert.equal(continueAndRepeat.repeatStayedInGame, true);
+
+    const reducedEndingStart = await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('en');
+      Game.state.settings.effects = false;
+      Game.state.meta.completedAt = null;
+      Game.state.meta.endingAcknowledged = false;
+      Game.state.meta.endingPhase = null;
+      const progress = Game.State.regionProg(Game.world.region.id);
+      progress.firstKill = false;
+      progress.cleared = false;
+      const boss = Game.world.makeMonster(Game.world.region.boss, true);
+      boss.x = Game.world.layout.bossPoint.x;
+      boss.y = Game.world.layout.bossPoint.y;
+      boss.hp = 0;
+      Game.world.entities.push(boss);
+      Game.world.bossEnt = boss;
+      Game.world.onEntityKilled(boss, Game.world.hero);
+      return {
+        reduced: document.getElementById('ending-root')?.classList.contains('reduced'),
+        visual: document.getElementById('ending-root')?.dataset.endingVisual,
+        phase: Game.ending.phase()
+      };
+    })()`);
+    assert.equal(reducedEndingStart.reduced, true);
+    assert.equal(reducedEndingStart.visual, 'dawn');
+    assert.equal(reducedEndingStart.phase, 'cinematic');
+    await delay(1000);
+    const reducedEnding = await cdp.evaluate(`(() => {
+      const phase = Game.ending.phase();
+      const lines = [];
+      for (let i = 0; i < 6; i++) {
+        Game.ui.ending.advanceStory();
+        const box = document.querySelector('.ending-story-box');
+        const text = box?.querySelector('.story-text');
+        lines.push({
+          text: text?.textContent.replace('▼', '').trim(),
+          fits: !!box && !!text && box.scrollHeight <= box.clientHeight && text.scrollWidth <= text.clientWidth
+        });
+        Game.ui.ending.advanceStory();
+      }
+      document.getElementById('ending-continue')?.click();
+      Game.state.settings.effects = true;
+      Game.i18n.setLocale('zh-CN');
+      return { phase, finished: !Game.ending.isActive(), lines };
+    })()`);
+    assert.equal(reducedEnding.phase, 'epilogue');
+    assert.equal(reducedEnding.finished, true);
+    assert.equal(reducedEnding.lines.length, 6);
+    assert.ok(reducedEnding.lines.every((line) => line.fits), 'all English epilogue lines fit the mobile dialogue box');
+
+    const endingChecks = {
+      start: endingStart,
+      epilogue: endingEpilogue,
+      summary: endingSummary,
+      english: englishEndingFit,
+      restartGuard,
+      continueAndRepeat,
+      reduced: reducedEndingStart,
+      epilogueScreenshot: endingEpilogueScreenshot,
+      summaryScreenshot: endingSummaryScreenshot
+    };
+
     const densityChecks = [];
     const densityScreenshots = [];
     for (const regionId of ['grassland', 'forest', 'mine', 'graveyard', 'snowpass', 'lavacave', 'skyruins', 'darkcastle']) {
@@ -564,6 +807,29 @@ async function run() {
     const desktopScreenshot = path.join(os.tmpdir(), 'firpg-density-forest-desktop-cdp.png');
     fs.writeFileSync(desktopScreenshot, Buffer.from(desktopCapture.data, 'base64'));
 
+    const desktopEnding = await cdp.evaluate(`(() => {
+      Game.state.meta.completedAt = Date.now();
+      Game.state.meta.endingAcknowledged = false;
+      Game.state.meta.endingPhase = 'summary';
+      Game.ending.restorePending();
+      const root = document.getElementById('ending-root').getBoundingClientRect();
+      const panel = document.querySelector('.ending-summary-panel').getBoundingClientRect();
+      return {
+        rootWithinApp: root.left >= document.getElementById('app').getBoundingClientRect().left &&
+          root.right <= document.getElementById('app').getBoundingClientRect().right,
+        panelWithinRoot: panel.left >= root.left && panel.right <= root.right && panel.top >= root.top && panel.bottom <= root.bottom,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(desktopEnding.rootWithinApp, true);
+    assert.equal(desktopEnding.panelWithinRoot, true);
+    assert.equal(desktopEnding.noHorizontalOverflow, true);
+    await delay(80);
+    const desktopEndingCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const desktopEndingScreenshot = path.join(os.tmpdir(), 'firpg-ending-summary-desktop-cdp.png');
+    fs.writeFileSync(desktopEndingScreenshot, Buffer.from(desktopEndingCapture.data, 'base64'));
+    await cdp.evaluate(`Game.ending.continueGame()`);
+
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 390, height: 844, deviceScaleFactor: 1, mobile: true
     });
@@ -614,8 +880,9 @@ async function run() {
     const screenshot = path.join(os.tmpdir(), 'firpg-demo-mobile-cdp.png');
     fs.writeFileSync(screenshot, Buffer.from(capture.data, 'base64'));
     console.log('Browser smoke passed: ' + JSON.stringify({
-      main, worldChecks, campStateScreenshots, englishCampFit, densityChecks, desktop, demo,
-      mainScreenshot, densityScreenshots, desktopScreenshot, screenshot
+      main, worldChecks, campStateScreenshots, englishCampFit, endingChecks, densityChecks, desktop,
+      desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
+      desktopEndingScreenshot, screenshot
     }));
     cdp.ws.close();
   } finally {

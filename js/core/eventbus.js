@@ -19,6 +19,8 @@
  *   save:before / save:after    offline:settled {summary}
  *   mode:changed {mode}         control:changed {mode}
  *   camp:teleport {phase, x, y}
+ *   game:completed {rid, mid, tier, completedAt}
+ *   game:continued {rid}
  * ============================================================ */
 (function () {
   'use strict';

@@ -301,6 +301,29 @@
       claim: 'Claim'
     },
 
+    ending: {
+      dawnTitle: 'DAWN RETURNS',
+      summaryTitle: 'JOURNEY\'S END',
+      summarySubtitle: 'Dawn has returned to Lucia.',
+      continue: 'Continue',
+      restart: 'Begin Anew',
+      restartConfirm: 'All progress from this adventure will be permanently erased. Begin anew?',
+      statClass: 'Adventurer',
+      statPlayTime: 'Time Played',
+      statKills: 'Total Kills',
+      statBossKills: 'Boss Kills',
+      statWorldSeed: 'World Seed',
+      classLevel: '{cls} · Lv.{level}',
+      lines: {
+        1: 'The final blow falls. Belial, the Demon Lord, breaks apart in the light of dawn.',
+        2: 'The miasma above the Demon Castle scatters on the wind, and dawn returns to Lucia.',
+        3: 'From meadow to snowpeak, from the lava caverns to the sky ruins, long-darkened lights kindle one by one.',
+        4: 'The Adventurers\' Guild withdraws its highest writ and records your name in the Hall of Heroes.',
+        5: 'You set out alone as the guild\'s newest adventurer. Now the whole continent sings of your return.',
+        6: 'The subjugation is over. Yet if you so choose, your adventure may continue.'
+      }
+    },
+
     prologue: {
       1: 'The Demon Lord, sealed by heroes a thousand years ago, has awakened in the depths of the continent of Lucia…',
       2: 'Miasma spreads from the Demon Castle — meadow, forest, mine and snowpeak are falling one by one.',

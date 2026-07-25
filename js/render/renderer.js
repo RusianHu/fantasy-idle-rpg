@@ -266,8 +266,12 @@
       var focusX = hero.x, focusY = hero.y;
       var zoomT = 2.0;
       var mode = Game.state.world.mode;
+      var endingCam = Game.ending && Game.ending.cameraTarget();
 
-      if (W.cinematic && W.cinematic.ent) {
+      if (endingCam) {
+        focusX = endingCam.x; focusY = endingCam.y;
+        zoomT = endingCam.zoom;
+      } else if (W.cinematic && W.cinematic.ent) {
         focusX = W.cinematic.ent.x; focusY = W.cinematic.ent.y;
         zoomT = 2.9;
       } else if (W.bossEnt) {
@@ -283,8 +287,9 @@
       }
       if (cw < 400) zoomT *= 0.92;
 
-      cam.zoom = U.approach(cam.zoom, zoomT, W.cinematic ? 5 : 2.6, dt);
-      var rate = W.cinematic ? 6 : 3.6;
+      var cinematic = endingCam || W.cinematic;
+      cam.zoom = U.approach(cam.zoom, zoomT, cinematic ? 5 : 2.6, dt);
+      var rate = cinematic ? 6 : 3.6;
       cam.x = U.approach(cam.x, focusX, rate, dt);
       cam.y = U.approach(cam.y, focusY, rate, dt);
 
@@ -470,7 +475,9 @@
       var alpha = 1;
 
       if (e.kind === 'monster' && e.dead) {
-        alpha = Math.max(0, e.deathT / 0.5);
+        alpha = e.finaleFade !== undefined
+          ? U.clamp(e.finaleFade, 0, 1)
+          : Math.max(0, e.deathT / 0.5);
         sink += Math.round((1 - alpha) * 4);
       }
       if (e.kind === 'hero' && e.state === 'dead') {

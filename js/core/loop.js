@@ -20,6 +20,13 @@
 
   function step(dt) {
     var st = Game.state;
+    if (Game.ending && Game.ending.isActive()) {
+      Game.terrain.update(dt);
+      Game.ending.update(dt);
+      Game.particles.update(dt);
+      Game.fx.update(dt);
+      return;
+    }
     st.world.worldTime += dt;
     Game.terrain.update(dt);
     Game.world.update(dt);
@@ -69,6 +76,7 @@
         } else {
           var gap = (U.now() - hiddenAt) / 1000;
           lastFrame = performance.now();
+          if (Game.ending && Game.ending.isPending()) return;
           if (gap > OFFLINE_GAP) {
             var sum = Game.offline.settle(gap);
             if (sum) {

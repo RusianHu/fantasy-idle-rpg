@@ -36,6 +36,7 @@
         M.toast(t('ui.fellback', { name: t('region.' + p.rid + '.name') }), 'warn', 4200);
       });
       bus.on('boss:defeated', function (p) {
+        if (p.first && Game.ending && Game.ending.isActive()) return;
         if (p.first) M.toast('💎 ' + t('ui.bossFirstKill', { n: Game.F.bossCrystal(p.tier) }), 'gold', 3600);
         else M.toast(t('ui.bossKilled'));
       });
@@ -103,6 +104,7 @@
     },
 
     toast: function (msg, cls, life) {
+      if (Game.ending && Game.ending.isActive()) return;
       var box = document.getElementById('toasts');
       if (!box) return;
       var el = U.el('div', 'toast jrpg-box', msg);
@@ -113,6 +115,11 @@
       box.appendChild(el);
       setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, (life || 2400) + 400);
       while (box.children.length > 4) box.removeChild(box.firstChild);
+    },
+
+    clearToasts: function () {
+      var box = document.getElementById('toasts');
+      if (box) box.replaceChildren();
     },
 
     /* ---------------- 装备详情（含对比） ---------------- */
@@ -198,6 +205,87 @@
       });
     },
 
+    /* ---------------- 通用逐字叙事（序章 / 后日谈共享） ---------------- */
+    story: function (lines, opts) {
+      opts = opts || {};
+      lines = Array.isArray(lines) ? lines.filter(Boolean) : [];
+      var mount = opts.container || root;
+      var mask = U.el('div', opts.maskClass || 'prologue-mask');
+      var box = U.el('div', (opts.boxClass || 'prologue-box') + ' jrpg-box');
+      var textEl = U.el('div', 'story-text');
+      box.appendChild(textEl);
+      if (opts.tip) box.appendChild(U.el('div', 'prologue-tip', opts.tip));
+      mask.appendChild(box);
+      mask.setAttribute('role', 'dialog');
+      mask.setAttribute('aria-modal', 'true');
+      mask.setAttribute('tabindex', '-1');
+      mount.appendChild(mask);
+
+      var li = Math.max(0, Math.min(lines.length - 1, Number(opts.startIndex) || 0));
+      var ci = 0, timer = null, typing = false, finished = false;
+
+      function completeLine() {
+        clearInterval(timer);
+        timer = null;
+        typing = false;
+        textEl.innerHTML = U.esc(lines[li]) + ' <span class="cursor">▼</span>';
+      }
+
+      function typeLine() {
+        if (!lines.length) return finish();
+        typing = true;
+        ci = 0;
+        mask.setAttribute('data-story-line', String(li));
+        textEl.innerHTML = '';
+        if (opts.onLine) opts.onLine(li);
+        var line = lines[li];
+        timer = setInterval(function () {
+          ci++;
+          textEl.innerHTML = U.esc(line.slice(0, ci)) + '<span class="cursor">▌</span>';
+          if (ci >= line.length) completeLine();
+        }, opts.speed || 42);
+      }
+
+      function close() {
+        clearInterval(timer);
+        timer = null;
+        document.removeEventListener('keydown', onKeyDown);
+        if (mask.parentNode) mask.parentNode.removeChild(mask);
+      }
+
+      function finish() {
+        if (finished) return;
+        finished = true;
+        close();
+        if (opts.onDone) opts.onDone();
+      }
+
+      function advance() {
+        if (finished) return false;
+        if (typing) {
+          completeLine();
+          return true;
+        }
+        li++;
+        if (li >= lines.length) finish();
+        else typeLine();
+        return true;
+      }
+
+      function onKeyDown(e) {
+        if (e.code !== 'Enter' && e.code !== 'Space') return;
+        e.preventDefault();
+        e.stopPropagation();
+        advance();
+      }
+
+      mask.addEventListener('click', advance);
+      document.addEventListener('keydown', onKeyDown);
+      setTimeout(function () { if (mask.parentNode) mask.focus(); }, 0);
+      typeLine();
+      return { advance: advance, close: close, line: function () { return li; } };
+    },
+
     /* ---------------- 序章 ---------------- */
     prologue: function (onDone) {
       var t = Game.i18n.t;
@@ -207,53 +295,10 @@
         var txt = t(key);
         if (txt !== key) lines.push(txt);
       }
-      var mask = U.el('div', 'prologue-mask');
-      var box = U.el('div', 'prologue-box jrpg-box');
-      var textEl = U.el('div', '');
-      var tip = U.el('div', 'prologue-tip', t('ui.prologueTip'));
-      box.appendChild(textEl);
-      box.appendChild(tip);
-      mask.appendChild(box);
-      root.appendChild(mask);
-
-      var li = 0, ci = 0, timer = null, typing = false, finished = false;
-
-      function typeLine() {
-        typing = true;
-        ci = 0;
-        textEl.innerHTML = '';
-        var line = lines[li];
-        timer = setInterval(function () {
-          ci++;
-          textEl.innerHTML = U.esc(line.slice(0, ci)) + '<span class="cursor">▌</span>';
-          if (ci >= line.length) {
-            clearInterval(timer);
-            typing = false;
-            textEl.innerHTML = U.esc(line) + ' <span class="cursor">▼</span>';
-          }
-        }, 42);
-      }
-
-      function advance() {
-        if (finished) return;
-        if (typing) {
-          clearInterval(timer);
-          typing = false;
-          textEl.innerHTML = U.esc(lines[li]) + ' <span class="cursor">▼</span>';
-          return;
-        }
-        li++;
-        if (li >= lines.length) {
-          finished = true;
-          if (mask.parentNode) mask.parentNode.removeChild(mask);
-          onDone();
-          return;
-        }
-        typeLine();
-      }
-
-      mask.addEventListener('click', advance);
-      typeLine();
+      return M.story(lines, {
+        tip: t('ui.prologueTip'),
+        onDone: onDone
+      });
     },
 
     /* ---------------- 离线结算 ---------------- */

@@ -25,6 +25,7 @@
     // 系统监听器
     Game.audio.init();
     Game.prog.init();
+    Game.ending.init();
     Game.meta.init();
 
     // 读档 / 新档
@@ -76,6 +77,10 @@
     // 离线结算（防系统时间回调：ts 在未来 → 收益按 0）
     function settleOffline() {
       if (isNew) return;
+      if (Game.ending.isPending()) {
+        Game.ending.restorePending();
+        return;
+      }
       var elapsed = (U.now() - Game.save.lastTs()) / 1000;
       if (elapsed > 0) {
         var sum = Game.offline.settle(elapsed);

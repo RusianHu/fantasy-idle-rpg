@@ -112,7 +112,11 @@
             maxHit: 0, level: 1, highestRegion: 1
           },
           ach: {},
-          prologueDone: false
+          prologueDone: false,
+          completedAt: null,
+          endingAcknowledged: false,
+          endingPhase: null,
+          endingLine: 0
         }
       };
       return s;

@@ -11,6 +11,7 @@
   var Off = Game.offline = {
     /** 计算离线摘要（elapsed 秒）；不足 60s 或时间戳异常返回 null */
     settle: function (elapsedSec) {
+      if (Game.ending && Game.ending.isPending()) return null;
       if (!elapsedSec || elapsedSec < 60) return null;
       elapsedSec = Math.floor(elapsedSec);
       var mode = Game.state.world.mode;

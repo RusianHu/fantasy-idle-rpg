@@ -60,6 +60,11 @@
       bus.on('boss:spawned', function () { A.playBgm('bgm_boss'); });
       bus.on('boss:defeated', function () { A.playBgm('bgm_field'); });
       bus.on('boss:failed', function () { A.playBgm('bgm_field'); });
+      bus.on('game:completed', function () {
+        A.playSfx('sfx_final_victory');
+        A.playBgm('bgm_ending');
+      });
+      bus.on('game:continued', function () { A.playBgm('bgm_field'); });
       bus.on('rest:start', function () { A.playBgm('bgm_campfire'); });
       bus.on('rest:end', function () { A.playBgm('bgm_field'); });
       bus.on('region:changed', function () { if (!A.currentBgm || A.currentBgm === 'bgm_field') A.playBgm('bgm_field'); });

@@ -80,6 +80,25 @@
         data.world.layoutVersion = 2;
         data.v = 7;
       }
+    },
+    {
+      // v7 → v8：加入最终通关后日谈。已经打通末区的旧档在下次启动补播，
+      // 未通关档只获得默认字段，不改变任何养成或世界进度。
+      from: 7,
+      fn: function (data) {
+        data.meta = data.meta || {};
+        data.world = data.world || {};
+        var order = Game.State.normalizeRegionOrder(data.world.regionOrder);
+        var finalRid = order.length ? order[order.length - 1] : null;
+        var finalProg = finalRid && data.world.regionProg && data.world.regionProg[finalRid];
+        var completed = !!(finalProg && (finalProg.cleared || finalProg.firstKill));
+        var stamp = Number(data.ts) || Number(data.createdAt) || 1;
+        data.meta.completedAt = completed ? stamp : null;
+        data.meta.endingAcknowledged = false;
+        data.meta.endingPhase = completed ? 'epilogue' : null;
+        data.meta.endingLine = 0;
+        data.v = 8;
+      }
     }
   ];
 
@@ -189,6 +208,14 @@
         data.world && data.world.regionOrder
       );
       U.merge(st.meta, data.meta || {});
+      st.meta.completedAt = Number.isFinite(st.meta.completedAt) && st.meta.completedAt > 0
+        ? st.meta.completedAt
+        : null;
+      st.meta.endingAcknowledged = !!st.meta.endingAcknowledged;
+      st.meta.endingPhase = st.meta.endingPhase === 'summary' || st.meta.endingPhase === 'epilogue'
+        ? st.meta.endingPhase
+        : null;
+      st.meta.endingLine = Math.max(0, Math.min(5, Number(st.meta.endingLine) || 0));
 
       // 数据卫生：清除引用已下线内容的装备（折算金币），装备指针失效则置空
       var validItems = [];
@@ -286,6 +313,7 @@
       Game.world.init(Game.state.world.region);
       Game.ui.hud.update(true);
       Game.ui.tabs.queueRerender();
+      if (Game.ending) Game.ending.restorePending();
       S.save('import');
     },
 
