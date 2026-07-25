@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d1026">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230d1026'/%3E%3Crect x='9' y='2' width='2' height='2' fill='%23eef1f6'/%3E%3Crect x='8' y='4' width='2' height='2' fill='%23c8cdd8'/%3E%3Crect x='7' y='6' width='2' height='2' fill='%23c8cdd8'/%3E%3Crect x='6' y='8' width='2' height='2' fill='%23c8cdd8'/%3E%3Crect x='4' y='9' width='2' height='2' fill='%23e8c058'/%3E%3Crect x='3' y='11' width='3' height='2' fill='%238a5a32'/%3E%3C/svg%3E">
+<title>幻境远征 · Fantasy Idle RPG</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <!-- 顶部状态栏 -->
+  <header id="hud">
+    <div id="hud-avatar">
+      <canvas id="avatar-canvas" width="40" height="40"></canvas>
+      <div id="hud-level" class="lv-badge">1</div>
+    </div>
+    <div id="hud-mid">
+      <div class="bar hp"><div class="bar-fill" id="hud-hp-fill"></div><span class="bar-text" id="hud-hp-text"></span></div>
+      <div class="bar exp"><div class="bar-fill" id="hud-exp-fill"></div><span class="bar-text" id="hud-exp-text"></span></div>
+    </div>
+    <div id="hud-cur">
+      <div class="cur-row"><canvas class="cur-icon" id="icon-gold" width="16" height="16"></canvas><span id="hud-gold">0</span></div>
+      <div class="cur-row"><canvas class="cur-icon" id="icon-crystal" width="16" height="16"></canvas><span id="hud-crystal">0</span></div>
+    </div>
+  </header>
+
+  <!-- 中部世界舞台 -->
+  <main id="stage-wrap">
+    <canvas id="stage"></canvas>
+    <div id="battle-overlay">
+      <div id="region-chip"></div>
+      <div id="hunt-gauge" class="gauge"><div id="hunt-fill"></div><span id="hunt-text"></span></div>
+      <div id="boss-bar" class="hidden">
+        <div id="boss-name"></div>
+        <div class="bar boss"><div class="bar-fill" id="boss-hp-fill"></div></div>
+      </div>
+      <div id="buff-chips"></div>
+      <button id="btn-camp" class="btn btn-camp" type="button"></button>
+    </div>
+    <div id="panel-container" class="hidden">
+      <div id="panel-inner"></div>
+    </div>
+    <div id="toasts"></div>
+  </main>
+
+  <!-- 底部 Tab 导航（JS 生成） -->
+  <nav id="tabbar"></nav>
+</div>
+<div id="modal-root"></div>
+
+<!-- ===== 按序加载（file:// 兼容，全局命名空间 Game.*） ===== -->
+<script src="js/core/utils.js"></script>
+<script src="js/core/eventbus.js"></script>
+<script src="js/core/registry.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/i18n/i18n.js"></script>
+<script src="js/i18n/zh-CN.js"></script>
+<script src="js/i18n/en.js"></script>
+<script src="js/core/assets.js"></script>
+<script src="js/data/formulas.js"></script>
+<script src="js/sprites/palettes.js"></script>
+<script src="js/sprites/hero.js"></script>
+<script src="js/sprites/monsters_a.js"></script>
+<script src="js/sprites/monsters_b.js"></script>
+<script src="js/sprites/props.js"></script>
+<script src="js/data/affixes.js"></script>
+<script src="js/data/items.js"></script>
+<script src="js/data/skills.js"></script>
+<script src="js/data/monsters.js"></script>
+<script src="js/data/regions.js"></script>
+<script src="js/data/achievements.js"></script>
+<script src="js/systems/state.js"></script>
+<script src="js/systems/inventory.js"></script>
+<script src="js/systems/combat.js"></script>
+<script src="js/systems/world.js"></script>
+<script src="js/systems/progression.js"></script>
+<script src="js/systems/offline.js"></script>
+<script src="js/systems/shop.js"></script>
+<script src="js/systems/meta.js"></script>
+<script src="js/render/terrain.js"></script>
+<script src="js/render/particles.js"></script>
+<script src="js/render/daynight.js"></script>
+<script src="js/render/effects.js"></script>
+<script src="js/render/renderer.js"></script>
+<script src="js/ui/hud.js"></script>
+<script src="js/ui/panels_main.js"></script>
+<script src="js/ui/panels_misc.js"></script>
+<script src="js/ui/modals.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/core/loop.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

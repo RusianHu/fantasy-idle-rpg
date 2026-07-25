@@ -1,0 +1,237 @@
+/* ============================================================
+ * core/assets.js — 资产清单与像素精灵工厂
+ *
+ * 素材以「像素网格字符画 + 调色板」的形式存放于 js/sprites/（assets 数据层），
+ * 启动后按需编译为 offscreen canvas；渲染永远保持锐利（整数像素）。
+ * - 自动描边：不透明像素外圈自动生成深色轮廓（16-bit 观感的关键）
+ * - 帧合成：squash（压缩呼吸帧）/ bob（位移帧）/ flip（镜像）
+ * - 白闪缓存：受击闪白用剪影叠加
+ * - 占位降级：任何缺失的精灵 ID 自动落到「色块 + 首字母」，不白屏
+ * ============================================================ */
+(function () {
+  'use strict';
+  var Game = window.Game;
+  var U = Game.util;
+
+  var defs = {};    // id -> 定义
+  var built = {};   // id -> { frames: {name: canvas}, white: {name: canvas}, w, h, anchor }
+  var OUTLINE = '#16122b';
+
+  function makeCanvas(w, h) {
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  /** 字符网格 -> canvas（含 1px 外扩自动描边） */
+  function gridToCanvas(rows, pal, noOutline) {
+    var gh = rows.length, gw = 0, y, x;
+    for (y = 0; y < gh; y++) gw = Math.max(gw, rows[y].length);
+    var w = gw + 2, h = gh + 2;
+    var c = makeCanvas(w, h);
+    var ctx = c.getContext('2d');
+    var solid = [];
+    for (y = 0; y < gh; y++) {
+      solid.push([]);
+      var row = rows[y];
+      for (x = 0; x < gw; x++) {
+        var ch = row[x] || '.';
+        if (ch === '.' || ch === ' ') { solid[y].push(false); continue; }
+        var col = pal[ch];
+        if (!col) { solid[y].push(false); continue; }
+        ctx.fillStyle = col;
+        ctx.fillRect(x + 1, y + 1, 1, 1);
+        solid[y].push(true);
+      }
+    }
+    if (!noOutline) {
+      ctx.fillStyle = OUTLINE;
+      for (y = -1; y <= gh; y++) {
+        for (x = -1; x <= gw; x++) {
+          var here = y >= 0 && y < gh && solid[y][x];
+          if (here) continue;
+          var near =
+            (y > 0 && x >= 0 && x < gw && solid[y - 1][x]) ||
+            (y < gh - 1 && y + 1 >= 0 && x >= 0 && x < gw && solid[y + 1][x]) ||
+            (x > 0 && y >= 0 && y < gh && solid[y][x - 1]) ||
+            (x < gw - 1 && y >= 0 && y < gh && solid[y][x + 1]);
+          if (near) ctx.fillRect(x + 1, y + 1, 1, 1);
+        }
+      }
+    }
+    return c;
+  }
+
+  function flipCanvas(src) {
+    var c = makeCanvas(src.width, src.height);
+    var ctx = c.getContext('2d');
+    ctx.translate(src.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(src, 0, 0);
+    return c;
+  }
+
+  /** 垂直压缩 1px（底部对齐）——呼吸/待机第二帧 */
+  function squashCanvas(src) {
+    var c = makeCanvas(src.width, src.height);
+    var ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    var cut = Math.floor(src.height * 0.35);
+    // 上半部分下移 1px，下半部分保持 —— 产生「蹲伏呼吸」效果
+    ctx.drawImage(src, 0, 0, src.width, cut, 0, 1, src.width, cut);
+    ctx.drawImage(src, 0, cut, src.width, src.height - cut, 0, cut, src.width, src.height - cut);
+    return c;
+  }
+
+  function bobCanvas(src, dy) {
+    var c = makeCanvas(src.width, src.height);
+    var ctx = c.getContext('2d');
+    ctx.drawImage(src, 0, dy);
+    return c;
+  }
+
+  function whiteOf(src) {
+    var c = makeCanvas(src.width, src.height);
+    var ctx = c.getContext('2d');
+    ctx.drawImage(src, 0, 0);
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c;
+  }
+
+  function buildSprite(id) {
+    var d = defs[id];
+    if (!d) return null;
+    var frames = {}, name;
+    var srcDef = d;
+    // variantOf：复用其它精灵的网格，仅替换调色板（如 冰狼=灰狼 换色）
+    if (d.variantOf && defs[d.variantOf]) {
+      srcDef = defs[d.variantOf];
+    }
+    var pal = d.pal || srcDef.pal;
+    for (name in srcDef.frames) {
+      frames[name] = gridToCanvas(srcDef.frames[name], pal, d.noOutline);
+    }
+    var derive = d.derive || srcDef.derive || {};
+    for (name in derive) {
+      var op = derive[name];
+      var from = frames[op.from];
+      if (!from) continue;
+      if (op.op === 'squash') frames[name] = squashCanvas(from);
+      else if (op.op === 'bob') frames[name] = bobCanvas(from, op.dy || 1);
+      else if (op.op === 'flip') frames[name] = flipCanvas(from);
+    }
+    // 通用规则：任何 *_r* 帧自动生成对应 *_l* 镜像帧
+    for (name in frames) {
+      if (name.indexOf('_r') >= 0) {
+        var lname = name.replace('_r', '_l');
+        if (!frames[lname]) frames[lname] = flipCanvas(frames[name]);
+      }
+    }
+    var first = frames[Object.keys(frames)[0]];
+    var anchor = d.anchor || srcDef.anchor || { x: Math.floor(first.width / 2), y: first.height - 1 };
+    var b = built[id] = {
+      frames: frames,
+      white: {},
+      w: first.width,
+      h: first.height,
+      anchor: { x: anchor.x + 1, y: anchor.y + 1 } // 补偿描边外扩 1px
+    };
+    return b;
+  }
+
+  function placeholder(id) {
+    var c = makeCanvas(18, 18);
+    var ctx = c.getContext('2d');
+    var seed = U.strSeed(id);
+    var hue = seed % 360;
+    ctx.fillStyle = 'hsl(' + hue + ',45%,40%)';
+    ctx.fillRect(1, 1, 16, 16);
+    ctx.strokeStyle = '#16122b';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, 16, 16);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText((id[0] || '?').toUpperCase(), 9, 10);
+    return {
+      frames: { idle0: c },
+      white: {},
+      w: 18, h: 18,
+      anchor: { x: 9, y: 17 },
+      isPlaceholder: true
+    };
+  }
+
+  var A = Game.assets = {
+    defineSprite: function (d) { defs[d.id] = d; },
+
+    sprite: function (id) {
+      var b = built[id];
+      if (b) return b;
+      if (defs[id]) return buildSprite(id);
+      console.warn('[Assets] 缺失精灵，使用占位：', id);
+      return (built[id] = placeholder(id));
+    },
+
+    frame: function (id, name) {
+      var s = A.sprite(id);
+      return s.frames[name] || s.frames.idle0 || s.frames[Object.keys(s.frames)[0]];
+    },
+
+    hasFrame: function (id, name) {
+      var s = A.sprite(id);
+      return !!s.frames[name];
+    },
+
+    /**
+     * 世界坐标绘制（脚底锚点对齐）
+     * opts: { flip, alpha, white(0..1), sinkPx, scale }
+     */
+    draw: function (ctx, id, frameName, x, y, opts) {
+      opts = opts || {};
+      var s = A.sprite(id);
+      var f = s.frames[frameName] || s.frames.idle0 || s.frames[Object.keys(s.frames)[0]];
+      if (!f) return;
+      var anchorX = s.anchor.x;
+      if (opts.flip) {
+        var b = built[id];
+        if (!b._mirror) b._mirror = {};
+        if (!b._mirror[frameName]) b._mirror[frameName] = flipCanvas(f);
+        f = b._mirror[frameName];
+        anchorX = f.width - s.anchor.x;
+      }
+      var sc = opts.scale || 1;
+      var sink = opts.sinkPx || 0;
+      var dx = Math.round(x - anchorX * sc);
+      var dy = Math.round(y - s.anchor.y * sc);
+      var sh = f.height - sink;
+      if (sh <= 0) return;
+      if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
+      ctx.drawImage(f, 0, 0, f.width, sh, dx, dy, Math.round(f.width * sc), Math.round(sh * sc));
+      if (opts.white) {
+        var key = (opts.flip ? 'M:' : '') + frameName;
+        var s2 = built[id];
+        if (!s2.white[key]) s2.white[key] = whiteOf(f);
+        ctx.globalAlpha = (opts.alpha !== undefined ? opts.alpha : 1) * opts.white;
+        ctx.drawImage(s2.white[key], 0, 0, f.width, sh, dx, dy, Math.round(f.width * sc), Math.round(sh * sc));
+      }
+      if (opts.alpha !== undefined || opts.white) ctx.globalAlpha = 1;
+    },
+
+    /** 将某帧绘制到 DOM canvas（背包图标等），整数倍缩放居中 */
+    drawToDom: function (canvasEl, id, frameName) {
+      var f = A.frame(id, frameName || 'icon');
+      var ctx = canvasEl.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+      var k = Math.max(1, Math.floor(Math.min(canvasEl.width / f.width, canvasEl.height / f.height)));
+      var w = f.width * k, h = f.height * k;
+      ctx.drawImage(f, Math.floor((canvasEl.width - w) / 2), Math.floor((canvasEl.height - h) / 2), w, h);
+    },
+
+    OUTLINE: OUTLINE
+  };
+})();

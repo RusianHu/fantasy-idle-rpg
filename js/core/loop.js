@@ -1,0 +1,100 @@
+/* ============================================================
+ * core/loop.js — 主循环
+ * requestAnimationFrame 驱动；页面不可见期间用时间戳补偿：
+ * 短隙（<90s）快进模拟，长隙走离线结算弹窗。
+ * ============================================================ */
+(function () {
+  'use strict';
+  var Game = window.Game;
+  var U = Game.util;
+
+  var running = false;
+  var lastFrame = 0;
+  var autosaveT = 0;
+  var hiddenAt = 0;
+
+  var SIM_STEP = 0.1;
+  var CATCHUP_MAX = 90;      // 秒；快进模拟的上限
+  var OFFLINE_GAP = 300;     // 秒；隐藏超过 5 分钟才走离线结算弹窗
+  var AUTOSAVE_EVERY = 15;
+
+  function step(dt) {
+    var st = Game.state;
+    st.world.worldTime += dt;
+    Game.terrain.update(dt);
+    Game.world.update(dt);
+    Game.particles.update(dt);
+    Game.fx.update(dt);
+    Game.meta.tick(dt);
+  }
+
+  function frame(ts) {
+    if (!running) return;
+    var dt = (ts - lastFrame) / 1000;
+    lastFrame = ts;
+    if (dt < 0) dt = 0.016;
+    if (dt > 0.25) dt = 0.25;
+
+    step(dt);
+    Game.render.frame(dt);
+    Game.ui.hud.tick(dt);
+
+    autosaveT += dt;
+    if (autosaveT >= AUTOSAVE_EVERY) {
+      autosaveT = 0;
+      Game.save.save('auto');
+    }
+    requestAnimationFrame(frame);
+  }
+
+  var L = Game.loop = {
+    start: function () {
+      if (running) return;
+      running = true;
+      lastFrame = performance.now();
+      requestAnimationFrame(frame);
+    },
+
+    /** 快进补偿（隐藏页返回的短间隙） */
+    catchup: function (seconds) {
+      var n = Math.min(seconds, CATCHUP_MAX) / SIM_STEP;
+      for (var i = 0; i < n; i++) step(SIM_STEP);
+    },
+
+    init: function () {
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          hiddenAt = U.now();
+          Game.save.save('hidden');
+        } else {
+          var gap = (U.now() - hiddenAt) / 1000;
+          lastFrame = performance.now();
+          if (gap > OFFLINE_GAP) {
+            var sum = Game.offline.settle(gap);
+            if (sum) {
+              Game.ui.modals.offline(sum, function () {
+                Game.offline.apply(sum);
+                Game.save.save('offline');
+              });
+            }
+          } else if (gap > 2) {
+            L.catchup(gap);
+          }
+        }
+      });
+      window.addEventListener('pagehide', function () { Game.save.save('pagehide'); });
+      window.addEventListener('beforeunload', function () { Game.save.save('unload'); });
+
+      // 关键事件即时保存
+      var saveOn = ['player:levelup', 'boss:defeated', 'item:equipped', 'region:changed',
+        'achievement:unlocked', 'shop:bought', 'skill:upgraded'];
+      saveOn.forEach(function (evt) {
+        Game.bus.on(evt, function () {
+          // 轻微防抖：合并密集事件
+          clearTimeout(L._evtSaveT);
+          L._evtSaveT = setTimeout(function () { Game.save.save('event'); }, 800);
+        });
+      });
+    }
+  };
+})();
