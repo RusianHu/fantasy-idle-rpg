@@ -52,6 +52,7 @@
 index.html            入口（按序加载脚本）
 css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
+tech-demos/           技术验证演示页（独立命名入口，直接复用生产代码）
 js/
   core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop
   i18n/               i18n 核心 + zh-CN + en 语言包

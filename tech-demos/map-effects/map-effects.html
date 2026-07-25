@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#151614">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23151614'/%3E%3C/svg%3E">
+<title>地图级特效技术验证 · 幻境远征</title>
+<link rel="stylesheet" href="map-effects.css">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">FANTASY IDLE RPG / EFFECTS LAB / MAP-FX-01</p>
+      <h1>地图级特效技术验证</h1>
+    </div>
+    <a class="back-link" href="../../index.html">返回原游戏</a>
+  </header>
+
+  <nav id="region-tabs" class="region-tabs" aria-label="特效验证区域"></nav>
+
+  <main class="workspace">
+    <section class="preview-column" aria-labelledby="stage-region-name">
+      <div class="preview-toolbar">
+        <div class="region-heading">
+          <span id="stage-index" class="region-index">01</span>
+          <div>
+            <h2 id="stage-region-name">新手草原</h2>
+            <p id="stage-region-id">region / grassland</p>
+          </div>
+        </div>
+        <div class="icon-actions">
+          <button id="prev-region" class="icon-button" type="button" title="上一个区域" aria-label="上一个区域">&#8592;</button>
+          <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示">&#8545;</button>
+          <button id="next-region" class="icon-button" type="button" title="下一个区域" aria-label="下一个区域">&#8594;</button>
+        </div>
+      </div>
+
+      <div id="stage-wrap" class="stage-wrap">
+        <canvas id="stage" aria-label="原版地图级特效实时画布"></canvas>
+        <div class="stage-badges" aria-hidden="true">
+          <span id="runtime-status">原版特效运行中</span>
+          <span id="runtime-count">0 个实体</span>
+        </div>
+      </div>
+
+      <div class="control-strip">
+        <div class="segmented" aria-label="日夜阶段">
+          <button type="button" data-time="cycle" class="active">循环</button>
+          <button type="button" data-time="day">昼间</button>
+          <button type="button" data-time="dusk">黄昏</button>
+          <button type="button" data-time="night">夜晚</button>
+        </div>
+        <div class="focus-actions" aria-label="镜头视点">
+          <button type="button" data-focus="camp">营地</button>
+          <button type="button" data-focus="center">中部</button>
+          <button type="button" data-focus="boss">Boss 点</button>
+        </div>
+        <label class="check-control">
+          <input id="effects-toggle" type="checkbox" checked>
+          <span>环境效果</span>
+        </label>
+      </div>
+
+      <div class="source-line">
+        <span>验证链路</span>
+        <code>regions.js</code><b>&#8594;</b><code>world.init()</code><b>&#8594;</b><code>terrain.build()</code><b>&#8594;</b><code>renderer.frame()</code>
+      </div>
+    </section>
+
+    <aside id="inspector" class="inspector" aria-label="地图级特效配置明细"></aside>
+  </main>
+</div>
+
+<script src="../../js/core/utils.js"></script>
+<script src="../../js/core/eventbus.js"></script>
+<script src="../../js/core/registry.js"></script>
+<script src="../../js/i18n/i18n.js"></script>
+<script src="../../js/i18n/zh-CN.js"></script>
+<script src="../../js/i18n/en.js"></script>
+<script src="../../js/core/assets.js"></script>
+<script src="../../js/data/formulas.js"></script>
+<script src="../../js/sprites/palettes.js"></script>
+<script src="../../js/sprites/hero.js"></script>
+<script src="../../js/sprites/monsters_a.js"></script>
+<script src="../../js/sprites/monsters_b.js"></script>
+<script src="../../js/sprites/props.js"></script>
+<script src="../../js/sprites/flora.js"></script>
+<script src="../../js/data/affixes.js"></script>
+<script src="../../js/data/items.js"></script>
+<script src="../../js/data/classes.js"></script>
+<script src="../../js/data/skills.js"></script>
+<script src="../../js/data/monsters.js"></script>
+<script src="../../js/data/regions.js"></script>
+<script src="../../js/systems/state.js"></script>
+<script src="../../js/systems/inventory.js"></script>
+<script src="../../js/systems/combat.js"></script>
+<script src="../../js/render/terrain.js"></script>
+<script src="../../js/render/particles.js"></script>
+<script src="../../js/render/daynight.js"></script>
+<script src="../../js/render/effects.js"></script>
+<script src="../../js/render/renderer.js"></script>
+<script src="../../js/systems/world.js"></script>
+<script src="map-effects.js"></script>
+</body>
+</html>

@@ -9,6 +9,7 @@
   var U = Game.util, P = Game.PAL, A = Game.assets;
   var D = A.defineSprite;
   var OUT = '#16122b';
+  var TREE_PAD = 5;
 
   function mk(w, h) {
     var c = document.createElement('canvas');
@@ -48,11 +49,10 @@
     }
   }
 
-  /** 树冠摇曳帧：顶部 55% 右移 1px */
-  function swayTop(src) {
+  /** 树冠摇曳帧：顶部 55% 右移 1px；透明边距容纳位移后的像素 */
+  function swayTop(src, cut) {
     var c = mk(src.width, src.height);
     var ctx = c.getContext('2d');
-    var cut = Math.floor(src.height * 0.55);
     ctx.drawImage(src, 0, 0, src.width, cut, 1, 0, src.width, cut);
     ctx.drawImage(src, 0, cut, src.width, src.height - cut, 0, cut, src.width, src.height - cut);
     return c;
@@ -60,7 +60,8 @@
 
   /* ---------------- 阔叶树生成器 ---------------- */
   function broadleaf(id, opts) {
-    var w = opts.w, h = opts.h;
+    var innerW = opts.w, innerH = opts.h;
+    var w = innerW + TREE_PAD * 2, h = innerH + TREE_PAD;
     var rng = U.seededRng(U.strSeed(id));
     var c = mk(w, h);
     var ctx = c.getContext('2d');
@@ -68,30 +69,31 @@
 
     // 树干（底部居中，右侧暗面）
     var tw = opts.trunkW || 4;
-    var tx = Math.floor(w / 2 - tw / 2);
-    var th = opts.trunkH || Math.floor(h * 0.32);
+    var tx = TREE_PAD + Math.floor(innerW / 2 - tw / 2);
+    var th = opts.trunkH || Math.floor(innerH * 0.32);
+    var baseY = TREE_PAD + innerH;
     ctx.fillStyle = pal.trunk;
-    ctx.fillRect(tx, h - th, tw, th);
+    ctx.fillRect(tx, baseY - th, tw, th);
     ctx.fillStyle = pal.trunkD;
-    ctx.fillRect(tx + tw - 1, h - th, 1, th);
+    ctx.fillRect(tx + tw - 1, baseY - th, 1, th);
     // 根部外扩
-    ctx.fillRect(tx - 1, h - 2, 1, 2);
+    ctx.fillRect(tx - 1, baseY - 2, 1, 2);
     ctx.fillStyle = pal.trunk;
-    ctx.fillRect(tx + tw, h - 2, 1, 2);
+    ctx.fillRect(tx + tw, baseY - 2, 1, 2);
     if (opts.birch) {
       ctx.fillStyle = pal.trunkD;
-      for (var bi = 0; bi < th; bi += 3) ctx.fillRect(tx + (bi % 2), h - th + bi, 2, 1);
+      for (var bi = 0; bi < th; bi += 3) ctx.fillRect(tx + (bi % 2), baseY - th + bi, 2, 1);
     }
 
     // 树冠：多个色块簇（深→中→亮分层，光源左上）
-    var cy = h * (opts.canopyY || 0.34);
-    var cx = w / 2;
+    var cy = TREE_PAD + innerH * (opts.canopyY || 0.34);
+    var cx = TREE_PAD + innerW / 2;
     var blobs = [];
     var n = opts.blobs || 5;
     for (var i = 0; i < n; i++) {
       blobs.push({
-        x: cx + (rng() - 0.5) * w * 0.55,
-        y: cy + (rng() - 0.5) * h * 0.3,
+        x: cx + (rng() - 0.5) * innerW * 0.55,
+        y: cy + (rng() - 0.5) * innerH * 0.3,
         r: (opts.rMin || 4) + rng() * ((opts.rMax || 7) - (opts.rMin || 4))
       });
     }
@@ -105,9 +107,9 @@
     // 顶部受光碎点（整图快照一次采样）
     var snap = ctx.getImageData(0, 0, w, h).data;
     ctx.fillStyle = pal.light;
-    for (var s = 0; s < w * 0.9; s++) {
-      var sx2 = (rng() * w) | 0;
-      var sy2 = (cy - h * 0.12 + rng() * h * 0.2) | 0;
+    for (var s = 0; s < innerW * 0.9; s++) {
+      var sx2 = TREE_PAD + ((rng() * innerW) | 0);
+      var sy2 = (cy - innerH * 0.12 + rng() * innerH * 0.2) | 0;
       if (sx2 < 0 || sy2 < 0 || sx2 >= w || sy2 >= h) continue;
       if (snap[(sy2 * w + sx2) * 4 + 3] > 10 && rng() < 0.5) ctx.fillRect(sx2, sy2, 1, 1);
     }
@@ -115,40 +117,42 @@
     if (opts.dots) {
       ctx.fillStyle = opts.dots;
       for (var f = 0; f < (opts.dotN || 6); f++) {
-        var fx = cx + (rng() - 0.5) * w * 0.6, fy = cy + (rng() - 0.5) * h * 0.28;
+        var fx = cx + (rng() - 0.5) * innerW * 0.6, fy = cy + (rng() - 0.5) * innerH * 0.28;
         ctx.fillRect(fx | 0, fy | 0, 1, 1);
       }
     }
 
     outlinePass(c);
     A.defineCanvas(id, {
-      frames: { idle0: c, idle1: swayTop(c) },
-      anchor: { x: Math.floor(w / 2), y: h - 1 }
+      frames: { idle0: c, idle1: swayTop(c, TREE_PAD + Math.floor(innerH * 0.55)) },
+      anchor: { x: TREE_PAD + Math.floor(innerW / 2), y: h - 1 }
     });
   }
 
   /* ---------------- 针叶树生成器（可积雪） ---------------- */
   function pine(id, opts) {
-    var w = opts.w, h = opts.h;
+    var innerW = opts.w, innerH = opts.h;
+    var w = innerW + TREE_PAD * 2, h = innerH + TREE_PAD;
     var c = mk(w, h);
     var ctx = c.getContext('2d');
     var pal = opts.pal;
     var tiers = opts.tiers || 4;
     var th = opts.trunkH || 5;
-    var cx = Math.floor(w / 2);
+    var cx = TREE_PAD + Math.floor(innerW / 2);
+    var baseY = TREE_PAD + innerH;
 
     ctx.fillStyle = pal.trunk;
-    ctx.fillRect(cx - 1, h - th, 3, th);
+    ctx.fillRect(cx - 1, baseY - th, 3, th);
     ctx.fillStyle = pal.trunkD;
-    ctx.fillRect(cx + 1, h - th, 1, th);
+    ctx.fillRect(cx + 1, baseY - th, 1, th);
 
-    var topY = 1;
-    var bottomY = h - th - 1;
+    var topY = TREE_PAD + 1;
+    var bottomY = baseY - th - 1;
     var t, y;
     for (t = tiers - 1; t >= 0; t--) {
       var y0 = topY + (bottomY - topY) * t / tiers;
       var y1 = topY + (bottomY - topY) * (t + 1) / tiers + 2;
-      var halfBase = (w / 2 - 1) * (0.45 + 0.55 * (t + 1) / tiers);
+      var halfBase = (innerW / 2 - 1) * (0.45 + 0.55 * (t + 1) / tiers);
       for (y = Math.floor(y0); y <= Math.min(bottomY + 1, Math.floor(y1)); y++) {
         var k = (y - y0) / Math.max(1, y1 - y0);
         var half = Math.max(1, Math.round(halfBase * k));
@@ -162,11 +166,11 @@
         }
       }
     }
-    if (opts.snow) { ctx.fillStyle = pal.snow; ctx.fillRect(cx, 0, 1, 2); }
+    if (opts.snow) { ctx.fillStyle = pal.snow; ctx.fillRect(cx, TREE_PAD, 1, 2); }
 
     outlinePass(c);
     A.defineCanvas(id, {
-      frames: { idle0: c, idle1: swayTop(c) },
+      frames: { idle0: c, idle1: swayTop(c, TREE_PAD + Math.floor(innerH * 0.55)) },
       anchor: { x: cx, y: h - 1 }
     });
   }
