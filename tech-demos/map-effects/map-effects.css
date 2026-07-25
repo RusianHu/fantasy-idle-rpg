@@ -204,6 +204,37 @@ h1 {
   border-bottom: 1px solid var(--line);
 }
 
+.seed-control {
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: auto 92px auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.seed-control label { color: var(--muted); font-size: 11px; }
+.seed-control input {
+  width: 92px;
+  min-height: 42px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  color: var(--text);
+  background: var(--surface);
+  font: 12px Consolas, monospace;
+  text-transform: uppercase;
+}
+.seed-control button {
+  min-height: 42px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 2px;
+  color: #171711;
+  background: var(--gold);
+  cursor: pointer;
+}
+.seed-control span { grid-column: 2 / 4; color: #777869; font-size: 9px; }
+
 .segmented, .focus-actions {
   display: inline-grid;
   grid-auto-flow: column;
@@ -375,11 +406,17 @@ h1 {
   .region-tabs { margin-inline: -12px; padding-left: 12px; grid-template-columns: repeat(8, 116px); }
   .workspace { padding-top: 16px; gap: 20px; }
   .preview-toolbar { align-items: center; flex-wrap: wrap; }
-  .icon-actions { width: 100%; justify-content: flex-end; }
+  .icon-actions { width: 100%; flex: 1 0 100%; justify-content: flex-end; }
   .region-heading p { display: none; }
   .stage-wrap { margin-inline: -12px; width: calc(100% + 24px); border-left: 0; border-right: 0; border-radius: 0; }
-  .control-strip { align-items: stretch; }
-  .segmented, .focus-actions { width: 100%; grid-auto-columns: 1fr; }
+  .control-strip { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+  .seed-control { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(88px, 96px) 64px; }
+  .seed-control input { width: 100%; }
+  .seed-control span { grid-column: 2 / 4; }
+  .segmented, .focus-actions { width: 100%; min-width: 0; grid-auto-flow: row; }
+  .segmented { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .focus-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .segmented button, .focus-actions button { min-width: 0; padding-inline: 4px; }
   .check-control { margin-left: 0; }
   .source-line { line-height: 1.6; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }

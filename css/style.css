@@ -703,6 +703,25 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 .skill-lv { font-size: 10px; color: var(--gold); }
 
 /* ---------- 地图 ---------- */
+.world-seed-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 58px;
+  padding: 7px 8px 9px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--panel-line);
+}
+.world-seed-row .grow { min-width: 0; }
+.world-seed-row .name { font-size: 12px; color: var(--gold); }
+.world-seed-row .desc { margin-top: 3px; font-size: 10px; line-height: 1.35; color: var(--ink-dim); }
+.world-seed-row code {
+  color: var(--ink);
+  font: 13px Consolas, monospace;
+  white-space: nowrap;
+}
+.world-seed-row .seed-copy { min-width: 52px; }
 .region-card .thumb {
   width: 52px; height: 52px;
   flex: 0 0 auto;

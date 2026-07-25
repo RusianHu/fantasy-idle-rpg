@@ -14,11 +14,12 @@
 
   var State = Game.State = {
     /** 新档只打乱前四区；后半程与最终区域保持固定。 */
-    makeRegionOrder: function () {
+    makeRegionOrder: function (worldSeed) {
       var list = reg.ids('region');
       var count = Math.min(4, list.length);
+      var rng = U.seededRng(worldSeed >>> 0);
       for (var i = count - 1; i > 0; i--) {
-        var j = Math.floor(Math.random() * (i + 1));
+        var j = Math.floor(rng() * (i + 1));
         var tmp = list[i];
         list[i] = list[j];
         list[j] = tmp;
@@ -68,7 +69,8 @@
 
     /** 新档（职业在序章后选择） */
     newGame: function () {
-      var regionOrder = State.makeRegionOrder();
+      var worldSeed = U.randomSeed();
+      var regionOrder = State.makeRegionOrder(worldSeed);
       var s = {
         createdAt: U.now(),
         settings: {
@@ -94,6 +96,8 @@
         world: {
           region: regionOrder[0],
           regionOrder: regionOrder,
+          worldSeed: worldSeed,
+          layoutVersion: 2,
           mode: 'battle',
           restBuffT: 0,
           worldTime: 300,

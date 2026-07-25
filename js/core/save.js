@@ -61,6 +61,25 @@
         data.settings.controlMode = 'auto';
         data.v = 5;
       }
+    },
+    {
+      // v5 → v6：旧档只新增稳定布局种子，区域顺序保持原样。
+      from: 5,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.worldSeed = U.strSeed('legacy:' + (data.createdAt || data.ts || 0));
+        data.world.layoutVersion = 1;
+        data.v = 6;
+      }
+    },
+    {
+      // v6 → v7：切换到高密度布局一次，世界种子与区域顺序保持原样。
+      from: 6,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.layoutVersion = 2;
+        data.v = 7;
+      }
     }
   ];
 
@@ -101,6 +120,8 @@
         world: {
           region: st.world.region,
           regionOrder: st.world.regionOrder,
+          worldSeed: st.world.worldSeed >>> 0,
+          layoutVersion: st.world.layoutVersion,
           mode: st.world.mode,
           restBuffT: st.world.restBuffT,
           worldTime: st.world.worldTime,
@@ -160,6 +181,10 @@
         U.merge(st.inv.potions, data.inv.potions || {});
       }
       U.merge(st.world, data.world || {});
+      st.world.worldSeed = Number.isFinite(st.world.worldSeed)
+        ? (st.world.worldSeed >>> 0)
+        : U.strSeed('legacy:' + (data.createdAt || data.ts || 0));
+      st.world.layoutVersion = data.world && data.world.layoutVersion === 1 ? 1 : 2;
       st.world.regionOrder = Game.State.normalizeRegionOrder(
         data.world && data.world.regionOrder
       );

@@ -24,6 +24,7 @@
 
   var W = Game.world = {
     region: null,       // 区域定义
+    layout: null,       // 当前存档/区域的运行时生成布局
     entities: [],
     hero: null,
     props: [],          // 场景装饰（y 排序渲染）
@@ -47,13 +48,17 @@
       W.cinematic = null;
       W.pendingRespawn = [];
 
-      Game.terrain.build(region);
-      W.props = Game.terrain.props;
+      W.layout = Game.terrain.build(
+        region,
+        Game.state.world.worldSeed,
+        Game.state.world.layoutVersion
+      );
+      W.props = W.layout.props;
       if (Game.particles) Game.particles.initRegion(region);
 
       var hero = W.hero = W.makeHero();
-      hero.x = region.camp.x + 30;
-      hero.y = region.camp.y + 26;
+      hero.x = W.layout.camp.x + 30;
+      hero.y = W.layout.camp.y + 26;
       W.entities.push(hero);
 
       for (var i = 0; i < POPULATION; i++) W.spawnMonster(true);
@@ -83,7 +88,7 @@
         skillCd: {}, potionCd: 0,
         target: null, stepAcc: 0, spriteH: 20,
         deathT: 0, recoverT: 0, moving: false,
-        moveOrder: null, manualTarget: false, campWarp: null
+        moveOrder: null, manualTarget: false, campWarp: null, navRoute: null
       };
     },
 
@@ -118,15 +123,25 @@
       var region = W.region;
       var mid = U.choice(region.monsters);
       var ent = W.makeMonster(mid, false);
-      var tries = 0;
-      do {
-        ent.x = U.rand(60, region.world.w - 60);
-        ent.y = U.rand(BOUND_TOP + 30, region.world.h - 40);
-        tries++;
-      } while (tries < 24 && (
-        (W.hero && U.dist(ent.x, ent.y, W.hero.x, W.hero.y) < (initial ? 130 : 110)) ||
-        U.dist(ent.x, ent.y, region.camp.x, region.camp.y) < 80
-      ));
+      var candidates = W.layout.spawnCandidates;
+      var fallback = W.layout.corridorCandidates;
+      var point = null;
+      for (var tries = 0; tries < 24 && candidates.length; tries++) {
+        var candidate = U.choice(candidates);
+        if (!W.hero || U.dist(candidate.x, candidate.y, W.hero.x, W.hero.y) >= (initial ? 130 : 110)) {
+          point = candidate;
+          break;
+        }
+      }
+      if (!point && fallback.length) {
+        for (var fi = 0; fi < fallback.length; fi++) {
+          var fp = fallback[(fi + ((Math.random() * fallback.length) | 0)) % fallback.length];
+          if (!W.hero || U.dist(fp.x, fp.y, W.hero.x, W.hero.y) >= 90) { point = fp; break; }
+        }
+      }
+      if (!point) point = { x: W.layout.camp.x + W.layout.campSafeRadius + 36, y: W.layout.camp.y };
+      ent.x = point.x;
+      ent.y = point.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
       W.entities.push(ent);
       return ent;
@@ -149,7 +164,7 @@
         animT: U.rand(0, 0.3), animF: 0, flash: 0, lungeT: 0,
         wanderT: U.rand(0.5, 2), wx: 0, wy: 0,
         engaged: false, stepAcc: 0, dots: [],
-        spriteH: sp.h, dead: false, deathT: 0
+        spriteH: sp.h, dead: false, deathT: 0, navRoute: null
       };
     },
 
@@ -170,8 +185,8 @@
       if (Game.player.hpPct() < 0.6) return;
 
       var ent = W.makeMonster(region.boss, true);
-      ent.x = region.bossPoint.x;
-      ent.y = region.bossPoint.y;
+      ent.x = W.layout.bossPoint.x;
+      ent.y = W.layout.bossPoint.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
       ent.state = 'fight';
       W.entities.push(ent);
@@ -181,6 +196,7 @@
       W.cinematic = { ent: ent, t: 1.5 };
       if (W.hero.state !== 'recover') W.hero.state = 'entrance';
       W.hero.moveOrder = null;
+      Game.nav.clear(W.hero);
       W.hero.manualTarget = false;
       W.hero.target = null;
       if (Game.fx) {
@@ -258,6 +274,7 @@
       hero.deathT = 1.0;
       hero.target = null;
       hero.moveOrder = null;
+      Game.nav.clear(hero);
       hero.manualTarget = false;
       hero.campWarp = null;
       hero.shield = 0;
@@ -308,6 +325,7 @@
         hero.target = best;
         hero.manualTarget = true;
         hero.moveOrder = null;
+        Game.nav.clear(hero);
         if (Game.fx) Game.fx.ring(best.x, best.y - best.spriteH * 0.4, 12, '#f0c860');
         return;
       }
@@ -316,10 +334,12 @@
       if (sw.mode === 'rest') W.setMode('battle');
       hero.moveOrder = {
         x: U.clamp(wx, 18, W.region.world.w - 18),
-        y: U.clamp(wy, BOUND_TOP, W.region.world.h - 14)
+        y: U.clamp(wy, BOUND_TOP, W.region.world.h - 14),
+        id: 'tap:' + U.uid()
       };
       hero.target = null;
       hero.manualTarget = false;
+      Game.nav.clear(hero);
     },
 
     /* ---------------- 自动 / 手动操控 ---------------- */
@@ -340,6 +360,7 @@
         hero.target = null;
         hero.manualTarget = false;
         hero.moveOrder = null;
+        Game.nav.clear(hero);
         var protectedState = hero.state === 'dead' || hero.state === 'recover' ||
           hero.state === 'entrance' || hero.state === 'warpOut' ||
           hero.state === 'warpIn' || Game.state.world.mode === 'rest';
@@ -378,6 +399,7 @@
           W.hero.target = null;
           W.hero.manualTarget = false;
           W.hero.moveOrder = null;
+          Game.nav.clear(W.hero);
           W.hero.state = 'walk';
           W.moveVector(W.hero, v.x, v.y, HERO_SPEED, 1 / 30);
         }
@@ -419,6 +441,7 @@
         hero.target = null;
         hero.manualTarget = false;
         hero.moveOrder = null;
+        Game.nav.clear(hero);
         moveKeys = {};
         if (hero.state !== 'recover' && hero.state !== 'dead') W.startCampReturn(hero);
         bus.emit('rest:start');
@@ -431,7 +454,7 @@
     },
 
     campRestPoint: function () {
-      return { x: W.region.camp.x + 22, y: W.region.camp.y + 22 };
+      return { x: W.layout.camp.x + 22, y: W.layout.camp.y + 22 };
     },
 
     startCampReturn: function (hero) {
@@ -481,6 +504,7 @@
         hero.x = warp.landingX;
         hero.y = warp.landingY;
         hero.stepAcc = 0;
+        Game.nav.clear(hero);
         W.clampToWorld(hero);
         warp.phase = 'in';
         warp.t = CAMP_WARP_IN_T - carry;
@@ -567,8 +591,9 @@
       if (hero.state === 'dead') {
         hero.deathT -= dt;
         if (hero.deathT <= 0) {
-          hero.x = W.region.camp.x + 26;
-          hero.y = W.region.camp.y + 24;
+          hero.x = W.layout.camp.x + 26;
+          hero.y = W.layout.camp.y + 24;
+          Game.nav.clear(hero);
           hero.state = 'recover';
           hero.recoverT = RECOVER_T;
         }
@@ -595,8 +620,8 @@
       /* ----- 休息模式 ----- */
       if (sw.mode === 'rest') {
         if (hero.state === 'goCamp') {
-          var cx = W.region.camp.x + 22, cy = W.region.camp.y + 22;
-          if (W.moveToward(hero, cx, cy, HERO_SPEED, dt) < 4) {
+          var cx = W.layout.camp.x + 22, cy = W.layout.camp.y + 22;
+          if (W.moveToward(hero, cx, cy, HERO_SPEED, dt, 'camp') < 4) {
             hero.state = 'sitting';
             hero.dir = 'l'; // 面向篝火
           }
@@ -631,6 +656,7 @@
           hero.target = null;
           hero.manualTarget = false;
           hero.moveOrder = null;
+          Game.nav.clear(hero);
           hero.state = 'walk';
           W.moveVector(hero, mv.x, mv.y, HERO_SPEED, dt);
           return;
@@ -641,7 +667,7 @@
       if (hero.moveOrder) {
         var mo = hero.moveOrder;
         hero.state = 'walk';
-        if (W.moveToward(hero, mo.x, mo.y, HERO_SPEED, dt) < 5) {
+        if (W.moveToward(hero, mo.x, mo.y, HERO_SPEED, dt, mo.id) < 5) {
           hero.moveOrder = null;
           hero.state = 'idle';
         }
@@ -684,7 +710,7 @@
       var distTo = U.dist(hero.x, hero.y, target.x, target.y);
       if (distTo > range) {
         hero.state = 'walk';
-        W.moveToward(hero, target.x, target.y, HERO_SPEED, dt);
+        W.moveToward(hero, target.x, target.y, HERO_SPEED, dt, target);
       } else {
         hero.state = 'fight';
         hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
@@ -744,7 +770,7 @@
         var reach = MELEE_RANGE + (e.boss ? 10 : 2);
         var dist = U.dist(hero.x, hero.y, e.x, e.y);
         if (dist > reach) {
-          W.moveToward(e, hero.x, hero.y, MONSTER_WANDER_SPEED + (e.boss ? 16 : 12), dt);
+          W.moveToward(e, hero.x, hero.y, MONSTER_WANDER_SPEED + (e.boss ? 16 : 12), dt, hero);
           e.state = 'walk';
           return;
         }
@@ -770,8 +796,8 @@
       var len = Math.sqrt(dx * dx + dy * dy);
       if (len < 0.01) return 0;
       dx /= len; dy /= len;
-      var mat = Game.terrain.materialAt(ent.x, ent.y);
-      if (mat === 'water') speed *= 0.72;
+      speed /= Math.max(1, Game.terrain.costAt(ent.x, ent.y));
+      dt = Math.min(Math.max(0, dt), 0.25);
       var ox = ent.x, oy = ent.y;
       ent.x += dx * speed * dt;
       ent.y += dy * speed * dt;
@@ -783,13 +809,12 @@
       return moved;
     },
 
-    moveToward: function (ent, tx, ty, speed, dt) {
+    moveDirect: function (ent, tx, ty, speed, dt) {
       var dx = tx - ent.x, dy = ty - ent.y;
       var d = Math.sqrt(dx * dx + dy * dy);
       if (d < 0.5) return 0;
-      // 浅水减速
-      var mat = Game.terrain.materialAt(ent.x, ent.y);
-      if (mat === 'water') speed *= 0.72;
+      speed /= Math.max(1, Game.terrain.costAt(ent.x, ent.y));
+      dt = Math.min(Math.max(0, dt), 0.25);
       var step = Math.min(d, speed * dt);
       ent.x += dx / d * step;
       ent.y += dy / d * step;
@@ -798,6 +823,11 @@
       W.clampToWorld(ent);
       W.stepFx(ent, step);
       return d - step;
+    },
+
+    moveToward: function (ent, tx, ty, speed, dt, token) {
+      if (!Game.nav || !Game.nav.finder) return W.moveDirect(ent, tx, ty, speed, dt);
+      return Game.nav.step(ent, tx, ty, speed, dt, token, W.moveDirect);
     },
 
     wanderTick: function (ent, dt, speed, ax, ay, radius) {
@@ -809,10 +839,11 @@
         var r = radius || 90;
         ent.wx = U.clamp(cx + U.rand(-r, r), 30, W.region.world.w - 30);
         ent.wy = U.clamp(cy + U.rand(-r, r), BOUND_TOP + 16, W.region.world.h - 20);
+        ent.wanderKey = (ent.wanderKey || 0) + 1;
       }
       var d = U.dist(ent.x, ent.y, ent.wx, ent.wy);
       if (d > 5) {
-        W.moveToward(ent, ent.wx, ent.wy, speed, dt);
+        W.moveToward(ent, ent.wx, ent.wy, speed, dt, 'wander:' + ent.wanderKey);
         if (ent.kind === 'monster') ent.state = 'walk';
       } else if (ent.kind === 'monster') {
         ent.state = 'wander';

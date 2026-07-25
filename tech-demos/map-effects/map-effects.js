@@ -9,6 +9,25 @@
   var timeMode = 'cycle';
   var lastFrame = performance.now();
 
+  function queryParams() {
+    try { return new URLSearchParams(window.location.search); } catch (e) { return new URLSearchParams(); }
+  }
+
+  function parseSeed(value) {
+    value = String(value || '').trim().replace(/^0x/i, '');
+    return /^[0-9a-fA-F]{1,8}$/.test(value) ? (parseInt(value, 16) >>> 0) : null;
+  }
+
+  function updateUrl(regionId) {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set('seed', U.hex32(Game.state.world.worldSeed));
+      url.searchParams.set('region', regionId);
+      url.hash = '';
+      window.history.replaceState(null, '', url.href);
+    } catch (e) { window.location.hash = regionId; }
+  }
+
   var MATERIAL_NAMES = {
     grass: '草地', dirt: '泥土', water: '浅水', snow: '雪地',
     sand: '沙土', lava: '熔岩', stone: '石地', miasma: '瘴气地'
@@ -96,21 +115,28 @@
 
   function renderInspector(region) {
     var cfg = region.terrain;
-    var decoCount = cfg.deco.reduce(function (sum, item) { return sum + item.count; }, 0) + 2;
-    var patchCount = cfg.patches.reduce(function (sum, item) { return sum + item.count; }, 0);
-    var flowerCount = cfg.flowers ? cfg.flowers.count : 0;
+    var layout = Game.world.layout;
+    var decoCount = layout.props.length;
+    var patchCount = layout.patches.length;
+    var flowerCount = layout.flowers.length;
+    var propCounts = layout.props.reduce(function (counts, prop) {
+      counts[prop.sprite] = (counts[prop.sprite] || 0) + 1;
+      return counts;
+    }, {});
     var materialRows = '<div class="config-row"><span>基础材质</span><div>' +
       esc(MATERIAL_NAMES[cfg.base.mat] || cfg.base.mat) + swatches(cfg.base.colors) +
       '<div class="raw-id">' + esc(cfg.base.mat) + '</div></div></div>';
 
     materialRows += cfg.patches.map(function (patch) {
-      return '<div class="config-row"><span>' + esc(MATERIAL_NAMES[patch.mat] || patch.mat) + ' × ' + patch.count + '</span>' +
+      var generated = layout.patches.filter(function (item) { return item.mat === patch.mat; }).length;
+      return '<div class="config-row"><span>' + esc(MATERIAL_NAMES[patch.mat] || patch.mat) + ' × ' + generated + '</span>' +
         '<div>半径 ' + patch.rMin + '–' + patch.rMax + ' px ' + swatches(patch.colors) +
-        '<div class="raw-id">' + esc(patch.mat) + '</div></div></div>';
+        '<div class="raw-id">原始 ' + patch.count + ' / ' + esc(patch.mat) + '</div></div></div>';
     }).join('');
 
     var decoRows = cfg.deco.map(function (def) {
-      return spriteRow(def.sprite, DECO_NAMES[def.sprite] || def.sprite, trait('× ' + def.count) + decoTraits(def));
+      return spriteRow(def.sprite, DECO_NAMES[def.sprite] || def.sprite,
+        trait('× ' + (propCounts[def.sprite] || 0)) + decoTraits(def));
     }).join('');
     decoRows += spriteRow('tent', '营帐', trait('固定注入') + trait('软阴影'));
     decoRows += spriteRow('campfire', '四帧篝火', trait('固定注入') + trait('动态光晕', 'accent') + trait('火星/轻烟', 'accent'));
@@ -118,7 +144,7 @@
     var monsterRows = region.monsters.map(function (id) {
       return spriteRow(id, monsterName(id), trait('普通怪'));
     }).join('');
-    monsterRows += spriteRow(region.boss, monsterName(region.boss), trait('Boss', 'boss') + trait('出生点 ' + region.bossPoint.x + ',' + region.bossPoint.y));
+    monsterRows += spriteRow(region.boss, monsterName(region.boss), trait('Boss', 'boss') + trait('出生点 ' + layout.bossPoint.x + ',' + layout.bossPoint.y));
 
     var parallaxRows = region.parallax.map(function (layer, index) {
       var extra = [];
@@ -143,20 +169,24 @@
       '<div class="metric-grid">' +
         '<div class="metric"><strong>' + decoCount + '</strong><span>装饰实例</span></div>' +
         '<div class="metric"><strong>' + patchCount + '</strong><span>材质斑块</span></div>' +
-        '<div class="metric"><strong>' + cfg.tufts + '</strong><span>动态草簇</span></div>' +
+        '<div class="metric"><strong>' + layout.tufts.length + '</strong><span>动态草簇</span></div>' +
         '<div class="metric"><strong>' + flowerCount + '</strong><span>烘焙花簇</span></div>' +
       '</div>' +
       '<section class="inspect-section"><h3>地表着色与材质反馈</h3><div class="row-list">' + materialRows +
         '<div class="config-row"><span>世界尺寸</span><div>' + region.world.w + ' × ' + region.world.h + ' px / 8 px 材质网格</div></div>' +
         '<div class="config-row"><span>草簇配色</span><div>' + (cfg.tuftColors ? swatches(cfg.tuftColors) : '无') + '</div></div>' +
-        '<div class="config-row"><span>烘焙花簇</span><div>' + (cfg.flowers ? cfg.flowers.count + ' 组 ' + swatches(cfg.flowers.colors) : '无') + '</div></div>' +
-      '</div><p class="note">地表还会由原版算法固定生成 7 块明暗色斑、材质纹理、材质边缘与纵向深度光照。</p></section>' +
+        '<div class="config-row"><span>烘焙花簇</span><div>' + (cfg.flowers ? layout.flowers.length + ' 组 ' + swatches(cfg.flowers.colors) : '无') + '</div></div>' +
+        '<div class="config-row"><span>v2 密度倍率</span><div>斑块 ×' + layout.density.patches + ' / 装饰 ×' + layout.density.decor + ' / 细节 ×' + layout.density.details + '</div></div>' +
+      '</div><p class="note">地表还会生成 ' + Math.round(7 * layout.density.details) + ' 块明暗色斑、材质纹理、材质边缘与纵向深度光照。</p></section>' +
       '<section class="inspect-section"><h3>动态装饰与发光体</h3><div class="sprite-list">' + decoRows + '</div></section>' +
       '<section class="inspect-section"><h3>实体与地形交互载体</h3><div class="sprite-list">' + monsterRows + '</div>' +
         '<p class="note">普通怪同时存在 7 个，由原版世界逻辑分散刷新并持续触发移动、脚步材质反馈与战斗特效；击杀 ' + region.killTarget + ' 只后触发 Boss 登场演出。</p></section>' +
       '<section class="inspect-section"><h3>固定特效锚点</h3><div class="row-list">' +
-        '<div class="config-row"><span>营地点</span><div>(' + region.camp.x + ', ' + region.camp.y + ')；营帐位于 X−30 / Y−4，篝火位于 X / Y+8</div></div>' +
-        '<div class="config-row"><span>Boss 点</span><div>(' + region.bossPoint.x + ', ' + region.bossPoint.y + ')</div></div>' +
+        '<div class="config-row"><span>世界种子</span><div><code>' + U.hex32(layout.worldSeed) + '</code> / layout v' + layout.version + '</div></div>' +
+        '<div class="config-row"><span>营地点</span><div>(' + layout.camp.x + ', ' + layout.camp.y + ')；安全半径 ' + layout.campSafeRadius + ' px</div></div>' +
+        '<div class="config-row"><span>Boss 点</span><div>(' + layout.bossPoint.x + ', ' + layout.bossPoint.y + ')；战斗半径 ' + layout.bossSafeRadius + ' px</div></div>' +
+        '<div class="config-row"><span>主走廊</span><div>' + layout.corridor.points.length + ' 个点 / ' + layout.corridor.width + ' px / ' + esc(layout.corridor.mat) + '</div></div>' +
+        '<div class="config-row"><span>导航与出生</span><div>' + layout.nav.w + ' × ' + layout.nav.h + ' 格 / 低代价候选 ' + layout.spawnCandidates.length + '</div></div>' +
       '</div></section>' +
       '<section class="inspect-section"><h3>天空、视差与环境粒子</h3><div class="row-list">' +
         '<div class="config-row"><span>天空渐变</span><div>' + swatches([region.skyTop, region.skyBottom]) + ' ' + esc(region.skyTop + ' → ' + region.skyBottom) + '</div></div>' +
@@ -184,10 +214,6 @@
     currentIndex = (index + regions.length) % regions.length;
     var region = regions[currentIndex];
 
-    if (window.location.hash !== '#' + region.id) {
-      window.history.replaceState(null, '', '#' + region.id);
-    }
-
     Game.state.world.region = region.id;
     Game.state.world.mode = 'battle';
     Game.state.world.deathsRow = 0;
@@ -197,6 +223,8 @@
     Game.player.recalc();
     Game.state.player.hp = Game.state.derived.maxHp;
     Game.world.init(region.id);
+    updateUrl(region.id);
+    document.getElementById('seed-input').value = U.hex32(Game.state.world.worldSeed);
 
     document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
     document.getElementById('stage-region-name').textContent = regionName(region);
@@ -233,6 +261,19 @@
     document.getElementById('effects-toggle').addEventListener('change', function () {
       Game.particles.setEnabled(this.checked);
     });
+    document.getElementById('seed-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var input = document.getElementById('seed-input');
+      var seed = parseSeed(input.value);
+      if (seed === null) {
+        input.setCustomValidity('请输入 1–8 位十六进制数字');
+        input.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      Game.state.world.worldSeed = seed;
+      activateRegion(currentIndex);
+    });
     document.querySelector('.segmented').addEventListener('click', function (event) {
       var button = event.target.closest('[data-time]');
       if (button) setTimeMode(button.getAttribute('data-time'));
@@ -241,20 +282,16 @@
       var button = event.target.closest('[data-focus]');
       if (!button) return;
       var region = Game.world.region;
+      var layout = Game.world.layout;
       var focus = button.getAttribute('data-focus');
-      if (focus === 'camp') setHeroPosition(region.camp.x + 30, region.camp.y + 26);
+      if (focus === 'camp') setHeroPosition(layout.camp.x + 30, layout.camp.y + 26);
       if (focus === 'center') setHeroPosition(region.world.w * 0.5, region.world.h * 0.56);
-      if (focus === 'boss') setHeroPosition(region.bossPoint.x - 48, region.bossPoint.y + 12);
+      if (focus === 'boss') setHeroPosition(layout.bossPoint.x - 48, layout.bossPoint.y + 12);
     });
     window.addEventListener('keydown', function (event) {
       if (event.target && /input|textarea|select/i.test(event.target.tagName)) return;
       if (event.key === '[') activateRegion(currentIndex - 1);
       if (event.key === ']') activateRegion(currentIndex + 1);
-    });
-    window.addEventListener('hashchange', function () {
-      var id = window.location.hash.slice(1);
-      var index = regions.findIndex(function (region) { return region.id === id; });
-      if (index >= 0 && index !== currentIndex) activateRegion(index);
     });
   }
 
@@ -277,6 +314,9 @@
 
   Game.i18n.setLocale('zh-CN');
   Game.state = Game.State.newGame();
+  var params = queryParams();
+  var querySeed = parseSeed(params.get('seed'));
+  if (querySeed !== null) Game.state.world.worldSeed = querySeed;
   Game.state.world.regionOrder = Game.reg.ids('region');
   Game.state.settings.autoAdvance = false;
   Game.state.settings.autoEquip = false;
@@ -284,7 +324,7 @@
   Game.player.setClass('warrior');
   Game.render.init(document.getElementById('stage'));
   bindControls();
-  var initialId = window.location.hash.slice(1);
+  var initialId = params.get('region') || window.location.hash.slice(1);
   var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
   activateRegion(initialIndex >= 0 ? initialIndex : 0);
   requestAnimationFrame(frame);

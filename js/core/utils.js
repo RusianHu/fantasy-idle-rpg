@@ -5,8 +5,8 @@
   'use strict';
 
   var Game = window.Game = window.Game || {};
-  Game.VERSION = '1.5.0';
-  Game.SAVE_VERSION = 5;
+  Game.VERSION = '1.7.0';
+  Game.SAVE_VERSION = 7;
 
   var U = Game.util = {};
 
@@ -40,6 +40,21 @@
     var h = 2166136261;
     for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
+  };
+
+  /** 新存档使用的 uint32 世界种子；无 Web Crypto 时保留离线回退。 */
+  U.randomSeed = function () {
+    try {
+      if (window.crypto && window.crypto.getRandomValues) {
+        var out = new Uint32Array(1);
+        window.crypto.getRandomValues(out);
+        return out[0] >>> 0;
+      }
+    } catch (e) { /* file:// 或旧浏览器下回退 */ }
+    return Math.floor(Math.random() * 4294967296) >>> 0;
+  };
+  U.hex32 = function (value) {
+    return ('00000000' + (value >>> 0).toString(16).toUpperCase()).slice(-8);
   };
 
   var _uid = 0;

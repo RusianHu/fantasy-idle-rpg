@@ -556,7 +556,7 @@
       if (sp.frames.idle1 && (p.sway || p.flicker)) {
         frame = (((t / (p.animSpd || 1)) + (p.phase || 0)) | 0) % 2 === 0 ? 'idle0' : 'idle1';
       }
-      A.draw(ctx, p.sprite, frame, p.x, p.y + oy, {});
+      A.draw(ctx, p.sprite, frame, p.x, p.y + oy, { flip: !!p.flipX });
     }
   };
 })();

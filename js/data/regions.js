@@ -20,7 +20,6 @@
       monsters: ['slime_green', 'wolf_gray'], boss: 'slime_king',
       killTarget: 10,
       world: { w: W, h: H },
-      camp: { x: 120, y: 130 }, bossPoint: { x: 640, y: 260 },
       terrain: {
         base: { mat: 'grass', colors: ['#4f9a3f', '#468c37', '#5aa848'] },
         patches: [
@@ -56,7 +55,6 @@
       monsters: ['mushroom_toxic', 'treant_sapling'], boss: 'elder_treant',
       killTarget: 10,
       world: { w: W, h: H },
-      camp: { x: 130, y: 140 }, bossPoint: { x: 650, y: 250 },
       terrain: {
         base: { mat: 'grass', colors: ['#3a7a30', '#336c2a', '#428838'] },
         patches: [
@@ -89,7 +87,6 @@
       monsters: ['cave_bat', 'kobold_miner'], boss: 'stone_golem',
       killTarget: 11,
       world: { w: W, h: H },
-      camp: { x: 120, y: 135 }, bossPoint: { x: 660, y: 270 },
       terrain: {
         base: { mat: 'dirt', colors: ['#6b5a48', '#5f5040', '#77654f'] },
         patches: [
@@ -118,7 +115,6 @@
       monsters: ['skeleton_soldier', 'ghost_wisp'], boss: 'necromancer',
       killTarget: 11,
       world: { w: W, h: H },
-      camp: { x: 125, y: 130 }, bossPoint: { x: 640, y: 260 },
       terrain: {
         base: { mat: 'dirt', colors: ['#4c4452', '#443c4a', '#544c5c'] },
         patches: [
@@ -150,7 +146,6 @@
       monsters: ['ice_wolf', 'yeti_small'], boss: 'frost_giant',
       killTarget: 12,
       world: { w: W, h: H },
-      camp: { x: 120, y: 135 }, bossPoint: { x: 650, y: 255 },
       terrain: {
         base: { mat: 'snow', colors: ['#dce8f0', '#d2e0ea', '#e6f0f6'] },
         patches: [
@@ -179,7 +174,6 @@
       monsters: ['fire_imp', 'lava_lizard'], boss: 'flame_demon',
       killTarget: 12,
       world: { w: W, h: H },
-      camp: { x: 118, y: 132 }, bossPoint: { x: 655, y: 265 },
       terrain: {
         base: { mat: 'stone', colors: ['#4c3630', '#42302a', '#563c34'] },
         patches: [
@@ -206,7 +200,6 @@
       monsters: ['guardian_orb', 'harpy'], boss: 'ruin_guardian',
       killTarget: 13,
       world: { w: W, h: H },
-      camp: { x: 125, y: 138 }, bossPoint: { x: 645, y: 255 },
       terrain: {
         base: { mat: 'stone', colors: ['#8a92a8', '#7e869c', '#969eb4'] },
         patches: [
@@ -239,7 +232,6 @@
       monsters: ['demon_soldier', 'gargoyle'], boss: 'demon_lord',
       killTarget: 14,
       world: { w: W, h: H },
-      camp: { x: 122, y: 132 }, bossPoint: { x: 650, y: 258 },
       terrain: {
         base: { mat: 'stone', colors: ['#3c3448', '#342c40', '#443c52'] },
         patches: [
@@ -266,8 +258,44 @@
     }
   ];
 
+  function layout(roadMat, roadColors, roadWidth, decorSpacing, density) {
+    density = density || {};
+    return {
+      campZone: { x: [0.10, 0.20], y: [0.27, 0.70] },
+      bossZone: { x: [0.70, 0.85], y: [0.27, 0.70] },
+      campSafeRadius: 80,
+      bossSafeRadius: 70,
+      road: { mat: roadMat, colors: roadColors, width: roadWidth },
+      decorSpacing: decorSpacing,
+      patchDensity: density.patches || 1,
+      decorDensity: density.decor || 1,
+      detailDensity: density.details || 1,
+      waterDecorDensity: density.waterDecor || 1
+    };
+  }
+
+  var LAYOUTS = {
+    grassland: layout('dirt', ['#96734a', '#82623e', '#aa8456'], 52, 12,
+      { patches: 1.9, decor: 3.4, details: 2.2, waterDecor: 1.8 }),
+    forest: layout('dirt', ['#755d42', '#654e37', '#856b4d'], 44, 13,
+      { patches: 2.0, decor: 4.0, details: 2.4, waterDecor: 1.8 }),
+    mine: layout('stone', ['#85818a', '#716e78', '#96919c'], 48, 12,
+      { patches: 2.0, decor: 3.5, details: 2.0, waterDecor: 1.8 }),
+    graveyard: layout('dirt', ['#5c5260', '#4c4452', '#6a6070'], 44, 12,
+      { patches: 2.0, decor: 3.5, details: 2.2, waterDecor: 1.8 }),
+    snowpass: layout('stone', ['#aeb7c2', '#969faa', '#c0c8d0'], 48, 13,
+      { patches: 2.1, decor: 3.5, details: 2.0, waterDecor: 1.8 }),
+    lavacave: layout('dirt', ['#6a5040', '#584234', '#7a5c48'], 56, 14,
+      { patches: 2.1, decor: 4.5, details: 2.0, waterDecor: 1.8 }),
+    skyruins: layout('stone', ['#a0a8ba', '#8e96aa', '#b2bac8'], 64, 13,
+      { patches: 2.1, decor: 3.8, details: 2.2, waterDecor: 1.8 }),
+    darkcastle: layout('stone', ['#51475d', '#433a50', '#60556c'], 52, 14,
+      { patches: 2.1, decor: 3.8, details: 2.2, waterDecor: 1.8 })
+  };
+
   for (var i = 0; i < R.length; i++) {
     R[i].order = i;
+    R[i].layout = LAYOUTS[R[i].id];
     Game.register('region', R[i]);
   }
 })();

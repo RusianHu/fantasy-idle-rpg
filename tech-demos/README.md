@@ -15,4 +15,4 @@
 
 | 验证项 | 入口 | 验证记录 | 范围 |
 | --- | --- | --- | --- |
-| 地图级特效 | `map-effects/map-effects.html` | `map-effects/map-effects.md` | 八区地表、材质反馈、动态装饰、发光体、环境粒子、日夜、视差与实体演出 |
+| 地图级特效与布局 | `map-effects/map-effects.html?seed=1234ABCD&region=forest` | `map-effects/map-effects.md` | 八区 v1/v2 受约束布局、高密度主题元素、关键点、道路、导航/出生候选、地表、粒子、日夜、视差、实体演出与性能 |

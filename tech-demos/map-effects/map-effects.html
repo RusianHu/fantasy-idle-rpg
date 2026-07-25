@@ -46,6 +46,12 @@
       </div>
 
       <div class="control-strip">
+        <form id="seed-form" class="seed-control">
+          <label for="seed-input">世界种子</label>
+          <input id="seed-input" type="text" inputmode="text" maxlength="8" spellcheck="false" autocomplete="off" aria-describedby="seed-format">
+          <button type="submit">应用</button>
+          <span id="seed-format">8 位十六进制</span>
+        </form>
         <div class="segmented" aria-label="日夜阶段">
           <button type="button" data-time="cycle" class="active">循环</button>
           <button type="button" data-time="day">昼间</button>
@@ -65,7 +71,7 @@
 
       <div class="source-line">
         <span>验证链路</span>
-        <code>regions.js</code><b>&#8594;</b><code>world.init()</code><b>&#8594;</b><code>terrain.build()</code><b>&#8594;</b><code>renderer.frame()</code>
+        <code>regions.js</code><b>&#8594;</b><code>terrain.build(seed)</code><b>&#8594;</b><code>nav.useLayout()</code><b>&#8594;</b><code>renderer.frame()</code>
       </div>
     </section>
 
@@ -74,6 +80,7 @@
 </div>
 
 <script src="../../js/core/utils.js"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js"></script>
 <script src="../../js/core/eventbus.js"></script>
 <script src="../../js/core/registry.js"></script>
 <script src="../../js/i18n/i18n.js"></script>
@@ -94,6 +101,8 @@
 <script src="../../js/data/monsters.js"></script>
 <script src="../../js/data/regions.js"></script>
 <script src="../../js/systems/state.js"></script>
+<script src="../../js/systems/terrain.js"></script>
+<script src="../../js/systems/nav.js"></script>
 <script src="../../js/systems/inventory.js"></script>
 <script src="../../js/systems/combat.js"></script>
 <script src="../../js/render/terrain.js"></script>

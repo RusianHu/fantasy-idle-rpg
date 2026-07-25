@@ -82,6 +82,26 @@
 
     root.appendChild(U.el('div', 'panel-title', t('ui.tab.map')));
 
+    var seedHex = U.hex32(s.world.worldSeed);
+    var seedRow = U.el('div', 'world-seed-row',
+      '<div class="grow"><div class="name">' + t('ui.worldSeed') + '</div>' +
+      '<div class="desc">' + t('ui.worldSeedHint') + '</div></div>' +
+      '<code aria-label="' + U.esc(t('ui.worldSeed')) + '">' + seedHex + '</code>' +
+      '<button class="btn small seed-copy" type="button">' + t('ui.copySeed') + '</button>');
+    seedRow.querySelector('.seed-copy').addEventListener('click', function () {
+      var helper = U.el('textarea');
+      helper.value = seedHex;
+      helper.setAttribute('readonly', 'readonly');
+      helper.style.cssText = 'position:fixed;left:-9999px;top:-9999px;';
+      document.body.appendChild(helper);
+      helper.select();
+      try { document.execCommand('copy'); } catch (e) {}
+      document.body.removeChild(helper);
+      if (navigator.clipboard) navigator.clipboard.writeText(seedHex).catch(function () {});
+      Game.ui.modals.toast(t('ui.seedCopied', { seed: seedHex }));
+    });
+    root.appendChild(seedRow);
+
     // 自动推进开关
     var autoRow = U.el('div', 'card', '<div class="row"><div class="grow">' +
       '<div class="name">' + t('settings.autoAdvance') + '</div>' +
