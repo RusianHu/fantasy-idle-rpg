@@ -1,7 +1,7 @@
 /* ============================================================
  * systems/world.js — 可位移的平面小世界
- * 伪俯视 2D 场景：角色 x/y 双轴坐标，自动游走、索敌、走向怪物
- * 发起战斗；怪物分散刷新；扎营休息 / 死亡重整 / Boss 讨伐演出。
+ * 伪俯视 2D 场景：角色 x/y 双轴坐标，支持自动游走索敌与玩家
+ * 手动移动交战；怪物分散刷新；扎营传送 / 死亡重整 / Boss 讨伐演出。
  * ============================================================ */
 (function () {
   'use strict';
@@ -15,6 +15,12 @@
   var RESPAWN_T = 4;
   var RECOVER_T = 6;
   var BOUND_TOP = 68;
+  var CAMP_WARP_DISTANCE = 260;
+  var CAMP_WARP_OUT_T = 0.38;
+  var CAMP_WARP_IN_T = 0.42;
+  var CAMP_APPROACH_DISTANCE = 46;
+  var moveKeys = {};
+  var controlsBound = false;
 
   var W = Game.world = {
     region: null,       // 区域定义
@@ -28,6 +34,7 @@
 
     /* ---------------- 初始化区域 ---------------- */
     init: function (rid) {
+      W.bindControls();
       var region = reg.get('region', rid);
       if (!region) { // 已下线区域：回退到第一个有效区域
         rid = Game.State.regionOrder()[0];
@@ -75,7 +82,8 @@
         atkTimer: 0, animT: 0, animF: 0, flash: 0, lungeT: 0,
         skillCd: {}, potionCd: 0,
         target: null, stepAcc: 0, spriteH: 20,
-        deathT: 0, recoverT: 0, moving: false
+        deathT: 0, recoverT: 0, moving: false,
+        moveOrder: null, manualTarget: false, campWarp: null
       };
     },
 
@@ -249,6 +257,9 @@
       hero.state = 'dead';
       hero.deathT = 1.0;
       hero.target = null;
+      hero.moveOrder = null;
+      hero.manualTarget = false;
+      hero.campWarp = null;
       hero.shield = 0;
       hero.buffs = [];
       Game.state.meta.stats.deaths++;
@@ -311,6 +322,92 @@
       hero.manualTarget = false;
     },
 
+    /* ---------------- 自动 / 手动操控 ---------------- */
+    controlMode: function () {
+      return Game.state && Game.state.settings.controlMode === 'manual' ? 'manual' : 'auto';
+    },
+
+    setControlMode: function (mode) {
+      mode = mode === 'manual' ? 'manual' : 'auto';
+      if (!Game.state) return mode;
+      var settings = Game.state.settings;
+      if (settings.controlMode === mode) return mode;
+      settings.controlMode = mode;
+      moveKeys = {};
+
+      var hero = W.hero;
+      if (hero) {
+        hero.target = null;
+        hero.manualTarget = false;
+        hero.moveOrder = null;
+        var protectedState = hero.state === 'dead' || hero.state === 'recover' ||
+          hero.state === 'entrance' || hero.state === 'warpOut' ||
+          hero.state === 'warpIn' || Game.state.world.mode === 'rest';
+        if (!protectedState) hero.state = 'idle';
+      }
+      bus.emit('control:changed', { mode: mode });
+      bus.emit('settings:changed', { key: 'controlMode', value: mode });
+      return mode;
+    },
+
+    toggleControlMode: function () {
+      return W.setControlMode(W.controlMode() === 'manual' ? 'auto' : 'manual');
+    },
+
+    bindControls: function () {
+      if (controlsBound) return;
+      controlsBound = true;
+      var keyCodes = {
+        KeyW: true, KeyA: true, KeyS: true, KeyD: true,
+        ArrowUp: true, ArrowLeft: true, ArrowDown: true, ArrowRight: true
+      };
+      function canCapture(e) {
+        var tag = e.target && e.target.tagName;
+        return W.controlMode() === 'manual' &&
+          Game.state && Game.state.world.mode === 'battle' &&
+          tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' &&
+          !(e.target && e.target.isContentEditable);
+      }
+      document.addEventListener('keydown', function (e) {
+        if (!keyCodes[e.code] || !canCapture(e)) return;
+        var firstPress = !moveKeys[e.code];
+        moveKeys[e.code] = true;
+        // 短按也给出一个小步进；持续按住仍由主循环平滑移动。
+        if (firstPress && W.hero && W.canManualMove(W.hero)) {
+          var v = W.manualMoveVector();
+          W.hero.target = null;
+          W.hero.manualTarget = false;
+          W.hero.moveOrder = null;
+          W.hero.state = 'walk';
+          W.moveVector(W.hero, v.x, v.y, HERO_SPEED, 1 / 30);
+        }
+        e.preventDefault();
+      });
+      document.addEventListener('keyup', function (e) {
+        if (!keyCodes[e.code]) return;
+        delete moveKeys[e.code];
+        if (W.controlMode() === 'manual') e.preventDefault();
+      });
+      window.addEventListener('blur', function () { moveKeys = {}; });
+    },
+
+    canManualMove: function (hero) {
+      return !!hero && Game.player.hasClass() &&
+        Game.state.world.mode === 'battle' &&
+        hero.state !== 'dead' && hero.state !== 'recover' &&
+        hero.state !== 'entrance' && hero.state !== 'warpOut' &&
+        hero.state !== 'warpIn';
+    },
+
+    manualMoveVector: function () {
+      var x = 0, y = 0;
+      if (moveKeys.KeyA || moveKeys.ArrowLeft) x--;
+      if (moveKeys.KeyD || moveKeys.ArrowRight) x++;
+      if (moveKeys.KeyW || moveKeys.ArrowUp) y--;
+      if (moveKeys.KeyS || moveKeys.ArrowDown) y++;
+      return { x: x, y: y };
+    },
+
     /* ---------------- 模式切换（战斗 / 扎营休息） ---------------- */
     setMode: function (mode) {
       var w = Game.state.world;
@@ -320,13 +417,82 @@
       var hero = W.hero;
       if (mode === 'rest') {
         hero.target = null;
-        if (hero.state !== 'recover' && hero.state !== 'dead') hero.state = 'goCamp';
+        hero.manualTarget = false;
+        hero.moveOrder = null;
+        moveKeys = {};
+        if (hero.state !== 'recover' && hero.state !== 'dead') W.startCampReturn(hero);
         bus.emit('rest:start');
       } else {
+        W.cancelCampTeleport(hero);
         if (hero.state === 'sitting' || hero.state === 'goCamp') hero.state = 'idle';
         bus.emit('rest:end');
       }
       bus.emit('mode:changed', { mode: mode });
+    },
+
+    campRestPoint: function () {
+      return { x: W.region.camp.x + 22, y: W.region.camp.y + 22 };
+    },
+
+    startCampReturn: function (hero) {
+      var rest = W.campRestPoint();
+      var distance = U.dist(hero.x, hero.y, rest.x, rest.y);
+      if (distance <= CAMP_WARP_DISTANCE) {
+        hero.campWarp = null;
+        hero.state = 'goCamp';
+        return false;
+      }
+      var landing = {
+        x: U.clamp(rest.x + CAMP_APPROACH_DISTANCE, 18, W.region.world.w - 18),
+        y: U.clamp(rest.y + 8, BOUND_TOP, W.region.world.h - 14)
+      };
+      hero.campWarp = {
+        phase: 'out',
+        t: CAMP_WARP_OUT_T,
+        landingX: landing.x,
+        landingY: landing.y
+      };
+      hero.state = 'warpOut';
+      if (Game.fx) Game.fx.teleport(hero.x, hero.y, 'out');
+      bus.emit('camp:teleport', { phase: 'out', x: hero.x, y: hero.y });
+      return true;
+    },
+
+    cancelCampTeleport: function (hero) {
+      if (!hero || (hero.state !== 'warpOut' && hero.state !== 'warpIn')) return false;
+      hero.campWarp = null;
+      hero.state = Game.state.world.mode === 'rest' ? 'goCamp' : 'idle';
+      return true;
+    },
+
+    updateCampTeleport: function (hero, dt) {
+      var warp = hero.campWarp;
+      if (!warp) {
+        hero.state = Game.state.world.mode === 'rest' ? 'goCamp' : 'idle';
+        return;
+      }
+      if (Game.state.world.mode !== 'rest') {
+        W.cancelCampTeleport(hero);
+        return;
+      }
+      warp.t -= dt;
+      if (warp.phase === 'out' && warp.t <= 0) {
+        var carry = -warp.t;
+        hero.x = warp.landingX;
+        hero.y = warp.landingY;
+        hero.stepAcc = 0;
+        W.clampToWorld(hero);
+        warp.phase = 'in';
+        warp.t = CAMP_WARP_IN_T - carry;
+        hero.state = 'warpIn';
+        if (Game.render) Game.render.snapCamera(hero.x, hero.y);
+        if (Game.fx) Game.fx.teleport(hero.x, hero.y, 'in');
+        bus.emit('camp:teleport', { phase: 'in', x: hero.x, y: hero.y });
+      }
+      if (warp.phase === 'in' && warp.t <= 0) {
+        hero.campWarp = null;
+        hero.state = 'goCamp';
+      }
     },
 
     /* ---------------- 主更新 ---------------- */
@@ -420,6 +586,11 @@
       }
       // Boss 登场僵直
       if (hero.state === 'entrance') return;
+      // 远距回营传送：原地收束 → 营地外落地 → 短步行收尾
+      if (hero.state === 'warpOut' || hero.state === 'warpIn') {
+        W.updateCampTeleport(hero, dt);
+        return;
+      }
 
       /* ----- 休息模式 ----- */
       if (sw.mode === 'rest') {
@@ -453,7 +624,20 @@
 
       Game.combat.potionTick(hero, dt);
 
-      // 玩家移动指令：优先执行，抵达后恢复自动索敌
+      // 手动方向输入优先于点地路径和锁定目标
+      if (W.controlMode() === 'manual') {
+        var mv = W.manualMoveVector();
+        if (mv.x || mv.y) {
+          hero.target = null;
+          hero.manualTarget = false;
+          hero.moveOrder = null;
+          hero.state = 'walk';
+          W.moveVector(hero, mv.x, mv.y, HERO_SPEED, dt);
+          return;
+        }
+      }
+
+      // 玩家移动指令：自动模式抵达后恢复 AI，手动模式抵达后原地待命
       if (hero.moveOrder) {
         var mo = hero.moveOrder;
         hero.state = 'walk';
@@ -469,21 +653,27 @@
       if (!target || target.hp <= 0 || target.dead) {
         hero.manualTarget = false;
         target = null;
-        if (W.bossEnt && !W.bossEnt.dead) target = W.bossEnt;
-        else {
-          var best = 1e9;
-          for (var i = 0; i < W.entities.length; i++) {
-            var e = W.entities[i];
-            if (e.kind !== 'monster' || e.dead) continue;
-            var d2 = U.dist(hero.x, hero.y, e.x, e.y);
-            if (d2 < best) { best = d2; target = e; }
+        if (W.controlMode() === 'auto') {
+          if (W.bossEnt && !W.bossEnt.dead) target = W.bossEnt;
+          else {
+            var best = 1e9;
+            for (var i = 0; i < W.entities.length; i++) {
+              var e = W.entities[i];
+              if (e.kind !== 'monster' || e.dead) continue;
+              var d2 = U.dist(hero.x, hero.y, e.x, e.y);
+              if (d2 < best) { best = d2; target = e; }
+            }
           }
         }
         hero.target = target;
       }
 
       if (!target) {
-        // 无怪可打：闲逛
+        // 手动模式原地待命；自动模式无怪可打时闲逛
+        if (W.controlMode() === 'manual') {
+          hero.state = 'idle';
+          return;
+        }
         W.wanderTick(hero, dt, HERO_SPEED * 0.5);
         hero.state = hero.moving ? 'walk' : 'idle';
         return;
@@ -576,6 +766,23 @@
     },
 
     /* ---------------- 移动辅助 ---------------- */
+    moveVector: function (ent, dx, dy, speed, dt) {
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.01) return 0;
+      dx /= len; dy /= len;
+      var mat = Game.terrain.materialAt(ent.x, ent.y);
+      if (mat === 'water') speed *= 0.72;
+      var ox = ent.x, oy = ent.y;
+      ent.x += dx * speed * dt;
+      ent.y += dy * speed * dt;
+      ent.dir = U.dirOf(dx, dy);
+      ent.moving = true;
+      W.clampToWorld(ent);
+      var moved = U.dist(ox, oy, ent.x, ent.y);
+      W.stepFx(ent, moved);
+      return moved;
+    },
+
     moveToward: function (ent, tx, ty, speed, dt) {
       var dx = tx - ent.x, dy = ty - ent.y;
       var d = Math.sqrt(dx * dx + dy * dy);
@@ -627,6 +834,7 @@
       Game.particles.step(mat, ent.x, ent.y, ent);
     },
 
-    BOUND_TOP: BOUND_TOP
+    BOUND_TOP: BOUND_TOP,
+    CAMP_WARP_DISTANCE: CAMP_WARP_DISTANCE
   };
 })();

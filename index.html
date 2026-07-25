@@ -40,6 +40,14 @@
         <div class="bar boss"><div class="bar-fill" id="boss-hp-fill"></div></div>
       </div>
       <div id="buff-chips"></div>
+      <button id="control-switch" class="control-switch" type="button" role="switch" aria-checked="false">
+        <span class="control-glyph" aria-hidden="true">◆</span>
+        <span class="control-copy">
+          <span id="control-title" class="control-title"></span>
+          <strong id="control-mode-label" class="control-mode-label"></strong>
+        </span>
+        <span class="control-track" aria-hidden="true"><span class="control-knob"></span></span>
+      </button>
       <button id="btn-camp" class="btn btn-camp" type="button"></button>
     </div>
     <div id="panel-container" class="hidden">
@@ -78,6 +86,7 @@
 <script src="js/data/achievements.js"></script>
 <script src="js/systems/state.js"></script>
 <script src="js/systems/inventory.js"></script>
+<script src="js/systems/automation.js"></script>
 <script src="js/systems/combat.js"></script>
 <script src="js/systems/world.js"></script>
 <script src="js/systems/progression.js"></script>

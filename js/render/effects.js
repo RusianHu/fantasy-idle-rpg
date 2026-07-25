@@ -1,6 +1,6 @@
 /* ============================================================
  * render/effects.js — 特效：伤害飘字 / 受击火花 / 技能特效 /
- * 死亡烟雾 / Zzz 气泡 / 震屏 / Boss 横幅
+ * 死亡烟雾 / Zzz 气泡 / 回营传送 / 震屏 / Boss 横幅
  * ============================================================ */
 (function () {
   'use strict';
@@ -63,6 +63,25 @@
     },
     zzz: function (x, y) {
       shapes.push({ kind: 'zzz', x: x, y: y, t: 0, life: 2.2 });
+    },
+    teleport: function (x, y, phase) {
+      var life = phase === 'out' ? 0.46 : 0.52;
+      shapes.push({ kind: 'teleport', x: x, y: y, phase: phase, t: 0, life: life });
+      for (var i = 0; i < 12; i++) {
+        var angle = i / 12 * Math.PI * 2 + U.rand(-0.18, 0.18);
+        var radius = U.rand(5, 18);
+        shapes.push({
+          kind: 'warpp',
+          x: x + Math.cos(angle) * radius,
+          y: y - U.rand(0, 24) + Math.sin(angle) * radius * 0.22,
+          phase: phase,
+          t: 0,
+          life: U.rand(0.34, 0.62),
+          vx: Math.cos(angle) * U.rand(4, 14),
+          vy: phase === 'out' ? U.rand(-34, -18) : U.rand(-22, -8),
+          s: U.chance(0.28) ? 2 : 1
+        });
+      }
     },
 
     /* ---------- 震屏 ---------- */
@@ -220,6 +239,50 @@
           ctx.font = 'bold 7px monospace';
           ctx.fillText('z', s.x + zk * 8, s.y - zk * 14);
           if (zk > 0.3) ctx.fillText('z', s.x + 3 + zk * 8, s.y - 4 - zk * 14);
+          ctx.globalAlpha = 1;
+        } else if (s.kind === 'teleport') {
+          var wp = s.t / s.life;
+          var wa = Math.sin(Math.PI * Math.min(1, wp));
+          var wr = s.phase === 'out' ? 20 - wp * 8 : 7 + wp * 15;
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.globalAlpha = wa * 0.9;
+
+          var beam = ctx.createLinearGradient(s.x, s.y - 46, s.x, s.y + 2);
+          beam.addColorStop(0, 'rgba(120,218,255,0)');
+          beam.addColorStop(0.45, 'rgba(150,226,255,' + (wa * 0.20).toFixed(3) + ')');
+          beam.addColorStop(1, 'rgba(246,220,128,0)');
+          ctx.fillStyle = beam;
+          ctx.fillRect(Math.round(s.x - 6), Math.round(s.y - 46), 12, 48);
+
+          ctx.strokeStyle = '#8ce6ff';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.ellipse(s.x, s.y + 1, wr, wr * 0.34, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = wa * 0.65;
+          ctx.strokeStyle = '#f2d57b';
+          ctx.beginPath();
+          ctx.ellipse(s.x, s.y + 1, Math.max(3, wr - 5), Math.max(1.5, wr * 0.22), 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = '#d8f6ff';
+          for (var wi = 0; wi < 8; wi++) {
+            var wang = wi / 8 * Math.PI * 2 + wp * (s.phase === 'out' ? 2.8 : -2.2);
+            var wx = s.x + Math.cos(wang) * (wr + 2);
+            var wy = s.y + 1 + Math.sin(wang) * (wr * 0.34 + 1);
+            ctx.fillRect(Math.round(wx) - 1, Math.round(wy) - 1, 2, 2);
+          }
+          ctx.restore();
+        } else if (s.kind === 'warpp') {
+          var pk = 1 - s.t / s.life;
+          ctx.globalAlpha = Math.max(0, pk);
+          ctx.fillStyle = s.phase === 'out' ? '#a7ecff' : '#f3dc8a';
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
+          if (s.s > 1) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+          }
           ctx.globalAlpha = 1;
         }
       }

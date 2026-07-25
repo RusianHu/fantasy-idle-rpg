@@ -61,22 +61,25 @@
         return;
       }
 
-      Game.player.addExp(sum.expBase);
-      Game.player.addGold(sum.goldBase);
-      s.meta.stats.kills += sum.kills;
+      var batching = !!Game.auto;
+      if (batching) Game.auto.beginBatch('offline');
+      try {
+        Game.player.addExp(sum.expBase);
+        Game.player.addGold(sum.goldBase);
+        s.meta.stats.kills += sum.kills;
 
-      var lv = s.player.level;
-      var gotItems = [];
-      for (var i = 0; i < sum.items; i++) {
-        var item = Game.inv.genLoot(lv);
-        if (Game.inv.addItem(item, { silent: true })) {
-          gotItems.push(item);
-          bus.emit('item:dropped', { item: item, offline: true });
+        var lv = s.player.level;
+        var generated = [];
+        for (var i = 0; i < sum.items; i++) {
+          generated.push(Game.inv.genLoot(lv));
         }
+        var gotItems = Game.inv.addItems(generated, { offline: true, source: 'offline' });
+        if (sum.potions > 0) Game.inv.addPotion('potion_small', sum.potions);
+        sum.gotItems = gotItems;
+        bus.emit('offline:settled', { summary: sum });
+      } finally {
+        if (batching) Game.auto.endBatch();
       }
-      if (sum.potions > 0) Game.inv.addPotion('potion_small', sum.potions);
-      sum.gotItems = gotItems;
-      bus.emit('offline:settled', { summary: sum });
     }
   };
 })();

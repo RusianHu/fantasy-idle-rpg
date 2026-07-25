@@ -476,6 +476,13 @@
       if (e.kind === 'hero' && e.state === 'dead') {
         alpha = Math.max(0.15, e.deathT / 1.0);
       }
+      if (e.kind === 'hero' && e.campWarp) {
+        if (e.state === 'warpOut') {
+          alpha = U.clamp(e.campWarp.t / 0.38, 0, 1);
+        } else if (e.state === 'warpIn') {
+          alpha = U.clamp(1 - e.campWarp.t / 0.42, 0, 1);
+        }
+      }
 
       // 阴影
       ctx.globalAlpha = 0.22 * alpha;

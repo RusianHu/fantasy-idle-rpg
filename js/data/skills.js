@@ -2,19 +2,20 @@
  * data/skills.js — 职业技能表（5 职业 × 各 3 主动 + 3 被动）
  * 通用 schema：kind = strike | aoe | heal | buff | shield，
  * 战斗系统提供统一执行器；被动 bonus 为「每级线性」数值。
- * 数值取法：F.skillVal({base, per}, lv) = base + per×(lv-1)
+ * 主动技能 0 点以基础值释放；投入 N 点后：
+ * F.skillVal({base, per}, N) = base + per×N，保证每一点都有收益。
  * ============================================================ */
 (function () {
   'use strict';
   var Game = window.Game;
 
-  Game.F.skillVal = function (v, lv) {
+  Game.F.skillVal = function (v, invested) {
     if (v === undefined || v === null) return 0;
     if (typeof v === 'number') return v;
-    return v.base + (v.per || 0) * (lv - 1);
+    return v.base + (v.per || 0) * Math.max(0, invested || 0);
   };
   var V = Game.F.skillVal;
-  function pct(v, lv) { return Math.round(V(v, lv) * 100); }
+  function pct(v, invested) { return Math.round(V(v, invested) * 100); }
 
   var S = [
     /* ================= 战士 Fighter ================= */

@@ -52,6 +52,21 @@
         Game.fx.flashScreen();
         M.toast(t('ui.heroDown'), 'warn');
       });
+      bus.on('automation:summary', function (p) {
+        if (!p || (!p.skillPoints && !p.gearCount)) return;
+        var msg;
+        if (p.skillPoints && p.gearCount) {
+          msg = t('ui.autoBothSummary', { s: p.skillPoints, g: p.gearCount });
+        } else if (p.skillPoints) {
+          msg = t('ui.autoSkillSummary', { n: p.skillPoints });
+        } else {
+          msg = t('ui.autoGearSummary', {
+            n: p.gearCount,
+            p: Math.max(0, p.gain * 100).toFixed(1)
+          });
+        }
+        M.toast(msg, 'gold', 3200);
+      });
     },
 
     /* ---------------- 基础弹窗 ---------------- */
@@ -132,13 +147,24 @@
 
       // 对比
       if (equipped && !isEquipped) {
-        var diff = Game.inv.score(item) - Game.inv.score(equipped);
-        var arrow = diff >= 0 ? '<span style="color:var(--ok)">▲ +' + fmt(Math.round(diff)) + '</span>'
-          : '<span style="color:var(--danger)">▼ ' + fmt(Math.round(diff)) + '</span>';
+        var diff = Game.auto.compareItem(item);
+        function pct(v) {
+          var positive = v >= 0;
+          return '<span style="color:var(--' + (positive ? 'ok' : 'danger') + ')">' +
+            (positive ? '▲ +' : '▼ ') + (v * 100).toFixed(1) + '%</span>';
+        }
         html += '<hr style="border-color:var(--panel-line);margin:8px 0">' +
           '<div style="font-size:11px;color:var(--ink-dim)">' + t('ui.compareWith') +
           ' <span class="rar-r' + equipped.rar + '">' + Game.ui.itemName(equipped) + '</span>' +
-          '（' + t('ui.score') + ' ' + arrow + '）</div>';
+          '</div><div class="compare-grid">' +
+          '<span>' + t('ui.compareOverall') + '</span>' + pct(diff.overall) +
+          '<span>' + t('ui.compareOffense') + '</span>' + pct(diff.offense) +
+          '<span>' + t('ui.compareSurvival') + '</span>' + pct(diff.survival) +
+          '<span>' + t('ui.compareEconomy') + '</span>' + pct(diff.economy) +
+          '</div>';
+      }
+      if (Game.state.inv.lockedSlots[item.base]) {
+        html += '<div class="locked-note">🔒 ' + t('ui.lockedSlotHint') + '</div>';
       }
       html += '</div>';
       c.innerHTML = html;

@@ -240,7 +240,8 @@
         (cls.skills || []).forEach(function (sid) {
           var sk = reg.get('skill', sid);
           if (!sk) return;
-          var vars = sk.descVars ? sk.descVars(1) : {};
+          var previewRank = sk.type === 'active' ? 0 : 1;
+          var vars = sk.descVars ? sk.descVars(previewRank) : {};
           var typeTxt = sk.type === 'active' ? t('ui.skillActive', { cd: sk.cd }) : t('ui.skillPassive');
           skillsHtml += '<div class="cs-skill-row">' +
             '<canvas width="20" height="20" data-icon="' + sk.icon + '"></canvas>' +

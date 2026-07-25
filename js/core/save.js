@@ -38,6 +38,29 @@
         data.world.regionOrder = Game.reg.ids('region');
         data.v = 3;
       }
+    },
+    {
+      // v3 → v4：自动技能/换装默认开启，并加入独立槽位锁。
+      // 真正的旧档协调必须等状态恢复、职业与注册表可用后在 automation 执行。
+      from: 3,
+      fn: function (data) {
+        data.settings = data.settings || {};
+        data.settings.autoSkillUpgrade = true;
+        data.settings.autoEquip = true;
+        data.inv = data.inv || {};
+        data.inv.lockedSlots = { weapon: false, armor: false, ring: false };
+        data.v = 4;
+      }
+    },
+    {
+      // v4 → v5：世界舞台加入持久化自动/手动操控总开关。
+      // 旧档维持原有挂机行为，统一迁移为自动模式。
+      from: 4,
+      fn: function (data) {
+        data.settings = data.settings || {};
+        data.settings.controlMode = 'auto';
+        data.v = 5;
+      }
     }
   ];
 
@@ -71,6 +94,7 @@
         inv: {
           items: st.inv.items,
           equipped: st.inv.equipped,
+          lockedSlots: st.inv.lockedSlots,
           potions: st.inv.potions,
           uidSeq: Game.inv.peekUidSeq()
         },
@@ -127,10 +151,12 @@
       var st = Game.State.newGame();
       if (data.createdAt) st.createdAt = data.createdAt;
       U.merge(st.settings, data.settings || {});
+      st.settings.controlMode = st.settings.controlMode === 'manual' ? 'manual' : 'auto';
       U.merge(st.player, data.player || {});
       if (data.inv) {
         st.inv.items = Array.isArray(data.inv.items) ? data.inv.items : [];
         U.merge(st.inv.equipped, data.inv.equipped || {});
+        U.merge(st.inv.lockedSlots, data.inv.lockedSlots || {});
         U.merge(st.inv.potions, data.inv.potions || {});
       }
       U.merge(st.world, data.world || {});
@@ -152,6 +178,7 @@
         if (uid && !validItems.some(function (x) { return x.uid === uid; })) {
           st.inv.equipped[slot] = null;
         }
+        st.inv.lockedSlots[slot] = !!st.inv.lockedSlots[slot];
       }
       // 区域已下线 → 回退到最近有效区域
       if (!Game.reg.has('region', st.world.region)) {
@@ -227,6 +254,7 @@
     /** 导入后的世界重建 */
     afterImport: function () {
       Game.player.recalc();
+      if (Game.auto) Game.auto.reconcile('import');
       Game.state.player.hp = Math.min(Game.state.player.hp, Game.state.derived.maxHp);
       Game.i18n.setLocale(Game.state.settings.lang);
       Game.particles.setEnabled(Game.state.settings.effects);

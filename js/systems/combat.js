@@ -88,8 +88,8 @@
         if (r.dodged) return;
         if (opts.healOfDmg && r.dmg > 0) Game.player.heal(r.dmg * opts.healOfDmg);
         if (opts.dot && r.dmg > 0) {
-          var lv = opts.lv || 1;
-          var total = hero.atk * F.skillVal(opts.dot.mult, lv);
+            var invested = opts.invested || 0;
+            var total = hero.atk * F.skillVal(opts.dot.mult, invested);
           target.dots = target.dots || [];
           target.dots.push({ dps: total / opts.dot.dur, t: opts.dot.dur });
           if (Game.fx) {
@@ -121,12 +121,12 @@
         if (p.level < (sk.unlockLv || 1)) continue;
         if (cds[sk.id] > 0) continue;
 
-        var lv = Math.max(1, p.skills[sk.id] || 0);
+        var invested = p.skills[sk.id] || 0;
         var casted = false;
 
         if (sk.kind === 'heal') {
           if (Game.player.hpPct() < (sk.healCond || 1)) {
-            var heal = Game.player.derived().maxHp * F.skillVal(sk.healPct, lv);
+            var heal = Game.player.derived().maxHp * F.skillVal(sk.healPct, invested);
             Game.player.heal(heal);
             if (Game.fx) {
               Game.fx.heal(hero.x, hero.y - 10);
@@ -137,7 +137,7 @@
         } else if (sk.kind === 'buff') {
           if (target && target.hp > 0) { // 接敌才开增益
             var mods = {}, bm = sk.buff.mods;
-            for (var k in bm) mods[k] = F.skillVal(bm[k], lv);
+            for (var k in bm) mods[k] = F.skillVal(bm[k], invested);
             hero.buffs = (hero.buffs || []).filter(function (b) { return b.sid !== sk.id; });
             hero.buffs.push({ sid: sk.id, t: sk.buff.dur, mods: mods });
             if (Game.fx) Game.fx.ring(hero.x, hero.y - 8, 26, '#f0c060');
@@ -145,7 +145,7 @@
           }
         } else if (sk.kind === 'shield') {
           if (target && target.hp > 0) {
-            var val = Game.player.derived().maxHp * F.skillVal(sk.shieldPct, lv);
+            var val = Game.player.derived().maxHp * F.skillVal(sk.shieldPct, invested);
             if ((hero.shield || 0) < val) {
               hero.shield = val;
               if (Game.fx) Game.fx.ring(hero.x, hero.y - 8, 22, '#7ad0f0');
@@ -155,11 +155,11 @@
         } else if (sk.kind === 'strike') {
           if (target && target.hp > 0 && !target.dead) {
             C.heroAttack(hero, target, {
-              mult: F.skillVal(sk.mult, lv),
+              mult: F.skillVal(sk.mult, invested),
               critBonus: sk.critBonus || 0,
               healOfDmg: sk.healOfDmg || 0,
               dot: sk.dot || null,
-              lv: lv,
+              invested: invested,
               projectile: sk.projectile !== undefined ? sk.projectile : hero.projectile,
               big: true
             });
@@ -174,7 +174,7 @@
           } else {
             cx = hero.x; cy = hero.y;
           }
-          var mult = F.skillVal(sk.mult, lv);
+          var mult = F.skillVal(sk.mult, invested);
           var hits = 0, killedList = [];
           var ents = Game.world.entities;
           for (var j = 0; j < ents.length; j++) {
@@ -188,7 +188,7 @@
           if (hits > 0) {
             if (Game.fx) Game.fx.ring(cx, cy - 8, sk.radius, sk.cls === 'mage' ? '#a8e0f0' : '#7ad0f0');
             if (sk.selfHealPct) {
-              Game.player.heal(Game.player.derived().maxHp * F.skillVal(sk.selfHealPct, lv));
+              Game.player.heal(Game.player.derived().maxHp * F.skillVal(sk.selfHealPct, invested));
               if (Game.fx) Game.fx.heal(hero.x, hero.y - 10);
             }
             for (var m = 0; m < killedList.length; m++) Game.world.onEntityKilled(killedList[m], hero);

@@ -19,6 +19,18 @@
       (clsName ? ' <span style="font-size:11px;color:var(--ink-dim)">' + clsName + '</span>' : '') +
       '<span style="font-size:12px;color:var(--gold)">' + t('ui.spLeft', { n: p.sp }) + '</span>'));
 
+    var autoRow = U.el('div', 'card automation-card', '<div class="row"><div class="grow">' +
+      '<div class="name">' + t('settings.autoSkillUpgrade') + '</div>' +
+      '<div class="desc">' + t('settings.autoSkillUpgradeHint') + '</div></div>' +
+      '<button type="button" role="switch" aria-label="' + U.esc(t('settings.autoSkillUpgrade')) +
+      '" aria-checked="' + (s.settings.autoSkillUpgrade ? 'true' : 'false') +
+      '" class="toggle' + (s.settings.autoSkillUpgrade ? ' on' : '') + '"></button></div>');
+    autoRow.querySelector('.toggle').addEventListener('click', function () {
+      Game.auto.setAutoSkillUpgrade(!s.settings.autoSkillUpgrade);
+      UI.tabs.rerender();
+    });
+    root.appendChild(autoRow);
+
     var list = reg.all('skill').filter(function (sk) { return sk.cls === cid; });
     if (!list.length) {
       root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.noClassYet') + '</div>'));
@@ -29,8 +41,8 @@
       var lv = p.skills[sk.id] || 0;
       var locked = p.level < (sk.unlockLv || 1);
       var maxed = lv >= Game.SKILL_MAX_LV;
-      var showLv = Math.max(1, lv);
-      var vars = sk.descVars ? sk.descVars(showLv) : {};
+      var descRank = sk.type === 'active' ? lv : Math.max(1, lv);
+      var vars = sk.descVars ? sk.descVars(descRank) : {};
       var typeTxt = sk.type === 'active'
         ? t('ui.skillActive', { cd: sk.cd })
         : t('ui.skillPassive');
@@ -74,10 +86,13 @@
     var autoRow = U.el('div', 'card', '<div class="row"><div class="grow">' +
       '<div class="name">' + t('settings.autoAdvance') + '</div>' +
       '<div class="desc">' + t('settings.autoAdvanceHint') + '</div></div>' +
-      '<div class="toggle' + (s.settings.autoAdvance ? ' on' : '') + '"></div></div>');
+      '<button type="button" role="switch" aria-label="' + U.esc(t('settings.autoAdvance')) +
+      '" aria-checked="' + (s.settings.autoAdvance ? 'true' : 'false') +
+      '" class="toggle' + (s.settings.autoAdvance ? ' on' : '') + '"></button></div>');
     autoRow.querySelector('.toggle').addEventListener('click', function () {
       s.settings.autoAdvance = !s.settings.autoAdvance;
       this.classList.toggle('on', s.settings.autoAdvance);
+      this.setAttribute('aria-checked', s.settings.autoAdvance ? 'true' : 'false');
     });
     root.appendChild(autoRow);
 
@@ -141,10 +156,13 @@
     function toggleRow(label, hint, value, onChange) {
       var row = U.el('div', 'setting-row', '<div><div>' + label + '</div>' +
         (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>' +
-        '<div class="toggle' + (value ? ' on' : '') + '"></div>');
+        '<button type="button" role="switch" aria-label="' + U.esc(label) +
+        '" aria-checked="' + (value ? 'true' : 'false') +
+        '" class="toggle' + (value ? ' on' : '') + '"></button>');
       row.querySelector('.toggle').addEventListener('click', function () {
         var v = !this.classList.contains('on');
         this.classList.toggle('on', v);
+        this.setAttribute('aria-checked', v ? 'true' : 'false');
         onChange(v);
       });
       return row;
@@ -189,6 +207,20 @@
     root.appendChild(toggleRow(t('settings.autoAdvance'), t('settings.autoAdvanceHint'), s.settings.autoAdvance, function (v) {
       s.settings.autoAdvance = v;
     }));
+
+    // 自动技能与智能换装
+    root.appendChild(toggleRow(
+      t('settings.autoSkillUpgrade'),
+      t('settings.autoSkillUpgradeHint'),
+      s.settings.autoSkillUpgrade,
+      function (v) { Game.auto.setAutoSkillUpgrade(v); }
+    ));
+    root.appendChild(toggleRow(
+      t('settings.autoEquip'),
+      t('settings.autoEquipHint'),
+      s.settings.autoEquip,
+      function (v) { Game.auto.setAutoEquip(v); }
+    ));
 
     // 音频（占位）
     root.appendChild(toggleRow(t('settings.sfx'), t('settings.comingSoon'), s.settings.sfx, function (v) {

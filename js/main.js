@@ -51,6 +51,7 @@
     Game.ui.hud.init();
     Game.ui.tabs.init();
     Game.ui.modals.init();
+    Game.auto.init();
     Game.loop.init();
 
     // 选职业（新档全屏选择；v1 旧档迁移补选，等价一次免费洗点）
@@ -61,7 +62,7 @@
         // 公会配发：职业武器（仅背包为空时）
         if (!Game.state.inv.items.length) {
           var starter = Game.inv.genLoot(1, { base: 'weapon', rar: 0 });
-          Game.inv.addItem(starter, { silent: true });
+          Game.inv.addItem(starter, { silent: true, skipAuto: true, source: 'starter' });
           Game.inv.equip(starter.uid);
         }
         Game.state.player.hp = Game.state.derived.maxHp;

@@ -22,6 +22,9 @@
         gauge: $('#hunt-gauge'), gaugeFill: $('#hunt-fill'), gaugeText: $('#hunt-text'),
         bossBar: $('#boss-bar'), bossName: $('#boss-name'), bossFill: $('#boss-hp-fill'),
         buffChips: $('#buff-chips'),
+        controlSwitch: $('#control-switch'),
+        controlTitle: $('#control-title'),
+        controlModeLabel: $('#control-mode-label'),
         btnCamp: $('#btn-camp')
       };
 
@@ -34,8 +37,18 @@
         Game.world.setMode(mode === 'rest' ? 'battle' : 'rest');
         Hud.hud.update(true);
       });
+      els.controlSwitch.addEventListener('click', function () {
+        var mode = Game.world.toggleControlMode();
+        if (Game.ui.modals && Game.ui.modals.toast) {
+          Game.ui.modals.toast(Game.i18n.t(
+            mode === 'manual' ? 'ui.controlChangedManual' : 'ui.controlChangedAuto'
+          ));
+        }
+        Hud.hud.update(true);
+      });
 
       bus.on('mode:changed', function () { Hud.hud.update(true); });
+      bus.on('control:changed', function () { Hud.hud.update(true); });
       bus.on('locale:changed', function () { Hud.hud.update(true); });
       bus.on('region:changed', function () { Hud.hud.update(true); });
       bus.on('class:chosen', function () { Hud.hud.drawAvatar(); Hud.hud.update(true); });
@@ -80,6 +93,17 @@
       var mode = s.world.mode;
 
       els.regionChip.textContent = t('region.' + W.region.id + '.name');
+
+      // 世界舞台自动 / 手动操控开关
+      var controlMode = W.controlMode();
+      var manual = controlMode === 'manual';
+      var controlText = t(manual ? 'ui.controlManual' : 'ui.controlAuto');
+      els.controlTitle.textContent = t('ui.controlTitle');
+      els.controlModeLabel.textContent = controlText;
+      els.controlSwitch.classList.toggle('manual', manual);
+      els.controlSwitch.setAttribute('aria-checked', manual ? 'true' : 'false');
+      els.controlSwitch.setAttribute('aria-label', t('ui.controlAria', { mode: controlText }));
+      els.controlSwitch.title = t(manual ? 'ui.controlManualHint' : 'ui.controlAutoHint');
 
       var gi = W.gaugeInfo();
       var boss = W.bossEnt;

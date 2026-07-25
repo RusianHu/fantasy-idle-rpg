@@ -73,7 +73,9 @@
         createdAt: U.now(),
         settings: {
           lang: 'zh-CN', effects: true, potionThreshold: 0.3,
-          autoAdvance: true, sfx: true, music: true
+          autoAdvance: true, autoSkillUpgrade: true, autoEquip: true,
+          controlMode: 'auto',
+          sfx: true, music: true
         },
         player: {
           classId: null,
@@ -86,6 +88,7 @@
         inv: {
           items: [],
           equipped: { weapon: null, armor: null, ring: null },
+          lockedSlots: { weapon: false, armor: false, ring: false },
           potions: { potion_small: 3, potion_large: 0 }
         },
         world: {
@@ -141,11 +144,19 @@
       return true;
     },
 
-    /** 全量重算派生属性（职业 + 等级 + 装备 + 被动 + 永久强化） */
-    recalc: function () {
+    /**
+     * 无副作用地预览派生属性。
+     * opts 可覆盖 level/classId/skills/equipped；equipped 的值可为 uid 或物品对象。
+     */
+    previewDerived: function (opts) {
+      opts = opts || {};
       var s = Game.state, p = s.player;
-      var cls = Player.classDef();
-      var base = F.playerBase(cls, p.level);
+      var classId = opts.classId !== undefined ? opts.classId : p.classId;
+      var cls = reg.get('class', classId) || Player.classDef();
+      var level = opts.level !== undefined ? opts.level : p.level;
+      var skills = opts.skills || p.skills;
+      var equipped = opts.equipped || s.inv.equipped;
+      var base = F.playerBase(cls, level);
       var d = {
         maxHp: base.hp, atk: base.atk, def: base.def, spd: base.spd,
         crit: base.crit, critDmg: base.critDmg,
@@ -162,24 +173,26 @@
       var pctAcc = { atkPct: 0, hpPct: 0, defPct: 0, spdPct: 0 };
 
       // 装备
-      var eq = s.inv.equipped;
-      for (var slot in eq) {
-        if (!eq[slot]) continue;
-        var item = Game.inv.byUid(eq[slot]);
+      for (var slot in equipped) {
+        if (!equipped[slot]) continue;
+        var item = typeof equipped[slot] === 'string'
+          ? Game.inv.byUid(equipped[slot])
+          : equipped[slot];
         if (!item) continue;
         var st = Game.inv.itemStats(item);
         d.atk += st.atk || 0; d.maxHp += st.hp || 0; d.def += st.def || 0; d.spd += st.spd || 0;
         d.crit += st.crit || 0; d.critDmg += st.critDmg || 0;
         d.goldMul += st.goldMul || 0; d.expMul += st.expMul || 0;
+        d.dropMul += st.dropMul || 0;
         pctAcc.atkPct += st.atkPct || 0; pctAcc.hpPct += st.hpPct || 0;
       }
 
       // 被动技能（仅本职业技能生效）
-      for (var sid in p.skills) {
-        var lv = p.skills[sid];
+      for (var sid in skills) {
+        var lv = skills[sid];
         if (!lv) continue;
         var def = reg.get('skill', sid);
-        if (!def || def.type !== 'passive' || def.cls !== p.classId) continue;
+        if (!def || def.type !== 'passive' || def.cls !== classId) continue;
         var b = def.bonus || {};
         pctAcc.atkPct += (b.atkPct || 0) * lv;
         pctAcc.hpPct += (b.hpPct || 0) * lv;
@@ -215,6 +228,13 @@
       d.dodge = Math.min(F.BAL.dodgeCap, d.dodge);
       d.cdr = Math.min(F.BAL.cdrCap, d.cdr);
 
+      return d;
+    },
+
+    /** 全量重算派生属性（职业 + 等级 + 装备 + 被动 + 永久强化） */
+    recalc: function () {
+      var s = Game.state, p = s.player;
+      var d = Player.previewDerived();
       s.derived = d;
       if (p.hp > d.maxHp) p.hp = d.maxHp;
       return d;

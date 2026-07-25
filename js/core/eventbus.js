@@ -12,8 +12,13 @@
  *   gold:changed / crystal:changed / exp:gained
  *   achievement:unlocked {aid}  shop:bought {sid}
  *   skill:upgraded {sid, lv}    locale:changed {locale}
+ *   skills:autoAllocated {count, allocations}
+ *   equipment:autoChanged {changes, gain}
+ *   automation:summary {skillPoints, gearCount, gain}
+ *   slot:lockChanged {slot, locked} settings:changed {key, value}
  *   save:before / save:after    offline:settled {summary}
- *   mode:changed {mode}
+ *   mode:changed {mode}         control:changed {mode}
+ *   camp:teleport {phase, x, y}
  * ============================================================ */
 (function () {
   'use strict';

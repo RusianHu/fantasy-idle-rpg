@@ -67,7 +67,8 @@
       bus.on('locale:changed', function () { UI.tabs.relabel(); UI.tabs.rerender(); });
       var rerenderOn = ['item:dropped', 'item:equipped', 'gold:changed', 'crystal:changed',
         'skill:upgraded', 'achievement:unlocked', 'player:levelup', 'shop:bought',
-        'region:changed', 'boss:defeated', 'potion:used', 'potion:dropped'];
+        'region:changed', 'boss:defeated', 'potion:used', 'potion:dropped',
+        'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged'];
       rerenderOn.forEach(function (evt) {
         bus.on(evt, function () {
           if (current !== 'battle' && current !== 'settings') UI.tabs.queueRerender();
@@ -233,6 +234,19 @@
     var s = Game.state;
     var inv = s.inv;
 
+    // 智能换装快捷开关
+    var autoRow = U.el('div', 'card automation-card', '<div class="row"><div class="grow">' +
+      '<div class="name">' + t('settings.autoEquip') + '</div>' +
+      '<div class="desc">' + t('settings.autoEquipHint') + '</div></div>' +
+      '<button type="button" role="switch" aria-label="' + U.esc(t('settings.autoEquip')) +
+      '" aria-checked="' + (s.settings.autoEquip ? 'true' : 'false') +
+      '" class="toggle' + (s.settings.autoEquip ? ' on' : '') + '"></button></div>');
+    autoRow.querySelector('.toggle').addEventListener('click', function () {
+      Game.auto.setAutoEquip(!s.settings.autoEquip);
+      UI.tabs.rerender();
+    });
+    root.appendChild(autoRow);
+
     // 已装备
     var strip = U.el('div', 'equip-strip');
     reg.ids('slot').forEach(function (slotId) {
@@ -240,13 +254,31 @@
       var item = uid ? Game.inv.byUid(uid) : null;
       var slotDef = reg.get('slot', slotId);
       var cls = 'inv-slot' + (item ? ' r' + item.rar : '');
+      var wrap = U.el('div', 'equip-slot-wrap' + (inv.lockedSlots[slotId] ? ' locked' : ''));
       var el = U.el('button', cls,
         '<canvas width="28" height="28" data-icon="' + slotDef.icon + '"></canvas>' +
         '<span class="slot-label">' + (item ? UI.itemName(item) : t('slot.' + slotId)) + '</span>');
+      el.setAttribute('aria-label', item
+        ? UI.itemName(item) + ' · ' + t('ui.equippedTag')
+        : t('slot.' + slotId));
       if (item) {
         el.addEventListener('click', function () { Game.ui.modals.itemDetail(item); });
       }
-      strip.appendChild(el);
+      var locked = !!inv.lockedSlots[slotId];
+      var lockBtn = U.el('button', 'slot-lock-btn' + (locked ? ' on' : ''),
+        (locked ? '🔒 ' + t('ui.slotLocked') : '🔓 ' + t('ui.slotUnlocked')));
+      lockBtn.title = locked
+        ? t('ui.unlockSlotNamed', { slot: t('slot.' + slotId) })
+        : t('ui.lockSlotNamed', { slot: t('slot.' + slotId) });
+      lockBtn.setAttribute('aria-label', lockBtn.title);
+      lockBtn.setAttribute('data-slot', slotId);
+      lockBtn.addEventListener('click', function () {
+        Game.auto.setSlotLocked(slotId, !Game.state.inv.lockedSlots[slotId]);
+        UI.tabs.rerender();
+      });
+      wrap.appendChild(el);
+      wrap.appendChild(lockBtn);
+      strip.appendChild(wrap);
     });
     root.appendChild(strip);
 
@@ -286,6 +318,10 @@
       var slot = U.el('button', 'inv-slot r' + item.rar + (Game.inv.isEquipped(item.uid) ? ' equipped' : ''),
         '<canvas width="30" height="30" data-icon="' + UI.itemIcon(item) + '"></canvas>' +
         '<span class="ilvl">' + item.ilvl + '</span>');
+      slot.setAttribute('data-uid', item.uid);
+      slot.setAttribute('aria-label',
+        UI.itemName(item) + ' · ' + t('rarity.r' + item.rar) + ' · ' + t('ui.itemLevel', { lv: item.ilvl }) +
+        (Game.inv.isEquipped(item.uid) ? ' · ' + t('ui.equippedTag') : ''));
       slot.addEventListener('click', function () { Game.ui.modals.itemDetail(item); });
       grid.appendChild(slot);
     });

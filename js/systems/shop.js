@@ -59,8 +59,7 @@
         } else {
           item = Game.inv.genLoot(p.level, { luck: 1.4 });
         }
-        Game.inv.addItem(item);
-        result.item = item;
+        result.item = Game.inv.addItem(item, { source: 'shop' });
       } else if (def.kind === 'perm') {
         p.perms[def.id] = (p.perms[def.id] || 0) + 1;
         Game.player.recalc();

@@ -47,7 +47,10 @@
 
     /* ---------------- 属性折算 ---------------- */
     itemStats: function (item) {
-      var st = { atk: 0, hp: 0, def: 0, spd: 0, crit: 0, critDmg: 0, goldMul: 0, expMul: 0, atkPct: 0, hpPct: 0 };
+      var st = {
+        atk: 0, hp: 0, def: 0, spd: 0, crit: 0, critDmg: 0,
+        goldMul: 0, expMul: 0, dropMul: 0, atkPct: 0, hpPct: 0
+      };
       var P = F.gearPrimary(item.ilvl) * F.RARITY[item.rar].mult;
       if (item.base === 'weapon') {
         st.atk = Math.round(P);
@@ -74,14 +77,6 @@
       return st;
     },
 
-    /** 粗略战力评分（对比/排序用） */
-    score: function (item) {
-      var st = Inv.itemStats(item);
-      return st.atk * 3 + st.hp * 0.3 + st.def * 2 + st.spd * 8 +
-        (st.crit + st.atkPct) * 400 + (st.critDmg + st.hpPct) * 200 +
-        (st.goldMul + st.expMul) * 150;
-    },
-
     byUid: function (uid) {
       var items = Game.state.inv.items;
       for (var i = 0; i < items.length; i++) if (items[i].uid === uid) return items[i];
@@ -94,43 +89,73 @@
     },
 
     /* ---------------- 获得 / 穿戴 / 出售 ---------------- */
-    addItem: function (item, opts) {
+    /**
+     * 批量装备入库事务：先暂存并自动优化，再执行容量淘汰。
+     * 返回最终仍在背包中的本批物品。
+     */
+    addItems: function (items, opts) {
+      opts = opts || {};
       var inv = Game.state.inv;
-      // 背包满：自动出售最旧的最低稀有度物品腾位
-      if (inv.items.length >= CAP) {
+      var incoming = [];
+      for (var n = 0; n < items.length; n++) {
+        if (!items[n]) continue;
+        inv.items.push(items[n]);
+        incoming.push(items[n]);
+      }
+      if (!incoming.length) return [];
+
+      // 自动换装必须先于容量淘汰，避免升级品在满包时被直接折现。
+      if (!opts.skipAuto && Game.auto && Game.state.settings.autoEquip) {
+        Game.auto.optimizeEquipment({ reason: opts.source || (opts.offline ? 'offline' : 'loot') });
+      }
+
+      while (inv.items.length > CAP) {
         var lowest = null, li = -1;
         for (var i = 0; i < inv.items.length; i++) {
           var it = inv.items[i];
           if (Inv.isEquipped(it.uid)) continue;
           if (!lowest || it.rar < lowest.rar) { lowest = it; li = i; }
         }
-        if (lowest && lowest.rar <= item.rar) {
-          inv.items.splice(li, 1);
-          Game.player.addGold(F.sellPrice(lowest.ilvl, lowest.rar), { raw: false });
-          bus.emit('inv:autosell', { item: lowest });
-        } else {
-          // 新掉落品质不高于包内最低：直接折现
-          Game.player.addGold(F.sellPrice(item.ilvl, item.rar));
-          return null;
-        }
+        if (!lowest) break; // 理论上最多仅 3 件装备被保护，保底避免死循环。
+        inv.items.splice(li, 1);
+        Game.player.addGold(F.sellPrice(lowest.ilvl, lowest.rar), { raw: false });
+        bus.emit('inv:autosell', { item: lowest });
       }
-      inv.items.push(item);
-      if (!(opts && opts.silent)) bus.emit('item:dropped', { item: item });
-      return item;
+
+      var kept = incoming.filter(function (item) {
+        return inv.items.indexOf(item) >= 0;
+      });
+      if (!opts.silent) {
+        kept.forEach(function (item) {
+          bus.emit('item:dropped', { item: item, offline: !!opts.offline, source: opts.source || 'loot' });
+        });
+      }
+      return kept;
     },
 
-    equip: function (uid) {
+    addItem: function (item, opts) {
+      var kept = Inv.addItems([item], opts);
+      return kept.length ? kept[0] : null;
+    },
+
+    equip: function (uid, opts) {
+      opts = opts || {};
       var item = Inv.byUid(uid);
       if (!item) return false;
+      var previous = Inv.byUid(Game.state.inv.equipped[item.base]);
       Game.state.inv.equipped[item.base] = uid;
       Game.player.recalc();
-      bus.emit('item:equipped', { item: item });
+      if (Game.world && Game.world.hero) Game.world.syncHeroStats();
+      bus.emit('item:equipped', { item: item, previous: previous, auto: !!opts.auto });
       return true;
     },
 
     unequip: function (slot) {
+      var previous = Inv.byUid(Game.state.inv.equipped[slot]);
       Game.state.inv.equipped[slot] = null;
       Game.player.recalc();
+      if (Game.world && Game.world.hero) Game.world.syncHeroStats();
+      bus.emit('item:unequipped', { slot: slot, item: previous });
     },
 
     /** 出售：传说分解为魔晶石，其余折金币 */
@@ -141,6 +166,7 @@
       if (Inv.isEquipped(uid)) {
         inv.equipped[item.base] = null;
         Game.player.recalc();
+        if (Game.world && Game.world.hero) Game.world.syncHeroStats();
       }
       inv.items.splice(inv.items.indexOf(item), 1);
       Game.state.meta.stats.sells++;
@@ -209,7 +235,7 @@
       var lv = Game.state.player.level;
       if (isBoss || U.chance(F.BAL.dropEquip * dropMul)) {
         var item = Inv.genLoot(lv, isBoss ? { rarMin: 2, luck: 2 } : {});
-        if (Inv.addItem(item)) out.push(item);
+        if (Inv.addItem(item, { source: isBoss ? 'boss' : 'loot' })) out.push(item);
       }
       if (U.chance(F.BAL.dropPotion * (isBoss ? 3 : 1))) {
         var pid = U.chance(0.8) ? 'potion_small' : 'potion_large';
