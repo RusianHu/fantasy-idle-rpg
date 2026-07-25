@@ -9,7 +9,7 @@
   var Prog = Game.prog = {
     /** 区域是否已解锁（首区域恒解锁；其余需前一区域 Boss 已击败） */
     isUnlocked: function (rid) {
-      var list = reg.ids('region');
+      var list = Game.State.regionOrder();
       var idx = list.indexOf(rid);
       if (idx <= 0) return idx === 0;
       var prev = list[idx - 1];
@@ -17,17 +17,17 @@
     },
 
     currentIndex: function () {
-      return reg.ids('region').indexOf(Game.state.world.region);
+      return Game.State.regionIndex(Game.state.world.region);
     },
 
     nextRegion: function () {
-      var list = reg.ids('region');
+      var list = Game.State.regionOrder();
       var idx = Prog.currentIndex();
       return idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
     },
 
     prevRegion: function () {
-      var list = reg.ids('region');
+      var list = Game.State.regionOrder();
       var idx = Prog.currentIndex();
       return idx > 0 ? list[idx - 1] : null;
     },
@@ -40,7 +40,7 @@
       Game.state.world.region = rid;
       Game.state.world.deathsRow = 0;
       Game.world.init(rid);
-      var order = reg.get('region', rid).order + 1;
+      var order = Game.State.regionTier(rid);
       var st = Game.state.meta.stats;
       if (order > st.highestRegion) st.highestRegion = order;
       return true;
@@ -50,7 +50,7 @@
       // Boss 击败 → 解锁下一区域；自动推进开关（默认开启）
       bus.on('boss:defeated', function (p) {
         var next = (function () {
-          var list = reg.ids('region');
+          var list = Game.State.regionOrder();
           var idx = list.indexOf(p.rid);
           return idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
         })();

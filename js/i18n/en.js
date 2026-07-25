@@ -264,7 +264,7 @@
       1: 'The Demon Lord, sealed by heroes a thousand years ago, has awakened in the depths of the continent of Lucia…',
       2: 'Miasma spreads from the Demon Castle — meadow, forest, mine and snowpeak are falling one by one.',
       3: 'The Adventurers\' Guild has issued its highest writ of subjugation.',
-      4: 'And you — the guild\'s newest lone adventurer — set out from the Novice Meadow.',
+      4: 'And you — the guild\'s newest lone adventurer — set out for one of four embattled frontiers.',
       5: 'Purify the eight lands, and storm the Demon Castle!'
     }
   });

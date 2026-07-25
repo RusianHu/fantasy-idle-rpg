@@ -28,6 +28,16 @@
         data.player.skills = {};
         data.v = 2;
       }
+    },
+    {
+      // v2 → v3：区域顺序改为每档持久化。旧档保留经典顺序，
+      // 避免升级后当前区域、解锁关系和难度发生变化。
+      from: 2,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.regionOrder = Game.reg.ids('region');
+        data.v = 3;
+      }
     }
   ];
 
@@ -66,6 +76,7 @@
         },
         world: {
           region: st.world.region,
+          regionOrder: st.world.regionOrder,
           mode: st.world.mode,
           restBuffT: st.world.restBuffT,
           worldTime: st.world.worldTime,
@@ -123,6 +134,9 @@
         U.merge(st.inv.potions, data.inv.potions || {});
       }
       U.merge(st.world, data.world || {});
+      st.world.regionOrder = Game.State.normalizeRegionOrder(
+        data.world && data.world.regionOrder
+      );
       U.merge(st.meta, data.meta || {});
 
       // 数据卫生：清除引用已下线内容的装备（折算金币），装备指针失效则置空
@@ -141,7 +155,7 @@
       }
       // 区域已下线 → 回退到最近有效区域
       if (!Game.reg.has('region', st.world.region)) {
-        st.world.region = Game.reg.ids('region')[0];
+        st.world.region = st.world.regionOrder[0];
       }
       // uid 续接，避免冲突
       var maxUid = data.inv && data.inv.uidSeq ? data.inv.uidSeq : 1;

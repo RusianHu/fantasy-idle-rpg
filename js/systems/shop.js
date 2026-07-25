@@ -13,8 +13,7 @@
     price: function (def) {
       var s = Game.state;
       if (def.kind === 'potion') {
-        var region = reg.get('region', s.world.region);
-        return F.potionPrice(def.ref, region ? region.tier : 1);
+        return F.potionPrice(def.ref, Game.State.regionTier(s.world.region));
       }
       if (def.kind === 'gearbox') {
         return def.cur === 'crystal' ? def.price : F.gearBoxPrice(s.player.level);

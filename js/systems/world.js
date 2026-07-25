@@ -30,7 +30,7 @@
     init: function (rid) {
       var region = reg.get('region', rid);
       if (!region) { // 已下线区域：回退到第一个有效区域
-        rid = reg.ids('region')[0];
+        rid = Game.State.regionOrder()[0];
         region = reg.get('region', rid);
         Game.state.world.region = rid;
       }
@@ -126,11 +126,12 @@
 
     makeMonster: function (mid, isBossFight) {
       var def = reg.get('monster', mid);
-      var st = F.monsterStats(def.tier, def.mods, def.boss);
+      var tier = Game.State.regionTier(W.region && W.region.id);
+      var st = F.monsterStats(tier, def.mods, def.boss);
       var sp = Game.assets.sprite(def.sprite);
       return {
         kind: 'monster', mid: mid, sprite: def.sprite,
-        boss: !!def.boss, tier: def.tier,
+        boss: !!def.boss, tier: tier,
         x: 0, y: 0, dir: 'l',
         state: 'wander',
         hp: st.hp, maxHp: st.hp, atk: st.atk, def: st.def, spd: st.spd,
@@ -189,10 +190,11 @@
       prog.cleared = true;
       prog.kills = 0;
       W.bossEnt = null;
-      if (first) Game.player.addCrystal(F.bossCrystal(region.tier));
+      var tier = Game.State.regionTier(region.id);
+      if (first) Game.player.addCrystal(F.bossCrystal(tier));
       Game.state.meta.stats.bossKills++;
       if (Game.fx) Game.fx.shake(4, 0.6);
-      bus.emit('boss:defeated', { rid: region.id, mid: ent.mid, first: first, tier: region.tier });
+      bus.emit('boss:defeated', { rid: region.id, mid: ent.mid, first: first, tier: tier });
     },
 
     onBossFailed: function () {

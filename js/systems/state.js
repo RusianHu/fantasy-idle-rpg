@@ -13,8 +13,62 @@
   Game.state = null;
 
   var State = Game.State = {
+    /** 新档只打乱前四区；后半程与最终区域保持固定。 */
+    makeRegionOrder: function () {
+      var list = reg.ids('region');
+      var count = Math.min(4, list.length);
+      for (var i = count - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var tmp = list[i];
+        list[i] = list[j];
+        list[j] = tmp;
+      }
+      return list;
+    },
+
+    /**
+     * 清理存档中的区域顺序：移除重复/下线 ID，并将新增区域按注册顺序补到末尾。
+     * 未提供顺序时使用经典注册顺序（用于旧档兼容）。
+     */
+    normalizeRegionOrder: function (savedOrder) {
+      var canonical = reg.ids('region');
+      var source = Array.isArray(savedOrder) ? savedOrder : canonical;
+      var seen = {}, out = [];
+      for (var i = 0; i < source.length; i++) {
+        var rid = source[i];
+        if (!seen[rid] && reg.has('region', rid)) {
+          seen[rid] = true;
+          out.push(rid);
+        }
+      }
+      for (var j = 0; j < canonical.length; j++) {
+        if (!seen[canonical[j]]) out.push(canonical[j]);
+      }
+      return out;
+    },
+
+    regionOrder: function () {
+      if (Game.state && Game.state.world) {
+        return State.normalizeRegionOrder(Game.state.world.regionOrder);
+      }
+      return reg.ids('region');
+    },
+
+    regionIndex: function (rid) {
+      return State.regionOrder().indexOf(rid);
+    },
+
+    /** 难度与奖励取本存档中的推进位置，而不是区域的经典编号。 */
+    regionTier: function (rid) {
+      var idx = State.regionIndex(rid);
+      if (idx >= 0) return idx + 1;
+      var def = reg.get('region', rid);
+      return def ? def.tier : 1;
+    },
+
     /** 新档（职业在序章后选择） */
     newGame: function () {
+      var regionOrder = State.makeRegionOrder();
       var s = {
         createdAt: U.now(),
         settings: {
@@ -35,7 +89,8 @@
           potions: { potion_small: 3, potion_large: 0 }
         },
         world: {
-          region: 'grassland',
+          region: regionOrder[0],
+          regionOrder: regionOrder,
           mode: 'battle',
           restBuffT: 0,
           worldTime: 300,
@@ -255,8 +310,7 @@
     estimateDps: function () {
       var d = Player.derived();
       var cls = Player.classDef();
-      var region = reg.get('region', Game.state.world.region);
-      var tier = region ? region.tier : 1;
+      var tier = State.regionTier(Game.state.world.region);
       var mDef = F.monsterStats(tier, {}, false).def;
       var hit = d.atk * d.atk / (d.atk + mDef);
       var critMult = 1 + d.crit * (d.critDmg - 1);
