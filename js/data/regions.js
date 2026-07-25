@@ -1,17 +1,18 @@
 /* ============================================================
  * data/regions.js — 八大区域注册表
- * 每个区域：怪物、Boss、讨伐数、地形配置（底材/材质补丁/装饰）、
- * 环境粒子、视差远景层。新增区域 = 新增一条注册，零引擎改动。
+ * 每个区域：怪物、Boss、讨伐数、地形配置（底材/材质补丁/装饰丛聚/
+ * 草簇配色/花簇/发光体）、环境粒子、视差远景层、林间光柱。
+ * 新增区域 = 新增一条注册，零引擎改动。
  *
- * 材质 ID（render/particles 按材质映射反馈效果）：
- *   grass 草丛 | dirt 泥土 | water 浅水 | snow 雪地 |
- *   sand 沙土 | lava 熔岩地 | stone 石面 | miasma 瘴气地
+ * 材质 ID：grass | dirt | water | snow | sand | lava | stone | miasma
+ * 装饰字段：{sprite, count, cluster?, water?, shadow?, bob?,
+ *            glow?:{color, r}, flicker?}
  * ============================================================ */
 (function () {
   'use strict';
   var Game = window.Game;
 
-  var W = 900, H = 520; // 每区域世界尺寸（世界像素）
+  var W = 900, H = 520;
 
   var R = [
     {
@@ -28,11 +29,19 @@
           { mat: 'sand', colors: ['#c8b078', '#bca46c'], count: 1, rMin: 24, rMax: 36 }
         ],
         deco: [
-          { sprite: 'deco_tree', count: 7 },
-          { sprite: 'deco_bush', count: 9 },
-          { sprite: 'deco_rock', count: 4 }
+          { sprite: 'flora_oak_big', count: 5, cluster: true },
+          { sprite: 'flora_oak_small', count: 5, cluster: true },
+          { sprite: 'flora_blossom', count: 2 },
+          { sprite: 'flora_bush_berry', count: 6 },
+          { sprite: 'flora_flowers', count: 4 },
+          { sprite: 'flora_flowers_pink', count: 4 },
+          { sprite: 'flora_pebbles', count: 4 },
+          { sprite: 'flora_stump', count: 2 },
+          { sprite: 'flora_lily', count: 3, water: true }
         ],
-        tufts: 60
+        tufts: 150,
+        tuftColors: ['#3d8232', '#8ad06a'],
+        flowers: { count: 44, colors: ['#f4f4f4', '#f8e060', '#f0a0c8'] }
       },
       particles: 'meadow',
       skyTop: '#79c0e8', skyBottom: '#a8dca0',
@@ -55,13 +64,19 @@
           { mat: 'water', colors: ['#356a9a', '#30618c'], count: 2, rMin: 30, rMax: 44 }
         ],
         deco: [
-          { sprite: 'deco_tree', count: 16 },
-          { sprite: 'deco_shroom_glow', count: 7 },
-          { sprite: 'deco_bush', count: 6 }
+          { sprite: 'flora_tree_forest', count: 10, cluster: true },
+          { sprite: 'flora_birch', count: 5, cluster: true },
+          { sprite: 'flora_fern', count: 8 },
+          { sprite: 'flora_shroom_glow', count: 6, glow: { color: '#5ad8cc', r: 15 } },
+          { sprite: 'flora_bush_berry', count: 3 },
+          { sprite: 'flora_lily', count: 3, water: true }
         ],
-        tufts: 46
+        tufts: 120,
+        tuftColors: ['#2f6b28', '#6fae5a'],
+        flowers: { count: 22, colors: ['#8ab8f0', '#e8f0d0'] }
       },
       particles: 'leaves',
+      rays: { color: '#fff2c8', alpha: 0.11 },
       skyTop: '#4a7a6a', skyBottom: '#38604e',
       parallax: [
         { type: 'fogband', color: '#a8c8b8', factor: 0.12, y: 60, alpha: 0.35 },
@@ -82,8 +97,11 @@
           { mat: 'sand', colors: ['#9a8058', '#8e7650'], count: 2, rMin: 24, rMax: 40 }
         ],
         deco: [
-          { sprite: 'deco_rock', count: 10 },
-          { sprite: 'deco_crystal', count: 6 },
+          { sprite: 'flora_rocks_big', count: 6, cluster: true },
+          { sprite: 'deco_rock', count: 6 },
+          { sprite: 'flora_crystal_big', count: 5, glow: { color: '#78d0e8', r: 20 } },
+          { sprite: 'flora_beam', count: 3 },
+          { sprite: 'flora_pebbles', count: 6 },
           { sprite: 'deco_bone', count: 3 }
         ],
         tufts: 0
@@ -108,11 +126,16 @@
           { mat: 'water', colors: ['#2c3c50', '#283648'], count: 1, rMin: 26, rMax: 38 }
         ],
         deco: [
-          { sprite: 'deco_tombstone', count: 10 },
-          { sprite: 'deco_dead_tree', count: 6 },
-          { sprite: 'deco_bone', count: 5 }
+          { sprite: 'flora_deadtree_big', count: 4 },
+          { sprite: 'deco_dead_tree', count: 4 },
+          { sprite: 'deco_tombstone', count: 6, cluster: true },
+          { sprite: 'flora_grave_cross', count: 5, cluster: true },
+          { sprite: 'flora_candle', count: 6, glow: { color: '#f8c860', r: 13 }, flicker: true },
+          { sprite: 'flora_skulls', count: 4 }
         ],
-        tufts: 20
+        tufts: 46,
+        tuftColors: ['#4c543e', '#7a8560'],
+        flowers: { count: 12, colors: ['#8a86a8'] }
       },
       particles: 'wisps',
       skyTop: '#2a2438', skyBottom: '#403852',
@@ -135,8 +158,12 @@
           { mat: 'stone', colors: ['#8a92a0', '#7e8694'], count: 3, rMin: 24, rMax: 40 }
         ],
         deco: [
-          { sprite: 'deco_pine_snow', count: 10 },
-          { sprite: 'deco_rock', count: 5 }
+          { sprite: 'flora_pine_big', count: 7, cluster: true },
+          { sprite: 'flora_pine_mid', count: 6, cluster: true },
+          { sprite: 'deco_pine_snow', count: 3 },
+          { sprite: 'flora_ice_shard', count: 4, glow: { color: '#a8e0f0', r: 15 } },
+          { sprite: 'flora_snow_mound', count: 6 },
+          { sprite: 'deco_rock', count: 3 }
         ],
         tufts: 0
       },
@@ -160,8 +187,10 @@
           { mat: 'dirt', colors: ['#5c4638', '#523e32'], count: 3, rMin: 26, rMax: 40 }
         ],
         deco: [
-          { sprite: 'deco_lava_rock', count: 10 },
-          { sprite: 'deco_rock', count: 4 }
+          { sprite: 'flora_obsidian', count: 5, cluster: true },
+          { sprite: 'deco_lava_rock', count: 8, glow: { color: '#f09030', r: 13 } },
+          { sprite: 'flora_char_stump', count: 5 },
+          { sprite: 'flora_rocks_big', count: 3 }
         ],
         tufts: 0
       },
@@ -185,12 +214,19 @@
           { mat: 'water', colors: ['#78b8d8', '#6cacce'], count: 2, rMin: 22, rMax: 34 }
         ],
         deco: [
-          { sprite: 'deco_pillar', count: 9 },
-          { sprite: 'deco_crystal', count: 5 }
+          { sprite: 'flora_pillar_big', count: 5, cluster: true },
+          { sprite: 'flora_pillar_broken', count: 5 },
+          { sprite: 'deco_pillar', count: 3 },
+          { sprite: 'flora_float_crystal', count: 5, bob: true, glow: { color: '#8ae8dc', r: 15 } },
+          { sprite: 'flora_flowers_blue', count: 5 },
+          { sprite: 'deco_crystal', count: 3, glow: { color: '#68c8e8', r: 11 } }
         ],
-        tufts: 24
+        tufts: 64,
+        tuftColors: ['#5f8c5f', '#a0cca0'],
+        flowers: { count: 16, colors: ['#c8e8ff', '#f4f4f4'] }
       },
       particles: 'cloudwisp',
+      rays: { color: '#ffffff', alpha: 0.09 },
       skyTop: '#5a8ac8', skyBottom: '#a8c8e8',
       parallax: [
         { type: 'clouds', color: '#ffffff', factor: 0.35, y: 40, alpha: 0.9, fast: true },
@@ -211,11 +247,15 @@
           { mat: 'dirt', colors: ['#463c4a', '#3e3442'], count: 2, rMin: 26, rMax: 38 }
         ],
         deco: [
-          { sprite: 'deco_banner_evil', count: 7 },
-          { sprite: 'deco_pillar', count: 5 },
+          { sprite: 'flora_dark_tree', count: 4 },
+          { sprite: 'deco_banner_evil', count: 6, cluster: true },
+          { sprite: 'flora_lantern', count: 6, glow: { color: '#b070e0', r: 15 }, flicker: true },
+          { sprite: 'flora_spikes', count: 4 },
+          { sprite: 'deco_pillar', count: 3 },
           { sprite: 'deco_bone', count: 4 }
         ],
-        tufts: 0
+        tufts: 30,
+        tuftColors: ['#43265f', '#8a56c0']
       },
       particles: 'miasma',
       skyTop: '#1c1028', skyBottom: '#38204a',

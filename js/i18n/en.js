@@ -67,9 +67,16 @@
       /* Classes */
       classTitle: '⚔ Choose Your Class',
       classHint: 'Your class defines growth and combat style. This choice is permanent.',
+      classHint2: '◀ ▶ or swipe to browse · choice is permanent',
       classPick: 'Pick',
       classConfirm: 'Begin the hunt as a {name}? (Cannot be changed)',
+      csSkills: '─ Skills ─',
+      csConfirmBtn: 'Begin as {name}',
       noClassYet: 'No class chosen yet',
+      /* Title screen */
+      titleLogo: 'Fantasy Idle',
+      titleStart: 'Begin Adventure',
+      adventureBegin: '✦ The Adventure Begins ✦',
       miss: 'MISS',
       poisoned: 'Poisoned',
       dim: { hp: 'HP', atk: 'ATK', def: 'DEF', spd: 'SPD', burst: 'Burst' },

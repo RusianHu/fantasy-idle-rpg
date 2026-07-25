@@ -90,6 +90,16 @@
     return c;
   }
 
+  /** 树冠摇曳帧：顶部 55% 右移 1px（底部固定，风吹树梢） */
+  function swayCanvas(src) {
+    var c = makeCanvas(src.width, src.height);
+    var ctx = c.getContext('2d');
+    var cut = Math.floor(src.height * 0.55);
+    ctx.drawImage(src, 0, 0, src.width, cut, 1, 0, src.width, cut);
+    ctx.drawImage(src, 0, cut, src.width, src.height - cut, 0, cut, src.width, src.height - cut);
+    return c;
+  }
+
   function whiteOf(src) {
     var c = makeCanvas(src.width, src.height);
     var ctx = c.getContext('2d');
@@ -120,6 +130,7 @@
       if (!from) continue;
       if (op.op === 'squash') frames[name] = squashCanvas(from);
       else if (op.op === 'bob') frames[name] = bobCanvas(from, op.dy || 1);
+      else if (op.op === 'sway') frames[name] = swayCanvas(from);
       else if (op.op === 'flip') frames[name] = flipCanvas(from);
     }
     // 通用规则：任何 *_r* 帧自动生成对应 *_l* 镜像帧
@@ -167,6 +178,17 @@
 
   var A = Game.assets = {
     defineSprite: function (d) { defs[d.id] = d; },
+
+    /** 直接注册已绘制画布帧（程序化植被等）；anchor 为画布坐标 */
+    defineCanvas: function (id, obj) {
+      var first = obj.frames[Object.keys(obj.frames)[0]];
+      built[id] = {
+        frames: obj.frames,
+        white: {},
+        w: first.width, h: first.height,
+        anchor: obj.anchor || { x: Math.floor(first.width / 2), y: first.height - 1 }
+      };
+    },
 
     sprite: function (id) {
       var b = built[id];
@@ -231,6 +253,24 @@
       var w = f.width * k, h = f.height * k;
       ctx.drawImage(f, Math.floor((canvasEl.width - w) / 2), Math.floor((canvasEl.height - h) / 2), w, h);
     },
+
+    /** 光晕纹理：径向渐变预渲染并按 (color, r) 缓存，运行时仅 drawImage */
+    glowTex: (function () {
+      var cache = {};
+      return function (color, r) {
+        var key = color + '_' + r;
+        if (cache[key]) return cache[key];
+        var c = makeCanvas(r * 2, r * 2);
+        var ctx = c.getContext('2d');
+        var g = ctx.createRadialGradient(r, r, 1, r, r, r);
+        g.addColorStop(0, color);
+        g.addColorStop(0.5, color.length === 7 ? color + '66' : color);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, r * 2, r * 2);
+        return (cache[key] = c);
+      };
+    })(),
 
     OUTLINE: OUTLINE
   };

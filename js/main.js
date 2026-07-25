@@ -53,10 +53,10 @@
     Game.ui.modals.init();
     Game.loop.init();
 
-    // 选职业（新档；或 v1 旧档迁移补选，等价一次免费洗点）
-    function ensureClass(cb) {
+    // 选职业（新档全屏选择；v1 旧档迁移补选，等价一次免费洗点）
+    function classFlow(cb) {
       if (Game.player.hasClass()) { if (cb) cb(); return; }
-      Game.ui.modals.classSelect(function (cid) {
+      Game.ui.title.classSelect(function (cid) {
         Game.player.setClass(cid);
         // 公会配发：职业武器（仅背包为空时）
         if (!Game.state.inv.items.length) {
@@ -87,15 +87,24 @@
       }
     }
 
-    // 首次：序章 → 选职业；老档：直接补选（若无职业）→ 离线结算
+    // 新玩家：标题画面 → 序章 → 选职业 → 淡入世界并鸣锣开场
+    // 迁移档（无职业）：直接全屏补选；老玩家：秒进 + 离线结算
     if (!Game.state.meta.prologueDone) {
-      Game.ui.modals.prologue(function () {
-        Game.state.meta.prologueDone = true;
-        Game.save.save('prologue');
-        ensureClass(settleOffline);
+      Game.ui.title.show(function () {
+        Game.ui.modals.prologue(function () {
+          Game.state.meta.prologueDone = true;
+          Game.save.save('prologue');
+          classFlow(function () {
+            Game.ui.title.hide();
+            setTimeout(function () {
+              Game.fx.banner('ui.adventureBegin');
+              if (Game.world.hero) Game.fx.poof(Game.world.hero.x, Game.world.hero.y - 10);
+            }, 500);
+          });
+        });
       });
     } else {
-      ensureClass(settleOffline);
+      classFlow(settleOffline);
     }
 
     Game.loop.start();

@@ -28,7 +28,7 @@
   /* 稀有度 */
   --r0: #b8b8b8; --r1: #6fc76f; --r2: #5a9ce0; --r3: #b56ae0; --r4: #e0a03c;
   --tabbar-h: 58px;
-  --hud-h: 56px;
+  --hud-h: 62px;
   font-size: 16px;
 }
 
@@ -133,7 +133,7 @@ img { image-rendering: pixelated; }
   transition: width .25s steps(12);
 }
 .bar.hp .bar-fill { background: linear-gradient(180deg, #f07a6a, var(--hp) 45%, #8a2020); }
-.bar.exp { height: 12px; }
+.bar.exp { height: 15px; }
 .bar.exp .bar-fill { background: linear-gradient(180deg, #7ad0f0, var(--exp) 45%, #1c5a86); }
 .bar-text {
   position: absolute; inset: 0;
@@ -143,7 +143,8 @@ img { image-rendering: pixelated; }
   text-shadow: 1px 1px 0 #000;
   pointer-events: none;
 }
-.bar.hp .bar-text { line-height: 13px; }
+.bar.hp .bar-text { line-height: 12px; }
+.bar.exp .bar-text { line-height: 11px; }
 
 #hud-cur { flex: 0 0 auto; display: flex; flex-direction: column; gap: 3px; align-items: flex-end; }
 .cur-row {
@@ -617,3 +618,103 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
   animation: fadeOut .4s forwards;
 }
 @keyframes fadeOut { to { opacity: 0; } }
+
+/* ---------- 标题画面 ---------- */
+#title-root {
+  position: absolute; inset: 0;
+  z-index: 60;
+  background: #05060f;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity .7s;
+}
+#title-root.fade-out { opacity: 0; pointer-events: none; }
+#title-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.title-ui {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center;
+  padding-top: 13vh;
+  pointer-events: none;
+}
+.title-ui .btn { pointer-events: auto; }
+.title-logo {
+  font-size: 36px;
+  color: var(--gold);
+  text-align: center;
+  line-height: 1.2;
+  letter-spacing: 8px;
+  text-shadow: 3px 3px 0 #16122b, -2px -2px 0 #16122b, 2px -2px 0 #16122b,
+    -2px 2px 0 #16122b, 0 0 22px #d8b45a66;
+}
+.title-sub {
+  display: block;
+  font-size: 10px;
+  color: var(--ink-dim);
+  letter-spacing: 5px;
+  margin-top: 10px;
+  text-shadow: 1px 1px 0 #000;
+}
+.title-menu {
+  margin-top: auto;
+  margin-bottom: 5vh;
+  display: flex; flex-direction: column; gap: 10px; align-items: center;
+}
+.title-start { min-width: 208px; font-size: 15px; animation: titlePulse 1.6s steps(2) infinite; }
+@keyframes titlePulse { 50% { filter: brightness(1.3); } }
+.title-ver { position: absolute; bottom: 8px; right: 10px; font-size: 9px; color: var(--ink-dim); }
+
+/* ---------- 全屏职业选择 ---------- */
+#class-root {
+  position: absolute; inset: 0;
+  z-index: 70;
+  background: #0a0c1cee;
+  display: flex; align-items: center; justify-content: center;
+  padding: 10px;
+}
+.cs-inner {
+  width: min(94vw, 420px);
+  max-height: 96%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  display: flex; flex-direction: column;
+}
+.cs-inner h2 {
+  font-size: 16px; color: var(--gold);
+  text-align: center; text-shadow: 1px 1px 0 #000;
+  margin-bottom: 6px;
+}
+.cs-stage { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.cs-canvas {
+  width: 132px; height: 128px;
+  background: radial-gradient(ellipse at 50% 72%, #232a54 0%, #12152e 72%);
+  border: 2px solid var(--panel-line);
+}
+.cs-arrow {
+  min-width: 44px; min-height: 64px;
+  background: none; border: none;
+  color: var(--gold); font-size: 22px;
+  cursor: pointer; font-family: inherit;
+  text-shadow: 2px 2px 0 #000;
+}
+.cs-arrow:active { transform: scale(.88); }
+.cs-name { text-align: center; font-size: 15px; color: var(--ink); margin-top: 6px; }
+.cs-page { font-size: 10px; color: var(--ink-dim); margin-left: 8px; }
+.cs-desc {
+  text-align: center; font-size: 11px; color: var(--ink-dim);
+  line-height: 1.6; margin: 4px 0 6px; min-height: 30px;
+}
+.cs-dots { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; font-size: 9px; color: var(--ink-dim); }
+.cs-dots b { color: var(--gold); font-weight: normal; }
+.cs-dots i { opacity: .25; font-style: normal; }
+.cs-skills { margin-top: 8px; border-top: 2px solid var(--panel-line); padding-top: 6px; }
+.cs-skill-head { font-size: 11px; color: var(--gold); margin-bottom: 4px; }
+.cs-skill-row {
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--panel-line);
+}
+.cs-skill-row b { font-size: 11px; color: var(--ink); font-weight: normal; }
+.cs-skill-row em { font-size: 9px; color: var(--ink-dim); font-style: normal; }
+.cs-skill-row span { font-size: 10px; color: var(--ink-dim); line-height: 1.5; }
+.cs-confirm { margin-top: 10px; }
+.cs-hint { text-align: center; font-size: 9px; color: var(--ink-dim); margin-top: 6px; }

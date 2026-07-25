@@ -172,58 +172,6 @@
       });
     },
 
-    /* ---------------- 职业选择（新档 / 旧档迁移补选） ---------------- */
-    classSelect: function (onDone) {
-      var t = Game.i18n.t;
-      var mask = U.el('div', 'modal-mask');
-      var box = U.el('div', 'modal jrpg-box');
-      box.innerHTML = '<h3>' + t('ui.classTitle') + '</h3>' +
-        '<div style="text-align:center;font-size:10px;color:var(--ink-dim);margin-bottom:10px;">' +
-        t('ui.classHint') + '</div>';
-      var wrap = U.el('div', '');
-
-      var dims = ['hp', 'atk', 'def', 'spd', 'burst'];
-      reg.all('class').forEach(function (cls) {
-        var dotHtml = dims.map(function (k) {
-          var n = cls.statDots[k] || 0;
-          var full = '', empty = '';
-          for (var i = 0; i < n; i++) full += '●';
-          for (var j = n; j < 5; j++) empty += '●';
-          return '<span style="font-size:8px;color:var(--ink-dim)">' + t('ui.dim.' + k) +
-            '<span style="color:var(--gold)">' + full + '</span><span style="opacity:.25">' + empty + '</span></span>';
-        }).join(' ');
-        var traits = (cls.traits || []).map(function (tr) {
-          return '<span class="badge">' + t('ui.trait.' + tr) + '</span>';
-        }).join('');
-
-        var card = U.el('div', 'card');
-        card.innerHTML = '<div class="row">' +
-          '<canvas width="40" height="56" data-hero="hero_' + cls.id + '"></canvas>' +
-          '<div class="grow">' +
-          '<div class="name">' + t('class.' + cls.id + '.name') + traits + '</div>' +
-          '<div class="desc">' + t('class.' + cls.id + '.desc') + '</div>' +
-          '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">' + dotHtml + '</div>' +
-          '</div>' +
-          '<button class="btn small gold pick-btn">' + t('ui.classPick') + '</button>' +
-          '</div>';
-        card.querySelector('.pick-btn').addEventListener('click', function () {
-          M.confirm(t('ui.classConfirm', { name: t('class.' + cls.id + '.name') }), function () {
-            if (mask.parentNode) mask.parentNode.removeChild(mask);
-            onDone(cls.id);
-          });
-        });
-        wrap.appendChild(card);
-      });
-
-      box.appendChild(wrap);
-      mask.appendChild(box);
-      root.appendChild(mask);
-      var cvs = wrap.querySelectorAll('canvas[data-hero]');
-      for (var i = 0; i < cvs.length; i++) {
-        Game.assets.drawToDom(cvs[i], cvs[i].getAttribute('data-hero'), 'walk_d0');
-      }
-    },
-
     /* ---------------- 序章 ---------------- */
     prologue: function (onDone) {
       var t = Game.i18n.t;

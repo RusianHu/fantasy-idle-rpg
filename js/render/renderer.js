@@ -13,6 +13,18 @@
   var parallaxLayers = [];   // {canvas, factor, y, alpha, fast, fog}
   var parallaxRegion = null;
   var SW = 480;              // 视差条带宽（可平铺）
+  var vignetteC = null;      // 暗角缓存
+
+  function buildVignette() {
+    vignetteC = document.createElement('canvas');
+    vignetteC.width = cw; vignetteC.height = ch;
+    var g = vignetteC.getContext('2d');
+    var grad = g.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.42, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
+    grad.addColorStop(0, 'rgba(8,6,24,0)');
+    grad.addColorStop(1, 'rgba(8,6,24,0.32)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, cw, ch);
+  }
 
   /* ================= 视差条带生成器 ================= */
   function genLayer(layer, region, seed) {
@@ -215,6 +227,20 @@
       ctx = canvas.getContext('2d');
       R.resize();
       window.addEventListener('resize', R.resize);
+      // 点击/触摸交互：点怪=锁定目标，点地=移动指令，点营地=扎营/拔营
+      canvas.addEventListener('pointerdown', function (e) {
+        var rect = canvas.getBoundingClientRect();
+        var pt = R.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+        if (Game.world && Game.world.handleTap) Game.world.handleTap(pt.x, pt.y);
+      });
+    },
+
+    /** 屏幕坐标（CSS px，相对画布）→ 世界坐标 */
+    screenToWorld: function (sx, sy) {
+      return {
+        x: cam.x + (sx - cw / 2) / cam.zoom,
+        y: cam.y + (sy - ch / 2) / cam.zoom
+      };
     },
 
     resize: function () {
@@ -225,6 +251,7 @@
       canvas.height = Math.round(ch * dpr);
       canvas.style.width = cw + 'px';
       canvas.style.height = ch + 'px';
+      vignetteC = null;
     },
 
     snapCamera: function (x, y) {
@@ -319,7 +346,7 @@
       Game.terrain.drawGround(ctx);
       Game.terrain.drawLiquid(ctx, viewL, viewT, viewR, viewB);
       Game.terrain.drawDecals(ctx);
-      Game.terrain.drawTufts(ctx);
+      Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
 
       // 5) y 排序绘制（装饰 + 实体）
       var drawables = [];
@@ -332,6 +359,27 @@
       for (j = 0; j < W.entities.length; j++) drawables.push(W.entities[j]);
       drawables.sort(function (a, b) { return a.y - b.y; });
 
+      // 手动锁定目标：金色选中圈；移动指令：绿色标记
+      var hero0 = W.hero;
+      if (hero0 && hero0.manualTarget && hero0.target && !hero0.target.dead) {
+        var mt = hero0.target;
+        ctx.strokeStyle = 'rgba(240,200,80,' + (0.55 + 0.3 * Math.sin(t * 6)).toFixed(2) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(mt.x, mt.y + 1, 10, 4, 0, 0, 6.29);
+        ctx.stroke();
+      }
+      if (hero0 && hero0.moveOrder) {
+        var mo = hero0.moveOrder;
+        ctx.strokeStyle = 'rgba(120,230,130,' + (0.5 + 0.3 * Math.sin(t * 7)).toFixed(2) + ')';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(mo.x, mo.y, 6, 3, 0, 0, 6.29);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(120,230,130,0.7)';
+        ctx.fillRect(mo.x - 1, mo.y - 1, 2, 2);
+      }
+
       for (j = 0; j < drawables.length; j++) {
         e = drawables[j];
         if (e.kind === 'hero' || e.kind === 'monster') R.drawEntity(e);
@@ -339,12 +387,13 @@
       }
 
       // 6) 篝火光晕（半径/透明度随机抖动）
+      var fxOn = !Game.particles || Game.particles.isEnabled();
+      var nightF = Game.daynight.nightFactor();
       var cf = Game.terrain.campfirePos;
       if (cf) {
-        var night = Game.daynight.nightFactor();
         var flick = 0.86 + 0.14 * Math.sin(t * 9.7) * Math.sin(t * 5.3 + 1.7);
-        var glowR = (26 + 7 * night) * flick;
-        var alpha = (0.16 + 0.22 * night) * flick;
+        var glowR = (26 + 7 * nightF) * flick;
+        var alpha = (0.16 + 0.22 * nightF) * flick;
         var gr = ctx.createRadialGradient(cf.x, cf.y - 4, 2, cf.x, cf.y - 4, glowR);
         gr.addColorStop(0, 'rgba(255,190,90,' + alpha.toFixed(3) + ')');
         gr.addColorStop(1, 'rgba(255,120,30,0)');
@@ -354,13 +403,55 @@
         Game.particles.campfire(dt, cf.x, cf.y - 2, resting);
       }
 
+      // 6.5) 发光体光晕（预渲染纹理 + lighter 合成，视口剔除）
+      var glows = Game.terrain.glows;
+      if (fxOn && glows && glows.length) {
+        ctx.globalCompositeOperation = 'lighter';
+        for (var gi = 0; gi < glows.length; gi++) {
+          var gp = glows[gi];
+          if (gp.x < viewL - 30 || gp.x > viewR + 30 || gp.y < viewT - 30 || gp.y > viewB + 30) continue;
+          var ga = gp.flicker
+            ? 0.30 + 0.16 * Math.sin(t * 11 + gp.phase) * Math.sin(t * 5.3 + gp.phase * 2)
+            : 0.26 + 0.12 * Math.sin(t * 1.8 + gp.phase);
+          var grr = gp.glow.r;
+          var gyy = gp.y - gp.h * 0.45 + (gp.bob ? Math.sin(t * 1.3 + gp.phase) * 2.2 - 3 : 0);
+          ctx.globalAlpha = ga * (0.7 + 0.55 * nightF);
+          ctx.drawImage(Game.assets.glowTex(gp.glow.color, 16), gp.x - grr, gyy - grr, grr * 2, grr * 2);
+        }
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
       // 7) 触发粒子 + 氛围粒子 + 形状特效
       Game.particles.draw(ctx);
       Game.fx.drawShapes(ctx);
 
-      // 8) 日夜色调（屏幕空间）
+      // 8) 屏幕空间：林间光柱 → 日夜色调 → 暗角
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (fxOn && region.rays) {
+        var dayK = 1 - Math.min(1, nightF / 0.4);
+        if (dayK > 0.05) {
+          ctx.save();
+          ctx.globalAlpha = region.rays.alpha * dayK * (0.85 + 0.15 * Math.sin(t * 0.7));
+          ctx.fillStyle = region.rays.color;
+          for (var ri = 0; ri < 3; ri++) {
+            var bx = ((ri * 170 + t * 5) % (cw + 240)) - 120;
+            ctx.beginPath();
+            ctx.moveTo(bx, -20);
+            ctx.lineTo(bx + 44, -20);
+            ctx.lineTo(bx + 44 - ch * 0.5, ch + 20);
+            ctx.lineTo(bx - ch * 0.5, ch + 20);
+            ctx.closePath();
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+      }
       Game.daynight.drawTint(ctx, cw, ch);
+      if (fxOn) {
+        if (!vignetteC) buildVignette();
+        ctx.drawImage(vignetteC, 0, 0);
+      }
 
       // 9) 飘字置于色调之上（保证可读）
       ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (cw / 2 - cam.x * z + sh.x), dpr * (ch / 2 - cam.y * z + sh.y));
@@ -441,9 +532,24 @@
       if (p.campfire) {
         var f = 'f' + (((t / 0.14) | 0) % 4);
         A.draw(ctx, 'campfire', f, p.x, p.y, {});
-      } else {
-        A.draw(ctx, p.sprite, 'idle0', p.x, p.y, {});
+        return;
       }
+      var sp = A.sprite(p.sprite);
+      var oy = 0;
+      if (p.bob) oy = Math.sin(t * 1.3 + (p.phase || 0)) * 2.2 - 3;
+      if (p.shadow) {
+        ctx.globalAlpha = 0.20;
+        ctx.fillStyle = '#101024';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 1, Math.max(4, sp.w * 0.30), 2.6, 0, 0, 6.29);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      var frame = 'idle0';
+      if (sp.frames.idle1 && (p.sway || p.flicker)) {
+        frame = (((t / (p.animSpd || 1)) + (p.phase || 0)) | 0) % 2 === 0 ? 'idle0' : 'idle1';
+      }
+      A.draw(ctx, p.sprite, frame, p.x, p.y + oy, {});
     }
   };
 })();

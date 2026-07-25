@@ -67,9 +67,16 @@
       /* 职业 */
       classTitle: '⚔ 选择你的职业',
       classHint: '职业决定成长曲线与战斗方式，选定后不可更改。',
+      classHint2: '◀ ▶ 或滑动切换职业 · 选定后不可更改',
       classPick: '选择',
       classConfirm: '以「{name}」之名踏上讨伐之旅？（不可更改）',
+      csSkills: '─ 技能一览 ─',
+      csConfirmBtn: '以「{name}」开始冒险',
       noClassYet: '尚未选择职业',
+      /* 标题画面 */
+      titleLogo: '幻境远征',
+      titleStart: '开始冒险',
+      adventureBegin: '✦ 冒险开始 ✦',
       miss: 'MISS',
       poisoned: '中毒',
       dim: { hp: '生命', atk: '攻击', def: '防御', spd: '速度', burst: '爆发' },

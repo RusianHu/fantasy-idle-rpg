@@ -171,6 +171,9 @@
       // 登场演出：镜头拉近 + 震屏，双方短暂僵持
       W.cinematic = { ent: ent, t: 1.5 };
       if (W.hero.state !== 'recover') W.hero.state = 'entrance';
+      W.hero.moveOrder = null;
+      W.hero.manualTarget = false;
+      W.hero.target = null;
       if (Game.fx) {
         Game.fx.shake(5, 0.9);
         Game.fx.banner('ui.bossAppear', { name: Game.i18n.t('monster.' + ent.mid + '.name') });
@@ -258,6 +261,52 @@
           bus.emit('protect:fallback', { rid: W.region.id });
         }
       }
+    },
+
+    /* ---------------- 点击/触摸指令 ---------------- */
+    /** 点怪=锁定优先目标；点地=移动指令；点营地=扎营/拔营 */
+    handleTap: function (wx, wy) {
+      var hero = W.hero;
+      if (!hero || !Game.player.hasClass()) return;
+      if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance') return;
+      var sw = Game.state.world;
+
+      // 营地交互（篝火附近）
+      var cf = Game.terrain.campfirePos;
+      if (cf && U.dist(wx, wy, cf.x, cf.y) < 30) {
+        W.setMode(sw.mode === 'battle' ? 'rest' : 'battle');
+        return;
+      }
+
+      // 怪物命中检测（以脚点与身体中心综合判定）
+      var best = null, bestD = 1e9;
+      for (var i = 0; i < W.entities.length; i++) {
+        var e = W.entities[i];
+        if (e.kind !== 'monster' || e.dead || e.hp <= 0) continue;
+        var d = Math.min(
+          U.dist(wx, wy, e.x, e.y),
+          U.dist(wx, wy, e.x, e.y - e.spriteH * 0.5)
+        );
+        var r = Math.max(12, e.spriteH * 0.6);
+        if (d < r && d < bestD) { bestD = d; best = e; }
+      }
+      if (best) {
+        if (sw.mode === 'rest') W.setMode('battle');
+        hero.target = best;
+        hero.manualTarget = true;
+        hero.moveOrder = null;
+        if (Game.fx) Game.fx.ring(best.x, best.y - best.spriteH * 0.4, 12, '#f0c860');
+        return;
+      }
+
+      // 地面移动指令
+      if (sw.mode === 'rest') W.setMode('battle');
+      hero.moveOrder = {
+        x: U.clamp(wx, 18, W.region.world.w - 18),
+        y: U.clamp(wy, BOUND_TOP, W.region.world.h - 14)
+      };
+      hero.target = null;
+      hero.manualTarget = false;
     },
 
     /* ---------------- 模式切换（战斗 / 扎营休息） ---------------- */
@@ -402,9 +451,21 @@
 
       Game.combat.potionTick(hero, dt);
 
+      // 玩家移动指令：优先执行，抵达后恢复自动索敌
+      if (hero.moveOrder) {
+        var mo = hero.moveOrder;
+        hero.state = 'walk';
+        if (W.moveToward(hero, mo.x, mo.y, HERO_SPEED, dt) < 5) {
+          hero.moveOrder = null;
+          hero.state = 'idle';
+        }
+        return;
+      }
+
       // 选目标：Boss 优先，否则最近存活怪
       var target = hero.target;
       if (!target || target.hp <= 0 || target.dead) {
+        hero.manualTarget = false;
         target = null;
         if (W.bossEnt && !W.bossEnt.dead) target = W.bossEnt;
         else {
