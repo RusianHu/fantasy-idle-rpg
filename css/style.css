@@ -232,7 +232,49 @@ img { image-rendering: pixelated; }
 
 .btn-camp {
   position: absolute; right: 10px; bottom: 12px;
-  min-width: 96px;
+  width: 142px;
+  padding: 6px 9px;
+  gap: 6px;
+  overflow: hidden;
+}
+.camp-action-icon {
+  flex: 0 0 24px;
+  width: 24px; height: 24px;
+}
+.camp-action-label {
+  min-width: 0;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1;
+}
+html[lang="en"] .camp-action-label { font-size: 9px; }
+.btn-camp.boss-retreat {
+  color: #ffd6c8;
+  border-color: #b85c4d;
+  background: linear-gradient(180deg, #613238, #43232d 55%, #2d1722);
+}
+.btn-camp.low-hp {
+  border-color: #f27462;
+  animation: campLowHp .72s steps(2, end) infinite;
+}
+.btn-camp.is-warping .camp-action-icon {
+  animation: campWarpIcon .64s steps(4, end) infinite;
+}
+@keyframes campLowHp {
+  50% {
+    color: #fff4df;
+    background: linear-gradient(180deg, #7a3335, #542128 55%, #35151d);
+    box-shadow: 0 0 0 2px #321016, inset 0 2px 0 #ff9a7aaa, 0 0 12px #e84e3f;
+    filter: brightness(1.22);
+  }
+}
+@keyframes campWarpIcon {
+  50% { filter: brightness(1.7) drop-shadow(0 0 3px #79e8f2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-camp.low-hp,
+  .btn-camp.is-warping .camp-action-icon { animation: none; }
+  .btn-camp.low-hp { box-shadow: 0 0 0 2px #321016, inset 0 2px 0 #ff9a7aaa, 0 0 8px #e84e3f; }
 }
 
 .control-switch {
@@ -329,6 +371,9 @@ img { image-rendering: pixelated; }
   .control-switch { width: 112px; grid-template-columns: 18px minmax(0, 1fr) 30px; gap: 3px; }
   .control-title { font-size: 7px; }
   .control-mode-label { font-size: 10px; }
+  .btn-camp { width: 132px; }
+  .camp-action-label { font-size: 10px; }
+  html[lang="en"] .camp-action-label { font-size: 8px; }
 }
 
 /* ---------- 通用按钮 ---------- */

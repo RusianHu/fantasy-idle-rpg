@@ -1,7 +1,7 @@
 /* ============================================================
  * systems/world.js — 可位移的平面小世界
  * 伪俯视 2D 场景：角色 x/y 双轴坐标，支持自动游走索敌与玩家
- * 手动移动交战；怪物分散刷新；扎营传送 / 死亡重整 / Boss 讨伐演出。
+ * 手动移动交战；怪物分散刷新；回营传送 / 死亡重整 / Boss 讨伐演出。
  * ============================================================ */
 (function () {
   'use strict';
@@ -221,7 +221,7 @@
       bus.emit('boss:defeated', { rid: region.id, mid: ent.mid, first: first, tier: tier });
     },
 
-    onBossFailed: function () {
+    onBossFailed: function (reason) {
       var region = W.region;
       var prog = Game.State.regionProg(region.id);
       // 进度保留一半：撤场重攒，不清零（卡关不惩罚过头）
@@ -232,7 +232,7 @@
         W.bossEnt = null;
       }
       W.cinematic = null;
-      bus.emit('boss:failed', { rid: region.id });
+      bus.emit('boss:failed', { rid: region.id, reason: reason || 'defeat' });
     },
 
     /* ---------------- 击杀结算 ---------------- */
@@ -283,7 +283,7 @@
       bus.emit('player:death', { byBoss: byBoss });
 
       if (byBoss) {
-        W.onBossFailed(); // Boss 战失败不计入卡关计数
+        W.onBossFailed('defeat'); // Boss 战失败不计入卡关计数
       } else {
         Game.state.world.deathsRow++;
         if (Game.state.world.deathsRow >= 3) {
@@ -430,14 +430,16 @@
       return { x: x, y: y };
     },
 
-    /* ---------------- 模式切换（战斗 / 扎营休息） ---------------- */
+    /* ---------------- 模式切换（战斗 / 返回营地） ---------------- */
     setMode: function (mode) {
       var w = Game.state.world;
-      if (w.mode === mode) return;
-      if (mode === 'rest' && W.bossEnt) return; // Boss 战期间不可扎营
+      if (w.mode === mode) return false;
+      var bossRetreat = mode === 'rest' && !!W.bossEnt;
       w.mode = mode;
       var hero = W.hero;
       if (mode === 'rest') {
+        // 先切换到安全模式，再撤掉 Boss，确保点击后的同一帧不再受击。
+        if (bossRetreat) W.onBossFailed('retreat');
         hero.target = null;
         hero.manualTarget = false;
         hero.moveOrder = null;
@@ -450,11 +452,36 @@
         if (hero.state === 'sitting' || hero.state === 'goCamp') hero.state = 'idle';
         bus.emit('rest:end');
       }
-      bus.emit('mode:changed', { mode: mode });
+      bus.emit('mode:changed', { mode: mode, bossRetreat: bossRetreat });
+      return true;
     },
 
     campRestPoint: function () {
       return { x: W.layout.camp.x + 22, y: W.layout.camp.y + 22 };
+    },
+
+    /** HUD 使用同一距离阈值表达步行、传送、撤离和取消状态。 */
+    campActionState: function () {
+      var hero = W.hero;
+      var mode = Game.state.world.mode;
+      if (mode === 'rest') {
+        if (hero && (hero.state === 'warpOut' || hero.state === 'warpIn')) {
+          return { id: 'cancel-warp', label: 'ui.cancelCampWarp', hint: 'ui.cancelCampWarpHint', icon: 'icon_camp_warp' };
+        }
+        if (hero && hero.state === 'goCamp') {
+          return { id: 'cancel-return', label: 'ui.cancelCampReturn', hint: 'ui.cancelCampReturnHint', icon: 'icon_camp_return' };
+        }
+        return { id: 'break-camp', label: 'ui.breakCamp', hint: 'ui.breakCampHint', icon: 'icon_camp_depart' };
+      }
+      if (W.bossEnt) {
+        return { id: 'boss-retreat', label: 'ui.bossCampReturn', hint: 'ui.bossCampReturnHint', icon: 'icon_camp_retreat' };
+      }
+      var rest = W.campRestPoint();
+      var distance = hero ? U.dist(hero.x, hero.y, rest.x, rest.y) : 0;
+      if (distance > CAMP_WARP_DISTANCE) {
+        return { id: 'teleport', label: 'ui.teleportCamp', hint: 'ui.teleportCampHint', icon: 'icon_camp_warp' };
+      }
+      return { id: 'return', label: 'ui.camp', hint: 'ui.campHint', icon: 'icon_camp_return' };
     },
 
     startCampReturn: function (hero) {

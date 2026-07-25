@@ -356,6 +356,83 @@
     }
   });
 
+  /* ---------------- 回营操作图标 ---------------- */
+  D({
+    id: 'icon_camp_return',
+    pal: { a: '#f0d488', b: '#b57b45', c: '#5b3824', r: '#78d8e8' },
+    frames: {
+      icon: [
+        '....a.....',
+        '...aaa....',
+        '..aabaa...',
+        '.aabbbba..',
+        'aabbbbbbaa',
+        'abbbccbbba',
+        'abbbccbbba',
+        'aa..cc..aa',
+        '.rrr......',
+        'rrr.......'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_camp_warp',
+    pal: { a: '#f6dc82', b: '#ffffff', c: '#77dceb', d: '#347b9b' },
+    frames: {
+      icon: [
+        '....bb....',
+        '..bc..cb..',
+        '.bc.dd.cb.',
+        'bc.d..d.cb',
+        'c.d.aa.d.c',
+        'c.d.aa.d.c',
+        'bc.d..d.cb',
+        '.bc.dd.cb.',
+        '..bc..cb..',
+        '....bb....'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_camp_retreat',
+    pal: { a: '#a8c8e8', b: '#547ba8', c: '#294b76', y: P.gold, Y: P.goldDark },
+    frames: {
+      icon: [
+        '..aaaaaa..',
+        '.abbbbbba.',
+        '.abyyyyba.',
+        'Yabbbbbba.',
+        'YYbbbbba..',
+        'YYYbbbba..',
+        'YYabbbba..',
+        'Y..abbba..',
+        '....abba..',
+        '.....aa...'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_camp_depart',
+    pal: { w: P.metalLight, m: P.metal, d: P.metalDark, g: P.leather, y: P.gold },
+    frames: {
+      icon: [
+        '.......ww.',
+        '......wwm.',
+        '.....wwm..',
+        '....wwm...',
+        '.y.wwm....',
+        '..ywm.....',
+        '.gyy......',
+        'gg.y......',
+        'g.........',
+        '..........'
+      ]
+    }
+  });
+
   /* ---------------- 货币图标 ---------------- */
   D({
     id: 'icon_gold',

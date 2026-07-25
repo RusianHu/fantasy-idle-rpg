@@ -39,8 +39,8 @@
         if (p.first) M.toast('💎 ' + t('ui.bossFirstKill', { n: Game.F.bossCrystal(p.tier) }), 'gold', 3600);
         else M.toast(t('ui.bossKilled'));
       });
-      bus.on('boss:failed', function () {
-        M.toast(t('ui.bossFailed'), 'warn', 3600);
+      bus.on('boss:failed', function (p) {
+        M.toast(t(p && p.reason === 'retreat' ? 'ui.bossRetreated' : 'ui.bossFailed'), 'warn', 3600);
       });
       bus.on('item:dropped', function (p) {
         if (p.offline) return;

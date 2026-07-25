@@ -9,6 +9,7 @@
 
   var els = {};
   var throttle = 0;
+  var campIcon = '';
 
   var Hud = Game.ui = Game.ui || {};
   Hud.hud = {
@@ -25,7 +26,9 @@
         controlSwitch: $('#control-switch'),
         controlTitle: $('#control-title'),
         controlModeLabel: $('#control-mode-label'),
-        btnCamp: $('#btn-camp')
+        btnCamp: $('#btn-camp'),
+        campIcon: $('#camp-action-icon'),
+        campLabel: $('#camp-action-label')
       };
 
       Hud.hud.drawAvatar();
@@ -120,9 +123,21 @@
         els.gauge.classList.toggle('full', gi.kills >= gi.target);
       }
 
-      // 扎营按钮
-      els.btnCamp.textContent = mode === 'rest' ? t('ui.breakCamp') : t('ui.camp');
-      els.btnCamp.disabled = !!boss;
+      // 返回营地按钮：距离、传送阶段与 Boss 撤离均有独立表达。
+      var campAction = W.campActionState();
+      var campText = t(campAction.label);
+      els.campLabel.textContent = campText;
+      els.btnCamp.setAttribute('aria-label', campText);
+      els.btnCamp.title = t(campAction.hint);
+      els.btnCamp.setAttribute('data-action', campAction.id);
+      els.btnCamp.classList.toggle('is-warping', campAction.id === 'cancel-warp');
+      els.btnCamp.classList.toggle('boss-retreat', campAction.id === 'boss-retreat');
+      var lowHp = mode === 'battle' && p.hp > 0 && hpPct / 100 <= s.settings.potionThreshold;
+      els.btnCamp.classList.toggle('low-hp', lowHp);
+      if (campIcon !== campAction.icon || force) {
+        Game.assets.drawToDom(els.campIcon, campAction.icon, 'icon');
+        campIcon = campAction.icon;
+      }
 
       // 增益 chips
       var chips = '';

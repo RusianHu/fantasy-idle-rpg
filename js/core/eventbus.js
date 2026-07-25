@@ -6,7 +6,7 @@
  *   player:levelup {level}      player:death {byBoss}
  *   item:dropped {item}         item:equipped {item}
  *   boss:spawned {rid, mid}     boss:defeated {rid, mid, first}
- *   boss:failed {rid}
+ *   boss:failed {rid, reason:'defeat'|'retreat'}
  *   region:changed {rid}        region:unlocked {rid}
  *   rest:start / rest:end       potion:used {pid}
  *   gold:changed / crystal:changed / exp:gained

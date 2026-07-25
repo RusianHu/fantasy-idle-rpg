@@ -247,19 +247,33 @@ async function run() {
       hero.navRoute = null;
       hero.x = W.layout.camp.x + 150;
       hero.y = W.layout.camp.y;
+      const nearCampAction = W.campActionState();
+      Game.ui.hud.update(true);
+      const campButton = document.getElementById('btn-camp');
+      const campIcon = document.getElementById('camp-action-icon');
+      const nearButtonText = document.getElementById('camp-action-label').textContent;
+      const campIconPixels = campIcon.getContext('2d').getImageData(0, 0, campIcon.width, campIcon.height).data;
+      let campIconVisiblePixels = 0;
+      for (let i = 3; i < campIconPixels.length; i += 4) {
+        if (campIconPixels[i] > 0) campIconVisiblePixels++;
+      }
+      const campButtonEmojiFree = !/[\u{1F000}-\u{1FAFF}]/u.test(nearButtonText);
       W.setMode('rest');
       for (let i = 0; i < 300; i++) W.updateHero(hero, 0.1);
       const nearCampSitting = hero.state === 'sitting';
       const nearCampState = hero.state;
       const nearCampDistance = U.dist(hero.x, hero.y, W.layout.camp.x + 22, W.layout.camp.y + 22);
+      const sittingCampAction = W.campActionState();
 
       W.setMode('battle');
       hero.state = 'idle';
       hero.navRoute = null;
       hero.x = W.region.world.w - 30;
       hero.y = W.region.world.h - 35;
+      const farCampAction = W.campActionState();
       W.setMode('rest');
       const farWarpStarted = hero.state === 'warpOut';
+      const warpCampAction = W.campActionState();
       W.updateHero(hero, 0.4);
       W.updateHero(hero, 0.45);
       for (let i = 0; i < 180; i++) W.updateHero(hero, 0.1);
@@ -274,12 +288,25 @@ async function run() {
         U.dist(hero.x, hero.y, W.layout.camp.x + 26, W.layout.camp.y + 24) < 0.01;
 
       hero.state = 'idle';
+      Game.state.player.hp = hero.maxHp * Game.state.settings.potionThreshold * 0.5;
+      Game.ui.hud.update(true);
+      const lowHpCampFlashes = campButton.classList.contains('low-hp');
       Game.state.player.hp = hero.maxHp;
       const prog = Game.State.regionProg(W.region.id);
       prog.kills = W.region.killTarget;
       W.trySpawnBoss();
       const bossAtLandmark = !!W.bossEnt &&
         U.dist(W.bossEnt.x, W.bossEnt.y, W.layout.bossPoint.x, W.layout.bossPoint.y) < 0.01;
+      Game.ui.hud.update(true);
+      const bossCampAction = W.campActionState();
+      const bossCampEnabled = !campButton.disabled;
+      let bossFailurePayload = null;
+      Game.bus.once('boss:failed', (payload) => { bossFailurePayload = payload; });
+      W.setMode('rest');
+      const bossRetreatSafe = Game.state.world.mode === 'rest' && !W.bossEnt && !W.cinematic &&
+        !hero.target && prog.kills === Math.ceil(W.region.killTarget / 2);
+      const bossRetreatReason = bossFailurePayload && bossFailurePayload.reason;
+      W.setMode('battle');
 
       const beforeLargeDt = { x: hero.x, y: hero.y };
       W.moveVector(hero, 1, 0, 56, 8);
@@ -296,8 +323,11 @@ async function run() {
 
       return {
         clickHadOrder, clickMoved, autoAcquired, movingTargetRepathed, monsterInterceptPath, monsterWanderPath,
-        nearCampSitting, nearCampState, nearCampDistance, farWarpStarted, farCampSitting, deathAtCamp,
-        bossAtLandmark, largeDtStep, regionSwitchUsesLayout
+        nearCampAction: nearCampAction.id, nearButtonText, campIconVisiblePixels, campButtonEmojiFree,
+        nearCampSitting, nearCampState, nearCampDistance, sittingCampAction: sittingCampAction.id,
+        farCampAction: farCampAction.id, farWarpStarted, warpCampAction: warpCampAction.id, farCampSitting,
+        deathAtCamp, lowHpCampFlashes, bossAtLandmark, bossCampAction: bossCampAction.id,
+        bossCampEnabled, bossRetreatSafe, bossRetreatReason, largeDtStep, regionSwitchUsesLayout
       };
     })()`);
     assert.equal(worldChecks.clickHadOrder, true);
@@ -306,13 +336,129 @@ async function run() {
     assert.equal(worldChecks.movingTargetRepathed, true);
     assert.equal(worldChecks.monsterInterceptPath, true);
     assert.equal(worldChecks.monsterWanderPath, true);
+    assert.equal(worldChecks.nearCampAction, 'return');
+    assert.equal(worldChecks.nearButtonText, await cdp.evaluate("Game.i18n.t('ui.camp')"));
+    assert.ok(worldChecks.campIconVisiblePixels > 10, 'camp action uses a rendered pixel icon');
+    assert.equal(worldChecks.campButtonEmojiFree, true, 'camp action label contains no emoji');
     assert.equal(worldChecks.nearCampSitting, true, 'near camp: ' + JSON.stringify(worldChecks));
+    assert.equal(worldChecks.sittingCampAction, 'break-camp');
+    assert.equal(worldChecks.farCampAction, 'teleport');
     assert.equal(worldChecks.farWarpStarted, true);
+    assert.equal(worldChecks.warpCampAction, 'cancel-warp');
     assert.equal(worldChecks.farCampSitting, true);
     assert.equal(worldChecks.deathAtCamp, true);
+    assert.equal(worldChecks.lowHpCampFlashes, true);
     assert.equal(worldChecks.bossAtLandmark, true);
+    assert.equal(worldChecks.bossCampAction, 'boss-retreat');
+    assert.equal(worldChecks.bossCampEnabled, true);
+    assert.equal(worldChecks.bossRetreatSafe, true);
+    assert.equal(worldChecks.bossRetreatReason, 'retreat');
     assert.ok(worldChecks.largeDtStep <= 14.01, 'large dt movement is capped');
     assert.equal(worldChecks.regionSwitchUsesLayout, true);
+
+    const campStateScreenshots = [];
+    for (const campState of ['return', 'teleport', 'low-hp', 'boss-retreat', 'break-camp']) {
+      const metrics = await cdp.evaluate(`(() => {
+        const W = Game.world;
+        const hero = W.hero;
+        Game.ui.tabs.open('battle');
+        W.setControlMode('manual');
+        Game.state.world.mode = 'battle';
+        if (W.bossEnt) {
+          const bossIndex = W.entities.indexOf(W.bossEnt);
+          if (bossIndex >= 0) W.entities.splice(bossIndex, 1);
+        }
+        W.bossEnt = null;
+        W.cinematic = null;
+        hero.state = 'idle';
+        hero.target = null;
+        hero.moveOrder = null;
+        hero.campWarp = null;
+        const state = ${JSON.stringify(campState)};
+        hero.potionCd = state === 'low-hp' ? 999 : 0;
+        Game.nav.clear(hero);
+        const progress = Game.State.regionProg(W.region.id);
+        progress.kills = 0;
+        Game.state.player.hp = hero.maxHp;
+
+        if (state === 'return') {
+          hero.x = W.layout.camp.x + 120;
+          hero.y = W.layout.camp.y;
+        } else {
+          hero.x = W.region.world.w - 34;
+          hero.y = W.region.world.h - 38;
+        }
+        if (state === 'low-hp') {
+          Game.state.player.hp = hero.maxHp * Game.state.settings.potionThreshold * 0.45;
+        }
+        if (state === 'boss-retreat') {
+          progress.kills = W.region.killTarget;
+          W.trySpawnBoss();
+        }
+        if (state === 'break-camp') {
+          Game.state.world.mode = 'rest';
+          hero.x = W.layout.camp.x + 22;
+          hero.y = W.layout.camp.y + 22;
+          hero.state = 'sitting';
+        }
+        const toastRoot = document.getElementById('toasts');
+        if (toastRoot) toastRoot.replaceChildren();
+        document.querySelectorAll('#stage-wrap > div').forEach((el) => {
+          if (el.style.zIndex === '16') el.style.opacity = '0';
+        });
+        Game.ui.hud.update(true);
+        Game.render.snapCamera(hero.x, hero.y);
+        Game.render.frame(1 / 60);
+        const button = document.getElementById('btn-camp');
+        const control = document.getElementById('control-switch');
+        const br = button.getBoundingClientRect();
+        const cr = control.getBoundingClientRect();
+        return {
+          state,
+          action: button.dataset.action,
+          label: document.getElementById('camp-action-label').textContent,
+          lowHp: button.classList.contains('low-hp'),
+          noOverlap: br.left >= cr.right || br.bottom <= cr.top || cr.bottom <= br.top,
+          withinViewport: br.left >= 0 && br.right <= innerWidth && br.top >= 0 && br.bottom <= innerHeight
+        };
+      })()`);
+      assert.equal(metrics.action, campState === 'low-hp' ? 'teleport' : campState);
+      assert.equal(metrics.lowHp, campState === 'low-hp');
+      assert.equal(metrics.noOverlap, true, campState + ' camp button does not overlap control switch');
+      assert.equal(metrics.withinViewport, true, campState + ' camp button stays in viewport');
+      await delay(80);
+      const stateCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+      const stateScreenshot = path.join(os.tmpdir(), 'firpg-camp-' + campState + '-mobile-cdp.png');
+      fs.writeFileSync(stateScreenshot, Buffer.from(stateCapture.data, 'base64'));
+      campStateScreenshots.push({ ...metrics, screenshot: stateScreenshot });
+    }
+
+    const englishCampFit = await cdp.evaluate(`(() => {
+      const previous = Game.i18n.locale();
+      Game.i18n.setLocale('en');
+      Game.state.world.mode = 'battle';
+      const W = Game.world;
+      const hero = W.hero;
+      hero.x = W.region.world.w - 34;
+      hero.y = W.region.world.h - 38;
+      hero.state = 'idle';
+      Game.ui.hud.update(true);
+      const label = document.getElementById('camp-action-label');
+      const labels = ['ui.camp', 'ui.teleportCamp', 'ui.bossCampReturn', 'ui.cancelCampWarp', 'ui.cancelCampReturn', 'ui.breakCamp'];
+      const labelFits = labels.map((key) => {
+        label.textContent = Game.i18n.t(key);
+        return { key, text: label.textContent, fits: label.scrollWidth <= label.clientWidth };
+      });
+      const result = {
+        labels: labelFits,
+        fits: labelFits.every((item) => item.fits),
+        buttonFits: document.getElementById('btn-camp').scrollWidth <= document.getElementById('btn-camp').clientWidth
+      };
+      Game.i18n.setLocale(previous);
+      return result;
+    })()`);
+    assert.equal(englishCampFit.fits, true, 'English camp label fits its allocated width');
+    assert.equal(englishCampFit.buttonFits, true, 'English camp button has no internal overflow');
 
     const densityChecks = [];
     const densityScreenshots = [];
@@ -468,7 +614,8 @@ async function run() {
     const screenshot = path.join(os.tmpdir(), 'firpg-demo-mobile-cdp.png');
     fs.writeFileSync(screenshot, Buffer.from(capture.data, 'base64'));
     console.log('Browser smoke passed: ' + JSON.stringify({
-      main, worldChecks, densityChecks, desktop, demo, mainScreenshot, densityScreenshots, desktopScreenshot, screenshot
+      main, worldChecks, campStateScreenshots, englishCampFit, densityChecks, desktop, demo,
+      mainScreenshot, densityScreenshots, desktopScreenshot, screenshot
     }));
     cdp.ws.close();
   } finally {
