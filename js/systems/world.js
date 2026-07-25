@@ -60,14 +60,18 @@
 
     makeHero: function () {
       var d = Game.player.derived();
+      var cls = Game.player.classDef();
       return {
-        kind: 'hero', sprite: 'hero',
+        kind: 'hero', sprite: 'hero_' + cls.id,
         x: 100, y: 120, dir: 'd',
         state: 'idle',
         get hp() { return Game.state.player.hp; },
         set hp(v) { Game.state.player.hp = v; },
         maxHp: d.maxHp, atk: d.atk, def: d.def, spd: d.spd,
         crit: d.crit, critDmg: d.critDmg,
+        range: d.range, projectile: d.projectile,
+        dodge: d.dodge, lifesteal: d.lifesteal, cdr: d.cdr,
+        shield: 0, buffs: [],
         atkTimer: 0, animT: 0, animF: 0, flash: 0, lungeT: 0,
         skillCd: {}, potionCd: 0,
         target: null, stepAcc: 0, spriteH: 20,
@@ -79,8 +83,26 @@
       var d = Game.player.derived();
       var h = W.hero;
       if (!h) return;
-      h.maxHp = d.maxHp; h.atk = d.atk; h.def = d.def;
-      h.spd = d.spd; h.crit = d.crit; h.critDmg = d.critDmg;
+      // 职业可能刚选定：同步精灵
+      var cls = Game.player.classDef();
+      h.sprite = 'hero_' + cls.id;
+      // 临时增益乘区
+      var atkPct = 0, defPct = 0, critAdd = 0, spdPct = 0;
+      if (h.buffs && h.buffs.length) {
+        for (var i = 0; i < h.buffs.length; i++) {
+          var m = h.buffs[i].mods;
+          atkPct += m.atkPct || 0; defPct += m.defPct || 0;
+          critAdd += m.crit || 0; spdPct += m.spdPct || 0;
+        }
+      }
+      h.maxHp = d.maxHp;
+      h.atk = Math.round(d.atk * (1 + atkPct));
+      h.def = Math.round(d.def * (1 + defPct));
+      h.spd = +(d.spd * (1 + spdPct)).toFixed(2);
+      h.crit = Math.min(0.95, d.crit + critAdd);
+      h.critDmg = d.critDmg;
+      h.range = d.range; h.projectile = d.projectile;
+      h.dodge = d.dodge; h.lifesteal = d.lifesteal; h.cdr = d.cdr;
     },
 
     /* ---------------- 刷怪 ---------------- */
@@ -117,7 +139,7 @@
         atkTimer: F.atkInterval(st.spd) * U.rand(0.5, 1),
         animT: U.rand(0, 0.3), animF: 0, flash: 0, lungeT: 0,
         wanderT: U.rand(0.5, 2), wx: 0, wy: 0,
-        engaged: false, stepAcc: 0,
+        engaged: false, stepAcc: 0, dots: [],
         spriteH: sp.h, dead: false, deathT: 0
       };
     },
@@ -222,6 +244,8 @@
       hero.state = 'dead';
       hero.deathT = 1.0;
       hero.target = null;
+      hero.shield = 0;
+      hero.buffs = [];
       Game.state.meta.stats.deaths++;
       bus.emit('player:death', { byBoss: byBoss });
 
@@ -311,6 +335,17 @@
       hero.animT += dt;
       hero.moving = false;
 
+      // 未选择职业：站立等待（选职业弹窗期间不推进战斗）
+      if (!Game.player.hasClass()) { hero.state = 'idle'; return; }
+
+      // 临时增益倒计时
+      if (hero.buffs && hero.buffs.length) {
+        for (var bi = hero.buffs.length - 1; bi >= 0; bi--) {
+          hero.buffs[bi].t -= dt;
+          if (hero.buffs[bi].t <= 0) hero.buffs.splice(bi, 1);
+        }
+      }
+
       // 死亡 → 撤退回营
       if (hero.state === 'dead') {
         hero.deathT -= dt;
@@ -325,7 +360,7 @@
       // 重整（复用坐姿）
       if (hero.state === 'recover') {
         hero.recoverT -= dt;
-        Game.player.heal(hero.maxHp * dt / RECOVER_T);
+        Game.player.heal(hero.maxHp * dt / RECOVER_T, { raw: true });
         if (hero.recoverT <= 0) {
           Game.state.player.hp = hero.maxHp;
           hero.state = sw.mode === 'rest' ? 'goCamp' : 'idle';
@@ -360,9 +395,10 @@
       }
 
       /* ----- 战斗模式 ----- */
-      // 自然恢复（脱战快、战斗慢）
+      // 自然恢复（脱战快、战斗慢；被动回复加成叠加）
       var inFight = hero.state === 'fight';
-      Game.player.heal(hero.maxHp * (inFight ? 0.004 : 0.02) * dt);
+      var drv = Game.player.derived();
+      Game.player.heal(hero.maxHp * ((inFight ? 0.004 : 0.02) + (drv.regen || 0)) * dt);
 
       Game.combat.potionTick(hero, dt);
 
@@ -390,7 +426,8 @@
         return;
       }
 
-      var range = MELEE_RANGE + (target.boss ? 10 : 0);
+      // 攻击距离：职业决定（远程站位输出）
+      var range = (hero.range || MELEE_RANGE) + (target.boss ? 10 : 0);
       var distTo = U.dist(hero.x, hero.y, target.x, target.y);
       if (distTo > range) {
         hero.state = 'walk';
@@ -399,14 +436,12 @@
         hero.state = 'fight';
         hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
         target.engaged = true;
-        target.state = 'fight';
 
         hero.atkTimer -= dt;
         if (hero.atkTimer <= 0) {
           hero.atkTimer = F.atkInterval(hero.spd);
           hero.lungeT = 0.18;
-          var r = Game.combat.attack(hero, target, 1);
-          if (r.killed) W.onEntityKilled(target, hero);
+          Game.combat.heroAttack(hero, target, { mult: 1 });
         }
         Game.combat.tryCastSkills(hero, target, dt);
       }
@@ -418,33 +453,55 @@
       e.lungeT = Math.max(0, e.lungeT - dt);
       e.animT += dt;
 
+      // 持续伤害（中毒等）：可致死并正常结算
+      if (e.dots && e.dots.length) {
+        var dsum = 0;
+        for (var di = e.dots.length - 1; di >= 0; di--) {
+          var dot = e.dots[di];
+          dsum += dot.dps * Math.min(dt, Math.max(0, dot.t));
+          dot.t -= dt;
+          if (dot.t <= 0) e.dots.splice(di, 1);
+        }
+        if (dsum > 0) {
+          e.hp -= dsum;
+          e.dotAcc = (e.dotAcc || 0) + dsum;
+          e.dotFxT = (e.dotFxT || 0) - dt;
+          if (e.dotFxT <= 0 && Game.fx) {
+            e.dotFxT = 0.6;
+            Game.fx.floatText(e.x, e.y - e.spriteH - 2, '-' + Game.i18n.fmtNum(Math.round(e.dotAcc)), { color: '#9ae05a', small: true });
+            e.dotAcc = 0;
+          }
+          if (e.hp <= 0) {
+            e.hp = 0;
+            W.onEntityKilled(e, W.hero);
+            return;
+          }
+        }
+      }
+
       var hero = W.hero;
       var heroTargetable = hero && hero.state !== 'dead' && hero.state !== 'recover' &&
-        Game.state.world.mode === 'battle';
+        Game.state.world.mode === 'battle' && Game.player.hasClass();
 
-      // 被动应战：仅当主角以自己为目标（1v1 基准，不主动围攻）
-      var engagedNow = heroTargetable && hero.target === e &&
-        U.dist(hero.x, hero.y, e.x, e.y) <= MELEE_RANGE + (e.boss ? 12 : 4);
+      // 应战：被主角锁定后主动迎击（远程主角也会被近身）；Boss 恒主动。
+      // 1v1 基准不变：未被锁定的怪不加入围攻，AOE 波及仅是顺带伤害。
+      var engaged = heroTargetable && (hero.target === e || e.boss);
 
-      if (e.boss && heroTargetable) {
-        // Boss 主动迎击
-        var d = U.dist(hero.x, hero.y, e.x, e.y);
-        if (d > MELEE_RANGE + 8) {
-          W.moveToward(e, hero.x, hero.y, MONSTER_WANDER_SPEED + 14, dt);
+      if (engaged) {
+        var reach = MELEE_RANGE + (e.boss ? 10 : 2);
+        var dist = U.dist(hero.x, hero.y, e.x, e.y);
+        if (dist > reach) {
+          W.moveToward(e, hero.x, hero.y, MONSTER_WANDER_SPEED + (e.boss ? 16 : 12), dt);
           e.state = 'walk';
           return;
         }
-        engagedNow = true;
-      }
-
-      if (engagedNow) {
         e.state = 'fight';
         e.dir = U.dirOf(hero.x - e.x, hero.y - e.y);
         e.atkTimer -= dt;
         if (e.atkTimer <= 0) {
           e.atkTimer = F.atkInterval(e.spd);
           e.lungeT = 0.16;
-          var r = Game.combat.attack(e, hero, 1);
+          var r = Game.combat.attack(e, hero, {});
           if (r.killed) W.onEntityKilled(hero, e);
         }
         return;

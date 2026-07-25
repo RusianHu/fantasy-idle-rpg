@@ -21,13 +21,11 @@
 
   /* ---------------- 平衡常数 ---------------- */
   F.BAL = {
-    // 玩家基础（1 级）
-    baseHp: 120, baseAtk: 14, baseDef: 6, baseSpd: 10,
-    baseCrit: 0.05, baseCritDmg: 1.5,
-    // 每级复利
-    hpGrow: 1.075, atkGrow: 1.07, defGrow: 1.065,
+    // 玩家逐级通用成长（职业基础值与复利见 data/classes.js）
     spdPerLv: 0.25, critPerLv: 0.001, critDmgPerLv: 0.01,
     critCap: 0.4,
+    // 全局上限
+    dodgeCap: 0.35, cdrCap: 0.4,
     // 经验曲线
     expBase: 28, expGrow: 1.16,
     // 怪物 tier 缩放
@@ -59,16 +57,17 @@
     return Math.floor(B.expBase * lv * Math.pow(B.expGrow, lv - 1));
   };
 
-  /** 等级 → 裸属性（不含装备/技能/永久强化） */
-  F.playerBase = function (lv) {
+  /** 职业定义 + 等级 → 裸属性（不含装备/技能/永久强化） */
+  F.playerBase = function (cls, lv) {
     var g = lv - 1;
+    var b = cls.base, gr = cls.grow;
     return {
-      hp: Math.round(B.baseHp * Math.pow(B.hpGrow, g)),
-      atk: Math.round(B.baseAtk * Math.pow(B.atkGrow, g)),
-      def: Math.round(B.baseDef * Math.pow(B.defGrow, g)),
-      spd: +(B.baseSpd + B.spdPerLv * g).toFixed(2),
-      crit: Math.min(B.critCap, B.baseCrit + B.critPerLv * g),
-      critDmg: B.baseCritDmg + B.critDmgPerLv * g
+      hp: Math.round(b.hp * Math.pow(gr.hp, g)),
+      atk: Math.round(b.atk * Math.pow(gr.atk, g)),
+      def: Math.round(b.def * Math.pow(gr.def, g)),
+      spd: +(b.spd + B.spdPerLv * g).toFixed(2),
+      crit: Math.min(B.critCap, b.crit + B.critPerLv * g),
+      critDmg: b.critDmg + B.critDmgPerLv * g
     };
   };
 

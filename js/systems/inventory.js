@@ -185,7 +185,7 @@
       return Game.state.inv.potions[pid] || 0;
     },
 
-    /** 自动喝药：优先小瓶，小瓶不足时用大瓶 */
+    /** 自动喝药：优先小瓶，小瓶不足时用大瓶（受治疗强化加成） */
     consumePotion: function () {
       var pots = Game.state.inv.potions;
       var pid = null;
@@ -194,8 +194,8 @@
       if (!pid) return null;
       pots[pid]--;
       var d = Game.player.derived();
-      var heal = Math.round(d.maxHp * F.potionHeal[pid]);
-      Game.player.heal(heal);
+      var heal = Math.round(d.maxHp * F.potionHeal[pid] * (d.healPow || 1));
+      Game.player.heal(heal, { raw: true });
       Game.state.meta.stats.potions++;
       bus.emit('potion:used', { pid: pid, heal: heal });
       return { pid: pid, heal: heal };

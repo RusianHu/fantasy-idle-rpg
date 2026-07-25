@@ -12,9 +12,23 @@
   var KEY_BAK = 'firpg_save_backup';
   var lastLoadedTs = 0;
 
-  /* 版本迁移流水线：旧存档逐版本升级（示例位，v1 起步） */
+  /* 版本迁移流水线：旧存档逐版本升级 */
   var MIGRATIONS = [
-    // { from: 1, fn: function (data) { ...; data.v = 2; } }
+    {
+      // v1 → v2：引入多职业。旧「冒险者」需补选职业；
+      // 旧技能体系下线，已投入的技能点全额退还。
+      from: 1,
+      fn: function (data) {
+        data.player.classId = null;
+        var refund = 0;
+        for (var sid in (data.player.skills || {})) {
+          refund += data.player.skills[sid] || 0;
+        }
+        data.player.sp = (data.player.sp || 0) + refund;
+        data.player.skills = {};
+        data.v = 2;
+      }
+    }
   ];
 
   function runMigrations(data) {

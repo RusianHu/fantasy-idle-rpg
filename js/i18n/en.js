@@ -63,12 +63,27 @@
       recommendLv: 'Suggested Lv.{lv}+',
       goRegion: 'Travel',
       movedTo: 'Arrived at {name}',
-      prologueTip: 'Tap to continue ▶'
+      prologueTip: 'Tap to continue ▶',
+      /* Classes */
+      classTitle: '⚔ Choose Your Class',
+      classHint: 'Your class defines growth and combat style. This choice is permanent.',
+      classPick: 'Pick',
+      classConfirm: 'Begin the hunt as a {name}? (Cannot be changed)',
+      noClassYet: 'No class chosen yet',
+      miss: 'MISS',
+      poisoned: 'Poisoned',
+      dim: { hp: 'HP', atk: 'ATK', def: 'DEF', spd: 'SPD', burst: 'Burst' },
+      trait: {
+        melee: 'Melee', ranged: 'Ranged', tank: 'Sturdy', crit: 'Crit',
+        dodge: 'Evasive', burst: 'Burst', sustain: 'Sustain', treasure: 'Treasure'
+      }
     },
 
     stat: {
       hp: 'HP', atk: 'ATK', def: 'DEF', spd: 'SPD',
-      crit: 'Crit Rate', critDmg: 'Crit DMG', goldMul: 'Gold Bonus', expMul: 'EXP Bonus'
+      crit: 'Crit Rate', critDmg: 'Crit DMG', goldMul: 'Gold Bonus', expMul: 'EXP Bonus',
+      dodge: 'Dodge', lifesteal: 'Lifesteal', cdr: 'CD Reduction', healPow: 'Healing Power',
+      attackType: 'Attack Type'
     },
 
     statPage: {
@@ -85,7 +100,16 @@
     item: {
       pattern: '{mat} {base}',
       mat: { 1: 'Copper', 2: 'Iron', 3: 'Steel', 4: 'Silver', 5: 'Mithril', 6: 'Flamegold', 7: 'Starlight', 8: 'Dragonsoul' },
-      base: { weapon: 'Sword', armor: 'Armor', ring: 'Ring' }
+      base: { weapon: 'Sword', armor: 'Armor', ring: 'Ring' },
+      weapon: { fighter: 'Sword', rogue: 'Dagger', mage: 'Staff', cleric: 'Mace', ranger: 'Longbow' }
+    },
+
+    'class': {
+      fighter: { name: 'Fighter', desc: 'An armored bulwark of the front line. Peerless survival, steady damage — the safest idle pick.' },
+      rogue: { name: 'Rogue', desc: 'A blade that walks in shadow. Blinding speed and crits, dodging fatal blows.' },
+      mage: { name: 'Wizard', desc: 'A wielder of fire and frost. Ranged dominance and the biggest burst — in a very thin robe.' },
+      cleric: { name: 'Cleric', desc: 'A servant of the Light. Self-healing melee whose blessings and lifesteal outlast any foe.' },
+      ranger: { name: 'Ranger', desc: 'A hunter of the wilds. Steady ranged damage with an instinct for treasure.' }
     },
 
     affix: {
@@ -94,12 +118,41 @@
     },
 
     skill: {
-      power_strike: { name: 'Power Strike', desc: 'A devastating blow dealing {v}% ATK damage.' },
-      whirlwind: { name: 'Whirlwind', desc: 'Spin and hit all nearby enemies for {v}% ATK damage.' },
-      heal_light: { name: 'Healing Light', desc: 'Auto-casts below 70% HP, restoring {v}% max HP.' },
-      passive_might: { name: 'Blessing of Might', desc: 'Passive: ATK +{v}%.' },
-      passive_guard: { name: 'Iron Bulwark', desc: 'Passive: DEF +{v}%, max HP +{v2}%.' },
-      passive_swift: { name: 'Gale Boon', desc: 'Passive: SPD +{v}%, Crit Rate +{v2}%.' }
+      /* Fighter */
+      ft_heavy: { name: 'Heavy Slash', desc: 'A crushing blow dealing {v}% ATK damage.' },
+      ft_tough: { name: 'Toughness', desc: 'Passive: DEF +{v}%, max HP +{v2}%.' },
+      ft_whirl: { name: 'Whirlwind', desc: 'Spin and hit all nearby enemies for {v}% ATK damage.' },
+      ft_mastery: { name: 'Weapon Mastery', desc: 'Passive: ATK +{v}%.' },
+      ft_warcry: { name: 'War Cry', desc: 'A rallying roar: ATK and DEF +{v}% for {s}s.' },
+      ft_second: { name: 'Second Wind', desc: 'Passive: regenerate an extra {v}% max HP per second in combat.' },
+      /* Rogue */
+      rg_backstab: { name: 'Backstab', desc: 'Strike a weak point for {v}% ATK damage with +25% crit chance.' },
+      rg_swift: { name: 'Swiftness', desc: 'Passive: SPD +{v}%.' },
+      rg_poison: { name: 'Poison Blade', desc: 'Deal {v}% damage and inject venom dealing {v2}% ATK over {s}s.' },
+      rg_deadly: { name: 'Deadly Precision', desc: 'Passive: Crit Rate +{v}%, Crit DMG +{v2}%.' },
+      rg_flurry: { name: 'Blade Flurry', desc: 'A storm of daggers hits all nearby enemies for {v}% ATK damage.' },
+      rg_evasion: { name: 'Evasion', desc: 'Passive: Dodge +{v}% (cap 35%).' },
+      /* Wizard */
+      mg_fireball: { name: 'Fireball', desc: 'Hurl a blazing orb dealing {v}% ATK damage.' },
+      mg_mastery: { name: 'Spell Mastery', desc: 'Passive: spell power +{v}%.' },
+      mg_nova: { name: 'Frost Nova', desc: 'Detonate a nova at the target, dealing {v}% ATK damage in an area.' },
+      mg_surge: { name: 'Mana Surge', desc: 'Passive: skill cooldowns reduced by {v}% (cap 40%).' },
+      mg_barrier: { name: 'Arcane Barrier', desc: 'Raise a barrier absorbing damage equal to {v}% of max HP.' },
+      mg_armor: { name: 'Mage Armor', desc: 'Passive: HP and DEF +{v}% each.' },
+      /* Cleric */
+      cl_smite: { name: 'Holy Strike', desc: 'Smite for {v}% ATK damage, healing for {v2}% of damage dealt.' },
+      cl_faith: { name: 'Faith', desc: 'Passive: HP +{v}%, DEF +{v2}%.' },
+      cl_prayer: { name: 'Healing Prayer', desc: 'Auto-cast below 75% HP, restoring {v}% max HP.' },
+      cl_bless: { name: 'Blessing of Light', desc: 'Passive: all healing received +{v}% (including potions).' },
+      cl_nova: { name: 'Holy Nova', desc: 'A burst of light deals {v}% damage around you and heals {v2}% HP.' },
+      cl_radiance: { name: 'Radiance', desc: 'Passive: attacks lifesteal {v}%.' },
+      /* Ranger */
+      rn_power: { name: 'Power Shot', desc: 'Loose a mighty arrow dealing {v}% ATK damage.' },
+      rn_precision: { name: 'Precision', desc: 'Passive: Crit Rate +{v}%.' },
+      rn_multi: { name: 'Multi Shot', desc: 'A volley blankets the target area for {v}% ATK damage.' },
+      rn_survival: { name: 'Survivalist', desc: 'Passive: HP +{v}%, SPD +{v2}%.' },
+      rn_hawk: { name: 'Hawk Eye', desc: 'Lock on: ATK +{v}% and Crit Rate +{v2}% for {s}s.' },
+      rn_treasure: { name: 'Treasure Sense', desc: 'Passive: gold gain +{v}%, gear drop rate +{v2}%.' }
     },
 
     monster: {

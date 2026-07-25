@@ -63,12 +63,27 @@
       recommendLv: '推荐等级 Lv.{lv}+',
       goRegion: '前往',
       movedTo: '已抵达 {name}',
-      prologueTip: '点击继续 ▶'
+      prologueTip: '点击继续 ▶',
+      /* 职业 */
+      classTitle: '⚔ 选择你的职业',
+      classHint: '职业决定成长曲线与战斗方式，选定后不可更改。',
+      classPick: '选择',
+      classConfirm: '以「{name}」之名踏上讨伐之旅？（不可更改）',
+      noClassYet: '尚未选择职业',
+      miss: 'MISS',
+      poisoned: '中毒',
+      dim: { hp: '生命', atk: '攻击', def: '防御', spd: '速度', burst: '爆发' },
+      trait: {
+        melee: '近战', ranged: '远程', tank: '坚韧', crit: '暴击',
+        dodge: '闪避', burst: '爆发', sustain: '续航', treasure: '寻宝'
+      }
     },
 
     stat: {
       hp: '生命', atk: '攻击', def: '防御', spd: '速度',
-      crit: '暴击率', critDmg: '暴击伤害', goldMul: '金币加成', expMul: '经验加成'
+      crit: '暴击率', critDmg: '暴击伤害', goldMul: '金币加成', expMul: '经验加成',
+      dodge: '闪避', lifesteal: '吸血', cdr: '冷却缩减', healPow: '治疗强化',
+      attackType: '攻击方式'
     },
 
     statPage: {
@@ -85,7 +100,16 @@
     item: {
       pattern: '{mat}{base}',
       mat: { 1: '铜制', 2: '铁制', 3: '钢制', 4: '白银', 5: '秘银', 6: '炎金', 7: '星辉', 8: '龙魂' },
-      base: { weapon: '长剑', armor: '铠甲', ring: '戒指' }
+      base: { weapon: '长剑', armor: '铠甲', ring: '戒指' },
+      weapon: { fighter: '长剑', rogue: '短匕', mage: '法杖', cleric: '战锤', ranger: '长弓' }
+    },
+
+    'class': {
+      fighter: { name: '战士', desc: '身披重甲的前线壁垒。生存冠绝、输出稳健，挂机最安心的选择。' },
+      rogue: { name: '盗贼', desc: '出入阴影的利刃。极速与暴击的近战爆发，以闪避回避致命一击。' },
+      mage: { name: '法师', desc: '操火驭冰的奥术行者。远程压制、全游戏最强爆发，但衣袍单薄。' },
+      cleric: { name: '牧师', desc: '圣光的侍奉者。自愈型近战，治疗强化与吸血让他愈战愈勇。' },
+      ranger: { name: '游侠', desc: '荒野的猎手。远程稳定输出，天生的寻宝直觉带来额外财富。' }
     },
 
     affix: {
@@ -94,12 +118,41 @@
     },
 
     skill: {
-      power_strike: { name: '强力斩', desc: '蓄力挥出致命一击，造成 {v}% 攻击力的伤害。' },
-      whirlwind: { name: '旋风斩', desc: '旋身横扫，对周围所有敌人造成 {v}% 攻击力的伤害。' },
-      heal_light: { name: '治愈之光', desc: '生命低于 70% 时自动咏唱，恢复 {v}% 最大生命。' },
-      passive_might: { name: '力量祝福', desc: '被动：攻击力提升 {v}%。' },
-      passive_guard: { name: '铁壁守护', desc: '被动：防御提升 {v}%，生命上限提升 {v2}%。' },
-      passive_swift: { name: '疾风加护', desc: '被动：速度提升 {v}%，暴击率提升 {v2}%。' }
+      /* 战士 */
+      ft_heavy: { name: '重斩', desc: '蓄力挥出致命一击，造成 {v}% 攻击力的伤害。' },
+      ft_tough: { name: '坚韧', desc: '被动：防御提升 {v}%，生命上限提升 {v2}%。' },
+      ft_whirl: { name: '旋风斩', desc: '旋身横扫，对周围所有敌人造成 {v}% 攻击力的伤害。' },
+      ft_mastery: { name: '武器专精', desc: '被动：攻击力提升 {v}%。' },
+      ft_warcry: { name: '战吼', desc: '怒吼提振战意：{s} 秒内攻击与防御提升 {v}%。' },
+      ft_second: { name: '战意涌动', desc: '被动：战斗中每秒额外回复 {v}% 最大生命。' },
+      /* 盗贼 */
+      rg_backstab: { name: '背刺', desc: '绕至破绽处突刺，造成 {v}% 攻击力伤害，此击暴击率 +25%。' },
+      rg_swift: { name: '迅捷', desc: '被动：速度提升 {v}%。' },
+      rg_poison: { name: '毒刃', desc: '淬毒短匕造成 {v}% 伤害，并在 {s} 秒内追加共 {v2}% 攻击力的毒素伤害。' },
+      rg_deadly: { name: '致命', desc: '被动：暴击率 +{v}%，暴击伤害 +{v2}%。' },
+      rg_flurry: { name: '剑刃乱舞', desc: '匕影纷飞，对周围所有敌人造成 {v}% 攻击力的伤害。' },
+      rg_evasion: { name: '闪避精通', desc: '被动：闪避 +{v}%（上限 35%）。' },
+      /* 法师 */
+      mg_fireball: { name: '火球术', desc: '掷出炽热火球，造成 {v}% 攻击力的伤害。' },
+      mg_mastery: { name: '法术精研', desc: '被动：法术强度提升 {v}%。' },
+      mg_nova: { name: '冰霜新星', desc: '在目标处引爆新星，范围造成 {v}% 攻击力的伤害。' },
+      mg_surge: { name: '法力涌动', desc: '被动：技能冷却缩减 {v}%（上限 40%）。' },
+      mg_barrier: { name: '奥术屏障', desc: '展开屏障，吸收相当于 {v}% 最大生命的伤害。' },
+      mg_armor: { name: '魔导护体', desc: '被动：生命与防御各提升 {v}%。' },
+      /* 牧师 */
+      cl_smite: { name: '神圣打击', desc: '圣光重击造成 {v}% 攻击力伤害，并回复造成伤害 {v2}% 的生命。' },
+      cl_faith: { name: '信仰', desc: '被动：生命 +{v}%，防御 +{v2}%。' },
+      cl_prayer: { name: '治愈祷言', desc: '生命低于 75% 时自动祷告，回复 {v}% 最大生命。' },
+      cl_bless: { name: '圣光祝福', desc: '被动：所受一切治疗提升 {v}%（含药水）。' },
+      cl_nova: { name: '神圣新星', desc: '圣光爆发对周围敌人造成 {v}% 伤害，并回复自身 {v2}% 生命。' },
+      cl_radiance: { name: '圣光回响', desc: '被动：攻击附带 {v}% 吸血。' },
+      /* 游侠 */
+      rn_power: { name: '强力射击', desc: '弓弦满张射出一箭，造成 {v}% 攻击力的伤害。' },
+      rn_precision: { name: '精准', desc: '被动：暴击率 +{v}%。' },
+      rn_multi: { name: '多重射击', desc: '箭雨覆盖目标区域，造成 {v}% 攻击力的伤害。' },
+      rn_survival: { name: '荒野生存', desc: '被动：生命 +{v}%，速度 +{v2}%。' },
+      rn_hawk: { name: '鹰眼', desc: '鹰眼锁定：{s} 秒内攻击 +{v}%、暴击率 +{v2}%。' },
+      rn_treasure: { name: '寻宝直觉', desc: '被动：金币获取 +{v}%，装备掉率 +{v2}%。' }
     },
 
     monster: {

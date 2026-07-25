@@ -21,10 +21,16 @@
   UI.itemName = function (item) {
     var t = Game.i18n.t;
     var tier = U.clamp(Math.ceil(item.ilvl / 8), 1, 8);
-    return t('item.pattern', { mat: t('item.mat.' + tier), base: t('item.base.' + item.base) });
+    var baseName = item.base === 'weapon'
+      ? t('item.weapon.' + (Game.state.player.classId || 'fighter'))
+      : t('item.base.' + item.base);
+    return t('item.pattern', { mat: t('item.mat.' + tier), base: baseName });
   };
 
   UI.itemIcon = function (item) {
+    if (item.base === 'weapon') {
+      return 'icon_w_' + (Game.state.player.classId || 'fighter');
+    }
     var slot = reg.get('slot', item.base);
     return slot ? slot.icon : 'icon_weapon';
   };
@@ -117,7 +123,10 @@
     var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
     var s = Game.state, p = s.player;
 
-    var head = U.el('div', 'panel-title', t('ui.tab.char') + ' <span style="font-size:11px;color:var(--ink-dim)">Lv.' + p.level + '</span>');
+    var clsName = Game.player.hasClass() ? Game.i18n.t('class.' + p.classId + '.name') : '';
+    var head = U.el('div', 'panel-title', t('ui.tab.char') +
+      ' <span style="font-size:11px;color:var(--ink-dim)">' +
+      (clsName ? clsName + ' · ' : '') + 'Lv.' + p.level + '</span>');
     root.appendChild(head);
 
     var subs = U.el('div', 'subtabs');
@@ -141,6 +150,11 @@
         [t('stat.goldMul'), '+' + Math.round((d.goldMul - 1) * 100) + '%'],
         [t('stat.expMul'), '+' + Math.round((d.expMul - 1) * 100) + '%']
       ];
+      rows.push([t('stat.attackType'), t(d.projectile ? 'ui.trait.ranged' : 'ui.trait.melee')]);
+      if (d.dodge > 0) rows.push([t('stat.dodge'), Math.round(d.dodge * 100) + '%']);
+      if (d.lifesteal > 0) rows.push([t('stat.lifesteal'), Math.round(d.lifesteal * 100) + '%']);
+      if (d.cdr > 0) rows.push([t('stat.cdr'), Math.round(d.cdr * 100) + '%']);
+      if (d.healPow > 1.001) rows.push([t('stat.healPow'), '+' + Math.round((d.healPow - 1) * 100) + '%']);
       var grid = U.el('div', 'stat-grid');
       rows.forEach(function (r) {
         grid.appendChild(U.el('div', 'stat-row', '<span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span>'));

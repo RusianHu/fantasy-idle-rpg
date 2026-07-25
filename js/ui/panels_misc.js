@@ -8,15 +8,24 @@
 
   var UI = Game.ui;
 
-  /* ================= 技能面板 ================= */
+  /* ================= 技能面板（按职业过滤） ================= */
   UI.panels.skills = function (root) {
     var t = Game.i18n.t;
     var s = Game.state, p = s.player;
+    var cid = p.classId;
+    var clsName = cid ? t('class.' + cid + '.name') : '';
 
     root.appendChild(U.el('div', 'panel-title', t('ui.tab.skills') +
+      (clsName ? ' <span style="font-size:11px;color:var(--ink-dim)">' + clsName + '</span>' : '') +
       '<span style="font-size:12px;color:var(--gold)">' + t('ui.spLeft', { n: p.sp }) + '</span>'));
 
-    reg.all('skill').forEach(function (sk) {
+    var list = reg.all('skill').filter(function (sk) { return sk.cls === cid; });
+    if (!list.length) {
+      root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.noClassYet') + '</div>'));
+      return;
+    }
+
+    list.forEach(function (sk) {
       var lv = p.skills[sk.id] || 0;
       var locked = p.level < (sk.unlockLv || 1);
       var maxed = lv >= Game.SKILL_MAX_LV;

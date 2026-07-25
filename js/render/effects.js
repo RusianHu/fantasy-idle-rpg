@@ -9,10 +9,25 @@
 
   var floats = [];   // 飘字（世界空间）
   var shapes = [];   // 简单形状特效
+  var projs = [];    // 弹道（法弹/箭矢）
   var shake = { p: 0, t: 0, d: 0 };
   var bannerEl = null;
 
+  var PROJ_STYLE = {
+    bolt: { color: '#b06af0', glow: '#e0c0ff', speed: 240 },
+    fire: { color: '#f09030', glow: '#f8e060', speed: 220 },
+    arrow: { color: '#a0722f', glow: '#d8c090', speed: 300 }
+  };
+
   var FX = Game.fx = {
+    /* ---------- 弹道 ---------- */
+    projectile: function (x, y, target, kind, onHit) {
+      var st = PROJ_STYLE[kind] || PROJ_STYLE.bolt;
+      projs.push({
+        x: x, y: y, target: target, kind: kind,
+        speed: st.speed, onHit: onHit, t: 0, trail: []
+      });
+    },
     /* ---------- 飘字 ---------- */
     floatText: function (x, y, txt, opts) {
       opts = opts || {};
@@ -91,6 +106,30 @@
     update: function (dt) {
       if (shake.t > 0) shake.t -= dt;
       var i, f;
+      // 弹道：追踪目标当前位置，命中时结算；目标死亡则消散
+      for (i = projs.length - 1; i >= 0; i--) {
+        var p = projs[i];
+        p.t += dt;
+        var tgt = p.target;
+        if (!tgt || tgt.dead || tgt.hp <= 0 || p.t > 2.5) {
+          projs.splice(i, 1);
+          continue;
+        }
+        var tx = tgt.x, ty = tgt.y - (tgt.spriteH || 14) * 0.5;
+        var dx = tx - p.x, dy = ty - p.y;
+        var dist = Math.sqrt(dx * dx + dy * dy);
+        var step = p.speed * dt;
+        p.trail.unshift({ x: p.x, y: p.y });
+        if (p.trail.length > 5) p.trail.pop();
+        if (dist <= step + 3) {
+          projs.splice(i, 1);
+          if (p.onHit) p.onHit();
+        } else {
+          p.vx = dx / dist; p.vy = dy / dist;
+          p.x += p.vx * step;
+          p.y += p.vy * step;
+        }
+      }
       for (i = floats.length - 1; i >= 0; i--) {
         f = floats[i];
         f.t += dt;
@@ -107,8 +146,35 @@
       }
     },
 
-    /** 世界空间：形状特效 */
+    /** 世界空间：形状特效 + 弹道 */
     drawShapes: function (ctx) {
+      // 弹道
+      for (var pi = 0; pi < projs.length; pi++) {
+        var p = projs[pi];
+        var st = PROJ_STYLE[p.kind] || PROJ_STYLE.bolt;
+        if (p.kind === 'arrow') {
+          var vx = p.vx || 1, vy = p.vy || 0;
+          ctx.strokeStyle = st.color;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(p.x - vx * 4, p.y - vy * 4);
+          ctx.lineTo(p.x, p.y);
+          ctx.stroke();
+          ctx.fillStyle = '#e8ecf4';
+          ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 2, 2);
+        } else {
+          for (var ti = 0; ti < p.trail.length; ti++) {
+            ctx.globalAlpha = 0.5 * (1 - ti / p.trail.length);
+            ctx.fillStyle = st.color;
+            ctx.fillRect(Math.round(p.trail[ti].x) - 1, Math.round(p.trail[ti].y) - 1, 2, 2);
+          }
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = st.glow;
+          ctx.fillRect(Math.round(p.x) - 1, Math.round(p.y) - 1, 3, 3);
+          ctx.fillStyle = st.color;
+          ctx.fillRect(Math.round(p.x), Math.round(p.y), 1, 1);
+        }
+      }
       for (var i = 0; i < shapes.length; i++) {
         var s = shapes[i];
         var k = 1 - s.t / s.life;

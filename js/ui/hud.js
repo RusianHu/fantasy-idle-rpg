@@ -25,7 +25,7 @@
         btnCamp: $('#btn-camp')
       };
 
-      Game.assets.drawToDom($('#avatar-canvas'), 'hero_face', 'icon');
+      Hud.hud.drawAvatar();
       Game.assets.drawToDom($('#icon-gold'), 'icon_gold', 'icon');
       Game.assets.drawToDom($('#icon-crystal'), 'icon_crystal', 'icon');
 
@@ -38,8 +38,14 @@
       bus.on('mode:changed', function () { Hud.hud.update(true); });
       bus.on('locale:changed', function () { Hud.hud.update(true); });
       bus.on('region:changed', function () { Hud.hud.update(true); });
+      bus.on('class:chosen', function () { Hud.hud.drawAvatar(); Hud.hud.update(true); });
 
       Hud.hud.update(true);
+    },
+
+    drawAvatar: function () {
+      var cid = Game.player.hasClass() ? Game.state.player.classId : 'fighter';
+      Game.assets.drawToDom($('#avatar-canvas'), 'face_' + cid, 'icon');
     },
 
     /** 每帧节流刷新 */
@@ -96,13 +102,23 @@
 
       // 增益 chips
       var chips = '';
+      var hero = W.hero;
+      if (hero && hero.shield > 0) {
+        chips += '<div class="buff-chip" style="background:#10283fcc;border-color:#3f6a8a;color:#a0d0f0">🛡 ' +
+          Game.i18n.fmtNum(Math.ceil(hero.shield)) + '</div>';
+      }
+      if (hero && hero.buffs && hero.buffs.length) {
+        for (var bi = 0; bi < hero.buffs.length; bi++) {
+          var bf = hero.buffs[bi];
+          chips += '<div class="buff-chip">' + t('skill.' + bf.sid + '.name') + ' ' + Math.ceil(bf.t) + 's</div>';
+        }
+      }
       if (s.world.restBuffT > 0) {
         chips += '<div class="buff-chip">' + t('ui.restBuff') + ' ' + Game.i18n.fmtDur(s.world.restBuffT) + '</div>';
       }
       if (mode === 'rest') {
         chips += '<div class="buff-chip rest">' + t('ui.restingChip') + '</div>';
       }
-      var hero = W.hero;
       if (hero && hero.state === 'recover') {
         chips += '<div class="buff-chip rest">' + t('ui.recovering', { s: Math.ceil(hero.recoverT) }) + '</div>';
       }

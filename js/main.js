@@ -43,13 +43,7 @@
     Game.audio.setMuted('bgm', !Game.state.settings.music);
 
     Game.player.recalc();
-    if (isNew) {
-      // 公会配发：一把铜剑（初始装备）
-      var starter = Game.inv.genLoot(1, { base: 'weapon', rar: 0 });
-      Game.inv.addItem(starter, { silent: true });
-      Game.inv.equip(starter.uid);
-      Game.state.player.hp = Game.state.derived.maxHp;
-    }
+    if (isNew) Game.state.player.hp = Game.state.derived.maxHp;
 
     // 世界与渲染
     Game.world.init(Game.state.world.region);
@@ -59,8 +53,28 @@
     Game.ui.modals.init();
     Game.loop.init();
 
+    // 选职业（新档；或 v1 旧档迁移补选，等价一次免费洗点）
+    function ensureClass(cb) {
+      if (Game.player.hasClass()) { if (cb) cb(); return; }
+      Game.ui.modals.classSelect(function (cid) {
+        Game.player.setClass(cid);
+        // 公会配发：职业武器（仅背包为空时）
+        if (!Game.state.inv.items.length) {
+          var starter = Game.inv.genLoot(1, { base: 'weapon', rar: 0 });
+          Game.inv.addItem(starter, { silent: true });
+          Game.inv.equip(starter.uid);
+        }
+        Game.state.player.hp = Game.state.derived.maxHp;
+        Game.world.syncHeroStats();
+        Game.ui.hud.update(true);
+        Game.save.save('class');
+        if (cb) cb();
+      });
+    }
+
     // 离线结算（防系统时间回调：ts 在未来 → 收益按 0）
-    if (!isNew) {
+    function settleOffline() {
+      if (isNew) return;
       var elapsed = (U.now() - Game.save.lastTs()) / 1000;
       if (elapsed > 0) {
         var sum = Game.offline.settle(elapsed);
@@ -73,12 +87,15 @@
       }
     }
 
-    // 序章（仅首次）
+    // 首次：序章 → 选职业；老档：直接补选（若无职业）→ 离线结算
     if (!Game.state.meta.prologueDone) {
       Game.ui.modals.prologue(function () {
         Game.state.meta.prologueDone = true;
         Game.save.save('prologue');
+        ensureClass(settleOffline);
       });
+    } else {
+      ensureClass(settleOffline);
     }
 
     Game.loop.start();
