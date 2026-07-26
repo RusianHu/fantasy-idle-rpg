@@ -10,6 +10,13 @@
 - **移动端优先**：设计基准 390×844 竖屏；桌面浏览器居中显示手机比例容器。
 - 无任何构建步骤、无外部网络依赖（EasyStar.js 0.4.4 MIT 与 Fusion Pixel 字体均已本地固定）。
 
+## 发布与缓存
+
+- HTML 始终重新校验；CSS、JS、字体统一使用 `BUILD_ID` 查询版本并长期不可变缓存，避免手机端新旧资源混用。
+- 发布前执行 `.\tools\set-build-id.ps1 -BuildId YYYYMMDD.N`，随后运行 `node tests\cache-version.test.js`。同一发布内 `index.html`、技术演示、`Game.BUILD_ID`、字体 URL 与 `version.json` 必须一致。
+- 长开标签页每 5 分钟及 `pageshow` / 重新可见时以 `no-store` 检查 `version.json`；发现新版后显示中英文更新按钮，点击时先收束过场并保存，再重载页面。
+- VPS 的项目专属 Nginx 规则位于 `deploy/nginx/fantasy-idle-rpg-cache.conf`。部署规则后必须先执行 `nginx -t`，通过后才能 reload。
+
 ## 玩法概览
 
 | 系统 | 说明 |
@@ -51,12 +58,13 @@
 
 ```
 index.html            入口（按序加载脚本）
+version.json          当前发布 BUILD_ID（线上 no-store）
 css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 tech-demos/           技术验证演示页（支持区域/世界种子 URL 参数）
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
-  core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop
+  core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop / update
   i18n/               i18n 核心 + zh-CN + en 语言包
   data/               纯内容配置：formulas(数值公式集中) / regions / monsters / items / affixes / skills / achievements
   sprites/            像素素材（字符网格+调色板，运行时编译为 canvas，自动描边/镜像/呼吸帧）

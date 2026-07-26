@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const BASE = process.env.FIRPG_URL || 'http://127.0.0.1:4176/';
+const BUILD_ID = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')).buildId;
 const port = 9300 + Math.floor(Math.random() * 400);
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'firpg-cdp-'));
 
@@ -429,7 +430,7 @@ async function run() {
       width: 390, height: 700, deviceScaleFactor: 1, mobile: true
     });
     await cdp.evaluate(`document.querySelector('#title-root .archive-view').click()`);
-    await delay(80);
+    await delay(480);
     const titleShortView = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const prompt = root.querySelector('.title-reveal-prompt').getBoundingClientRect();
@@ -2006,6 +2007,29 @@ async function run() {
     assert.equal(deletedToEmpty.mainGone, true);
     assert.equal(deletedToEmpty.backupGone, true);
     assert.equal(deletedToEmpty.noAutoStart, true);
+
+    await cdp.evaluate(`(() => {
+      Game.BUILD_ID = 'browser-stale-build';
+      Game.updateChecker.check();
+    })()`);
+    await delay(420);
+    const updateNotice = await cdp.evaluate(`(() => {
+      const notice = document.getElementById('app-update-notice');
+      if (!notice) return { visible: false };
+      const rect = notice.getBoundingClientRect();
+      return {
+        visible: getComputedStyle(notice).visibility === 'visible',
+        height: rect.height,
+        withinViewport: rect.left >= 0 && rect.right <= innerWidth,
+        build: Game.updateChecker.availableBuild(),
+        copy: notice.textContent.trim()
+      };
+    })()`);
+    assert.equal(updateNotice.visible, true, 'a stale long-running tab receives an update action');
+    assert.ok(updateNotice.height >= 44, 'the update action keeps a touch target');
+    assert.equal(updateNotice.withinViewport, true, 'the update action fits the mobile viewport');
+    assert.equal(updateNotice.build, BUILD_ID);
+    assert.ok(updateNotice.copy.includes(BUILD_ID));
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
@@ -2017,7 +2041,7 @@ async function run() {
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
       restartCompleted, restartTitleScreenshot, restartClassScreenshot, existingTitle,
       existingTitleScreenshot, entryStarted, entryMid, entryScreenshot, resumedFromArchive,
-      replacedWithFresh, deletedToEmpty
+      replacedWithFresh, deletedToEmpty, updateNotice
     }));
     cdp.ws.close();
   } finally {

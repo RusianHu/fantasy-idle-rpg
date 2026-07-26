@@ -11,7 +11,8 @@
   function loadFont() {
     if (!window.FontFace) return;
     try {
-      var ff = new FontFace('FusionPixel', 'url(assets/fonts/fusion-pixel.woff2)');
+      var fontUrl = 'assets/fonts/fusion-pixel.woff2?v=' + encodeURIComponent(Game.BUILD_ID);
+      var ff = new FontFace('FusionPixel', 'url(' + fontUrl + ')');
       ff.load().then(function (f) {
         document.fonts.add(f);
       }).catch(function () { /* 字体缺失：回退系统字体 */ });

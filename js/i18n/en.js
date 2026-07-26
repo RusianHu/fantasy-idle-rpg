@@ -15,6 +15,8 @@
       worldSeedHint: 'Layout ID shared by all eight regions',
       copySeed: 'Copy',
       seedCopied: 'World seed {seed} copied',
+      updateAvailable: 'Version {version} is ready. Tap to update safely.',
+      updateApplying: 'Saving expedition progress and updating…',
       controlTitle: 'CONTROL',
       controlAuto: 'AUTO',
       controlManual: 'MANUAL',
