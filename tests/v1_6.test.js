@@ -49,7 +49,8 @@ function expectedDecorCount(region, def, version) {
 
 function assertLayout(region, seed, layout, version) {
   const cfg = region.layout;
-  const expectedProps = region.terrain.deco.reduce((sum, def) => sum + expectedDecorCount(region, def, version), 0) + 2;
+  const campPropCount = version >= 2 ? 8 : 2;
+  const expectedProps = region.terrain.deco.reduce((sum, def) => sum + expectedDecorCount(region, def, version), 0) + campPropCount;
   const expectedPatches = region.terrain.patches.reduce((sum, def) => {
     return sum + scaledCount(def.count, version === 1 ? 1 : cfg.patchDensity);
   }, 0);
@@ -89,7 +90,7 @@ function assertLayout(region, seed, layout, version) {
     assert.ok(layout.density.decor >= 3.4 && layout.density.details >= 2);
   }
 
-  const randomProps = layout.props.filter((prop) => prop.sprite !== 'tent' && !prop.campfire);
+  const randomProps = layout.props.filter((prop) => !prop.campProp && prop.sprite !== 'tent' && !prop.campfire);
   for (let i = 0; i < randomProps.length; i++) {
     for (let j = i + 1; j < randomProps.length; j++) {
       assert.ok(
@@ -103,7 +104,7 @@ function assertLayout(region, seed, layout, version) {
   for (const prop of layout.props) {
     assertFinitePoint(prop, region.id + ':' + prop.sprite);
     assert.ok(prop.x >= 0 && prop.x <= 900 && prop.y >= 0 && prop.y <= 520);
-    if (!prop.large || prop.sprite === 'tent' || prop.campfire) continue;
+    if (!prop.large || prop.campProp || prop.sprite === 'tent' || prop.campfire) continue;
     assert.ok(Game.util.dist(prop.x, prop.y, layout.camp.x, layout.camp.y) >= layout.campSafeRadius - 0.001);
     assert.ok(Game.util.dist(prop.x, prop.y, layout.bossPoint.x, layout.bossPoint.y) >= layout.bossSafeRadius - 0.001);
     assert.ok(Game.terrain.distanceToPath(prop.x, prop.y, layout.corridor.points) >= layout.corridor.width / 2 + 9.9);

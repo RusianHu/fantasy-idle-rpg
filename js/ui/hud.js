@@ -10,6 +10,7 @@
   var els = {};
   var throttle = 0;
   var campIcon = '';
+  var controlIcon = '';
 
   var Hud = Game.ui = Game.ui || {};
   Hud.hud = {
@@ -19,11 +20,15 @@
         hpFill: $('#hud-hp-fill'), hpText: $('#hud-hp-text'),
         expFill: $('#hud-exp-fill'), expText: $('#hud-exp-text'),
         gold: $('#hud-gold'), crystal: $('#hud-crystal'),
+        battleOverlay: $('#battle-overlay'),
         regionChip: $('#region-chip'),
+        regionKicker: $('#region-kicker'),
+        regionName: $('#region-name'),
         gauge: $('#hunt-gauge'), gaugeFill: $('#hunt-fill'), gaugeText: $('#hunt-text'),
         bossBar: $('#boss-bar'), bossName: $('#boss-name'), bossFill: $('#boss-hp-fill'),
         buffChips: $('#buff-chips'),
         controlSwitch: $('#control-switch'),
+        controlIcon: $('#control-mode-icon'),
         controlTitle: $('#control-title'),
         controlModeLabel: $('#control-mode-label'),
         btnCamp: $('#btn-camp'),
@@ -94,8 +99,15 @@
       var W = Game.world;
       if (!W.region) return;
       var mode = s.world.mode;
+      var tier = Game.State.regionTier(W.region.id);
+      var routeSize = Game.State.regionOrder().length;
 
-      els.regionChip.textContent = t('region.' + W.region.id + '.name');
+      els.battleOverlay.classList.toggle('camp-mode', mode === 'rest');
+      els.regionKicker.textContent = t(mode === 'rest' ? 'ui.campKicker' : 'ui.regionKicker', {
+        n: tier,
+        total: routeSize
+      });
+      els.regionName.textContent = t('region.' + W.region.id + '.name');
 
       // 世界舞台自动 / 手动操控开关
       var controlMode = W.controlMode();
@@ -107,20 +119,31 @@
       els.controlSwitch.setAttribute('aria-checked', manual ? 'true' : 'false');
       els.controlSwitch.setAttribute('aria-label', t('ui.controlAria', { mode: controlText }));
       els.controlSwitch.title = t(manual ? 'ui.controlManualHint' : 'ui.controlAutoHint');
+      var nextControlIcon = manual ? 'icon_control_manual' : 'icon_control_auto';
+      if (controlIcon !== nextControlIcon || force) {
+        Game.assets.drawToDom(els.controlIcon, nextControlIcon, 'icon');
+        controlIcon = nextControlIcon;
+      }
 
       var gi = W.gaugeInfo();
       var boss = W.bossEnt;
       if (boss) {
         els.gauge.classList.add('hidden');
+        els.gauge.classList.remove('resting', 'full');
         els.bossBar.classList.remove('hidden');
         els.bossName.textContent = t('monster.' + boss.mid + '.name');
         els.bossFill.style.width = U.clamp(boss.hp / boss.maxHp * 100, 0, 100) + '%';
       } else {
         els.gauge.classList.remove('hidden');
         els.bossBar.classList.add('hidden');
-        els.gaugeFill.style.width = (gi.kills / gi.target * 100) + '%';
-        els.gaugeText.textContent = t('ui.huntGauge') + ' ' + gi.kills + '/' + gi.target;
-        els.gauge.classList.toggle('full', gi.kills >= gi.target);
+        var restPct = U.clamp(s.world.restBuffT / Game.F.BAL.restBuffCap * 100, 0, 100);
+        var gaugePct = mode === 'rest' ? restPct : gi.kills / gi.target * 100;
+        els.gaugeFill.style.width = gaugePct + '%';
+        els.gaugeText.textContent = mode === 'rest'
+          ? t('ui.restGauge', { p: Math.floor(restPct) })
+          : t('ui.huntGauge') + ' ' + gi.kills + '/' + gi.target;
+        els.gauge.classList.toggle('resting', mode === 'rest');
+        els.gauge.classList.toggle('full', mode === 'rest' ? restPct >= 100 : gi.kills >= gi.target);
       }
 
       // 返回营地按钮：距离、传送阶段与 Boss 撤离均有独立表达。
@@ -143,7 +166,7 @@
       var chips = '';
       var hero = W.hero;
       if (hero && hero.shield > 0) {
-        chips += '<div class="buff-chip" style="background:#10283fcc;border-color:#3f6a8a;color:#a0d0f0">🛡 ' +
+        chips += '<div class="buff-chip shield"><span class="buff-chip-mark"></span>' +
           Game.i18n.fmtNum(Math.ceil(hero.shield)) + '</div>';
       }
       if (hero && hero.buffs && hero.buffs.length) {
@@ -153,10 +176,11 @@
         }
       }
       if (s.world.restBuffT > 0) {
-        chips += '<div class="buff-chip">' + t('ui.restBuff') + ' ' + Game.i18n.fmtDur(s.world.restBuffT) + '</div>';
+        chips += '<div class="buff-chip rested"><span class="buff-chip-mark"></span>' +
+          t('ui.restBuff') + ' ' + Game.i18n.fmtDur(s.world.restBuffT) + '</div>';
       }
       if (mode === 'rest') {
-        chips += '<div class="buff-chip rest">' + t('ui.restingChip') + '</div>';
+        chips += '<div class="buff-chip rest"><span class="buff-chip-mark"></span>' + t('ui.restingChip') + '</div>';
       }
       if (hero && hero.state === 'recover') {
         chips += '<div class="buff-chip rest">' + t('ui.recovering', { s: Math.ceil(hero.recoverT) }) + '</div>';

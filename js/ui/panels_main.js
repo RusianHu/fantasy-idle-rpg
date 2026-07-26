@@ -8,7 +8,14 @@
   var $ = U.$;
 
   var TABS = ['battle', 'char', 'inv', 'skills', 'map', 'settings'];
-  var ICONS = { battle: '⚔', char: '👤', inv: '🎒', skills: '✦', map: '🗺', settings: '⚙' };
+  var ICONS = {
+    battle: 'icon_nav_battle',
+    char: 'icon_nav_char',
+    inv: 'icon_nav_inv',
+    skills: 'icon_nav_skills',
+    map: 'icon_nav_map',
+    settings: 'icon_nav_settings'
+  };
   var current = 'battle';
   var charSub = 'attr';
   var invSub = 'bag';
@@ -56,8 +63,11 @@
       var bar = $('#tabbar');
       bar.innerHTML = '';
       TABS.forEach(function (tab) {
-        var b = U.el('button', 'tab-btn', '<span class="tab-ico">' + ICONS[tab] + '</span><span class="tab-label"></span><span class="tab-dot"></span>');
+        var b = U.el('button', 'tab-btn',
+          '<span class="tab-ico"><canvas width="24" height="24" aria-hidden="true"></canvas></span>' +
+          '<span class="tab-label"></span><span class="tab-dot"></span>');
         b.setAttribute('data-tab', tab);
+        Game.assets.drawToDom(b.querySelector('canvas'), ICONS[tab], 'icon');
         b.addEventListener('click', function () { UI.tabs.open(tab); });
         bar.appendChild(b);
       });

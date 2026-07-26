@@ -33,7 +33,13 @@
   <main id="stage-wrap">
     <canvas id="stage"></canvas>
     <div id="battle-overlay">
-      <div id="region-chip"></div>
+      <div id="region-chip">
+        <span class="region-sigil" aria-hidden="true"></span>
+        <span class="region-copy">
+          <span id="region-kicker" class="region-kicker"></span>
+          <strong id="region-name" class="region-name"></strong>
+        </span>
+      </div>
       <div id="hunt-gauge" class="gauge"><div id="hunt-fill"></div><span id="hunt-text"></span></div>
       <div id="boss-bar" class="hidden">
         <div id="boss-name"></div>
@@ -41,7 +47,9 @@
       </div>
       <div id="buff-chips"></div>
       <button id="control-switch" class="control-switch" type="button" role="switch" aria-checked="false">
-        <span class="control-glyph" aria-hidden="true">◆</span>
+        <span class="control-glyph" aria-hidden="true">
+          <canvas id="control-mode-icon" width="18" height="18"></canvas>
+        </span>
         <span class="control-copy">
           <span id="control-title" class="control-title"></span>
           <strong id="control-mode-label" class="control-mode-label"></strong>

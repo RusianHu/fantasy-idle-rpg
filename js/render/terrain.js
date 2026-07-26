@@ -77,6 +77,52 @@
     }
     ctx.globalAlpha = 1;
 
+    // 营地使用稳定的磨损地垫与刻印，建立独立于区域材质的视觉中心。
+    var camp = layout.camp;
+    if (camp) {
+      ctx.save();
+      ctx.globalAlpha = 0.24;
+      ctx.fillStyle = '#4a321f';
+      ctx.beginPath();
+      ctx.ellipse(camp.x, camp.y + 12, 56, 38, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.clip();
+      for (var cy = camp.y - 25; cy <= camp.y + 49; cy += 4) {
+        for (var cx = camp.x - 54; cx <= camp.x + 54; cx += 4) {
+          var pattern = ((cx * 13 + cy * 7 + layout.regionSeed) >>> 0) % 11;
+          if (pattern < 3) {
+            ctx.globalAlpha = pattern === 0 ? 0.13 : 0.08;
+            ctx.fillStyle = pattern === 0 ? '#f1d293' : '#1d1713';
+            ctx.fillRect(cx + (pattern & 1), cy, 2, 2);
+          }
+        }
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.28;
+      ctx.strokeStyle = '#d3ad61';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(camp.x, camp.y + 9, 15, 8, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      for (var rune = 0; rune < 8; rune++) {
+        var ra = rune / 8 * Math.PI * 2;
+        var rx = Math.round(camp.x + Math.cos(ra) * 18);
+        var ry = Math.round(camp.y + 9 + Math.sin(ra) * 10);
+        ctx.fillRect(rx - 1, ry - 1, rune % 2 ? 2 : 3, 2);
+      }
+      ctx.restore();
+
+      for (var stone = 0; stone < 12; stone++) {
+        var sa = stone / 12 * Math.PI * 2 + 0.18;
+        var sx2 = Math.round(camp.x + Math.cos(sa) * 54);
+        var sy2 = Math.round(camp.y + 12 + Math.sin(sa) * 36);
+        ctx.fillStyle = stone % 3 === 0 ? 'rgba(232,210,166,0.28)' : 'rgba(32,26,28,0.30)';
+        ctx.fillRect(sx2 - 2, sy2 - 1, 4, 2);
+      }
+    }
+
     for (gy = 0; gy < layout.gh; gy++) {
       for (gx = 0; gx < layout.gw; gx++) {
         idx = gy * layout.gw + gx;

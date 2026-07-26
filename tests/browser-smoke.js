@@ -79,7 +79,10 @@ class Cdp {
       awaitPromise: true,
       returnByValue: true
     });
-    if (response.exceptionDetails) throw new Error(response.exceptionDetails.text);
+    if (response.exceptionDetails) {
+      const detail = response.exceptionDetails;
+      throw new Error(detail.exception?.description || detail.text);
+    }
     return response.result.value;
   }
 
@@ -114,6 +117,9 @@ async function run() {
     });
 
     await cdp.navigate(BASE);
+    if (cdp.errors.length) {
+      throw new Error('browser boot errors: ' + cdp.errors.join(' | '));
+    }
     const main = await cdp.evaluate(`(() => {
       if (!window.Game || !Game.world || !Game.world.layout) throw new Error('game boot failed');
       if (!Game.player.hasClass()) Game.player.setClass('fighter');

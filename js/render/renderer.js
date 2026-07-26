@@ -590,6 +590,21 @@
         frame = (((t / (p.animSpd || 1)) + (p.phase || 0)) | 0) % 2 === 0 ? 'idle0' : 'idle1';
       }
       A.draw(ctx, p.sprite, frame, p.x, p.y + oy, { flip: !!p.flipX });
+      if (p.steam && (!Game.particles || Game.particles.isEnabled())) {
+        ctx.save();
+        for (var si = 0; si < 3; si++) {
+          var steamK = (t * 0.42 + si * 0.34 + (p.phase || 0)) % 1;
+          ctx.globalAlpha = 0.36 * (1 - steamK);
+          ctx.fillStyle = '#efe6d2';
+          ctx.fillRect(
+            Math.round(p.x - 2 + si * 2 + Math.sin(t * 2.1 + si) * 1.5),
+            Math.round(p.y - 10 - steamK * 9),
+            steamK < 0.55 ? 1 : 2,
+            2
+          );
+        }
+        ctx.restore();
+      }
     }
   };
 })();

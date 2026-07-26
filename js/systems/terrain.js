@@ -367,8 +367,24 @@
         }
       }
 
-      props.push({ sprite: 'tent', x: camp.x - 30, y: camp.y - 4, shadow: true, phase: 0, flipX: false, animSpd: 1, large: true });
-      props.push({ sprite: 'campfire', x: camp.x, y: camp.y + 8, campfire: true, phase: 0, flipX: false, animSpd: 1, shadow: false, large: false });
+      function addCampProp(prop) {
+        prop.campProp = true;
+        props.push(prop);
+        if (prop.glow) glows.push(prop);
+      }
+      if (dense) {
+        addCampProp({ sprite: 'camp_banner', x: camp.x - 50, y: camp.y - 5, shadow: true, phase: 0.35, sway: true, animSpd: 1.2, large: true });
+        addCampProp({ sprite: 'tent', x: camp.x - 30, y: camp.y - 4, shadow: true, phase: 0, animSpd: 1, large: true });
+        addCampProp({ sprite: 'camp_lantern', x: camp.x + 48, y: camp.y + 4, shadow: true, phase: 0.7, flicker: true, animSpd: 0.45, large: true, glow: { color: '#f3b84f', r: 18 } });
+        addCampProp({ sprite: 'campfire', x: camp.x, y: camp.y + 8, campfire: true, phase: 0, animSpd: 1, shadow: false, large: false });
+        addCampProp({ sprite: 'camp_cookpot', x: camp.x + 1, y: camp.y + 13, shadow: true, steam: true, phase: 0.2, large: false });
+        addCampProp({ sprite: 'camp_supply', x: camp.x - 45, y: camp.y + 19, shadow: true, phase: 0, large: false });
+        addCampProp({ sprite: 'camp_bedroll', x: camp.x - 13, y: camp.y + 29, shadow: true, phase: 0, large: false });
+        addCampProp({ sprite: 'camp_log', x: camp.x + 29, y: camp.y + 27, shadow: true, phase: 0, large: false });
+      } else {
+        props.push({ sprite: 'tent', x: camp.x - 30, y: camp.y - 4, shadow: true, phase: 0, flipX: false, animSpd: 1, large: true });
+        props.push({ sprite: 'campfire', x: camp.x, y: camp.y + 8, campfire: true, phase: 0, flipX: false, animSpd: 1, shadow: false, large: false });
+      }
 
       var nw = Math.ceil(w / NAV_CELL), nh = Math.ceil(h / NAV_CELL);
       var navGrid = [], navCosts = [];
@@ -393,7 +409,7 @@
       }
       for (i = 0; i < props.length; i++) {
         var avoid = props[i];
-        if (!avoid.large || avoid.campfire || avoid.sprite === 'tent') continue;
+        if (!avoid.large || avoid.campProp || avoid.campfire || avoid.sprite === 'tent') continue;
         var asp = spriteInfo(avoid.sprite);
         var avoidR = Math.max(22, Math.min(42, Math.max(asp.w, asp.h) * 1.25));
         for (gy = 0; gy < nh; gy++) {

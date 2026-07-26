@@ -108,6 +108,182 @@
     }
   });
 
+  /* ---------------- 前线营地陈设 ---------------- */
+  D({
+    id: 'camp_banner',
+    pal: { p: '#57412b', P: '#342718', a: '#334d86', b: '#253866', y: P.gold, Y: P.goldDark, w: '#e8dcc0' },
+    anchor: { x: 3, y: 18 },
+    frames: {
+      idle0: [
+        '..y..........',
+        '.yyy.........',
+        '..p..........',
+        '..paaaaaaa...',
+        '..pabbbbba...',
+        '..pabbybba...',
+        '..pabwybba...',
+        '..pabbybba...',
+        '..pabbbbba...',
+        '..paaaaaaa...',
+        '..p.....aa...',
+        '..p....aa....',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '.PpP.........',
+        'PPPPP........'
+      ],
+      idle1: [
+        '..y..........',
+        '.yyy.........',
+        '..p..........',
+        '..p.aaaaaaa..',
+        '..p.abbbbba..',
+        '..p.abbybba..',
+        '..p.abwybba..',
+        '..p.abbybba..',
+        '..p.abbbbba..',
+        '..p.aaaaaaa..',
+        '..p....aaa...',
+        '..p.....aa...',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '..p..........',
+        '.PpP.........',
+        'PPPPP........'
+      ]
+    }
+  });
+
+  D({
+    id: 'camp_supply',
+    pal: { a: '#b98a50', b: '#865d32', c: '#4b321d', y: P.gold, r: '#8f3d36', w: '#d9d0b8' },
+    anchor: { x: 9, y: 11 },
+    frames: {
+      idle0: [
+        '..............rr..',
+        '....ww........rr..',
+        '...wwww......wrrw.',
+        '..ww..ww.....wrrw.',
+        '.aaaaaaaaaaaaawww.',
+        '.abbbbbbbbbbbba...',
+        '.abybbbybbbybba...',
+        '.abbbbbbbbbbbba...',
+        '.abbbbbybbbbba...',
+        '.accccccccccca...',
+        '..cccccccccc....',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'camp_bedroll',
+    pal: { a: '#4d628f', b: '#33456f', c: '#243255', y: '#c6a45b', s: '#9c8350' },
+    anchor: { x: 10, y: 7 },
+    frames: {
+      idle0: [
+        '....yyyyyyyyyy......',
+        '..yaaaaaaaaaaay.....',
+        '.yabbbbbbbbbbbay....',
+        'yabbbbaabbbbbbay....',
+        'yabbbbaabbbbbbay....',
+        '.yabbbbbbbbbbay.....',
+        '..ycccccccccy..ss...',
+        '...yyyyyyyyy..ssss..'
+      ]
+    }
+  });
+
+  D({
+    id: 'camp_log',
+    pal: { a: '#98683d', b: '#704725', c: '#452b18', r: '#b88655', R: '#6a4023' },
+    anchor: { x: 10, y: 6 },
+    frames: {
+      idle0: [
+        '..raaaaaaaaaaaar....',
+        '.rabbbbbbbbbbbbar...',
+        'rabbbbbbbbbbbbbbar..',
+        'rrbbccbbccbbccbbrr..',
+        '.RRRccccccccccRRR...',
+        '...cc........cc.....',
+        '..ccc........ccc....'
+      ]
+    }
+  });
+
+  D({
+    id: 'camp_cookpot',
+    pal: { a: '#c5cad2', b: '#7d8491', c: '#444a56', d: '#292d35', w: '#e8dcc0' },
+    anchor: { x: 6, y: 9 },
+    frames: {
+      idle0: [
+        '..c......c..',
+        '..c......c..',
+        '...c....c...',
+        '.aaaaaaaaaa.',
+        '..abbbbbba..',
+        '..abbbbbba..',
+        '...abbbba...',
+        '....cccc....',
+        '...dd..dd...',
+        '..dd....dd..'
+      ]
+    }
+  });
+
+  D({
+    id: 'camp_lantern',
+    pal: { p: '#544331', P: '#30261d', a: '#ffefad', b: '#f3b84f', c: '#9b4b25' },
+    anchor: { x: 4, y: 17 },
+    frames: {
+      idle0: [
+        '...pp.....',
+        '..p..p....',
+        '..p..p....',
+        '..p..ppp..',
+        '..p.p..p..',
+        '..pp....p.',
+        '..p.aaaa..',
+        '..p.abba..',
+        '..p.abba..',
+        '..p.acca..',
+        '..p..pp...',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '.PpP......',
+        'PPPPP.....'
+      ],
+      idle1: [
+        '...pp.....',
+        '..p..p....',
+        '..p..p....',
+        '..p..ppp..',
+        '..p.p..p..',
+        '..pp....p.',
+        '..p.abba..',
+        '..p.baaa..',
+        '..p.abba..',
+        '..p.acca..',
+        '..p..pp...',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '..p.......',
+        '.PpP......',
+        'PPPPP.....'
+      ]
+    }
+  });
+
   /* ---------------- 场景装饰 ---------------- */
   D({
     id: 'deco_tree',
@@ -429,6 +605,159 @@
         'gg.y......',
         'g.........',
         '..........'
+      ]
+    }
+  });
+
+  /* ---------------- 主界面操控与导航图标 ---------------- */
+  D({
+    id: 'icon_control_auto',
+    pal: { a: '#f1d477', b: '#9e7934', c: '#50401f', w: '#fff3ba' },
+    frames: {
+      icon: [
+        '....aa....',
+        '..aabbba..',
+        '.abccccba.',
+        'abccwwccba',
+        'abcwaawcba',
+        'abcwaawcba',
+        'abccwwccba',
+        '.abccccba.',
+        '..abbbba..',
+        '....aa....'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_control_manual',
+    pal: { a: '#9fe8ef', b: '#4e9ba5', c: '#275a67', w: '#efffff' },
+    frames: {
+      icon: [
+        '....aa....',
+        '....aa....',
+        '..aabba...',
+        '..abccba..',
+        'aaacwwcaaa',
+        'aaacwwcaaa',
+        '..abccba..',
+        '...abba...',
+        '....aa....',
+        '....aa....'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_battle',
+    pal: { w: P.metalLight, m: P.metal, d: P.metalDark, y: P.gold, b: P.leather },
+    frames: {
+      icon: [
+        'w........w',
+        'mw......wm',
+        '.mw....wm.',
+        '..mw..wm..',
+        '...mwwm...',
+        '...ywwy...',
+        '..by..yb..',
+        '.bb....bb.',
+        '.b......b.',
+        '..........'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_char',
+    pal: { a: '#e4c38f', b: '#9a633f', m: P.metal, d: P.metalDark, y: P.gold },
+    frames: {
+      icon: [
+        '...mmmm...',
+        '..mmyymm..',
+        '..maaaadm.',
+        '.maaaaadm.',
+        '.maabbaadm.',
+        '..maaaadm.',
+        '...mddm...',
+        '..mmmmmm..',
+        '.mm....mm.',
+        '..........'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_inv',
+    pal: { a: '#bd8748', b: '#80572f', c: '#4c321e', y: P.gold, w: '#e8dcc0' },
+    frames: {
+      icon: [
+        '...bbbb...',
+        '..b....b..',
+        '..b....b..',
+        '.aaaaaaaa.',
+        '.abbbbbba.',
+        'aabyyybaa.',
+        'aabyyybaa.',
+        'aabbbbbbaa',
+        '.acccccca.',
+        '..cccccc..'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_skills',
+    pal: { a: '#f6e68c', b: '#d29b3a', c: '#7e4f24', w: '#fff9d3' },
+    frames: {
+      icon: [
+        '....aa....',
+        '....aa....',
+        '...abba...',
+        'aaabwbaaaa',
+        'aabwwwwbaa',
+        '..bwwwwb..',
+        'aaabwbaaaa',
+        '...abba...',
+        '....aa....',
+        '....aa....'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_map',
+    pal: { a: '#d9c28a', b: '#a37e49', c: '#70502f', r: '#b84a3b', w: '#f2e2b4' },
+    frames: {
+      icon: [
+        'aaww..wwaa',
+        'abww..wwba',
+        'abw.rr.wba',
+        'abw.rr.wba',
+        'abw....wba',
+        'abw.ww.wba',
+        'abw.ww.wba',
+        'abww..wwba',
+        'aaww..wwaa',
+        '.cc....cc.'
+      ]
+    }
+  });
+
+  D({
+    id: 'icon_nav_settings',
+    pal: { a: '#c7cbd7', b: '#858da2', c: '#4c5368', y: P.gold },
+    frames: {
+      icon: [
+        '..aa..aa..',
+        '.abb..bba.',
+        'abbbbbbbba',
+        'abbaaabbba',
+        '..baayab..',
+        '..bayyab..',
+        'abbaaabbba',
+        'abbbbbbbba',
+        '.abb..bba.',
+        '..aa..aa..'
       ]
     }
   });
