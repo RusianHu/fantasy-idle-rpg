@@ -3,6 +3,8 @@
  * 每个区域：怪物、Boss、讨伐数、地形配置（底材/材质补丁/装饰丛聚/
  * 草簇配色/花簇/发光体）、环境粒子、视差远景层、林间光柱。
  * 新增区域 = 新增一条注册，零引擎改动。
+ * tradeAreas 由运行时地标解析交易范围与商品目录；当前区域默认
+ * 在各自营地提供 camp-general，未来可按区域追加特殊交易地点。
  *
  * 材质 ID：grass | dirt | water | snow | sand | lava | stone | miasma
  * 装饰字段：{sprite, count, cluster?, water?, shadow?, bob?,
@@ -296,6 +298,23 @@
   for (var i = 0; i < R.length; i++) {
     R[i].order = i;
     R[i].layout = LAYOUTS[R[i].id];
+    var tradeAreas = (R[i].tradeAreas || []).slice();
+    var hasCampSupply = false;
+    for (var ti = 0; ti < tradeAreas.length; ti++) {
+      if (tradeAreas[ti].id === 'camp-supply') { hasCampSupply = true; break; }
+    }
+    if (!hasCampSupply) {
+      tradeAreas.unshift({
+        id: 'camp-supply',
+        kind: 'camp',
+        anchor: 'camp',
+        radiusFrom: 'campSafeRadius',
+        catalogs: ['camp-general'],
+        priority: 10,
+        nameKey: 'tradeArea.camp'
+      });
+    }
+    R[i].tradeAreas = tradeAreas;
     Game.register('region', R[i]);
   }
 })();

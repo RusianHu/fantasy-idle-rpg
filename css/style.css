@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260726.2') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260726.3') format('woff2');
   font-display: swap;
 }
 
@@ -944,6 +944,20 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   border-color: var(--gold-dark);
   color: var(--gold);
 }
+.subtab.trade-locked {
+  color: #8f91a7;
+  border-color: #343959;
+}
+.subtab.trade-locked::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-left: 6px;
+  background: #4a4f6d;
+  border: 1px solid #11152c;
+  box-shadow: 0 0 0 1px #242943;
+}
 
 /* ---------- 底部 Tab 导航 ---------- */
 #tabbar {
@@ -1044,6 +1058,48 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
 .card .name { font-size: 13px; }
 .card .desc { font-size: 11px; color: var(--ink-dim); margin-top: 3px; line-height: 1.45; }
 .card.locked { opacity: .55; }
+
+.trade-gate-card,
+.trade-context-card {
+  position: relative;
+  padding-left: 38px;
+}
+.trade-context-card {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  border-color: #76652d;
+  background:
+    linear-gradient(90deg, #78612212, transparent 44%),
+    linear-gradient(180deg, #1d2348, #13172f);
+}
+.trade-gate-card {
+  min-height: 92px;
+  border-color: #414765;
+}
+.trade-status-mark {
+  position: absolute;
+  left: 11px;
+  top: 14px;
+  width: 14px;
+  height: 14px;
+  background: #424863;
+  border: 2px solid #171b34;
+  box-shadow: 0 0 0 2px #777d94;
+}
+.trade-context-card .trade-status-mark {
+  background: #d0a947;
+  box-shadow: 0 0 0 2px #7a632a, 0 0 9px #e0ba5266;
+}
+.trade-return-btn {
+  margin-top: 12px;
+  min-height: 44px;
+}
+.shop-section-title {
+  margin: 10px 0 6px;
+  color: var(--gold);
+  font-size: 12px;
+}
 
 /* 属性双栏 */
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
