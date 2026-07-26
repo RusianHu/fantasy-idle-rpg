@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260727.4') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260727.5') format('woff2');
   font-display: swap;
 }
 
@@ -232,7 +232,8 @@ img { image-rendering: pixelated; }
   background: linear-gradient(0deg, #070916aa, transparent);
 }
 #battle-overlay .btn,
-#battle-overlay .control-switch { pointer-events: auto; }
+#battle-overlay .control-switch,
+#battle-overlay .auto-boss-switch { pointer-events: auto; }
 
 #region-chip {
   position: absolute; left: 9px; top: 9px;
@@ -344,6 +345,158 @@ img { image-rendering: pixelated; }
 .gauge.resting #hunt-fill { background: linear-gradient(180deg, #d2c572, #718b47 58%, #3b5d37); }
 .gauge.full #hunt-fill { animation: gaugePulse .5s steps(2) infinite; }
 @keyframes gaugePulse { 50% { filter: brightness(1.5); } }
+
+/* 讨伐条旁的 Boss 操作：小体积像素委托牌 + 独立自动开关 */
+.hunt-actions {
+  position: absolute;
+  right: 9px;
+  top: 39px;
+  width: 150px;
+  height: 44px;
+  display: grid;
+  grid-template-columns: 82px 64px;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 3;
+}
+#battle-overlay .boss-hunt-button {
+  position: relative;
+  width: 82px;
+  height: 44px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 3px 5px;
+  gap: 3px;
+  overflow: hidden;
+  border: 2px solid #76623a;
+  outline: 1px solid #080a18;
+  border-radius: 0;
+  color: #d8c9a0;
+  background:
+    linear-gradient(135deg, transparent 0 4px, #40351f 4px) top left,
+    linear-gradient(315deg, transparent 0 4px, #211b19 4px) bottom right;
+  background-size: 56% 100%;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 1px 0 #967b4355, 0 2px 7px #0009;
+  font-size: 9px;
+  line-height: 1;
+  white-space: nowrap;
+  text-transform: none;
+}
+.boss-hunt-button::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 2px;
+  height: 2px;
+  background: #745d30;
+  box-shadow: -72px -24px 0 #b09149;
+  transform: rotate(45deg);
+}
+.boss-hunt-button canvas {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(1px 1px 0 #080914);
+}
+#boss-hunt-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+#battle-overlay .boss-hunt-button.ready {
+  color: #fff0b6;
+  border-color: #d2a849;
+  background:
+    linear-gradient(135deg, transparent 0 4px, #744a25 4px) top left,
+    linear-gradient(315deg, transparent 0 4px, #3d2220 4px) bottom right;
+  background-size: 56% 100%;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 1px 0 #ffcf7055, 0 0 8px #c34f2c66, 0 2px 7px #0009;
+  animation: bossHuntReady .8s steps(2, end) infinite;
+}
+@keyframes bossHuntReady {
+  50% { filter: brightness(1.2); }
+}
+
+.auto-boss-switch {
+  position: relative;
+  width: 64px;
+  height: 44px;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px;
+  color: #7f87a6;
+  background: linear-gradient(180deg, #232844, #15182f 58%, #0e1124);
+  border: 2px solid #454b74;
+  outline: 1px solid #080a18;
+  border-radius: 0;
+  box-shadow: inset 0 1px 0 #56608a55, 0 2px 7px #0009;
+  font-family: inherit;
+  text-shadow: 1px 1px 0 #000;
+  cursor: pointer;
+}
+.auto-boss-switch::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 2px;
+  height: 2px;
+  background: #555d86;
+}
+.auto-boss-switch.on {
+  color: #efd77f;
+  border-color: #8c7439;
+  background: linear-gradient(180deg, #4e4124, #29251f 58%, #171724);
+}
+.auto-boss-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 8px;
+  line-height: 1;
+  text-align: center;
+}
+html[lang="en"] .auto-boss-label { font-size: 7px; letter-spacing: .3px; }
+.auto-boss-track {
+  position: relative;
+  width: 22px;
+  height: 12px;
+  background: #080b1d;
+  border: 1px solid #434a76;
+  box-shadow: inset 0 0 0 1px #12162f;
+}
+.auto-boss-knob {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 6px;
+  height: 6px;
+  background: #777e9a;
+  box-shadow: 0 0 3px #777e9a66;
+  transition: left .14s steps(2), background .14s;
+}
+.auto-boss-switch.on .auto-boss-track { border-color: #967735; }
+.auto-boss-switch.on .auto-boss-knob {
+  left: 12px;
+  background: #e6c45d;
+  box-shadow: 0 0 4px #e6c45daa;
+}
+.auto-boss-switch:active { transform: translateY(2px); filter: brightness(1.15); }
+.auto-boss-switch:focus-visible,
+.boss-hunt-button:focus-visible {
+  outline: 2px solid #f1d477;
+  outline-offset: 2px;
+}
+.camp-mode .hunt-actions { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  #battle-overlay .boss-hunt-button.ready { animation: none; }
+}
 
 #boss-bar {
   position: absolute; left: 50%; top: 50px;
@@ -881,12 +1034,14 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
 
 .scene-locked #battle-overlay .btn,
 .scene-locked #battle-overlay .control-switch,
+.scene-locked #battle-overlay .auto-boss-switch,
 .scene-locked #tabbar,
 .scene-locked #panel-container {
   pointer-events: none;
 }
 .scene-locked #battle-overlay .btn,
-.scene-locked #battle-overlay .control-switch {
+.scene-locked #battle-overlay .control-switch,
+.scene-locked #battle-overlay .auto-boss-switch {
   opacity: 0;
 }
 .scene-locked #battle-overlay { filter: saturate(.82) brightness(.88); }

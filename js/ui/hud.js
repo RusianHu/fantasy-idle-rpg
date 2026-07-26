@@ -26,6 +26,12 @@
         regionKicker: $('#region-kicker'),
         regionName: $('#region-name'),
         gauge: $('#hunt-gauge'), gaugeFill: $('#hunt-fill'), gaugeText: $('#hunt-text'),
+        huntActions: $('#hunt-actions'),
+        btnBossHunt: $('#btn-boss-hunt'),
+        bossHuntIcon: $('#boss-hunt-icon'),
+        bossHuntLabel: $('#boss-hunt-label'),
+        autoBossSwitch: $('#auto-boss-switch'),
+        autoBossLabel: $('#auto-boss-label'),
         bossBar: $('#boss-bar'), bossName: $('#boss-name'), bossFill: $('#boss-hp-fill'),
         buffChips: $('#buff-chips'),
         controlSwitch: $('#control-switch'),
@@ -47,7 +53,28 @@
       Hud.hud.drawAvatar();
       Game.assets.drawToDom($('#icon-gold'), 'icon_gold', 'icon');
       Game.assets.drawToDom($('#icon-crystal'), 'icon_crystal', 'icon');
+      Game.assets.drawToDom(els.bossHuntIcon, 'icon_boss_hunt', 'icon');
 
+      els.btnBossHunt.addEventListener('click', function () {
+        if (!Game.world.trySpawnBoss({ manual: true }) && Game.ui.modals) {
+          var gi = Game.world.gaugeInfo();
+          Game.ui.modals.toast(Game.i18n.t(
+            gi.kills < gi.target ? 'ui.bossHuntLocked' : 'ui.bossHuntBusy',
+            { n: Math.max(0, gi.target - gi.kills) }
+          ), 'warn');
+        }
+        Hud.hud.update(true);
+      });
+      els.autoBossSwitch.addEventListener('click', function () {
+        var enabled = Game.state.settings.autoBoss === false;
+        Game.state.settings.autoBoss = enabled;
+        bus.emit('settings:changed', { key: 'autoBoss', value: enabled });
+        if (enabled) Game.world.trySpawnBoss();
+        if (Game.ui.modals) {
+          Game.ui.modals.toast(Game.i18n.t(enabled ? 'ui.autoBossOn' : 'ui.autoBossOff'));
+        }
+        Hud.hud.update(true);
+      });
       els.btnCamp.addEventListener('click', function () {
         var mode = Game.state.world.mode;
         Game.world.setMode(mode === 'rest' ? 'battle' : 'rest');
@@ -83,6 +110,9 @@
       bus.on('control:changed', function () { Hud.hud.update(true); });
       bus.on('locale:changed', function () { Hud.hud.update(true); });
       bus.on('region:changed', function () { Hud.hud.update(true); });
+      bus.on('boss:spawned', function () { Hud.hud.update(true); });
+      bus.on('boss:failed', function () { Hud.hud.update(true); });
+      bus.on('boss:defeated', function () { Hud.hud.update(true); });
       bus.on('class:chosen', function () { Hud.hud.drawAvatar(); Hud.hud.update(true); });
       bus.on('trade:contextChanged', function () { Hud.hud.update(true); });
       bus.on('item:used', function () { Hud.hud.update(true); });
@@ -158,6 +188,30 @@
 
       var gi = W.gaugeInfo();
       var boss = W.bossEnt;
+
+      // 讨伐条下方的紧凑 Boss 操作组：自动讨伐默认开启，关闭后满进度待命。
+      var autoBoss = s.settings.autoBoss !== false;
+      var bossReady = mode === 'battle' && !boss && gi.kills >= gi.target &&
+        W.hero && W.hero.state !== 'dead' && W.hero.state !== 'recover' &&
+        (!Game.transitions || !Game.transitions.isActive());
+      els.huntActions.classList.toggle('hidden', !!boss || mode === 'rest');
+      els.bossHuntLabel.textContent = t('ui.bossHunt');
+      els.btnBossHunt.disabled = !bossReady;
+      els.btnBossHunt.classList.toggle('ready', bossReady);
+      els.btnBossHunt.setAttribute('aria-label', t('ui.bossHunt'));
+      els.btnBossHunt.title = bossReady
+        ? t('ui.bossHuntReady')
+        : t(gi.kills < gi.target ? 'ui.bossHuntLocked' : 'ui.bossHuntBusy', {
+          n: Math.max(0, gi.target - gi.kills)
+        });
+      els.autoBossLabel.textContent = t('ui.autoBossShort');
+      els.autoBossSwitch.classList.toggle('on', autoBoss);
+      els.autoBossSwitch.setAttribute('aria-checked', autoBoss ? 'true' : 'false');
+      els.autoBossSwitch.setAttribute('aria-label', t('ui.autoBossAria', {
+        state: t(autoBoss ? 'ui.switchOn' : 'ui.switchOff')
+      }));
+      els.autoBossSwitch.title = t('ui.autoBossHint');
+
       if (boss) {
         els.gauge.classList.add('hidden');
         els.gauge.classList.remove('resting', 'full');

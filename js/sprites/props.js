@@ -1143,6 +1143,22 @@
     }
   });
 
+  D({
+    id: 'icon_boss_hunt',
+    pal: { w: P.metalLight, m: P.metalDark, g: P.gold, r: '#d75a4b' },
+    frames: {
+      icon: [
+        'w.....w',
+        'mw...wm',
+        '.mw.wm.',
+        '..wrw..',
+        '..mgm..',
+        '.m...m.',
+        'g.....g'
+      ]
+    }
+  });
+
   /* ---------------- 主界面操控与导航图标 ---------------- */
   D({
     id: 'icon_control_auto',

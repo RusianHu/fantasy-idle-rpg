@@ -605,6 +605,9 @@ assert.deepEqual(Object.keys(migratedV9.inv.materials), []);
 assert.deepEqual(Object.keys(migratedV9.world.nodeCooldowns), []);
 assert.equal(migratedV9.settings.groundLoot, true);
 assert.equal(migratedV9.settings.autoCampRest, false);
+delete migratedV9.settings.autoBoss;
+Game.save.applyLoaded(migratedV9);
+assert.equal(Game.state.settings.autoBoss, true, 'old saves inherit automatic boss hunts');
 
 const index = read('index.html');
 assert.ok(index.indexOf('js/systems/items.js') < index.indexOf('js/systems/combat.js'));

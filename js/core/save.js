@@ -245,6 +245,7 @@
       if (data.createdAt) st.createdAt = data.createdAt;
       U.merge(st.settings, data.settings || {});
       st.settings.controlMode = st.settings.controlMode === 'manual' ? 'manual' : 'auto';
+      st.settings.autoBoss = st.settings.autoBoss !== false;
       U.merge(st.player, data.player || {});
       if (data.inv) {
         st.inv.items = Array.isArray(data.inv.items) ? data.inv.items : [];

@@ -84,7 +84,8 @@
         createdAt: U.now(),
         settings: {
           lang: 'zh-CN', effects: true, potionThreshold: 0.3,
-          autoAdvance: true, autoSkillUpgrade: true, autoEquip: true,
+          autoAdvance: true, autoBoss: true,
+          autoSkillUpgrade: true, autoEquip: true,
           groundLoot: true, autoCampRest: false,
           controlMode: 'auto',
           sfx: true, music: true

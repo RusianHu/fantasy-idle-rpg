@@ -18,7 +18,7 @@
     var stage = document.getElementById('stage-wrap');
     if (app) app.classList.toggle('scene-locked', flag);
     if (stage) stage.setAttribute('aria-busy', flag ? 'true' : 'false');
-    ['control-switch', 'btn-camp'].forEach(function (id) {
+    ['control-switch', 'btn-camp', 'btn-boss-hunt', 'auto-boss-switch'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.disabled = !!flag;
     });

@@ -182,16 +182,20 @@
       return { kills: Math.min(prog.kills, W.region.killTarget), target: W.region.killTarget, cleared: prog.cleared };
     },
 
-    trySpawnBoss: function () {
-      if (Game.transitions && Game.transitions.isActive()) return;
-      if (W.bossEnt || Game.state.world.mode !== 'battle') return;
+    trySpawnBoss: function (opts) {
+      opts = opts || {};
+      var manual = !!opts.manual;
+      if (!manual && Game.state.settings.autoBoss === false) return false;
+      if (Game.transitions && Game.transitions.isActive()) return false;
+      if (W.bossEnt || Game.state.world.mode !== 'battle') return false;
       var region = W.region;
       var prog = Game.State.regionProg(region.id);
-      if (prog.kills < region.killTarget) return;
+      if (prog.kills < region.killTarget) return false;
       // 状态不佳时暂缓登场，避免登场即团灭的循环
       var hero = W.hero;
-      if (!hero || hero.state === 'dead' || hero.state === 'recover') return;
-      if (Game.player.hpPct() < 0.6) return;
+      if (!hero || hero.state === 'dead' || hero.state === 'recover') return false;
+      // 玩家主动发起时尊重其挑战意愿；自动讨伐仍等生命恢复到安全线。
+      if (!manual && Game.player.hpPct() < 0.6) return false;
 
       var ent = W.makeMonster(region.boss, true);
       ent.x = W.layout.bossPoint.x;
@@ -213,6 +217,7 @@
         Game.fx.banner('ui.bossAppear', { name: Game.i18n.t('monster.' + ent.mid + '.name') });
       }
       bus.emit('boss:spawned', { rid: region.id, mid: ent.mid });
+      return true;
     },
 
     onBossDefeated: function (ent) {
@@ -894,8 +899,8 @@
       W.updateGroundLoot(dt);
       W.updateAutoCamp(hero);
 
-      // 讨伐进度满 → Boss 登场
-      W.trySpawnBoss();
+      // 自动讨伐开启时，进度满且状态安全才让 Boss 登场；关闭时等待手动按钮。
+      if (Game.state.settings.autoBoss !== false) W.trySpawnBoss();
 
       // Boss 登场演出计时
       if (W.cinematic) {

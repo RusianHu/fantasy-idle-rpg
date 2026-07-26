@@ -666,12 +666,36 @@ async function run() {
       Game.state.player.hp = hero.maxHp * Game.state.settings.potionThreshold * 0.5;
       Game.ui.hud.update(true);
       const lowHpCampFlashes = campButton.classList.contains('low-hp');
-      Game.state.player.hp = hero.maxHp;
       const prog = Game.State.regionProg(W.region.id);
+      const bossButton = document.getElementById('btn-boss-hunt');
+      const bossSwitch = document.getElementById('auto-boss-switch');
+      const bossIcon = document.getElementById('boss-hunt-icon');
+      const autoBossDefault = Game.state.settings.autoBoss === true;
+      Game.state.settings.autoBoss = false;
       prog.kills = W.region.killTarget;
-      W.trySpawnBoss();
+      Game.state.player.hp = hero.maxHp * 0.3;
+      Game.ui.hud.update(true);
+      const autoBossSuppressed = W.trySpawnBoss() === false && !W.bossEnt;
+      const bossButtonReady = !bossButton.disabled && bossButton.classList.contains('ready');
+      const bossSwitchOff = bossSwitch.getAttribute('aria-checked') === 'false';
+      const stageRect = document.getElementById('stage-wrap').getBoundingClientRect();
+      const gaugeRect = document.getElementById('hunt-gauge').getBoundingClientRect();
+      const actionRect = document.getElementById('hunt-actions').getBoundingClientRect();
+      const buttonRect = bossButton.getBoundingClientRect();
+      const switchRect = bossSwitch.getBoundingClientRect();
+      const bossControlsCompact = actionRect.width <= gaugeRect.width + 0.5 &&
+        actionRect.right <= stageRect.right + 0.5 &&
+        buttonRect.height >= 44 && switchRect.height >= 44;
+      const bossIconPixels = bossIcon.getContext('2d').getImageData(0, 0, bossIcon.width, bossIcon.height).data;
+      let bossIconVisiblePixels = 0;
+      for (let i = 3; i < bossIconPixels.length; i += 4) {
+        if (bossIconPixels[i] > 0) bossIconVisiblePixels++;
+      }
+      bossButton.click();
       const bossAtLandmark = !!W.bossEnt &&
         U.dist(W.bossEnt.x, W.bossEnt.y, W.layout.bossPoint.x, W.layout.bossPoint.y) < 0.01;
+      const manualBossLowHp = bossAtLandmark;
+      Game.state.player.hp = hero.maxHp;
       Game.ui.hud.update(true);
       const bossCampAction = W.campActionState();
       const bossCampEnabled = !campButton.disabled;
@@ -682,6 +706,7 @@ async function run() {
         !hero.target && prog.kills === Math.ceil(W.region.killTarget / 2);
       const bossRetreatReason = bossFailurePayload && bossFailurePayload.reason;
       W.setMode('battle');
+      Game.state.settings.autoBoss = true;
 
       const beforeLargeDt = { x: hero.x, y: hero.y };
       W.moveVector(hero, 1, 0, 56, 8);
@@ -701,7 +726,9 @@ async function run() {
         nearCampAction: nearCampAction.id, nearButtonText, campIconVisiblePixels, campButtonEmojiFree,
         nearCampSitting, nearCampState, nearCampDistance, sittingCampAction: sittingCampAction.id,
         farCampAction: farCampAction.id, farWarpStarted, warpCampAction: warpCampAction.id, farCampSitting,
-        deathAtCamp, lowHpCampFlashes, bossAtLandmark, bossCampAction: bossCampAction.id,
+        deathAtCamp, lowHpCampFlashes, autoBossDefault, autoBossSuppressed, bossButtonReady,
+        bossSwitchOff, bossControlsCompact, bossIconVisiblePixels, manualBossLowHp,
+        bossAtLandmark, bossCampAction: bossCampAction.id,
         bossCampEnabled, bossRetreatSafe, bossRetreatReason, largeDtStep, regionSwitchUsesLayout
       };
     })()`);
@@ -723,6 +750,13 @@ async function run() {
     assert.equal(worldChecks.farCampSitting, true);
     assert.equal(worldChecks.deathAtCamp, true);
     assert.equal(worldChecks.lowHpCampFlashes, true);
+    assert.equal(worldChecks.autoBossDefault, true);
+    assert.equal(worldChecks.autoBossSuppressed, true);
+    assert.equal(worldChecks.bossButtonReady, true);
+    assert.equal(worldChecks.bossSwitchOff, true);
+    assert.equal(worldChecks.bossControlsCompact, true);
+    assert.ok(worldChecks.bossIconVisiblePixels > 10, 'boss hunt uses a rendered pixel icon');
+    assert.equal(worldChecks.manualBossLowHp, true, 'manual boss challenge bypasses the automatic HP guard');
     assert.equal(worldChecks.bossAtLandmark, true);
     assert.equal(worldChecks.bossCampAction, 'boss-retreat');
     assert.equal(worldChecks.bossCampEnabled, true);
