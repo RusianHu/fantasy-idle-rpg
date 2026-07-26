@@ -120,6 +120,13 @@
   新材质零引擎改动；与环境粒子共用同一开关，低端设备可关闭。
   - 本节所有氛围与互动效果均为渲染层实现，走 `render/` 模块与区域注册表配置，遵循插件化架构，不影响挂机数值与存档。
 
+  ## 静态资源发布与缓存（必须）
+  - `BUILD_ID` 与游戏内容版本、存档版本相互独立。每次发布只要任一 HTML/CSS/JS/字体变化，必须生成从未在线使用过的新 `BUILD_ID`；主入口、QA 页面、`Game.BUILD_ID`、字体 URL 和 `version.json` 必须同步，自动测试禁止漏标、混标或复用。
+  - HTML 响应使用 `Cache-Control: no-cache, must-revalidate`；`version.json` 使用 `no-store`；带 `BUILD_ID` 的 CSS/JS/字体使用 `public, max-age=31536000, immutable`。不得依赖 `meta http-equiv` 替代服务器响应头，不得只给 CSS 单独加版本。
+  - 长开移动标签页每 5 分钟、从后台恢复及 BFCache `pageshow` 时检查 `version.json`。发现新版仅显示 ≥44px 的中英文更新入口，不强制打断；确认后先将过场收束到安全态并保存，再重载。
+  - 发布必须使用项目路径专属 Nginx 规则，不修改同域其他项目的全局缓存；配置先 `nginx -t`、后 reload。部署产物须来自已测试提交，以临时目录解包并通过目录切换上线，保留可恢复备份。
+  - 验收覆盖：全部入口的本地资源 URL 共用同一 `BUILD_ID`；HTML、`version.json`、CSS/JS/字体线上缓存头正确；旧版本 URL 与新版本 URL 可同时读取；390×844 中英文更新提示无溢出；`file://` 直开不发版本请求。
+
   ## 音频（本期缺省，仅预留接口与占位）
   - 本期**不实现实际发声**，但接口与触发点必须一次埋到位，未来补音频时零逻辑改动：
     - 实现 `AudioManager` 占位模块，提供 `playSfx(id)`、`playBgm(id)`、`stopBgm()`、`setMuted(bool)`

@@ -15,6 +15,8 @@
       worldSeedHint: '此存档的八区布局标识',
       copySeed: '复制',
       seedCopied: '已复制世界种子 {seed}',
+      updateAvailable: '检测到新版本 {version}，点击安全更新',
+      updateApplying: '正在保存远征进度并更新…',
       controlTitle: '操控',
       controlAuto: '自动',
       controlManual: '手动',

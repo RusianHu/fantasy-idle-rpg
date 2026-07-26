@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260726.1') format('woff2');
   font-display: swap;
 }
 
@@ -1122,6 +1122,34 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   pointer-events: none;
   display: flex;
   justify-content: center;
+}
+
+/* ---------- 新版本提示：长开标签页恢复后可安全重载 ---------- */
+#app-update-notice {
+  position: fixed;
+  z-index: 90;
+  top: calc(10px + env(safe-area-inset-top, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100vw - 24px), 456px);
+  min-height: 44px;
+  padding: 9px 14px;
+  border-color: var(--gold-dark);
+  color: var(--gold);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#app-update-notice:focus-visible {
+  outline: 3px solid #eef1f6;
+  outline-offset: 2px;
+}
+#app-update-notice[disabled] {
+  cursor: wait;
+  color: var(--ink-dim);
 }
 .modal-mask {
   position: absolute; inset: 0;
