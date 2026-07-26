@@ -20,6 +20,14 @@
 
   function step(dt) {
     var st = Game.state;
+    // 标题与建角流程只保留背景渲染所需的视觉更新，严禁在遮罩后战斗、
+    // 增长游玩统计或推进世界时间。
+    if (!Game.State.isAdventureStarted()) {
+      Game.terrain.update(dt);
+      Game.particles.update(dt);
+      Game.fx.update(dt);
+      return;
+    }
     if (Game.ending && Game.ending.isActive()) {
       Game.terrain.update(dt);
       Game.ending.update(dt);

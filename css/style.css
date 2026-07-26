@@ -1517,21 +1517,37 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 }
 .title-ui .btn { pointer-events: auto; }
 .title-logo {
-  font-size: 36px;
+  font-size: 38px;
   color: var(--gold);
   text-align: center;
   line-height: 1.2;
-  letter-spacing: 8px;
-  text-shadow: 3px 3px 0 #16122b, -2px -2px 0 #16122b, 2px -2px 0 #16122b,
-    -2px 2px 0 #16122b, 0 0 22px #d8b45a66;
+  letter-spacing: 9px;
+  text-shadow: 4px 4px 0 #0a0b18, -2px -2px 0 #25213b, 2px -2px 0 #16122b,
+    -2px 2px 0 #16122b, 0 0 28px #e3b95a7a;
 }
 .title-sub {
   display: block;
+  position: relative;
+  width: max-content;
   font-size: 10px;
   color: var(--ink-dim);
   letter-spacing: 5px;
-  margin-top: 10px;
+  margin: 11px auto 0;
   text-shadow: 1px 1px 0 #000;
+}
+.title-sub::before,
+.title-sub::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c99f4d88);
+}
+.title-sub::before { right: calc(100% + 12px); }
+.title-sub::after {
+  left: calc(100% + 8px);
+  transform: scaleX(-1);
 }
 .title-menu {
   margin-top: auto;

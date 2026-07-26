@@ -130,6 +130,18 @@ async function run() {
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       let warmPixels = 0;
       let opaquePixels = 0;
+      let citadelPixels = 0;
+      let riverPixels = 0;
+      let farRiverPixels = 0;
+      let belowCliffWaterPixels = 0;
+      let cliffFacePixels = 0;
+      let snowPixels = 0;
+      let forestPixels = 0;
+      let nestPixels = 0;
+      let pixelPairMatches = 0;
+      let pixelPairMatchesShifted = 0;
+      let pixelPairSamples = 0;
+      const landscapeColors = new Set();
       const y0 = Math.floor(canvas.height * 0.58);
       const y1 = Math.floor(canvas.height * 0.86);
       for (let y = y0; y < y1; y += 2) {
@@ -139,12 +151,87 @@ async function run() {
           if (pixels[i] > 105 && pixels[i] > pixels[i + 1] * 1.12 && pixels[i + 1] > pixels[i + 2]) warmPixels++;
         }
       }
+      for (let y = Math.floor(canvas.height * 0.36); y < Math.floor(canvas.height * 0.58); y++) {
+        for (let x = Math.floor(canvas.width * 0.64); x < Math.floor(canvas.width * 0.94); x++) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (r > 85 && r > g * 1.24 && r > b * 1.12) citadelPixels++;
+        }
+      }
+      for (let y = Math.floor(canvas.height * 0.34); y < Math.floor(canvas.height * 0.7); y += 2) {
+        for (let x = 0; x < canvas.width - 1; x += 2) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (r < 80 && g > 67 && b > 82 && b > g * 1.05) riverPixels++;
+          if (r > 130 && g > 140 && b > 145 && b - r < 85) snowPixels++;
+          if (g > 34 && g > r * 1.32 && b > r * 1.22 && Math.abs(g - b) < 28) forestPixels++;
+          landscapeColors.add(r + ',' + g + ',' + b);
+
+          const j = i + 4;
+          pixelPairSamples++;
+          if (
+            pixels[i] === pixels[j] &&
+            pixels[i + 1] === pixels[j + 1] &&
+            pixels[i + 2] === pixels[j + 2]
+          ) pixelPairMatches++;
+          if (x + 2 < canvas.width) {
+            const k = i + 8;
+            if (
+              pixels[j] === pixels[k] &&
+              pixels[j + 1] === pixels[k + 1] &&
+              pixels[j + 2] === pixels[k + 2]
+            ) pixelPairMatchesShifted++;
+          }
+        }
+      }
+      for (let y = Math.floor(canvas.height * 0.48); y < Math.floor(canvas.height * 0.7); y++) {
+        for (let x = Math.floor(canvas.width * 0.05); x < Math.floor(canvas.width * 0.36); x++) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (r > 150 && g > 138 && b > 105 && r - g < 34 && g - b < 58) nestPixels++;
+        }
+      }
+      for (let y = Math.floor(canvas.height * 0.7); y < Math.floor(canvas.height * 0.745); y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (r < 80 && g > 67 && b > 82 && b > g * 1.05) belowCliffWaterPixels++;
+        }
+      }
+      for (let y = Math.floor(canvas.height * 0.65); y < Math.floor(canvas.height * 0.7); y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (
+            r > 42 && r < 105 &&
+            Math.abs(r - g) < 18 &&
+            Math.abs(g - b) < 18
+          ) cliffFacePixels++;
+        }
+      }
+      for (let y = Math.floor(canvas.height * 0.6); y < Math.floor(canvas.height * 0.69); y++) {
+        for (let x = 0; x < canvas.width; x++) {
+          const i = (y * canvas.width + x) * 4;
+          const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+          if (r < 80 && g > 67 && b > 82 && b > g * 1.05) farRiverPixels++;
+        }
+      }
       const sr = start.getBoundingClientRect();
       const lr = lang.getBoundingClientRect();
       return {
         visible: true,
         warmPixels,
         opaquePixels,
+        citadelPixels,
+        riverPixels,
+        farRiverPixels,
+        belowCliffWaterPixels,
+        cliffFacePixels,
+        snowPixels,
+        forestPixels,
+        nestPixels,
+        pixelGridRatio: Math.max(pixelPairMatches, pixelPairMatchesShifted) / Math.max(1, pixelPairSamples),
+        landscapeColors: landscapeColors.size,
         canvasColors: new Set(Array.from({ length: 1000 }, (_, n) => {
           const i = Math.min(pixels.length - 4, n * Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4));
           return pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2];
@@ -157,15 +244,104 @@ async function run() {
     })()`);
     assert.equal(titleScene.visible, true, 'new saves open on the title scene');
     assert.ok(titleScene.warmPixels > 45, 'title camp has a visible warm fire-and-lantern focal area');
+    assert.ok(
+      titleScene.citadelPixels > 4 && titleScene.citadelPixels < 220,
+      'title scene keeps the demon citadel visible but distant'
+    );
+    assert.ok(titleScene.riverPixels > 35, 'title scene shows a broad river instead of a route line');
+    assert.ok(titleScene.farRiverPixels > 20, 'the distant river visibly feeds the cliff waterfall');
+    assert.ok(titleScene.belowCliffWaterPixels > 60, 'water visibly occupies the area below the cliff face');
+    assert.ok(titleScene.cliffFacePixels > 40, 'the lookout has a visible vertical cliff face');
+    assert.ok(titleScene.snowPixels > 20, 'title scene shows snow-capped mountains');
+    assert.ok(titleScene.forestPixels > 70, 'title scene shows a dense forest layer');
+    assert.ok(titleScene.nestPixels > 4, 'title scene shows the creature nest and eggs');
+    assert.ok(
+      titleScene.pixelGridRatio > 0.78,
+      'title landscape stays aligned to the 2x pixel-art grid: ' + titleScene.pixelGridRatio
+    );
+    assert.ok(titleScene.landscapeColors > 24, 'title scene has layered mid- and far-distance scenery');
     assert.ok(titleScene.canvasColors > 30, 'title camp canvas has enough visual variety');
     assert.ok(titleScene.opaquePixels > 1000, 'title camp canvas is painted');
     assert.ok(titleScene.startHeight >= 44, 'title start action keeps a touch target');
     assert.equal(titleScene.buttonsSeparate, true);
     assert.equal(titleScene.startFits, true);
     assert.equal(titleScene.noHorizontalOverflow, true);
+
+    // 删除存档后停在标题页：不重建存档、不推进世界、不允许任何离线结算或入账。
+    const unopenedTitle = await cdp.evaluate(`(() => {
+      const before = {
+        worldTime: Game.state.world.worldTime,
+        stats: JSON.stringify(Game.state.meta.stats),
+        player: JSON.stringify(Game.state.player)
+      };
+      const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, 'hidden');
+      const realNow = Game.util.now;
+      let simulatedNow = realNow();
+      let simulatedHidden = true;
+      let visibilitySimulated = false;
+      try {
+        Object.defineProperty(document, 'hidden', {
+          configurable: true,
+          get: () => simulatedHidden
+        });
+        Game.util.now = () => simulatedNow;
+        document.dispatchEvent(new Event('visibilitychange'));
+        simulatedNow += (15 * 60 + 19) * 1000;
+        simulatedHidden = false;
+        document.dispatchEvent(new Event('visibilitychange'));
+        visibilitySimulated = true;
+      } finally {
+        Game.util.now = realNow;
+        if (hiddenDescriptor) Object.defineProperty(document, 'hidden', hiddenDescriptor);
+        else delete document.hidden;
+      }
+      const summary = Game.offline.settle(15 * 60 + 19);
+      const saveResult = Game.save.save('unopened-title-regression');
+      Game.loop.catchup(90);
+      Game.offline.apply({
+        type: 'battle', seconds: 15 * 60 + 19, kills: 106,
+        expBase: 1272, goldBase: 742, items: 16, potions: 7
+      });
+      return {
+        started: Game.State.isAdventureStarted(),
+        visibilitySimulated,
+        summary,
+        saveResult,
+        worldTime: Game.state.world.worldTime,
+        stats: JSON.stringify(Game.state.meta.stats),
+        player: JSON.stringify(Game.state.player),
+        before,
+        mainSave: localStorage.getItem('firpg_save'),
+        backupSave: localStorage.getItem('firpg_save_backup'),
+        offlineModal: !!document.querySelector('#modal-root .offline-lines')
+      };
+    })()`);
+    assert.equal(unopenedTitle.started, false);
+    assert.equal(unopenedTitle.visibilitySimulated, true, 'title regression follows the visibilitychange path');
+    assert.equal(unopenedTitle.summary, null, 'title state rejects a 15-minute offline settlement');
+    assert.equal(unopenedTitle.saveResult, false, 'title state does not recreate a deleted save');
+    assert.equal(unopenedTitle.worldTime, unopenedTitle.before.worldTime, 'title catchup does not advance world time');
+    assert.equal(unopenedTitle.stats, unopenedTitle.before.stats, 'title catchup and stale claim do not change stats');
+    assert.equal(unopenedTitle.player, unopenedTitle.before.player, 'title catchup and stale claim do not change the player');
+    assert.equal(unopenedTitle.mainSave, null);
+    assert.equal(unopenedTitle.backupSave, null);
+    assert.equal(unopenedTitle.offlineModal, false);
+
     const titleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const titleScreenshot = path.join(os.tmpdir(), 'firpg-title-camp-mobile-cdp.png');
     fs.writeFileSync(titleScreenshot, Buffer.from(titleCapture.data, 'base64'));
+
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 522, height: 1320, deviceScaleFactor: 1, mobile: true
+    });
+    await delay(180);
+    const titleTallCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const titleTallScreenshot = path.join(os.tmpdir(), 'firpg-title-camp-tall-cdp.png');
+    fs.writeFileSync(titleTallScreenshot, Buffer.from(titleTallCapture.data, 'base64'));
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 390, height: 844, deviceScaleFactor: 1, mobile: true
+    });
+    await delay(120);
 
     const main = await cdp.evaluate(`(() => {
       if (!window.Game || !Game.world || !Game.world.layout) throw new Error('game boot failed');
@@ -1424,8 +1600,8 @@ async function run() {
       prologueDone: Game.state.meta.prologueDone,
       completedAt: Game.state.meta.completedAt,
       createdAt: Game.state.createdAt,
-      mainSaveIsFresh: JSON.parse(localStorage.getItem('firpg_save')).meta.completedAt === null,
-      backupSaveIsFresh: JSON.parse(localStorage.getItem('firpg_save_backup')).meta.completedAt === null
+      mainSaveAbsent: localStorage.getItem('firpg_save') === null,
+      backupSaveAbsent: localStorage.getItem('firpg_save_backup') === null
     }))()`);
     assert.equal(restartTitle.titleVisible, true, 'confirmed restart returns to the title screen');
     assert.equal(restartTitle.classVisible, false);
@@ -1434,8 +1610,8 @@ async function run() {
     assert.equal(restartTitle.prologueDone, false);
     assert.equal(restartTitle.completedAt, null);
     assert.notEqual(restartTitle.createdAt, restartBefore.createdAt);
-    assert.equal(restartTitle.mainSaveIsFresh, true);
-    assert.equal(restartTitle.backupSaveIsFresh, true);
+    assert.equal(restartTitle.mainSaveAbsent, true, 'reset stays deleted until the player starts');
+    assert.equal(restartTitle.backupSaveAbsent, true, 'reset backup stays deleted until the player starts');
     const restartTitleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const restartTitleScreenshot = path.join(os.tmpdir(), 'firpg-restart-title-mobile-cdp.png');
     fs.writeFileSync(restartTitleScreenshot, Buffer.from(restartTitleCapture.data, 'base64'));
@@ -1450,7 +1626,9 @@ async function run() {
         classVisible: !!root,
         classCount: root ? Game.reg.all('class').length : 0,
         confirmButton: !!root?.querySelector('.cs-confirm'),
-        prologueDone: Game.state.meta.prologueDone
+        prologueDone: Game.state.meta.prologueDone,
+        mainDraft: !!localStorage.getItem('firpg_save'),
+        backupDraft: !!localStorage.getItem('firpg_save_backup')
       };
     })()`);
     assert.equal(restartClassSelect.titleVisible, true);
@@ -1458,6 +1636,8 @@ async function run() {
     assert.ok(restartClassSelect.classCount >= 5);
     assert.equal(restartClassSelect.confirmButton, true);
     assert.equal(restartClassSelect.prologueDone, true);
+    assert.equal(restartClassSelect.mainDraft, true, 'clicking Start creates the main draft save');
+    assert.equal(restartClassSelect.backupDraft, true, 'clicking Start creates the backup draft save');
     const restartClassCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const restartClassScreenshot = path.join(os.tmpdir(), 'firpg-restart-class-select-mobile-cdp.png');
     fs.writeFileSync(restartClassScreenshot, Buffer.from(restartClassCapture.data, 'base64'));
@@ -1490,7 +1670,7 @@ async function run() {
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
-      titleScene, titleScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
+      titleScene, titleScreenshot, titleTallScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
       desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,

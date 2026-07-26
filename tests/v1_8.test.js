@@ -163,6 +163,28 @@ assert.equal(Game.ending.phase(), 'summary');
 assert.equal(summaryShows, 2, 'pending summary is restored without a fake boss cinematic');
 
 load('js/systems/offline.js');
+
+Game.ending.resetRuntime();
+Game.state = Game.State.newGame();
+const unopenedBefore = JSON.stringify(Game.state);
+assert.equal(Game.offline.settle(3600), null, 'an unopened new game has no battle offline settlement');
+Game.state.world.mode = 'rest';
+assert.equal(Game.offline.settle(3600), null, 'an unopened new game has no rest offline settlement');
+Game.offline.apply({
+  type: 'battle', seconds: 3600, kills: 50,
+  expBase: 500, goldBase: 300, items: 2, potions: 1
+});
+Game.state.world.mode = 'battle';
+assert.equal(
+  JSON.stringify(Game.state),
+  unopenedBefore,
+  'a stale offline claim cannot mutate an unopened new game'
+);
+
+fixture = resetEndingState();
+Game.state.meta.completedAt = Date.now();
+Game.state.meta.endingAcknowledged = false;
+Game.state.meta.endingPhase = 'summary';
 assert.equal(Game.offline.settle(3600), null, 'pending ending time grants no offline rewards');
 Game.ending.continueGame();
 

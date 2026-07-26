@@ -1,7 +1,7 @@
 /* ============================================================
  * ui/title.js — 开场体验
- * 标题画面：夜晚前线营地全景（星空/月亮/远山/帐篷/旗帜/营灯/
- * 补给/铺盖/炊具/篝火光晕/五职业围火坐席）
+ * 标题画面：统一半分辨率 2× 像素网格的半俯视悬崖营地（雪山/密林/
+ * 巨兽巢穴/蜿蜒河流/石桥/极远小比例魔王城/近岸哨戒/四人围火）
  * + 像素 LOGO + 菜单；全屏职业选择：大立绘动画预览、左右浏览、
  * 六技能预览、二次确认。仅新玩家与迁移补选时出现，老玩家零打扰。
  * ============================================================ */
@@ -34,6 +34,8 @@
       document.getElementById('app').appendChild(titleRoot);
 
       titleRoot.querySelector('.title-start').addEventListener('click', function () {
+        // 删除旧档后停留在标题页不会立刻重建双槽；玩家明确开始后才建立草稿。
+        if (Game.save && Game.save.beginNewGame) Game.save.beginNewGame();
         onStart();
       });
       titleRoot.querySelector('.title-lang').addEventListener('click', function () {
@@ -65,6 +67,8 @@
       var cv = titleRoot.querySelector('#title-canvas');
       var wrap = titleRoot;
       var g = cv.getContext('2d');
+      var pixelVista = document.createElement('canvas');
+      var pg = pixelVista.getContext('2d');
       var embers = [];
       var fireflies = [];
       var rng = U.seededRng(20260725);
@@ -81,9 +85,10 @@
         { id: 'hero_mage', dx: 43, dy: -1, flip: true, phase: 0.8 },
         { id: 'hero_fighter', dx: -72, dy: 31, flip: false, phase: 1.4 },
         { id: 'hero_cleric', dx: 72, dy: 31, flip: true, phase: 1.9 },
-        { id: 'hero_ranger', dx: 4, dy: 57, flip: true, phase: 2.5 }
+        { id: 'hero_ranger', dx: 4, dy: 57, flip: true, phase: 2.5, sentry: true }
       ];
       var t0 = performance.now();
+      var lastSceneWidth = 0, lastSceneHeight = 0;
 
       function drawShadow(x, y, rx, alpha) {
         g.globalAlpha = alpha || 0.28;
@@ -107,92 +112,654 @@
         });
       }
 
+      function drawMistBand(w, y, tt, speed, color, alpha, phase) {
+        g.save();
+        g.globalAlpha = alpha;
+        g.fillStyle = color;
+        for (var mi = 0; mi < 8; mi++) {
+          var mw = 42 + (mi % 3) * 18;
+          var mx = ((mi * 71 + tt * speed + phase * 37) % (w + 150)) - 90;
+          var my = y + Math.sin(mi * 1.7 + phase) * 7;
+          g.fillRect(Math.round(mx), Math.round(my), mw, 3);
+          g.fillRect(Math.round(mx + 12), Math.round(my - 3), mw - 20, 3);
+          g.fillRect(Math.round(mx + 22), Math.round(my + 3), mw - 8, 2);
+        }
+        g.restore();
+      }
+
+      function drawDemonCastle(centerX, baseY, scale, tt) {
+        g.save();
+        var px = function (n) { return Math.round(n); };
+        var back = '#15192a';
+        var body = '#1d2032';
+        var face = '#292b3d';
+        var roof = '#0d101c';
+        var glow = '#d26b7e';
+
+        function rect(x, y, w, h, color) {
+          g.fillStyle = color;
+          g.fillRect(px(x), px(y), Math.max(1, px(w)), Math.max(1, px(h)));
+        }
+
+        function poly(points, color) {
+          g.fillStyle = color;
+          g.beginPath();
+          g.moveTo(px(points[0][0]), px(points[0][1]));
+          for (var pp = 1; pp < points.length; pp++) {
+            g.lineTo(px(points[pp][0]), px(points[pp][1]));
+          }
+          g.closePath();
+          g.fill();
+        }
+
+        function light(x, y) {
+          g.globalAlpha = 0.58 + 0.25 * Math.sin(tt * 1.25 + x * 0.07);
+          rect(x, y, 2 * scale, 3 * scale, glow);
+          g.globalAlpha = 1;
+        }
+
+        function tower(dx, lift, width, height, spire, far) {
+          var x = centerX + dx * scale;
+          var bottom = baseY - lift * scale;
+          var top = bottom - height * scale;
+          var w2 = width * scale;
+          rect(x - w2 / 2, top, w2, height * scale, far ? back : body);
+          rect(x + w2 / 2 - 3 * scale, top + 4 * scale, 3 * scale, height * scale - 4 * scale, far ? '#0d1120' : face);
+          poly([
+            [x - w2 * 0.66, top],
+            [x, top - spire * scale],
+            [x + w2 * 0.66, top]
+          ], roof);
+          for (var ty = top + 18 * scale; ty < bottom - 8 * scale; ty += 21 * scale) {
+            light(x - scale, ty);
+          }
+        }
+
+        // 远景城塞只保留可读的天际线与微弱门火
+        var cg = g.createRadialGradient(centerX, baseY - 54 * scale, 3, centerX, baseY - 54 * scale, 96 * scale);
+        cg.addColorStop(0, 'rgba(178,79,104,0.15)');
+        cg.addColorStop(1, 'rgba(93,54,90,0)');
+        g.fillStyle = cg;
+        g.fillRect(centerX - 100 * scale, baseY - 160 * scale, 200 * scale, 170 * scale);
+
+        // 山口外墙以轻微斜角落入地形
+        poly([
+          [centerX - 76 * scale, baseY - 30 * scale],
+          [centerX + 72 * scale, baseY - 38 * scale],
+          [centerX + 82 * scale, baseY],
+          [centerX - 86 * scale, baseY + 5 * scale]
+        ], back);
+        rect(centerX - 74 * scale, baseY - 42 * scale, 148 * scale, 14 * scale, body);
+        for (var bi = 0; bi < 10; bi++) {
+          rect(centerX - 72 * scale + bi * 15 * scale, baseY - 48 * scale, 5 * scale, 7 * scale, body);
+        }
+
+        tower(-52, 25, 19, 45, 19, true);
+        tower(50, 29, 18, 51, 21, true);
+        tower(-27, 33, 23, 69, 26, false);
+        tower(31, 38, 22, 77, 29, false);
+        tower(2, 43, 28, 103, 39, false);
+
+        g.globalAlpha = 0.7 + Math.sin(tt * 1.2) * 0.12;
+        rect(centerX - 5 * scale, baseY - 28 * scale, 11 * scale, 27 * scale, '#ad536d');
+        rect(centerX - 2 * scale, baseY - 24 * scale, 5 * scale, 23 * scale, '#ef9a83');
+        g.globalAlpha = 1;
+        g.restore();
+      }
+
+      function drawPixelVista(w, h, tt) {
+        var bw = Math.ceil(w / 2);
+        var bh = Math.ceil(h / 2);
+        if (pixelVista.width !== bw || pixelVista.height !== bh) {
+          pixelVista.width = bw;
+          pixelVista.height = bh;
+        }
+        pg.imageSmoothingEnabled = false;
+        var horizonY = Math.round(bh * 0.37);
+        var snowBaseY = Math.round(bh * 0.505);
+        var valleyTopY = Math.round(bh * 0.495);
+        var cliffY = Math.round(bh * 0.695);
+        var cliffBaseY = cliffY - Math.max(22, Math.round(bh * 0.042));
+        var campX = Math.round(bw * 0.46);
+        var campY = Math.round(bh * 0.758);
+        var cliffRidgeHalfX = Math.round(bw * 0.62);
+        var sentryHalfX = Math.round(bw * 0.68);
+
+        function rect(x, y, rw, rh, color, alpha) {
+          pg.globalAlpha = alpha == null ? 1 : alpha;
+          pg.fillStyle = color;
+          pg.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(rw)), Math.max(1, Math.round(rh)));
+          pg.globalAlpha = 1;
+        }
+
+        function poly(points, color, alpha) {
+          pg.globalAlpha = alpha == null ? 1 : alpha;
+          pg.fillStyle = color;
+          pg.beginPath();
+          pg.moveTo(Math.round(points[0][0]), Math.round(points[0][1]));
+          for (var pp = 1; pp < points.length; pp++) {
+            pg.lineTo(Math.round(points[pp][0]), Math.round(points[pp][1]));
+          }
+          pg.closePath();
+          pg.fill();
+          pg.globalAlpha = 1;
+        }
+
+        function pixelDisc(x, y, r, color) {
+          pg.fillStyle = color;
+          for (var dy = -r; dy <= r; dy++) {
+            var span = Math.floor(Math.sqrt(r * r - dy * dy));
+            pg.fillRect(Math.round(x - span), Math.round(y + dy), span * 2 + 1, 1);
+          }
+        }
+
+        function hash01(a, b) {
+          var value = Math.sin(a * 12.9898 + b * 78.233) * 43758.5453;
+          return value - Math.floor(value);
+        }
+
+        function conifer(x, y, size, palette, seed) {
+          size = Math.max(2, Math.round(size));
+          var crownTop = y - size * 4 - 2;
+          rect(x, y - size * 3, 1, size * 3 + 2, palette.trunk);
+          rect(x - 1, y - 1, 3, 1, palette.trunk);
+
+          // 相互覆盖的像素枝团形成不规则冷杉轮廓，不画规则三角或横条
+          for (var tier = 0; tier < 4; tier++) {
+            var clusterY = crownTop + 1 + tier * size;
+            var radius = Math.max(1, Math.round(size * (0.5 + tier * 0.18)));
+            var lean = ((seed + tier * 5) % 3) - 1;
+            pixelDisc(x + lean, clusterY + radius, radius, tier < 2 ? palette.mid : palette.dark);
+            if (tier > 0) {
+              pixelDisc(x - 1 - lean, clusterY + radius + 1, Math.max(1, radius - 1), palette.dark);
+            }
+          }
+          rect(x + (seed % 3) - 1, crownTop, 1, 3, palette.light, 0.68);
+        }
+
+        function broadleaf(x, y, size, palette, seed) {
+          size = Math.max(2, Math.round(size));
+          rect(x, y - size * 2, 1, size * 2 + 2, palette.trunk);
+          pixelDisc(x - Math.max(1, size - 1), y - size * 2 - 1, size, palette.dark);
+          pixelDisc(x + Math.max(1, size - 1), y - size * 2, Math.max(1, size - 1), palette.dark);
+          pixelDisc(x, y - size * 3, size + (seed % 2), palette.mid);
+          rect(x - size, y - size * 3 - 1, Math.max(2, size), 1, palette.light, 0.68);
+          if (size > 2) rect(x + 1, y - size * 2, size, 1, palette.mid);
+        }
+
+        function forestTree(x, y, size, depth, variant) {
+          var palettes = [
+            { dark: '#102925', mid: '#183631', light: '#285047', trunk: '#17231f' },
+            { dark: '#0d2b25', mid: '#173a30', light: '#29513f', trunk: '#18251f' },
+            { dark: '#0a261f', mid: '#12362a', light: '#214936', trunk: '#142019' }
+          ];
+          var palette = palettes[Math.min(2, Math.floor(depth * 3))];
+          if (variant % 7 === 0 || variant % 11 === 0) {
+            broadleaf(x, y, Math.max(2, size - 1), palette, variant);
+          } else {
+            conifer(x, y, size, palette, variant);
+          }
+        }
+
+        function mountain(points, color, litColor) {
+          poly(points, color);
+          if (!litColor || points.length < 5) return;
+          var peak = points[2];
+          poly([
+            [peak[0], peak[1]],
+            [peak[0] - 7, peak[1] + 12],
+            [peak[0] - 2, peak[1] + 10],
+            [peak[0] + 2, peak[1] + 15],
+            [peak[0] + 9, peak[1] + 13]
+          ], litColor);
+        }
+
+        // 全背景在半分辨率像素网格绘制，再由主画布整数倍放大
+        var sky = pg.createLinearGradient(0, 0, 0, bh);
+        sky.addColorStop(0, '#07101d');
+        sky.addColorStop(0.48, '#101d31');
+        sky.addColorStop(0.67, '#344656');
+        sky.addColorStop(0.82, '#6f6863');
+        sky.addColorStop(1, '#1b2928');
+        pg.fillStyle = sky;
+        pg.fillRect(0, 0, bw, bh);
+
+        for (var si = 0; si < stars.length; si++) {
+          var st = stars[si];
+          var starY = Math.round(st.y * bh * 0.78);
+          if (starY > horizonY - 12) continue;
+          var starA = 0.38 + 0.62 * Math.abs(Math.sin(tt * 1.35 + st.tw));
+          rect(st.x * bw, starY, st.s > 1 ? 2 : 1, 1, st.s > 1 ? '#fff1c4' : '#c9dcf1', starA);
+        }
+
+        // 高空像素云
+        for (var cloud = 0; cloud < 7; cloud++) {
+          var cloudX = ((cloud * 41 + tt * (cloud % 2 ? -0.7 : 0.45)) % (bw + 48)) - 28;
+          var cloudY = horizonY - 38 + (cloud % 3) * 8;
+          rect(cloudX, cloudY, 24 + cloud % 3 * 7, 2, '#27364a', 0.34);
+          rect(cloudX + 7, cloudY - 2, 13 + cloud % 2 * 5, 2, '#2e3c50', 0.22);
+        }
+
+        // 最远雪山群：五座不同高度山峰和独立雪线
+        mountain([
+          [-18, snowBaseY + 8], [8, snowBaseY - 15], [34, horizonY + 19],
+          [65, snowBaseY - 7], [92, snowBaseY + 8]
+        ], '#3a4b61', '#aebdca');
+        mountain([
+          [38, snowBaseY + 8], [72, snowBaseY - 18], [104, horizonY + 9],
+          [134, snowBaseY - 12], [163, snowBaseY + 8]
+        ], '#40536a', '#c1cbd3');
+        mountain([
+          [112, snowBaseY + 8], [144, snowBaseY - 13], [171, horizonY + 23],
+          [196, snowBaseY - 11], [222, snowBaseY + 8]
+        ], '#36475d', '#a9b7c5');
+        mountain([
+          [176, snowBaseY + 8], [202, snowBaseY - 17], [224, horizonY + 14],
+          [251, snowBaseY - 8], [bw + 20, snowBaseY + 8]
+        ], '#405168', '#bdc8d0');
+
+        // 雪线碎片让山体保持像素质感
+        for (var snow = 0; snow < 18; snow++) {
+          var snowX = (snow * 29 + 17) % bw;
+          var snowY = horizonY + 33 + ((snow * 13) % Math.max(12, snowBaseY - horizonY - 42));
+          rect(snowX, snowY, 2 + snow % 4, 1, '#8296a8', 0.45);
+        }
+
+        // 最远山口只保留一枚小月与一座小城
+        var castleX = Math.round(bw * 0.79);
+        var castleBase = snowBaseY - 1;
+        pixelDisc(castleX + 1, castleBase - 23, 6, '#d7c8ad');
+        pixelDisc(castleX + 3, castleBase - 24, 5, '#3b4657');
+        poly([
+          [castleX - 24, castleBase + 3], [castleX - 14, castleBase - 8],
+          [castleX - 2, castleBase - 5], [castleX + 8, castleBase - 13],
+          [castleX + 18, castleBase - 4], [castleX + 25, castleBase + 3]
+        ], '#171d2d');
+        rect(castleX - 17, castleBase - 8, 35, 7, '#171827');
+        rect(castleX - 11, castleBase - 16, 5, 15, '#1e1d2b');
+        rect(castleX + 8, castleBase - 18, 5, 17, '#201e2e');
+        rect(castleX - 2, castleBase - 26, 7, 25, '#191824');
+        poly([[castleX - 12, castleBase - 16], [castleX - 9, castleBase - 23], [castleX - 5, castleBase - 16]], '#0c101b');
+        poly([[castleX + 7, castleBase - 18], [castleX + 11, castleBase - 26], [castleX + 14, castleBase - 18]], '#0c101b');
+        poly([[castleX - 3, castleBase - 26], [castleX + 2, castleBase - 36], [castleX + 6, castleBase - 26]], '#090d17');
+        rect(castleX, castleBase - 6, 3, 5, '#c76070', 0.82);
+        rect(castleX - 9, castleBase - 13, 1, 1, '#b45467', 0.7);
+        rect(castleX + 10, castleBase - 15, 1, 1, '#b45467', 0.7);
+
+        // 远山脚雾带
+        for (var mist = 0; mist < 9; mist++) {
+          var mistX = ((mist * 37 + tt * (mist % 2 ? 0.65 : -0.42)) % (bw + 50)) - 24;
+          var mistY = snowBaseY - 6 + (mist % 3) * 5;
+          rect(mistX, mistY, 28 + mist % 4 * 8, 2, '#9ca9ad', 0.18);
+        }
+
+        // 中层山谷与密林台地
+        poly([
+          [0, valleyTopY + 8], [24, valleyTopY - 8], [54, valleyTopY + 2],
+          [82, valleyTopY - 14], [112, valleyTopY + 1], [142, valleyTopY - 10],
+          [174, valleyTopY + 5], [207, valleyTopY - 12], [bw, valleyTopY + 1],
+          [bw, cliffY - 12], [0, cliffY - 12]
+        ], '#233b36');
+        poly([
+          [0, valleyTopY + 26], [33, valleyTopY + 14], [65, valleyTopY + 30],
+          [99, valleyTopY + 12], [129, valleyTopY + 27], [163, valleyTopY + 10],
+          [198, valleyTopY + 24], [bw, valleyTopY + 14],
+          [bw, cliffY - 8], [0, cliffY - 8]
+        ], '#2d493e');
+        poly([
+          [0, valleyTopY + 54], [39, valleyTopY + 38], [74, valleyTopY + 55],
+          [111, valleyTopY + 34], [149, valleyTopY + 51], [190, valleyTopY + 33],
+          [bw, valleyTopY + 49], [bw, cliffY - 4], [0, cliffY - 4]
+        ], '#365442');
+
+        // 河流位于崖下谷底：由右侧雪山汇入河谷，横向远离视点后被近谷林冠遮没
+        var riverStartY = snowBaseY + 8;
+        var riverEndY = cliffBaseY - 7;
+        function riverPoint(k) {
+          var sweep = k < 0.52
+            ? 0.71 - k * 0.17 + Math.sin(k * Math.PI * 2.15) * 0.045
+            : 0.62 - (k - 0.52) * 0.58 + Math.sin((k - 0.52) * Math.PI * 1.5) * 0.055;
+          var perspectiveHalf = 1.5 + Math.pow(k, 1.42) * 9;
+          // 河道先随透视变宽，抵达崖口前再被岩峡收窄，避免宽河偏接窄瀑布。
+          var gorgeTaper = k > 0.78
+            ? U.lerp(1, 0.38, (k - 0.78) / 0.22)
+            : 1;
+          return {
+            x: bw * sweep,
+            y: riverStartY + (riverEndY - riverStartY) * k,
+            half: perspectiveHalf * gorgeTaper
+          };
+        }
+        var bankL = [], bankR = [], waterL = [], waterR = [];
+        for (var ri = 0; ri <= 38; ri++) {
+          var rk = ri / 38;
+          var rv = riverPoint(rk);
+          bankL.push([rv.x - rv.half - 2, rv.y]);
+          bankR.unshift([rv.x + rv.half + 2, rv.y]);
+          waterL.push([rv.x - rv.half, rv.y]);
+          waterR.unshift([rv.x + rv.half, rv.y]);
+        }
+        poly(bankL.concat(bankR), '#182c29');
+        poly(waterL.concat(waterR), '#245869');
+        var innerL = [], innerR = [];
+        for (var ii = 0; ii <= 38; ii++) {
+          var ik = ii / 38;
+          var iv = riverPoint(ik);
+          innerL.push([iv.x - iv.half * 0.55, iv.y]);
+          innerR.unshift([iv.x + iv.half * 0.18, iv.y]);
+        }
+        poly(innerL.concat(innerR), '#39798a', 0.7);
+        for (var shine = 4; shine < 37; shine += 6) {
+          var shineP = riverPoint(shine / 38);
+          rect(shineP.x - shineP.half * 0.45, shineP.y, Math.max(2, shineP.half * 0.7), 1, '#91b6b0', 0.5);
+        }
+
+        // 河中石岛与一座低矮古桥
+        var bridge = riverPoint(0.51);
+        rect(bridge.x - bridge.half - 4, bridge.y - 1, bridge.half * 2 + 8, 3, '#7b7668');
+        rect(bridge.x - bridge.half - 3, bridge.y - 2, bridge.half * 2 + 6, 1, '#aaa18a');
+        for (var rock = 0; rock < 6; rock++) {
+          var rockP = riverPoint(0.2 + rock * 0.115);
+          rect(rockP.x + (rock % 2 ? -1 : 1) * rockP.half * 0.45, rockP.y + 2, 2 + rock % 2, 1, '#76918c', 0.7);
+        }
+
+        // 远河在崖沿汇聚；瀑布和真正的崖下河湾稍后叠到岩壁下方
+        var gorgeJoin = riverPoint(1);
+
+        // 密林按不规则林团组织；混合冷杉与阔叶树，避免等距三角阵列
+        var treeIndex = 0;
+        for (var forestBand = 0; forestBand < 5; forestBand++) {
+          var bandDepth = forestBand / 4;
+          var bandY = valleyTopY + 18 + forestBand * ((cliffBaseY - valleyTopY - 21) / 4);
+          var fx = -9 + hash01(forestBand, 2) * 7;
+          while (fx < bw + 10) {
+            var spacingNoise = hash01(treeIndex + 4, forestBand + 9);
+            fx += 7 + Math.floor(spacingNoise * (8 + forestBand));
+            var fy = bandY + (hash01(treeIndex + 13, forestBand + 3) - 0.5) * (7 + forestBand);
+            var fk = U.clamp((fy - riverStartY) / Math.max(1, riverEndY - riverStartY), 0, 1);
+            var fp = riverPoint(fk);
+            var size = 2 + Math.floor(bandDepth * 2.2 + hash01(treeIndex + 21, forestBand) * 1.6);
+            var bankClearance = fp.half + 4 + size * 0.7;
+            if (fy < riverEndY + 3 && Math.abs(fx - fp.x) < bankClearance) {
+              fx += bankClearance * 0.6;
+            } else if (hash01(treeIndex + 37, forestBand + 5) > 0.08) {
+              forestTree(fx, fy, size, bandDepth, treeIndex + forestBand * 17);
+            }
+            treeIndex++;
+          }
+        }
+
+        // 近谷树列收束远河，瀑布口仍保持可读
+        for (var grove = 0; grove < 10; grove++) {
+          var groveX = bw * 0.05 + grove * (bw * 0.086) + (grove % 3) * 2;
+          var groveY = cliffBaseY - 14 + (grove % 4);
+          forestTree(groveX, groveY, 3 + grove % 2, 0.86, 80 + grove);
+        }
+        for (var bankTree = 0; bankTree < 6; bankTree++) {
+          var onLeftBank = bankTree < 3;
+          var bankTreeX = onLeftBank
+            ? bw * (0.025 + bankTree * 0.035)
+            : bw * (0.76 + (bankTree - 3) * 0.075);
+          forestTree(bankTreeX, cliffBaseY - 1 + bankTree % 3, 4 + bankTree % 2, 0.98, 110 + bankTree);
+        }
+
+        // 左侧巨兽巢穴：岩洞、骨枝和三枚卵形成独立叙事点
+        var nestX = Math.round(bw * 0.18);
+        var nestY = Math.round(valleyTopY + (cliffBaseY - valleyTopY) * 0.58);
+        poly([
+          [nestX - 25, nestY + 8], [nestX - 23, nestY - 1],
+          [nestX - 16, nestY - 9], [nestX - 7, nestY - 15],
+          [nestX + 4, nestY - 13], [nestX + 14, nestY - 7],
+          [nestX + 23, nestY + 8]
+        ], '#273830');
+        pixelDisc(nestX - 1, nestY, 9, '#0a1514');
+        poly([
+          [nestX - 13, nestY + 3], [nestX - 8, nestY],
+          [nestX + 10, nestY + 1], [nestX + 15, nestY + 5],
+          [nestX + 10, nestY + 8], [nestX - 10, nestY + 8]
+        ], '#68543a');
+        rect(nestX - 9, nestY + 3, 20, 2, '#8b7049');
+        pixelDisc(nestX - 6, nestY + 1, 2, '#c6bea0');
+        pixelDisc(nestX, nestY, 3, '#d5c9a7');
+        pixelDisc(nestX + 7, nestY + 2, 2, '#b8b294');
+        poly([[nestX - 20, nestY + 2], [nestX - 18, nestY - 8], [nestX - 16, nestY - 8], [nestX - 18, nestY + 3]], '#b5aa8c');
+        poly([[nestX + 16, nestY + 1], [nestX + 20, nestY - 7], [nestX + 22, nestY - 6], [nestX + 18, nestY + 3]], '#a69d84');
+
+        // 崖壁：谷底止于上缘，纵向岩柱一直落到营地所在的高台边缘
+        poly([
+          [0, cliffBaseY + 2], [24, cliffBaseY - 3], [49, cliffBaseY + 1],
+          [75, cliffBaseY - 5], [101, cliffBaseY + 2], [128, cliffBaseY - 2],
+          [155, cliffBaseY + 3], [181, cliffBaseY - 4], [209, cliffBaseY + 1],
+          [bw, cliffBaseY - 2], [bw, cliffY + 2], [218, cliffY - 2],
+          [190, cliffY + 3], [160, cliffY - 1], [132, cliffY + 4],
+          [103, cliffY], [74, cliffY + 3], [47, cliffY - 1],
+          [22, cliffY + 2], [0, cliffY - 2]
+        ], '#3e443d');
+        poly([
+          [0, cliffBaseY + 2], [24, cliffBaseY - 3], [49, cliffBaseY + 1],
+          [75, cliffBaseY - 5], [101, cliffBaseY + 2], [128, cliffBaseY - 2],
+          [155, cliffBaseY + 3], [181, cliffBaseY - 4], [209, cliffBaseY + 1],
+          [bw, cliffBaseY - 2], [bw, cliffBaseY + 5], [207, cliffBaseY + 6],
+          [181, cliffBaseY + 3], [155, cliffBaseY + 8], [128, cliffBaseY + 4],
+          [101, cliffBaseY + 7], [75, cliffBaseY], [49, cliffBaseY + 6],
+          [24, cliffBaseY + 2], [0, cliffBaseY + 8]
+        ], '#202e2b');
+
+        // 大块垂直岩面与断裂阴影，打破“横向道路”观感
+        var cliffFaces = [
+          [5, 42, '#505047'], [55, 31, '#303a35'], [93, 47, '#4b4d43'],
+          [150, 35, '#2f3935'], [194, 49, '#4d4e45']
+        ];
+        for (var face = 0; face < cliffFaces.length; face++) {
+          var faceX = cliffFaces[face][0];
+          if (faceX > bw) continue;
+          var faceW = Math.min(cliffFaces[face][1], bw - faceX);
+          var faceTop = cliffBaseY + 6 + (face * 3) % 7;
+          poly([
+            [faceX, faceTop], [faceX + faceW * 0.42, faceTop - 4],
+            [faceX + faceW, faceTop + 1],
+            [faceX + faceW - 7, cliffY - 2 + face % 3],
+            [faceX + faceW * 0.48, cliffY - 6 + (face + 1) % 4],
+            [faceX + 4, cliffY + face % 2]
+          ], cliffFaces[face][2], 0.68);
+        }
+        for (var fissure = 0; fissure < 12; fissure++) {
+          var fissureX = 9 + fissure * Math.max(9, Math.floor((bw - 18) / 12));
+          var fissureY = cliffBaseY + 8 + (fissure * 7) % 9;
+          rect(fissureX, fissureY, 1, 5 + fissure % 8, fissure % 3 ? '#777264' : '#222e2b', 0.44);
+          if (fissure % 2) rect(fissureX - 2, fissureY + 5, 3, 1, '#252f2c', 0.58);
+        }
+
+        // 瀑布穿过岩壁：先补一段对称收束的岩峡水喉，再沿同一中心线落下。
+        var fallX = Math.round(gorgeJoin.x);
+        var fallMouthHalf = Math.max(3, Math.round(gorgeJoin.half));
+        poly([
+          [fallX - fallMouthHalf - 2, riverEndY - 1],
+          [fallX + fallMouthHalf + 2, riverEndY - 1],
+          [fallX + 5, cliffBaseY + 1],
+          [fallX - 5, cliffBaseY + 1]
+        ], '#182c29');
+        poly([
+          [fallX - fallMouthHalf, riverEndY - 1],
+          [fallX + fallMouthHalf, riverEndY - 1],
+          [fallX + 3, cliffBaseY + 2],
+          [fallX - 3, cliffBaseY + 2]
+        ], '#2f6d7c', 0.94);
+        poly([
+          [fallX - 5, cliffBaseY - 3], [fallX + 5, cliffBaseY - 3],
+          [fallX + 4, cliffY + 4], [fallX - 4, cliffY + 4]
+        ], '#183843', 0.9);
+        poly([
+          [fallX - 2, cliffBaseY - 4], [fallX + 2, cliffBaseY - 4],
+          [fallX + 2, cliffY + 5], [fallX - 2, cliffY + 5]
+        ], '#347584', 0.92);
+        for (var fall = 0; fall < 6; fall++) {
+          rect(fallX - 2 + fall % 3, cliffBaseY + 2 + fall * 4, 1, 3, '#9abbb4', 0.42);
+        }
+
+        // 近景高台从崖唇向镜头延伸
+        poly([
+          [0, cliffY - 2], [bw * 0.1, cliffY + 2], [bw * 0.22, cliffY - 1],
+          [bw * 0.36, cliffY + 3], [bw * 0.48, cliffY],
+          [cliffRidgeHalfX - 13, cliffY + 1], [cliffRidgeHalfX - 7, cliffY - 3],
+          [cliffRidgeHalfX + 4, cliffY - 2], [cliffRidgeHalfX + 13, cliffY - 1],
+          [bw * 0.78, cliffY + 3],
+          [bw * 0.9, cliffY - 2], [bw, cliffY + 2],
+          [bw, bh], [0, bh]
+        ], '#173126');
+        poly([
+          [cliffRidgeHalfX - 8, cliffY - 2], [cliffRidgeHalfX - 3, cliffY - 4],
+          [cliffRidgeHalfX + 5, cliffY - 3], [cliffRidgeHalfX + 11, cliffY],
+          [cliffRidgeHalfX + 6, cliffY - 1], [cliffRidgeHalfX - 5, cliffY - 1]
+        ], '#365840', 0.88);
+        for (var lip = 0; lip < bw; lip += 7) {
+          rect(lip, cliffY + ((lip * 5) % 5) - 2, 4 + lip % 3, 1, '#31533b', 0.72);
+        }
+        poly([
+          [0, cliffY + 12], [42, cliffY + 7], [78, cliffY + 15],
+          [118, cliffY + 8], [157, cliffY + 16], [198, cliffY + 9],
+          [bw, cliffY + 14], [bw, bh], [0, bh]
+        ], '#142b22', 0.78);
+
+        // 岩壁下方、营地上方的近景河湾：严格放在用户所指的屏幕层级
+        var lowerRiverTop = cliffY + (bh < 500 ? 2 : 4);
+        var lowerRiverBottom = cliffY + (bh < 500 ? 10 : 17);
+        // 营地紧贴近岸，同时保留一条干燥的步行带与底部菜单净空。
+        campY = Math.min(
+          campY,
+          lowerRiverBottom + (bh < 500 ? 12 : 17)
+        );
+        var sentryY = lowerRiverBottom + (bh < 500 ? 7 : 9);
+        poly([
+          [0, lowerRiverTop + 1], [bw * 0.13, lowerRiverTop - 2],
+          [fallX - 8, lowerRiverTop], [fallX + 8, lowerRiverTop + 2],
+          [bw * 0.64, lowerRiverTop - 1], [bw * 0.8, lowerRiverTop + 3],
+          [bw, lowerRiverTop], [bw, lowerRiverBottom + 4],
+          [bw * 0.78, lowerRiverBottom + 2], [bw * 0.58, lowerRiverBottom + 5],
+          [bw * 0.34, lowerRiverBottom + 2], [bw * 0.14, lowerRiverBottom + 5],
+          [0, lowerRiverBottom + 2]
+        ], '#0d211f');
+        poly([
+          [bw * 0.03, lowerRiverTop + 4], [bw * 0.17, lowerRiverTop + 1],
+          [fallX - 6, lowerRiverTop + 2], [fallX + 7, lowerRiverTop + 4],
+          [bw * 0.62, lowerRiverTop + 2], [bw * 0.78, lowerRiverTop + 5],
+          [bw * 0.96, lowerRiverTop + 3], [bw * 0.93, lowerRiverBottom],
+          [bw * 0.72, lowerRiverBottom - 1], [bw * 0.52, lowerRiverBottom + 2],
+          [bw * 0.28, lowerRiverBottom - 1], [bw * 0.07, lowerRiverBottom + 1]
+        ], '#205565');
+        poly([
+          [bw * 0.08, lowerRiverTop + 6], [bw * 0.24, lowerRiverTop + 4],
+          [fallX, lowerRiverTop + 5], [bw * 0.57, lowerRiverTop + 4],
+          [bw * 0.73, lowerRiverTop + 7], [bw * 0.88, lowerRiverTop + 6],
+          [bw * 0.69, lowerRiverBottom - 3], [bw * 0.49, lowerRiverBottom],
+          [bw * 0.26, lowerRiverBottom - 3], [bw * 0.12, lowerRiverBottom - 1]
+        ], '#347986', 0.72);
+        pixelDisc(fallX, lowerRiverTop + 5, 4, '#8db3ad');
+        pixelDisc(fallX, lowerRiverTop + 5, 2, '#c1d0c6');
+        for (var lowerRipple = 0; lowerRipple < 9; lowerRipple++) {
+          rect(
+            bw * (0.08 + lowerRipple * 0.095),
+            lowerRiverTop + 6 + (lowerRipple % 4) * 2,
+            4 + lowerRipple % 5,
+            1,
+            '#9abbb4',
+            0.44
+          );
+        }
+        // 篝火在水面的断续暖色倒影，把近岸与营地读成同一空间。
+        var fireReflection = 0.2 + 0.08 * Math.sin(tt * 4.7);
+        rect(campX - 5, lowerRiverTop + 5, 10, 1, '#c28a48', fireReflection);
+        rect(campX - 3, lowerRiverTop + 8, 6, 1, '#ddb164', fireReflection * 0.84);
+        rect(campX - 1, lowerRiverBottom - 1, 3, 1, '#efc677', fireReflection * 0.65);
+        pixelDisc(bw * 0.2, lowerRiverTop + 9, 2, '#53665f');
+        pixelDisc(bw * 0.72, lowerRiverTop + 8, 2, '#455e58');
+
+        // 近岸重新覆盖水面下缘，营地保持在干燥草地上
+        poly([
+          [0, lowerRiverBottom + 1], [bw * 0.16, lowerRiverBottom - 1],
+          [bw * 0.34, lowerRiverBottom + 2], [bw * 0.52, lowerRiverBottom],
+          [bw * 0.7, lowerRiverBottom + 3], [bw * 0.86, lowerRiverBottom],
+          [bw, lowerRiverBottom + 2], [bw, bh], [0, bh]
+        ], '#142b22');
+        for (var shore = 0; shore < bw; shore += 11) {
+          rect(shore, lowerRiverBottom + (shore % 3) - 1, 5 + shore % 4, 1, '#294b35', 0.62);
+        }
+
+        for (var patch = 0; patch < 34; patch++) {
+          var patchX = (patch * 31 + 13) % bw;
+          var patchY = lowerRiverBottom + 7 + ((patch * 19) % Math.max(10, bh - lowerRiverBottom - 12));
+          rect(patchX, patchY, 1 + patch % 3, 1, patch % 2 ? '#294532' : '#203b2b', 0.55);
+        }
+
+        // 远空鸟群与近谷雾点
+        for (var bird = 0; bird < 6; bird++) {
+          var birdX = bw * 0.53 + bird * 13 + Math.sin(tt * 0.11 + bird) * 2;
+          var birdY = valleyTopY - 26 + (bird % 3) * 5;
+          rect(birdX - 2, birdY, 2, 1, '#0c1720');
+          rect(birdX + 1, birdY, 2, 1, '#0c1720');
+        }
+
+        g.save();
+        g.imageSmoothingEnabled = false;
+        g.drawImage(pixelVista, 0, 0, bw, bh, 0, 0, w, h);
+        g.restore();
+
+        return {
+          groundY: (lowerRiverBottom + 4) * 2,
+          cx: campX * 2,
+          cy: campY * 2,
+          sentryX: sentryHalfX * 2,
+          sentryY: sentryY * 2,
+          sceneScale: U.clamp(w / 390, 0.84, 1.12) * (h < 700 ? 0.88 : 1)
+        };
+      }
+
       function frame(now) {
         if (!titleRoot) return;
         var tt = (now - t0) / 1000;
         var w = wrap.clientWidth, h = wrap.clientHeight;
-        if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+        if (cv.width !== w || cv.height !== h) {
+          cv.width = w;
+          cv.height = h;
+          if (lastSceneWidth && lastSceneHeight) {
+            embers.length = 0;
+            fireflies.length = 0;
+          }
+          lastSceneWidth = w;
+          lastSceneHeight = h;
+        }
         g.imageSmoothingEnabled = false;
 
-        // 夜空
-        var sky = g.createLinearGradient(0, 0, 0, h);
-        sky.addColorStop(0, '#070a1e');
-        sky.addColorStop(0.55, '#101736');
-        sky.addColorStop(1, '#1a2545');
-        g.fillStyle = sky;
-        g.fillRect(0, 0, w, h);
-        // 星
-        for (var si = 0; si < stars.length; si++) {
-          var st = stars[si];
-          g.globalAlpha = 0.45 + 0.55 * Math.abs(Math.sin(tt * 1.6 + st.tw));
-          g.fillStyle = '#dce8ff';
-          g.fillRect((st.x * w) | 0, (st.y * h) | 0, st.s, st.s);
-        }
-        g.globalAlpha = 1;
-        // 月亮
-        g.fillStyle = '#f0ecd8';
-        g.beginPath(); g.arc(w * 0.78, h * 0.14, 13, 0, 6.29); g.fill();
-        g.fillStyle = 'rgba(200,196,170,0.7)';
-        g.fillRect(w * 0.78 - 4, h * 0.14 - 3, 4, 3);
-        g.globalAlpha = 0.15;
-        g.beginPath(); g.arc(w * 0.78, h * 0.14, 21, 0, 6.29); g.fill();
-        g.globalAlpha = 1;
+        // 半分辨率像素远景直接提供营地层所需的统一透视基准
+        var pixelScene = drawPixelVista(w, h, tt);
+        var groundY = pixelScene.groundY;
+        var cx = pixelScene.cx;
+        var cy = pixelScene.cy;
+        var sceneScale = pixelScene.sceneScale;
 
-        // 远山两层
-        function hills(color, amp, base, phase) {
-          g.fillStyle = color;
-          g.beginPath();
-          g.moveTo(0, h);
-          for (var x = 0; x <= w; x += 8) {
-            g.lineTo(x, base - Math.sin(x * 0.008 + phase) * amp - Math.sin(x * 0.02 + phase * 2) * amp * 0.4);
-          }
-          g.lineTo(w, h);
-          g.fill();
-        }
-        hills('#151f3a', 26, h * 0.59, 1);
-        hills('#0c1429', 20, h * 0.67, 3);
-
-        // 地面
-        var groundY = h * (h < 700 ? 0.60 : 0.68);
-        var ground = g.createLinearGradient(0, groundY, 0, h);
-        ground.addColorStop(0, '#17281e');
-        ground.addColorStop(0.55, '#112219');
-        ground.addColorStop(1, '#0b1712');
-        g.fillStyle = ground;
-        g.fillRect(0, groundY, w, h - groundY);
-        g.fillStyle = 'rgba(0,0,0,0.28)';
-        g.fillRect(0, groundY, w, 2);
-
-        // 地平线灌木与树桩剪影
-        g.fillStyle = '#0a1711';
-        for (var bx = -12; bx < w + 18; bx += 24) {
-          var bh = 5 + ((bx * 7 + 19) & 7);
-          g.fillRect(bx, groundY - bh, 18, bh + 2);
-          if (((bx / 24) | 0) % 3 === 0) {
-            g.fillRect(bx + 8, groundY - bh - 8, 2, 9);
-            g.fillRect(bx + 4, groundY - bh - 6, 6, 2);
-          }
-        }
-
-        // 草叶与夜间微光
+        // 近景草叶同样锁定到 2px 网格
         for (var gi = 0; gi < grass.length; gi++) {
           var blade = grass[gi];
-          var gx = blade.x * w;
-          var gy = groundY + 12 + blade.y * Math.max(20, h - groundY - 22);
-          var sway = Math.sin(tt * 1.2 + blade.p) * 1.4;
+          var gx = Math.round(blade.x * w / 2) * 2;
+          var gy = Math.round((groundY + 12 + blade.y * Math.max(20, h - groundY - 22)) / 2) * 2;
+          var bladeH = Math.max(2, Math.round(blade.h / 2) * 2);
           g.globalAlpha = 0.22 + blade.y * 0.22;
-          g.strokeStyle = blade.y > 0.55 ? '#47613f' : '#304b35';
-          g.beginPath();
-          g.moveTo(gx, gy);
-          g.lineTo(gx + sway, gy - blade.h);
-          g.stroke();
+          g.fillStyle = blade.y > 0.55 ? '#47613f' : '#304b35';
+          g.fillRect(gx, gy - bladeH, 2, bladeH);
         }
         g.globalAlpha = 1;
 
+        // 游侠与营地同处河湾近岸，站在水线下方的干燥草地警戒上游。
+        var sentryX = pixelScene.sentryX;
+        var sentryY = pixelScene.sentryY;
+        var sentryGlow = g.createRadialGradient(sentryX, sentryY - 16 * sceneScale, 2, sentryX, sentryY - 16 * sceneScale, 29 * sceneScale);
+        sentryGlow.addColorStop(0, 'rgba(239,176,99,0.12)');
+        sentryGlow.addColorStop(1, 'rgba(239,176,99,0)');
+        g.fillStyle = sentryGlow;
+        g.fillRect(sentryX - 32 * sceneScale, sentryY - 52 * sceneScale, 64 * sceneScale, 62 * sceneScale);
+        drawSprite('hero_ranger', 'idle_r', sentryX, sentryY, 1.82 * sceneScale, { shadowAlpha: 0.38 });
+
         // 营地（居中，位于菜单上方）
-        var cx = w / 2;
-        var cy = h * (h < 700 ? 0.67 : 0.735);
-        var sceneScale = U.clamp(w / 390, 0.84, 1.12) * (h < 700 ? 0.88 : 1);
         var propScale = 2.35 * sceneScale;
         var heroScale = 2.15 * sceneScale;
         var fireScale = 3.1 * sceneScale;
@@ -254,9 +821,10 @@
         drawSprite('camp_log', 'idle0', cx - 58 * sceneScale, cy + 42 * sceneScale, 2.15 * sceneScale, { shadowAlpha: 0.25 });
         drawSprite('camp_log', 'idle0', cx + 58 * sceneScale, cy + 42 * sceneScale, 2.15 * sceneScale, { shadowAlpha: 0.25, flip: true });
 
-        // 五职业围坐，全部使用坐姿帧并朝向篝火
+        // 四名队友围火休整，游侠已在近岸担任哨戒
         for (var hi = 0; hi < heroes.length; hi++) {
           var hd = heroes[hi];
+          if (hd.sentry) continue;
           var sitFrame = ((tt / 1.45 + hd.phase) | 0) % 2 === 0 ? 'sit0' : 'sit1';
           drawSprite(
             hd.id,
@@ -321,13 +889,6 @@
           g.fillRect(fly.x | 0, fly.y | 0, 2, 2);
         }
         g.globalAlpha = 1;
-
-        // 暗角
-        var vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
-        vg.addColorStop(0, 'rgba(5,6,15,0)');
-        vg.addColorStop(1, 'rgba(5,6,15,0.48)');
-        g.fillStyle = vg;
-        g.fillRect(0, 0, w, h);
 
         titleRaf = requestAnimationFrame(frame);
       }

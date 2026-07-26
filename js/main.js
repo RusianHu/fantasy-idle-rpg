@@ -82,6 +82,7 @@
     // 离线结算（防系统时间回调：ts 在未来 → 收益按 0）
     function settleOffline() {
       if (isNew) return;
+      if (!Game.State.isAdventureStarted()) return;
       if (Game.transitions.isActive()) return;
       if (Game.ending.isPending()) {
         Game.ending.restorePending();

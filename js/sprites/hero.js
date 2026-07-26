@@ -69,6 +69,13 @@
     '......gggg......',
     '......GGGG......'
   ];
+  var LEGS_IDLE = [
+    '.....pp.pp......',
+    '.....pp.pp......',
+    '.....pp.pp......',
+    '.....gg.gg......',
+    '.....GG.GG......'
+  ];
   var LEGS_ATK = [
     '....pp..pp......',
     '...pp....pp.....',
@@ -162,6 +169,9 @@
       pal: palette,
       anchor: { x: 8, y: 19 },
       frames: {
+        idle_d: heads.down.concat([NECK], td, LEGS_IDLE),
+        idle_u: heads.up.concat([NECK], tu, LEGS_IDLE),
+        idle_r: heads.side.concat([NECK], tr, LEGS_IDLE),
         walk_d0: heads.down.concat([NECK], td, LEGS_D0),
         walk_d1: heads.down.concat([NECK], td, LEGS_D1),
         walk_u0: heads.up.concat([NECK], tu, LEGS_D0),

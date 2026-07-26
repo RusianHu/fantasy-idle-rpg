@@ -67,6 +67,15 @@
       return def ? def.tier : 1;
     },
 
+    /**
+     * 选定有效职业才算正式开档。标题、序章与补选职业阶段都只是草稿态，
+     * 不得推进世界数值或产生离线收益。
+     */
+    isAdventureStarted: function () {
+      var p = Game.state && Game.state.player;
+      return !!(p && p.classId && reg.has('class', p.classId));
+    },
+
     /** 新档（职业在序章后选择） */
     newGame: function () {
       var worldSeed = U.randomSeed();
@@ -138,7 +147,7 @@
     },
 
     hasClass: function () {
-      return !!(Game.state && Game.state.player.classId && reg.has('class', Game.state.player.classId));
+      return State.isAdventureStarted();
     },
 
     /** 选定职业（永久） */

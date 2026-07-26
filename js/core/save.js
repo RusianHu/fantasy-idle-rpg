@@ -12,6 +12,9 @@
   var KEY_BAK = 'firpg_save_backup';
   var lastLoadedTs = 0;
   var hardResetting = false;
+  // 删除存档后停在标题页时保持双槽为空；点击“开始冒险”或已有有效角色
+  // 后才开启本局持久化。加载到的迁移档即使尚待补选职业也必须允许保存。
+  var persistenceStarted = false;
 
   /* 版本迁移流水线：旧存档逐版本升级 */
   var MIGRATIONS = [
@@ -156,6 +159,8 @@
       // hardReset 会触发 visibilitychange/pagehide/beforeunload。此时任何自动
       // 存档都会把刚删除的通关档重新写回，因此重载前必须永久抑制本页写入。
       if (hardResetting || !Game.state) return false;
+      if (!persistenceStarted && !Game.State.isAdventureStarted()) return false;
+      persistenceStarted = true;
       bus.emit('save:before', { reason: reason });
       try {
         var json = JSON.stringify(S.serialize());
@@ -186,7 +191,15 @@
       if (!data || typeof data.v !== 'number' || !data.player) return null;
       runMigrations(data);
       lastLoadedTs = data.ts || 0;
+      persistenceStarted = true;
       return data;
+    },
+
+    /** 标题页确认开始后建立草稿档；未点击开始时不重新生成已删除的存档。 */
+    beginNewGame: function () {
+      if (hardResetting || !Game.state) return false;
+      persistenceStarted = true;
+      return S.save('new-game');
     },
 
     /** 将读出的数据套用到全新 state（缺失字段自动补默认值） */
@@ -268,6 +281,7 @@
         var data = JSON.parse(U.b64decode(b64));
         if (typeof data.v !== 'number' || !data.player) return { ok: false };
         runMigrations(data);
+        persistenceStarted = true;
         S.applyLoaded(data);
         S.afterImport();
         return { ok: true };
@@ -298,6 +312,7 @@
         var data = JSON.parse(text);
         if (typeof data.v !== 'number' || !data.player) return { ok: false };
         runMigrations(data);
+        persistenceStarted = true;
         S.applyLoaded(data);
         S.afterImport();
         return { ok: true };
@@ -324,6 +339,8 @@
     hardReset: function () {
       if (hardResetting) return false;
       hardResetting = true;
+      persistenceStarted = false;
+      lastLoadedTs = 0;
       try {
         localStorage.removeItem(KEY);
         localStorage.removeItem(KEY_BAK);
