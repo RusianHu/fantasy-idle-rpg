@@ -168,6 +168,7 @@
     } catch (e) {}
     if (continueFresh) {
       setTimeout(function () {
+        Game.ui.title.setArchiveOpen(true, false);
         var freshSlot = document.querySelector('#title-root .slot-empty');
         if (freshSlot) freshSlot.click();
       }, 220);

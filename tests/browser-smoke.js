@@ -127,13 +127,15 @@ async function run() {
     const titleScene = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const canvas = document.getElementById('title-canvas');
-      const start = root?.querySelector('.title-start');
+      const reveal = root?.querySelector('.title-reveal');
+      const prompt = reveal?.querySelector('.title-reveal-prompt');
       const lang = root?.querySelector('.title-lang');
-      if (!root || !canvas || !start || !lang) return {
+      if (!root || !canvas || !reveal || !prompt || !lang) return {
         visible: false,
         hasRoot: !!root,
         hasCanvas: !!canvas,
-        hasStart: !!start,
+        hasReveal: !!reveal,
+        hasPrompt: !!prompt,
         hasLang: !!lang,
         bodyText: document.body.innerText.slice(0, 200)
       };
@@ -226,7 +228,7 @@ async function run() {
           if (r < 80 && g > 67 && b > 82 && b > g * 1.05) farRiverPixels++;
         }
       }
-      const sr = start.getBoundingClientRect();
+      const sr = prompt.getBoundingClientRect();
       const lr = lang.getBoundingClientRect();
       const overlaps = !(
         sr.right <= lr.left || sr.left >= lr.right ||
@@ -252,11 +254,16 @@ async function run() {
           const i = Math.min(pixels.length - 4, n * Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4));
           return pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2];
         })).size,
-        startHeight: sr.height,
+        revealHeight: sr.height,
+        revealCopy: prompt.textContent.trim(),
         buttonsSeparate: !overlaps,
-        startFits: start.scrollWidth <= start.clientWidth,
+        revealFits: prompt.scrollWidth <= prompt.clientWidth,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
-        archiveVisible: !!archive && archive.getBoundingClientRect().height >= 130,
+        archiveVisible: !!archive &&
+          getComputedStyle(archive).visibility === 'visible' &&
+          Number(getComputedStyle(archive).opacity) > 0.9,
+        archiveHiddenFromAT: archive?.getAttribute('aria-hidden'),
+        archiveInert: archive?.hasAttribute('inert'),
         slotKind: slot?.getAttribute('data-slot-kind'),
         slotId: slot?.getAttribute('data-slot-id'),
         slotAria: slot?.getAttribute('aria-label') || '',
@@ -283,15 +290,44 @@ async function run() {
     assert.ok(titleScene.landscapeColors > 24, 'title scene has layered mid- and far-distance scenery');
     assert.ok(titleScene.canvasColors > 30, 'title camp canvas has enough visual variety');
     assert.ok(titleScene.opaquePixels > 1000, 'title camp canvas is painted');
-    assert.ok(titleScene.startHeight >= 44, 'title start action keeps a touch target');
+    assert.ok(titleScene.revealHeight >= 44, 'title reveal action keeps a touch target');
+    assert.ok(titleScene.revealCopy.includes('点击进入'));
     assert.equal(titleScene.buttonsSeparate, true);
-    assert.equal(titleScene.startFits, true);
+    assert.equal(titleScene.revealFits, true);
     assert.equal(titleScene.noHorizontalOverflow, true);
-    assert.equal(titleScene.archiveVisible, true, 'title shows the expedition archive panel');
+    assert.equal(titleScene.archiveVisible, false, 'title first shows the unobstructed camp view');
+    assert.equal(titleScene.archiveHiddenFromAT, 'true');
+    assert.equal(titleScene.archiveInert, true);
     assert.equal(titleScene.slotKind, 'empty');
     assert.equal(titleScene.slotId, 'expedition-1');
     assert.ok(titleScene.slotAria.length > 8, 'save slot has an accessible description');
     assert.ok(titleScene.languageHeight >= 44, 'language switch keeps a touch target');
+
+    await cdp.evaluate(`document.querySelector('#title-root .title-reveal').click()`);
+    await delay(480);
+    const titleArchiveReveal = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      const archive = root.querySelector('.title-archive');
+      const reveal = root.querySelector('.title-reveal');
+      const view = root.querySelector('.archive-view');
+      return {
+        open: root.classList.contains('is-archive-open'),
+        archiveVisible: getComputedStyle(archive).visibility === 'visible' &&
+          Number(getComputedStyle(archive).opacity) > 0.9,
+        archiveHiddenFromAT: archive.getAttribute('aria-hidden'),
+        archiveInert: archive.hasAttribute('inert'),
+        revealHiddenFromAT: reveal.getAttribute('aria-hidden'),
+        viewHeight: view.getBoundingClientRect().height,
+        focusedSlot: document.activeElement?.classList.contains('title-slot')
+      };
+    })()`);
+    assert.equal(titleArchiveReveal.open, true);
+    assert.equal(titleArchiveReveal.archiveVisible, true);
+    assert.equal(titleArchiveReveal.archiveHiddenFromAT, 'false');
+    assert.equal(titleArchiveReveal.archiveInert, false);
+    assert.equal(titleArchiveReveal.revealHiddenFromAT, 'true');
+    assert.ok(titleArchiveReveal.viewHeight >= 44, 'return-to-camp action keeps a touch target');
+    assert.equal(titleArchiveReveal.focusedSlot, true);
 
     const englishTitleFit = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
@@ -388,6 +424,55 @@ async function run() {
     const titleTallCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const titleTallScreenshot = path.join(os.tmpdir(), 'firpg-title-camp-tall-cdp.png');
     fs.writeFileSync(titleTallScreenshot, Buffer.from(titleTallCapture.data, 'base64'));
+
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 390, height: 700, deviceScaleFactor: 1, mobile: true
+    });
+    await cdp.evaluate(`document.querySelector('#title-root .archive-view').click()`);
+    await delay(80);
+    const titleShortView = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      const prompt = root.querySelector('.title-reveal-prompt').getBoundingClientRect();
+      const lang = root.querySelector('.title-lang').getBoundingClientRect();
+      const archive = root.querySelector('.title-archive');
+      return {
+        archiveOpen: root.classList.contains('is-archive-open'),
+        archiveVisible: getComputedStyle(archive).visibility === 'visible',
+        promptFits: prompt.top >= 0 && prompt.bottom <= innerHeight,
+        promptHeight: prompt.height,
+        languageHeight: lang.height,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(titleShortView.archiveOpen, false);
+    assert.equal(titleShortView.archiveVisible, false);
+    assert.equal(titleShortView.promptFits, true);
+    assert.ok(titleShortView.promptHeight >= 44);
+    assert.ok(titleShortView.languageHeight >= 44);
+    assert.equal(titleShortView.noHorizontalOverflow, true);
+    const titleShortCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const titleShortScreenshot = path.join(os.tmpdir(), 'firpg-title-camp-short-cdp.png');
+    fs.writeFileSync(titleShortScreenshot, Buffer.from(titleShortCapture.data, 'base64'));
+
+    await cdp.evaluate(`document.querySelector('#title-root .title-reveal').click()`);
+    await delay(480);
+    const titleShortArchive = await cdp.evaluate(`(() => {
+      const archive = document.querySelector('#title-root .title-archive');
+      const view = archive.querySelector('.archive-view').getBoundingClientRect();
+      const rect = archive.getBoundingClientRect();
+      return {
+        visible: getComputedStyle(archive).visibility === 'visible' &&
+          Number(getComputedStyle(archive).opacity) > 0.9,
+        fits: rect.top >= 0 && rect.bottom <= innerHeight,
+        viewHeight: view.height,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(titleShortArchive.visible, true);
+    assert.equal(titleShortArchive.fits, true);
+    assert.ok(titleShortArchive.viewHeight >= 44);
+    assert.equal(titleShortArchive.noHorizontalOverflow, true);
+
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 390, height: 844, deviceScaleFactor: 1, mobile: true
     });
@@ -1670,6 +1755,8 @@ async function run() {
     fs.writeFileSync(restartTitleScreenshot, Buffer.from(restartTitleCapture.data, 'base64'));
 
     const restartClassSelect = await cdp.evaluate(`(async () => {
+      document.querySelector('#title-root .title-reveal').click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
       document.querySelector('#title-root .title-start').click();
       await new Promise((resolve) => setTimeout(resolve, 1250));
       const story = document.querySelector('.prologue-mask');
@@ -1731,6 +1818,7 @@ async function run() {
     await delay(520);
     const existingTitle = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
+      root?.querySelector('.title-reveal')?.click();
       const slot = root?.querySelector('[data-slot-id="expedition-1"]');
       const newGame = root?.querySelector('.title-new-game');
       const deleteButton = slot?.parentNode.querySelector('.slot-delete');
@@ -1891,6 +1979,7 @@ async function run() {
     await delay(420);
     const deleteConfirmedReload = cdp.event('Page.loadEventFired');
     await cdp.evaluate(`(() => {
+      document.querySelector('#title-root .title-reveal')?.click();
       const del = document.querySelector('#title-root .slot-delete');
       if (!del) throw new Error('delete save button missing');
       del.click();
@@ -1920,7 +2009,9 @@ async function run() {
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
-      titleScene, englishTitleFit, titleScreenshot, titleTallScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
+      titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
+      titleScreenshot, titleTallScreenshot, titleShortScreenshot, main, worldChecks,
+      campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
       desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,

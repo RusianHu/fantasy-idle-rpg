@@ -146,6 +146,8 @@
       /* Title screen */
       titleLogo: 'Fantasy Idle',
       titleStart: 'New Game',
+      titleEnter: 'ENTER',
+      titleViewCamp: 'Return to camp view',
       titleArchiveKicker: 'ADVENTURERS GUILD · REGISTRY',
       titleArchive: 'EXPEDITION RECORD',
       titleSlotCount: '{current} / {total}',

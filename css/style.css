@@ -1524,8 +1524,101 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
     calc(14px + env(safe-area-inset-bottom, 0px));
   pointer-events: none;
 }
+.title-reveal {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity .26s ease, visibility 0s linear 0s;
+}
+.title-reveal-prompt {
+  position: absolute;
+  left: 50%;
+  top: clamp(168px, 25.5vh, 270px);
+  min-width: 126px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 7px 12px;
+  color: #f0d68b;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  transform: translateX(-50%);
+  text-align: center;
+  text-shadow: 2px 2px 0 #05060f, 0 0 12px #e4b94d66;
+  animation: titleRevealFloat 2.2s ease-in-out infinite;
+}
+.title-reveal-prompt strong {
+  color: #f0d68b;
+  font-size: 15px;
+  font-weight: normal;
+  line-height: 1.25;
+  letter-spacing: 3px;
+  white-space: nowrap;
+}
+.title-reveal-prompt i {
+  position: relative;
+  width: 16px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.title-reveal-prompt i::before,
+.title-reveal-prompt i::after {
+  content: '';
+  position: absolute;
+  background: #d8b45a;
+}
+.title-reveal-prompt i::before {
+  left: 2px;
+  top: 7px;
+  width: 11px;
+  height: 3px;
+}
+.title-reveal-prompt i::after {
+  right: 1px;
+  top: 4px;
+  width: 7px;
+  height: 9px;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.title-reveal:focus-visible { outline: none; }
+.title-reveal:focus-visible .title-reveal-prompt {
+  outline: 2px solid #fff0a5;
+  outline-offset: 4px;
+}
+#title-root.is-archive-open .title-reveal {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition-delay: 0s, .26s;
+}
+@keyframes titleRevealFloat {
+  0%, 100% {
+    filter: brightness(.96);
+    transform: translate(-50%, 0);
+  }
+  50% {
+    filter: brightness(1.16);
+    transform: translate(-50%, -5px);
+  }
+}
 .title-lang {
   position: absolute;
+  z-index: 5;
   top: calc(12px + env(safe-area-inset-top, 0px));
   right: 12px;
   width: 50px; height: 44px;
@@ -1554,6 +1647,9 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 .title-slot:focus-visible,
 .title-new-game:focus-visible { outline: 2px solid #fff0a5; outline-offset: 3px; }
 .title-logo {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
   font-size: clamp(31px, 9.7vw, 40px);
   color: var(--gold);
   text-align: center;
@@ -1590,11 +1686,15 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 
 .title-archive {
   position: relative;
+  z-index: 4;
   width: min(100%, 430px);
   margin-top: auto;
   margin-bottom: clamp(22px, 4vh, 46px);
   padding: 0 8px 7px;
-  pointer-events: auto;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(34px);
   background:
     linear-gradient(90deg, #c49c4026 0 1px, transparent 1px calc(100% - 1px), #c49c4026 calc(100% - 1px)),
     linear-gradient(180deg, #202745f2, #10162cef);
@@ -1605,7 +1705,17 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
     inset 0 0 0 4px #343a62,
     0 7px 0 #05060fcf,
     0 14px 26px #000a;
-  transition: transform .45s cubic-bezier(.2, .76, .18, 1), opacity .35s ease;
+  transition:
+    transform .45s cubic-bezier(.2, .76, .18, 1),
+    opacity .35s ease,
+    visibility 0s linear .45s;
+}
+#title-root.is-archive-open .title-archive {
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition-delay: 0s;
 }
 .title-archive::before,
 .title-archive::after {
@@ -1621,32 +1731,57 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 .title-archive::before { left: 12px; }
 .title-archive::after { right: 12px; }
 .archive-heading {
-  height: 34px;
+  height: 44px;
   display: grid;
-  grid-template-columns: 25px minmax(0, 1fr) auto;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
-  padding: 4px 6px 2px;
+  gap: 3px;
+  padding: 0 6px 0 0;
 }
-.archive-crest {
+.archive-view {
   position: relative;
-  width: 21px; height: 21px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #d8b45a;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.archive-view > span {
+  position: relative;
+  width: 23px;
+  height: 21px;
   border: 1px solid #9a7835;
-  transform: rotate(45deg);
   box-shadow: inset 0 0 0 2px #11152c;
 }
-.archive-crest::before,
-.archive-crest::after,
-.archive-crest i::before,
-.archive-crest i::after {
+.archive-view > span::before,
+.archive-view > span::after {
   content: '';
   position: absolute;
   background: #d8b45a;
 }
-.archive-crest::before { width: 3px; height: 13px; left: 8px; top: 3px; }
-.archive-crest::after { width: 13px; height: 3px; left: 3px; top: 8px; }
-.archive-crest i::before { width: 3px; height: 3px; left: 2px; top: 2px; }
-.archive-crest i::after { width: 3px; height: 3px; right: 2px; bottom: 2px; }
+.archive-view > span::before {
+  width: 10px;
+  height: 3px;
+  left: 2px;
+  top: 8px;
+  transform: rotate(45deg);
+  transform-origin: 100% 50%;
+}
+.archive-view > span::after {
+  width: 10px;
+  height: 3px;
+  right: 2px;
+  top: 8px;
+  transform: rotate(-45deg);
+  transform-origin: 0 50%;
+}
+.archive-view:active { filter: brightness(1.35); }
+.archive-view:focus-visible { outline: 2px solid #fff0a5; outline-offset: -4px; }
 .archive-heading-copy { display: flex; flex-direction: column; min-width: 0; }
 .archive-kicker {
   color: #8ea0b5;
@@ -1934,7 +2069,15 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
   transform: translateY(1px);
   box-shadow: inset 0 0 0 2px #07120f, inset 0 2px 0 #c5e49b66;
 }
-.title-ver { position: absolute; bottom: 8px; left: 10px; font-size: 9px; color: var(--ink-dim); }
+.title-ver {
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 10px;
+  font-size: 9px;
+  color: var(--ink-dim);
+  pointer-events: none;
+}
 
 /* 档案确认 → 营火传送门 → 像素帘幕。摄像机用连续缓动，像素帘幕用 steps。 */
 .title-entry-fx {
@@ -2101,14 +2244,15 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
   .title-logo { font-size: 28px; }
   .title-sub { margin-top: 6px; }
   .title-archive { margin-bottom: 13px; }
-  .archive-heading { height: 29px; }
   .title-slot { min-height: 82px; }
   .archive-footer { min-height: 19px; padding-top: 3px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #title-root, #title-canvas, .title-logo, .title-archive, .title-slot {
+  #title-root, #title-canvas, .title-logo, .title-reveal,
+  .title-reveal-prompt, .title-archive, .title-slot {
     transition-duration: .01ms !important;
   }
+  .title-reveal-prompt { animation: none; }
   #title-root.is-entering .title-entry-fx::before,
   #title-root.is-entering .title-entry-fx::after {
     animation: none !important;

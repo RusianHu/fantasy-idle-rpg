@@ -146,6 +146,8 @@
       /* 标题画面 */
       titleLogo: '幻境远征',
       titleStart: '开始新游戏',
+      titleEnter: '点击进入',
+      titleViewCamp: '返回营地观景',
       titleArchiveKicker: '冒险者公会 · 登记处',
       titleArchive: '远征档案',
       titleSlotCount: '{current} / {total}',

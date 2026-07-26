@@ -55,12 +55,15 @@
       titleRoot.innerHTML =
         '<canvas id="title-canvas"></canvas>' +
         '<div class="title-ui">' +
+        '<button class="title-reveal" type="button">' +
+        '<span class="title-reveal-prompt"><strong></strong><i aria-hidden="true"></i></span>' +
+        '</button>' +
         '<button class="title-lang" type="button"><span aria-hidden="true">文</span><strong></strong></button>' +
         '<div class="title-logo"><span class="title-logo-main">' + t('ui.titleLogo') + '</span>' +
         '<span class="title-sub">FANTASY IDLE RPG</span></div>' +
-        '<section class="title-archive" aria-labelledby="title-archive-heading">' +
+        '<section class="title-archive" aria-labelledby="title-archive-heading" aria-hidden="true" inert>' +
         '<div class="archive-heading">' +
-        '<span class="archive-crest" aria-hidden="true"><i></i></span>' +
+        '<button class="archive-view" type="button"><span aria-hidden="true"><i></i></span></button>' +
         '<span class="archive-heading-copy"><small class="archive-kicker"></small>' +
         '<strong id="title-archive-heading" class="archive-title"></strong></span>' +
         '<span class="archive-capacity"></span>' +
@@ -122,6 +125,16 @@
         if (titleOptions.onNewGame) titleOptions.onNewGame();
       });
 
+      titleRoot.querySelector('.title-reveal').addEventListener('click', function () {
+        if (titleRoot.classList.contains('is-entering')) return;
+        T.setArchiveOpen(true, true);
+      });
+
+      titleRoot.querySelector('.archive-view').addEventListener('click', function () {
+        if (titleRoot.classList.contains('is-entering')) return;
+        T.setArchiveOpen(false, true);
+      });
+
       titleRoot.querySelector('.title-lang').addEventListener('click', function () {
         if (titleRoot.classList.contains('is-entering')) return;
         var next = Game.i18n.locale() === 'zh-CN' ? 'en' : 'zh-CN';
@@ -132,6 +145,29 @@
 
       T._refreshTitleCopy();
       T._runTitleScene();
+    },
+
+    setArchiveOpen: function (open, moveFocus) {
+      if (!titleRoot || titleRoot.classList.contains('is-entering')) return;
+      var archive = titleRoot.querySelector('.title-archive');
+      var reveal = titleRoot.querySelector('.title-reveal');
+      if (!archive || !reveal) return;
+
+      titleRoot.classList.toggle('is-archive-open', !!open);
+      archive.setAttribute('aria-hidden', open ? 'false' : 'true');
+      reveal.setAttribute('aria-hidden', open ? 'true' : 'false');
+      if (open) {
+        archive.removeAttribute('inert');
+        reveal.setAttribute('tabindex', '-1');
+        if (moveFocus) {
+          var slot = archive.querySelector('.title-slot');
+          if (slot) slot.focus({ preventScroll: true });
+        }
+      } else {
+        archive.setAttribute('inert', '');
+        reveal.removeAttribute('tabindex');
+        if (moveFocus) reveal.focus({ preventScroll: true });
+      }
     },
 
     _drawSlotPortrait: function (canvas, slot) {
@@ -184,6 +220,12 @@
       var t = Game.i18n.t;
       var locale = Game.i18n.locale();
       titleRoot.querySelector('.title-logo-main').textContent = t('ui.titleLogo');
+      var reveal = titleRoot.querySelector('.title-reveal');
+      reveal.querySelector('strong').textContent = t('ui.titleEnter');
+      reveal.setAttribute('aria-label', t('ui.titleEnter'));
+      var view = titleRoot.querySelector('.archive-view');
+      view.setAttribute('aria-label', t('ui.titleViewCamp'));
+      view.title = t('ui.titleViewCamp');
       titleRoot.querySelector('.archive-kicker').textContent = t('ui.titleArchiveKicker');
       titleRoot.querySelector('.archive-title').textContent = t('ui.titleArchive');
       titleRoot.querySelector('.archive-capacity').textContent =
