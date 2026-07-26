@@ -120,6 +120,53 @@ async function run() {
     if (cdp.errors.length) {
       throw new Error('browser boot errors: ' + cdp.errors.join(' | '));
     }
+    await delay(240);
+    const titleScene = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      const canvas = document.getElementById('title-canvas');
+      const start = root?.querySelector('.title-start');
+      const lang = root?.querySelector('.title-lang');
+      if (!root || !canvas || !start || !lang) return { visible: false };
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let warmPixels = 0;
+      let opaquePixels = 0;
+      const y0 = Math.floor(canvas.height * 0.58);
+      const y1 = Math.floor(canvas.height * 0.86);
+      for (let y = y0; y < y1; y += 2) {
+        for (let x = 0; x < canvas.width; x += 2) {
+          const i = (y * canvas.width + x) * 4;
+          if (pixels[i + 3] > 0) opaquePixels++;
+          if (pixels[i] > 105 && pixels[i] > pixels[i + 1] * 1.12 && pixels[i + 1] > pixels[i + 2]) warmPixels++;
+        }
+      }
+      const sr = start.getBoundingClientRect();
+      const lr = lang.getBoundingClientRect();
+      return {
+        visible: true,
+        warmPixels,
+        opaquePixels,
+        canvasColors: new Set(Array.from({ length: 1000 }, (_, n) => {
+          const i = Math.min(pixels.length - 4, n * Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4));
+          return pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2];
+        })).size,
+        startHeight: sr.height,
+        buttonsSeparate: sr.bottom <= lr.top,
+        startFits: start.scrollWidth <= start.clientWidth,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(titleScene.visible, true, 'new saves open on the title scene');
+    assert.ok(titleScene.warmPixels > 45, 'title camp has a visible warm fire-and-lantern focal area');
+    assert.ok(titleScene.canvasColors > 30, 'title camp canvas has enough visual variety');
+    assert.ok(titleScene.opaquePixels > 1000, 'title camp canvas is painted');
+    assert.ok(titleScene.startHeight >= 44, 'title start action keeps a touch target');
+    assert.equal(titleScene.buttonsSeparate, true);
+    assert.equal(titleScene.startFits, true);
+    assert.equal(titleScene.noHorizontalOverflow, true);
+    const titleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const titleScreenshot = path.join(os.tmpdir(), 'firpg-title-camp-mobile-cdp.png');
+    fs.writeFileSync(titleScreenshot, Buffer.from(titleCapture.data, 'base64'));
+
     const main = await cdp.evaluate(`(() => {
       if (!window.Game || !Game.world || !Game.world.layout) throw new Error('game boot failed');
       if (!Game.player.hasClass()) Game.player.setClass('fighter');
@@ -1443,7 +1490,7 @@ async function run() {
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
-      main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
+      titleScene, titleScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
       desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,

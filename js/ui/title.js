@@ -1,6 +1,7 @@
 /* ============================================================
  * ui/title.js — 开场体验
- * 标题画面：夜晚篝火营地全景（星空/月亮/远山/篝火光晕/五职业围坐）
+ * 标题画面：夜晚前线营地全景（星空/月亮/远山/帐篷/旗帜/营灯/
+ * 补给/铺盖/炊具/篝火光晕/五职业围火坐席）
  * + 像素 LOGO + 菜单；全屏职业选择：大立绘动画预览、左右浏览、
  * 六技能预览、二次确认。仅新玩家与迁移补选时出现，老玩家零打扰。
  * ============================================================ */
@@ -65,17 +66,46 @@
       var wrap = titleRoot;
       var g = cv.getContext('2d');
       var embers = [];
+      var fireflies = [];
       var rng = U.seededRng(20260725);
       var stars = [];
-      for (var i = 0; i < 70; i++) stars.push({ x: rng(), y: rng() * 0.55, tw: rng() * 6.28, s: rng() < 0.25 ? 2 : 1 });
+      var grass = [];
+      for (var i = 0; i < 84; i++) {
+        stars.push({ x: rng(), y: rng() * 0.58, tw: rng() * 6.28, s: rng() < 0.2 ? 2 : 1 });
+      }
+      for (i = 0; i < 52; i++) {
+        grass.push({ x: rng(), y: rng(), h: 2 + ((rng() * 4) | 0), p: rng() * 6.28 });
+      }
       var heroes = [
-        { id: 'hero_fighter', dx: -52, frame: 'walk_r0' },
-        { id: 'hero_rogue', dx: -30, frame: 'walk_r0' },
-        { id: 'hero_mage', dx: 32, frame: 'walk_l0' },
-        { id: 'hero_cleric', dx: 54, frame: 'walk_l0' },
-        { id: 'hero_ranger', dx: 0, frame: 'sit0' }
+        { id: 'hero_rogue', dx: -43, dy: -1, flip: false, phase: 0.2 },
+        { id: 'hero_mage', dx: 43, dy: -1, flip: true, phase: 0.8 },
+        { id: 'hero_fighter', dx: -72, dy: 31, flip: false, phase: 1.4 },
+        { id: 'hero_cleric', dx: 72, dy: 31, flip: true, phase: 1.9 },
+        { id: 'hero_ranger', dx: 4, dy: 57, flip: true, phase: 2.5 }
       ];
       var t0 = performance.now();
+
+      function drawShadow(x, y, rx, alpha) {
+        g.globalAlpha = alpha || 0.28;
+        g.fillStyle = '#04050b';
+        g.beginPath();
+        g.ellipse(x, y + 2, rx, Math.max(2, rx * 0.24), 0, 0, 6.29);
+        g.fill();
+        g.globalAlpha = 1;
+      }
+
+      function drawSprite(id, frameName, x, y, scale, opts) {
+        opts = opts || {};
+        if (opts.shadow !== false) {
+          var sp = Game.assets.sprite(id);
+          drawShadow(x, y, Math.max(5, sp.w * scale * 0.26), opts.shadowAlpha || 0.25);
+        }
+        Game.assets.draw(g, id, frameName, x, y, {
+          scale: scale,
+          flip: !!opts.flip,
+          alpha: opts.alpha
+        });
+      }
 
       function frame(now) {
         if (!titleRoot) return;
@@ -119,52 +149,146 @@
           g.lineTo(w, h);
           g.fill();
         }
-        hills('#131c33', 26, h * 0.62, 1);
-        hills('#0d1426', 20, h * 0.70, 3);
+        hills('#151f3a', 26, h * 0.59, 1);
+        hills('#0c1429', 20, h * 0.67, 3);
 
         // 地面
-        g.fillStyle = '#152218';
-        g.fillRect(0, h * 0.74, w, h);
-        g.fillStyle = 'rgba(0,0,0,0.25)';
-        g.fillRect(0, h * 0.74, w, 2);
+        var groundY = h * (h < 700 ? 0.60 : 0.68);
+        var ground = g.createLinearGradient(0, groundY, 0, h);
+        ground.addColorStop(0, '#17281e');
+        ground.addColorStop(0.55, '#112219');
+        ground.addColorStop(1, '#0b1712');
+        g.fillStyle = ground;
+        g.fillRect(0, groundY, w, h - groundY);
+        g.fillStyle = 'rgba(0,0,0,0.28)';
+        g.fillRect(0, groundY, w, 2);
+
+        // 地平线灌木与树桩剪影
+        g.fillStyle = '#0a1711';
+        for (var bx = -12; bx < w + 18; bx += 24) {
+          var bh = 5 + ((bx * 7 + 19) & 7);
+          g.fillRect(bx, groundY - bh, 18, bh + 2);
+          if (((bx / 24) | 0) % 3 === 0) {
+            g.fillRect(bx + 8, groundY - bh - 8, 2, 9);
+            g.fillRect(bx + 4, groundY - bh - 6, 6, 2);
+          }
+        }
+
+        // 草叶与夜间微光
+        for (var gi = 0; gi < grass.length; gi++) {
+          var blade = grass[gi];
+          var gx = blade.x * w;
+          var gy = groundY + 12 + blade.y * Math.max(20, h - groundY - 22);
+          var sway = Math.sin(tt * 1.2 + blade.p) * 1.4;
+          g.globalAlpha = 0.22 + blade.y * 0.22;
+          g.strokeStyle = blade.y > 0.55 ? '#47613f' : '#304b35';
+          g.beginPath();
+          g.moveTo(gx, gy);
+          g.lineTo(gx + sway, gy - blade.h);
+          g.stroke();
+        }
+        g.globalAlpha = 1;
 
         // 营地（居中，位于菜单上方）
-        var cx = w / 2, cy = h * 0.76;
-        var S = 3;
+        var cx = w / 2;
+        var cy = h * (h < 700 ? 0.67 : 0.735);
+        var sceneScale = U.clamp(w / 390, 0.84, 1.12) * (h < 700 ? 0.88 : 1);
+        var propScale = 2.35 * sceneScale;
+        var heroScale = 2.15 * sceneScale;
+        var fireScale = 3.1 * sceneScale;
+
+        // 磨损营地地垫 + 营火刻印
+        var clearing = g.createRadialGradient(cx, cy + 27 * sceneScale, 12, cx, cy + 27 * sceneScale, 116 * sceneScale);
+        clearing.addColorStop(0, 'rgba(91,67,42,0.82)');
+        clearing.addColorStop(0.55, 'rgba(69,53,36,0.66)');
+        clearing.addColorStop(1, 'rgba(32,31,25,0)');
+        g.fillStyle = clearing;
+        g.beginPath();
+        g.ellipse(cx, cy + 27 * sceneScale, 148 * sceneScale, 76 * sceneScale, 0, 0, 6.29);
+        g.fill();
+        g.globalAlpha = 0.28;
+        g.strokeStyle = '#b68d4b';
+        g.lineWidth = 1;
+        g.beginPath();
+        g.ellipse(cx, cy + 18 * sceneScale, 28 * sceneScale, 14 * sceneScale, 0, 0, 6.29);
+        g.stroke();
+        for (var rune = 0; rune < 8; rune++) {
+          var ra = rune / 8 * Math.PI * 2;
+          g.fillStyle = rune % 2 ? '#b98d48' : '#dbc06d';
+          g.fillRect(
+            Math.round(cx + Math.cos(ra) * 35 * sceneScale) - 1,
+            Math.round(cy + 18 * sceneScale + Math.sin(ra) * 18 * sceneScale) - 1,
+            3,
+            2
+          );
+        }
+        g.globalAlpha = 1;
+
         // 篝火光晕
         var flick = 0.85 + 0.15 * Math.sin(tt * 9.3) * Math.sin(tt * 5.1 + 1);
-        var gr = g.createRadialGradient(cx, cy - 8, 4, cx, cy - 8, 90 * flick);
-        gr.addColorStop(0, 'rgba(255,190,90,0.34)');
+        var fireY = cy + 20 * sceneScale;
+        var gr = g.createRadialGradient(cx, fireY - 18 * sceneScale, 4, cx, fireY - 18 * sceneScale, 126 * sceneScale * flick);
+        gr.addColorStop(0, 'rgba(255,190,90,0.44)');
+        gr.addColorStop(0.45, 'rgba(225,122,42,0.15)');
         gr.addColorStop(1, 'rgba(255,120,30,0)');
         g.fillStyle = gr;
-        g.fillRect(cx - 100, cy - 108, 200, 200);
-        // 五职业围坐 + 篝火
+        g.fillRect(cx - 140 * sceneScale, fireY - 150 * sceneScale, 280 * sceneScale, 250 * sceneScale);
+
+        // 后景：公会旗、帐篷与营灯
+        var swayFrame = (((tt / 1.1) | 0) % 2) ? 'idle1' : 'idle0';
+        var lanternFrame = (((tt / 0.45) | 0) % 2) ? 'idle1' : 'idle0';
+        drawSprite('camp_banner', swayFrame, cx - 128 * sceneScale, cy + 4 * sceneScale, propScale, { shadowAlpha: 0.3 });
+        drawSprite('tent', 'idle0', cx - 86 * sceneScale, cy + 9 * sceneScale, 2.75 * sceneScale, { shadowAlpha: 0.34 });
+
+        var lanternX = cx + 126 * sceneScale, lanternY = cy + 7 * sceneScale;
+        var lg = g.createRadialGradient(lanternX, lanternY - 27 * sceneScale, 2, lanternX, lanternY - 27 * sceneScale, 46 * sceneScale);
+        lg.addColorStop(0, 'rgba(255,205,96,0.40)');
+        lg.addColorStop(1, 'rgba(240,145,40,0)');
+        g.fillStyle = lg;
+        g.fillRect(lanternX - 48 * sceneScale, lanternY - 74 * sceneScale, 96 * sceneScale, 96 * sceneScale);
+        drawSprite('camp_lantern', lanternFrame, lanternX, lanternY, propScale, { shadowAlpha: 0.3 });
+
+        // 中景：补给、铺盖和两段坐木
+        drawSprite('camp_supply', 'idle0', cx - 112 * sceneScale, cy + 45 * sceneScale, propScale, { shadowAlpha: 0.28 });
+        drawSprite('camp_bedroll', 'idle0', cx + 95 * sceneScale, cy + 53 * sceneScale, 2.15 * sceneScale, { shadowAlpha: 0.22 });
+        drawSprite('camp_log', 'idle0', cx - 58 * sceneScale, cy + 42 * sceneScale, 2.15 * sceneScale, { shadowAlpha: 0.25 });
+        drawSprite('camp_log', 'idle0', cx + 58 * sceneScale, cy + 42 * sceneScale, 2.15 * sceneScale, { shadowAlpha: 0.25, flip: true });
+
+        // 五职业围坐，全部使用坐姿帧并朝向篝火
         for (var hi = 0; hi < heroes.length; hi++) {
           var hd = heroes[hi];
-          var f = hd.frame;
-          if (f.indexOf('walk') === 0) {
-            f = f.slice(0, -1) + (((tt / 0.5 + hi) | 0) % 2);
-          } else if (f === 'sit0') {
-            f = ((tt / 1.4 + hi) | 0) % 2 === 0 ? 'sit0' : 'sit1';
-          }
-          var spr = Game.assets.sprite(hd.id);
-          var fr = spr.frames[f] || spr.frames.idle0;
-          var hx = cx + hd.dx * (S / 2.4);
-          var hy = cy + (hd.dx === 0 ? 16 : 4);
-          g.globalAlpha = 0.25;
-          g.fillStyle = '#000';
-          g.beginPath(); g.ellipse(hx, hy + 2, 8, 2.6, 0, 0, 6.29); g.fill();
-          g.globalAlpha = 1;
-          g.drawImage(fr, Math.round(hx - spr.anchor.x * 1.6), Math.round(hy - spr.anchor.y * 1.6),
-            Math.round(fr.width * 1.6), Math.round(fr.height * 1.6));
+          var sitFrame = ((tt / 1.45 + hd.phase) | 0) % 2 === 0 ? 'sit0' : 'sit1';
+          drawSprite(
+            hd.id,
+            sitFrame,
+            cx + hd.dx * sceneScale,
+            cy + hd.dy * sceneScale,
+            heroScale,
+            { flip: hd.flip, shadowAlpha: 0.32 }
+          );
         }
-        var cfr = Game.assets.frame('campfire', 'f' + (((tt / 0.14) | 0) % 4));
-        g.drawImage(cfr, Math.round(cx - cfr.width * S / 2), Math.round(cy - 8 - cfr.height * S + 10),
-          cfr.width * S, cfr.height * S);
+
+        // 篝火与炊具置于队伍中央
+        drawSprite('campfire', 'f' + (((tt / 0.14) | 0) % 4), cx, fireY, fireScale, { shadow: false });
+        drawSprite('camp_cookpot', 'idle0', cx + 2 * sceneScale, fireY + 7 * sceneScale, 2.35 * sceneScale, { shadowAlpha: 0.18 });
+
+        // 炊烟
+        for (var smoke = 0; smoke < 3; smoke++) {
+          var smokeK = (tt * 0.23 + smoke * 0.34) % 1;
+          g.globalAlpha = 0.2 * (1 - smokeK);
+          g.fillStyle = '#e7dfd0';
+          g.fillRect(
+            Math.round(cx - 3 + smoke * 3 + Math.sin(tt * 1.4 + smoke) * 3),
+            Math.round(fireY - 49 * sceneScale - smokeK * 38 * sceneScale),
+            smokeK > 0.55 ? 3 : 2,
+            3
+          );
+        }
+        g.globalAlpha = 1;
 
         // 火星
         if (Math.random() < 0.35) {
-          embers.push({ x: cx + U.rand(-5, 5), y: cy - 26, vx: U.rand(-6, 6), vy: U.rand(-40, -22), t: 0, life: U.rand(0.8, 1.6) });
+          embers.push({ x: cx + U.rand(-7, 7), y: fireY - 35 * sceneScale, vx: U.rand(-7, 7), vy: U.rand(-44, -24), t: 0, life: U.rand(0.8, 1.6) });
         }
         for (var ei = embers.length - 1; ei >= 0; ei--) {
           var em = embers[ei];
@@ -177,10 +301,31 @@
         }
         g.globalAlpha = 1;
 
+        // 营地边缘流萤
+        if (fireflies.length < 10 && Math.random() < 0.05) {
+          fireflies.push({
+            x: cx + U.rand(-150, 150) * sceneScale,
+            y: cy + U.rand(-40, 70) * sceneScale,
+            p: U.rand(0, 6.28),
+            life: U.rand(5, 9)
+          });
+        }
+        for (var fi = fireflies.length - 1; fi >= 0; fi--) {
+          var fly = fireflies[fi];
+          fly.life -= 1 / 60;
+          if (fly.life <= 0) { fireflies.splice(fi, 1); continue; }
+          fly.x += Math.sin(tt * 1.1 + fly.p) * 0.14;
+          fly.y += Math.cos(tt * 0.9 + fly.p) * 0.08;
+          g.globalAlpha = 0.2 + 0.6 * Math.max(0, Math.sin(tt * 2.2 + fly.p));
+          g.fillStyle = '#d7ee8a';
+          g.fillRect(fly.x | 0, fly.y | 0, 2, 2);
+        }
+        g.globalAlpha = 1;
+
         // 暗角
         var vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.72);
         vg.addColorStop(0, 'rgba(5,6,15,0)');
-        vg.addColorStop(1, 'rgba(5,6,15,0.55)');
+        vg.addColorStop(1, 'rgba(5,6,15,0.48)');
         g.fillStyle = vg;
         g.fillRect(0, 0, w, h);
 
