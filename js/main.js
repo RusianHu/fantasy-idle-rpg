@@ -1,7 +1,7 @@
 /* ============================================================
  * main.js — 启动引导
- * 顺序：i18n → 系统监听 → 读档/新档 → 世界 → 渲染/UI →
- *       离线结算 / 序章 → 主循环
+ * 顺序：i18n → 系统监听 → 读档/新档预览 → 世界/渲染预热 →
+ *       标题存档选择 → 离线结算 / 序章 → 主循环
  * ============================================================ */
 (function () {
   'use strict';
@@ -21,6 +21,7 @@
   function boot() {
     loadFont();
     Game.i18n.detect();
+    Game.entryState = 'menu';
 
     // 系统监听器
     Game.audio.init();
@@ -100,14 +101,22 @@
       }
     }
 
-    // 新玩家：标题画面 → 序章 → 选职业 → 淡入世界并鸣锣开场
-    // 迁移档（无职业）：直接全屏补选；老玩家：秒进 + 离线结算
-    if (!Game.state.meta.prologueDone) {
-      Game.ui.title.show(function () {
+    function activateSession() {
+      if (Game.entryState === 'active') return;
+      Game.entryState = 'active';
+      Game.loop.start();
+      Game.save.save('boot');
+      Game.audio.playBgm('bgm_field');
+    }
+
+    function startSelectedSlot() {
+      if (isNew && Game.save && Game.save.beginNewGame) Game.save.beginNewGame();
+      if (!Game.state.meta.prologueDone) {
         Game.ui.modals.prologue(function () {
           Game.state.meta.prologueDone = true;
           Game.save.save('prologue');
           classFlow(function () {
+            activateSession();
             Game.ui.title.hide();
             setTimeout(function () {
               Game.fx.banner('ui.adventureBegin');
@@ -115,14 +124,54 @@
             }, 500);
           });
         });
-      });
-    } else {
-      classFlow(settleOffline);
+      } else {
+        classFlow(function () {
+          activateSession();
+          Game.ui.title.hide();
+          setTimeout(settleOffline, 240);
+        });
+      }
     }
 
-    Game.loop.start();
-    Game.save.save('boot');
-    Game.audio.playBgm('bgm_field');
+    function replaceWithNewGame() {
+      Game.ui.modals.confirm(Game.i18n.t('ui.titleNewGameConfirm'), function () {
+        try { sessionStorage.setItem('firpg_start_new', '1'); } catch (e) {}
+        Game.save.hardReset();
+      });
+    }
+
+    function deleteExistingSave() {
+      Game.ui.modals.confirm(Game.i18n.t('ui.titleDeleteConfirm'), function () {
+        Game.save.hardReset();
+      });
+    }
+
+    // 新档、建角草稿、正式角色都先进入同一档案门厅。世界与 Canvas 已在
+    // 背后预热，但主循环、离线结算和自动存档要等玩家明确选择后才启动。
+    Game.ui.title.show({
+      slots: Game.ui.title.makeSlots({ occupied: !isNew }),
+      onNewGame: replaceWithNewGame,
+      onDelete: deleteExistingSave,
+      onSelect: function () {
+        if (Game.entryState !== 'menu') return;
+        Game.entryState = 'opening';
+        Game.ui.title.enter(startSelectedSlot);
+      }
+    });
+
+    // “开始新游戏”确认覆盖后会刷新以彻底清理旧世界；刷新完成自动衔接
+    // 空档的进入动画，避免让玩家重复点击。
+    var continueFresh = false;
+    try {
+      continueFresh = isNew && sessionStorage.getItem('firpg_start_new') === '1';
+      if (continueFresh) sessionStorage.removeItem('firpg_start_new');
+    } catch (e) {}
+    if (continueFresh) {
+      setTimeout(function () {
+        var freshSlot = document.querySelector('#title-root .slot-empty');
+        if (freshSlot) freshSlot.click();
+      }, 220);
+    }
   }
 
   if (document.readyState === 'loading') {

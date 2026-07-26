@@ -2,55 +2,278 @@
  * ui/title.js — 开场体验
  * 标题画面：统一半分辨率 2× 像素网格的半俯视悬崖营地（雪山/密林/
  * 巨兽巢穴/蜿蜒河流/石桥/极远小比例魔王城/近岸哨戒/四人围火）
- * + 像素 LOGO + 菜单；全屏职业选择：大立绘动画预览、左右浏览、
- * 六技能预览、二次确认。仅新玩家与迁移补选时出现，老玩家零打扰。
+ * + 像素 LOGO + 公会远征档案；全屏职业选择：大立绘动画预览、
+ * 左右浏览、六技能预览、二次确认。档案界面用稳定槽位 ID 和数组
+ * 渲染，当前只开放单槽，保留未来多档扩展能力。
  * ============================================================ */
 (function () {
   'use strict';
   var Game = window.Game;
   var U = Game.util, reg = Game.reg;
 
-  var titleRoot = null, titleRaf = 0;
+  var titleRoot = null, titleRaf = 0, titleEnterTimer = 0;
+  var titleOptions = null, titleSlots = [];
   var csRoot = null, csRaf = 0;
 
   var T = Game.ui.title = {
 
     /* ================= 标题画面 ================= */
-    show: function (onStart) {
+    makeSlots: function (opts) {
+      opts = opts || {};
+      var defs = Game.save && Game.save.slots ? Game.save.slots() :
+        [{ id: 'expedition-1', index: 1 }];
+      var s = Game.state;
+      var occupied = !!opts.occupied;
+      var hasClass = occupied && Game.player.hasClass();
+      return defs.map(function (def) {
+        return {
+          id: def.id,
+          index: def.index,
+          occupied: occupied,
+          kind: !occupied ? 'empty' : (hasClass ? 'active' : 'draft'),
+          classId: hasClass ? s.player.classId : null,
+          level: hasClass ? s.player.level : 1,
+          regionId: s.world.region,
+          highestRegion: Math.max(1, Number(s.meta.stats.highestRegion) || 1),
+          regionCount: Game.State.regionOrder().length,
+          playSec: Number(s.meta.stats.playSec) || 0,
+          savedAt: occupied ? Game.save.lastTs() : 0,
+          worldSeed: s.world.worldSeed >>> 0
+        };
+      });
+    },
+
+    show: function (opts) {
+      if (typeof opts === 'function') opts = { onSelect: opts };
+      opts = opts || {};
+      titleOptions = opts;
+      titleSlots = Array.isArray(opts.slots) && opts.slots.length ?
+        opts.slots : T.makeSlots({ occupied: false });
       var t = Game.i18n.t;
       titleRoot = U.el('div', '');
       titleRoot.id = 'title-root';
       titleRoot.innerHTML =
         '<canvas id="title-canvas"></canvas>' +
         '<div class="title-ui">' +
-        '<div class="title-logo">' + t('ui.titleLogo') +
+        '<button class="title-lang" type="button"><span aria-hidden="true">文</span><strong></strong></button>' +
+        '<div class="title-logo"><span class="title-logo-main">' + t('ui.titleLogo') + '</span>' +
         '<span class="title-sub">FANTASY IDLE RPG</span></div>' +
-        '<div class="title-menu">' +
-        '<button class="btn gold title-start">✦ ' + t('ui.titleStart') + ' ✦</button>' +
-        '<button class="btn small title-lang">中文 / EN</button>' +
+        '<section class="title-archive" aria-labelledby="title-archive-heading">' +
+        '<div class="archive-heading">' +
+        '<span class="archive-crest" aria-hidden="true"><i></i></span>' +
+        '<span class="archive-heading-copy"><small class="archive-kicker"></small>' +
+        '<strong id="title-archive-heading" class="archive-title"></strong></span>' +
+        '<span class="archive-capacity"></span>' +
         '</div>' +
+        '<div class="title-slots" role="list"></div>' +
+        '<div class="archive-footer"><span class="archive-hint"></span><span class="archive-last"></span></div>' +
+        '<button class="title-new-game" type="button"><i aria-hidden="true"></i>' +
+        '<span class="title-new-game-copy"><strong></strong><small></small></span></button>' +
+        '</section>' +
         '<div class="title-ver">v' + Game.VERSION + '</div>' +
+        '<div class="title-entry-fx" aria-hidden="true">' +
+        '<div class="entry-beam"></div><div class="entry-ring"><i></i></div>' +
+        '<div class="entry-pixels"></div><div class="entry-copy"></div>' +
+        '</div>' +
         '</div>';
       document.getElementById('app').appendChild(titleRoot);
 
-      titleRoot.querySelector('.title-start').addEventListener('click', function () {
-        // 删除旧档后停留在标题页不会立刻重建双槽；玩家明确开始后才建立草稿。
-        if (Game.save && Game.save.beginNewGame) Game.save.beginNewGame();
-        onStart();
+      var slotsRoot = titleRoot.querySelector('.title-slots');
+      titleSlots.forEach(function (slot) {
+        var wrap = U.el('div', 'title-slot-wrap' + (slot.occupied ? ' has-delete' : ''));
+        wrap.setAttribute('role', 'listitem');
+        var button = U.el('button', 'title-slot title-start slot-' + slot.kind);
+        button.type = 'button';
+        button.setAttribute('data-slot-id', slot.id);
+        button.setAttribute('data-slot-kind', slot.kind);
+        button.innerHTML =
+          '<span class="slot-number"><small>SLOT</small><b>' +
+          ('0' + slot.index).slice(-2) + '</b></span>' +
+          '<span class="slot-portrait"><canvas width="56" height="56"></canvas><i aria-hidden="true"></i></span>' +
+          '<span class="slot-copy"><strong class="slot-name"></strong>' +
+          '<span class="slot-location"></span><span class="slot-meta"></span></span>' +
+          '<span class="slot-action"><span></span><i aria-hidden="true"></i></span>';
+        button.addEventListener('click', function () {
+          if (titleRoot.classList.contains('is-entering')) return;
+          titleRoot.setAttribute('data-selected-slot', slot.id);
+          if (titleOptions.onSelect) titleOptions.onSelect(slot);
+        });
+        wrap.appendChild(button);
+        if (slot.occupied) {
+          var deleteButton = U.el('button', 'slot-delete');
+          deleteButton.type = 'button';
+          deleteButton.innerHTML = '<i aria-hidden="true"></i>';
+          deleteButton.addEventListener('click', function (event) {
+            event.stopPropagation();
+            if (titleRoot.classList.contains('is-entering')) return;
+            if (titleOptions.onDelete) titleOptions.onDelete(slot);
+          });
+          wrap.appendChild(deleteButton);
+        }
+        slotsRoot.appendChild(wrap);
+        T._drawSlotPortrait(button.querySelector('canvas'), slot);
       });
+
+      var newGame = titleRoot.querySelector('.title-new-game');
+      newGame.hidden = !titleSlots.some(function (slot) { return slot.occupied; });
+      titleRoot.querySelector('.title-archive').classList.toggle('has-new-game', !newGame.hidden);
+      newGame.addEventListener('click', function () {
+        if (titleRoot.classList.contains('is-entering')) return;
+        if (titleOptions.onNewGame) titleOptions.onNewGame();
+      });
+
       titleRoot.querySelector('.title-lang').addEventListener('click', function () {
+        if (titleRoot.classList.contains('is-entering')) return;
         var next = Game.i18n.locale() === 'zh-CN' ? 'en' : 'zh-CN';
         Game.state.settings.lang = next;
         Game.i18n.setLocale(next);
-        titleRoot.querySelector('.title-logo').innerHTML =
-          Game.i18n.t('ui.titleLogo') + '<span class="title-sub">FANTASY IDLE RPG</span>';
-        titleRoot.querySelector('.title-start').innerHTML = '✦ ' + Game.i18n.t('ui.titleStart') + ' ✦';
+        T._refreshTitleCopy();
       });
 
+      T._refreshTitleCopy();
       T._runTitleScene();
     },
 
+    _drawSlotPortrait: function (canvas, slot) {
+      if (!canvas) return;
+      var g = canvas.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, canvas.width, canvas.height);
+      g.fillStyle = '#080b18';
+      g.fillRect(0, 0, 56, 56);
+      g.fillStyle = slot.kind === 'active' ? '#243253' : '#151a32';
+      g.fillRect(3, 3, 50, 50);
+      g.fillStyle = slot.kind === 'active' ? '#9b7832' : '#343a62';
+      g.fillRect(6, 47, 44, 2);
+      if (slot.classId) {
+        g.fillStyle = '#d8b45a22';
+        g.fillRect(10, 9, 36, 36);
+        // 档案使用专用 12×12 职业肖像，而不是把完整站姿硬塞进小框。
+        // 按精灵实际尺寸计算整数倍居中，帽檐、发梢和肩部都必须完整保留。
+        var face = Game.assets.sprite('face_' + slot.classId);
+        var frame = face && face.frames.icon;
+        if (frame) {
+          var scale = Math.max(1, Math.min(3, Math.floor(44 / Math.max(frame.width, frame.height))));
+          var dw = frame.width * scale, dh = frame.height * scale;
+          var dx = Math.floor((56 - dw) / 2);
+          var dy = Math.floor((54 - dh) / 2);
+          g.drawImage(frame, 0, 0, frame.width, frame.height, dx, dy, dw, dh);
+          canvas.setAttribute('data-portrait-mode', 'face');
+        }
+        return;
+      }
+      // 空档/草稿使用字符网格绘制的公会羽剑纹章，不依赖 Emoji 或外部图标。
+      var ink = slot.kind === 'draft' ? '#d8b45a' : '#6d7398';
+      var hi = slot.kind === 'draft' ? '#f0d47b' : '#9da2bd';
+      g.fillStyle = ink;
+      g.fillRect(27, 11, 3, 25);
+      g.fillRect(24, 14, 9, 3);
+      g.fillRect(21, 17, 9, 3);
+      g.fillRect(20, 20, 8, 3);
+      g.fillRect(22, 23, 6, 3);
+      g.fillRect(24, 26, 4, 12);
+      g.fillRect(20, 36, 14, 3);
+      g.fillRect(25, 39, 4, 5);
+      g.fillStyle = hi;
+      g.fillRect(28, 12, 2, 23);
+      g.fillRect(22, 18, 5, 2);
+    },
+
+    _refreshTitleCopy: function () {
+      if (!titleRoot) return;
+      var t = Game.i18n.t;
+      var locale = Game.i18n.locale();
+      titleRoot.querySelector('.title-logo-main').textContent = t('ui.titleLogo');
+      titleRoot.querySelector('.archive-kicker').textContent = t('ui.titleArchiveKicker');
+      titleRoot.querySelector('.archive-title').textContent = t('ui.titleArchive');
+      titleRoot.querySelector('.archive-capacity').textContent =
+        t('ui.titleSlotCount', { current: 1, total: titleSlots.length });
+      titleRoot.querySelector('.archive-hint').textContent = t('ui.titleSlotHint');
+      titleRoot.querySelector('.title-new-game strong').textContent = t('ui.titleNewGame');
+      titleRoot.querySelector('.title-new-game small').textContent = t('ui.titleNewGameSub');
+      titleRoot.querySelector('.title-new-game').setAttribute('aria-label', t('ui.titleNewGame'));
+      var lang = titleRoot.querySelector('.title-lang');
+      lang.querySelector('strong').textContent = locale === 'zh-CN' ? '中' : 'EN';
+      lang.setAttribute('aria-label', t('ui.titleLanguage'));
+      lang.title = t('ui.titleLanguage');
+
+      titleSlots.forEach(function (slot) {
+        var root = titleRoot.querySelector('[data-slot-id="' + slot.id + '"]');
+        if (!root) return;
+        var name, location, meta, action;
+        if (slot.kind === 'active') {
+          name = t('ui.titleSlotHero', {
+            level: slot.level,
+            className: t('class.' + slot.classId + '.name')
+          });
+          location = t('ui.titleSlotLocation', {
+            region: t('region.' + slot.regionId + '.name')
+          });
+          meta = t('ui.titleSlotProgress', {
+            time: Game.i18n.fmtDur(slot.playSec),
+            current: slot.highestRegion,
+            total: slot.regionCount
+          });
+          action = t('ui.titleContinue');
+        } else if (slot.kind === 'draft') {
+          name = t('ui.titleSlotDraft');
+          location = t('ui.titleSlotDraftDesc');
+          meta = t('ui.titleSlotSeed', { seed: U.hex32(slot.worldSeed) });
+          action = t('ui.titleResumeDraft');
+        } else {
+          name = t('ui.titleSlotEmpty');
+          location = t('ui.titleSlotEmptyDesc');
+          meta = t('ui.titleSlotNewWorld');
+          action = t('ui.titleCreate');
+        }
+        root.querySelector('.slot-name').textContent = name;
+        root.querySelector('.slot-location').textContent = location;
+        root.querySelector('.slot-meta').textContent = meta;
+        root.querySelector('.slot-action span').textContent = action;
+        root.setAttribute('aria-label', action + ' · ' + name + ' · ' + location);
+        var deleteButton = root.parentNode.querySelector('.slot-delete');
+        if (deleteButton) {
+          deleteButton.setAttribute('aria-label', t('ui.titleDeleteSave'));
+          deleteButton.title = t('ui.titleDeleteSave');
+        }
+      });
+
+      var first = titleSlots[0];
+      var last = '';
+      if (first && first.savedAt) {
+        try {
+          last = new Intl.DateTimeFormat(locale === 'zh-CN' ? 'zh-CN' : 'en', {
+            month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+            hour12: false
+          }).format(new Date(first.savedAt));
+        } catch (e) { last = ''; }
+      }
+      titleRoot.querySelector('.archive-last').textContent = first && first.savedAt ?
+        t('ui.titleLastSave', { time: last }) : t('ui.titleLocalSave');
+      var selected = titleRoot.getAttribute('data-selected-slot');
+      var selectedSlot = titleSlots.filter(function (slot) { return slot.id === selected; })[0] || first;
+      titleRoot.querySelector('.entry-copy').textContent = selectedSlot && selectedSlot.kind === 'empty' ?
+        t('ui.titleOpeningNew') : t('ui.titleOpeningSave');
+    },
+
+    enter: function (onReady) {
+      if (!titleRoot || titleRoot.classList.contains('is-entering')) return;
+      var selectedId = titleRoot.getAttribute('data-selected-slot') ||
+        (titleSlots[0] && titleSlots[0].id);
+      var selected = selectedId && titleRoot.querySelector('[data-slot-id="' + selectedId + '"]');
+      if (selected) selected.classList.add('selected');
+      titleRoot.querySelectorAll('button').forEach(function (button) { button.disabled = true; });
+      titleRoot.classList.add('is-entering');
+      T._refreshTitleCopy();
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      titleEnterTimer = setTimeout(function () {
+        titleEnterTimer = 0;
+        if (onReady) onReady();
+      }, reduced ? 100 : 1180);
+    },
+
     hide: function () {
+      if (titleEnterTimer) { clearTimeout(titleEnterTimer); titleEnterTimer = 0; }
       if (csRaf) { cancelAnimationFrame(csRaf); csRaf = 0; }
       if (csRoot && csRoot.parentNode) { csRoot.parentNode.removeChild(csRoot); csRoot = null; }
       if (!titleRoot) return;
@@ -60,7 +283,7 @@
       setTimeout(function () {
         if (titleRaf) { cancelAnimationFrame(titleRaf); titleRaf = 0; }
         if (el.parentNode) el.parentNode.removeChild(el);
-      }, 750);
+      }, 620);
     },
 
     _runTitleScene: function () {

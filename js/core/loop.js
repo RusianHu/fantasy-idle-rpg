@@ -22,6 +22,12 @@
     var st = Game.state;
     // 标题与建角流程只保留背景渲染所需的视觉更新，严禁在遮罩后战斗、
     // 增长游玩统计或推进世界时间。
+    if (Game.entryState !== undefined && Game.entryState !== 'active') {
+      Game.terrain.update(dt);
+      Game.particles.update(dt);
+      Game.fx.update(dt);
+      return;
+    }
     if (!Game.State.isAdventureStarted()) {
       Game.terrain.update(dt);
       Game.particles.update(dt);
@@ -79,6 +85,11 @@
 
     init: function () {
       document.addEventListener('visibilitychange', function () {
+        if (Game.entryState !== undefined && Game.entryState !== 'active') {
+          hiddenAt = 0;
+          lastFrame = performance.now();
+          return;
+        }
         if (document.hidden) {
           if (Game.transitions) Game.transitions.settleBeforeSave();
           hiddenAt = U.now();
@@ -101,10 +112,12 @@
         }
       });
       window.addEventListener('pagehide', function () {
+        if (Game.entryState !== undefined && Game.entryState !== 'active') return;
         if (Game.transitions) Game.transitions.settleBeforeSave();
         Game.save.save('pagehide');
       });
       window.addEventListener('beforeunload', function () {
+        if (Game.entryState !== undefined && Game.entryState !== 'active') return;
         if (Game.transitions) Game.transitions.settleBeforeSave();
         Game.save.save('unload');
       });

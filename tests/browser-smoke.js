@@ -121,12 +121,22 @@ async function run() {
       throw new Error('browser boot errors: ' + cdp.errors.join(' | '));
     }
     await delay(240);
+    if (cdp.errors.length) {
+      throw new Error('browser title errors: ' + cdp.errors.join(' | '));
+    }
     const titleScene = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const canvas = document.getElementById('title-canvas');
       const start = root?.querySelector('.title-start');
       const lang = root?.querySelector('.title-lang');
-      if (!root || !canvas || !start || !lang) return { visible: false };
+      if (!root || !canvas || !start || !lang) return {
+        visible: false,
+        hasRoot: !!root,
+        hasCanvas: !!canvas,
+        hasStart: !!start,
+        hasLang: !!lang,
+        bodyText: document.body.innerText.slice(0, 200)
+      };
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       let warmPixels = 0;
       let opaquePixels = 0;
@@ -218,6 +228,12 @@ async function run() {
       }
       const sr = start.getBoundingClientRect();
       const lr = lang.getBoundingClientRect();
+      const overlaps = !(
+        sr.right <= lr.left || sr.left >= lr.right ||
+        sr.bottom <= lr.top || sr.top >= lr.bottom
+      );
+      const archive = root.querySelector('.title-archive');
+      const slot = root.querySelector('[data-slot-id="expedition-1"]');
       return {
         visible: true,
         warmPixels,
@@ -237,12 +253,17 @@ async function run() {
           return pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2];
         })).size,
         startHeight: sr.height,
-        buttonsSeparate: sr.bottom <= lr.top,
+        buttonsSeparate: !overlaps,
         startFits: start.scrollWidth <= start.clientWidth,
-        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
+        archiveVisible: !!archive && archive.getBoundingClientRect().height >= 130,
+        slotKind: slot?.getAttribute('data-slot-kind'),
+        slotId: slot?.getAttribute('data-slot-id'),
+        slotAria: slot?.getAttribute('aria-label') || '',
+        languageHeight: lr.height
       };
     })()`);
-    assert.equal(titleScene.visible, true, 'new saves open on the title scene');
+    assert.equal(titleScene.visible, true, 'new saves open on the title scene: ' + JSON.stringify(titleScene));
     assert.ok(titleScene.warmPixels > 45, 'title camp has a visible warm fire-and-lantern focal area');
     assert.ok(
       titleScene.citadelPixels > 4 && titleScene.citadelPixels < 220,
@@ -266,6 +287,35 @@ async function run() {
     assert.equal(titleScene.buttonsSeparate, true);
     assert.equal(titleScene.startFits, true);
     assert.equal(titleScene.noHorizontalOverflow, true);
+    assert.equal(titleScene.archiveVisible, true, 'title shows the expedition archive panel');
+    assert.equal(titleScene.slotKind, 'empty');
+    assert.equal(titleScene.slotId, 'expedition-1');
+    assert.ok(titleScene.slotAria.length > 8, 'save slot has an accessible description');
+    assert.ok(titleScene.languageHeight >= 44, 'language switch keeps a touch target');
+
+    const englishTitleFit = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      root.querySelector('.title-lang').click();
+      const slot = root.querySelector('.title-slot');
+      const action = slot.querySelector('.slot-action span');
+      const name = slot.querySelector('.slot-name');
+      const result = {
+        archiveTitle: root.querySelector('.archive-title').textContent,
+        action: action.textContent,
+        actionFits: action.scrollWidth <= action.clientWidth,
+        nameFits: name.scrollWidth <= name.clientWidth || getComputedStyle(name).textOverflow === 'ellipsis',
+        slotFits: slot.scrollWidth <= slot.clientWidth,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+      root.querySelector('.title-lang').click();
+      return result;
+    })()`);
+    assert.equal(englishTitleFit.archiveTitle, 'EXPEDITION RECORD');
+    assert.equal(englishTitleFit.action, 'NEW GAME');
+    assert.equal(englishTitleFit.actionFits, true);
+    assert.equal(englishTitleFit.nameFits, true);
+    assert.equal(englishTitleFit.slotFits, true);
+    assert.equal(englishTitleFit.noHorizontalOverflow, true);
 
     // 删除存档后停在标题页：不重建存档、不推进世界、不允许任何离线结算或入账。
     const unopenedTitle = await cdp.evaluate(`(() => {
@@ -348,6 +398,8 @@ async function run() {
       if (!Game.player.hasClass()) Game.player.setClass('fighter');
       Game.state.meta.prologueDone = true;
       Game.state.player.hp = Game.player.derived().maxHp;
+      Game.entryState = 'active';
+      Game.loop.start();
       Game.ui.title.hide();
 
       const firstSeed = Game.state.world.worldSeed;
@@ -356,6 +408,7 @@ async function run() {
       Game.world.init(firstRegion);
       const snapB = JSON.stringify(Game.terrain.snapshot());
       if (snapA !== snapB) throw new Error('same-save layout changed after rebuild');
+      Game.render.frame(0.016);
 
       Game.ui.tabs.open('map');
       const seedText = document.querySelector('.world-seed-row code')?.textContent;
@@ -1616,9 +1669,11 @@ async function run() {
     const restartTitleScreenshot = path.join(os.tmpdir(), 'firpg-restart-title-mobile-cdp.png');
     fs.writeFileSync(restartTitleScreenshot, Buffer.from(restartTitleCapture.data, 'base64'));
 
-    const restartClassSelect = await cdp.evaluate(`(() => {
+    const restartClassSelect = await cdp.evaluate(`(async () => {
       document.querySelector('#title-root .title-start').click();
+      await new Promise((resolve) => setTimeout(resolve, 1250));
       const story = document.querySelector('.prologue-mask');
+      if (!story) throw new Error('prologue did not open after the archive transition');
       for (let i = 0; i < 10; i++) story.click();
       const root = document.getElementById('class-root');
       return {
@@ -1658,7 +1713,8 @@ async function run() {
         classGone: !document.getElementById('class-root'),
         saveMatches: saved.player.classId === Game.state.player.classId,
         backupMatches: backup.player.classId === Game.state.player.classId,
-        endingCleared: saved.meta.completedAt === null && backup.meta.completedAt === null
+        endingCleared: saved.meta.completedAt === null && backup.meta.completedAt === null,
+        savedTs: saved.ts
       };
     })()`);
     assert.equal(restartCompleted.hasClass, true);
@@ -1667,14 +1723,210 @@ async function run() {
     assert.equal(restartCompleted.saveMatches, true);
     assert.equal(restartCompleted.backupMatches, true);
     assert.equal(restartCompleted.endingCleared, true);
+
+    // 正式档刷新后必须先回到档案门厅，不可直进游戏、覆盖离线时间或推进世界。
+    const existingReloaded = cdp.event('Page.loadEventFired');
+    await cdp.send('Page.reload', { ignoreCache: true });
+    await existingReloaded;
+    await delay(520);
+    const existingTitle = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      const slot = root?.querySelector('[data-slot-id="expedition-1"]');
+      const newGame = root?.querySelector('.title-new-game');
+      const deleteButton = slot?.parentNode.querySelector('.slot-delete');
+      const portrait = slot?.querySelector('canvas');
+      const portraitFrame = Game.assets.sprite('face_' + Game.state.player.classId)?.frames.icon;
+      const stored = JSON.parse(localStorage.getItem('firpg_save'));
+      const beforeSaveTs = stored.ts;
+      const beforeWorldTime = Game.state.world.worldTime;
+      Game.loop.catchup(90);
+      const afterWorldTime = Game.state.world.worldTime;
+      newGame?.click();
+      const modal = document.querySelector('#modal-root .modal-mask');
+      const destructiveCopy = modal?.querySelector('.modal-body')?.textContent || '';
+      const newGameHeight = newGame?.getBoundingClientRect().height || 0;
+      modal?.querySelector('.modal-btns .btn:not(.gold)')?.click();
+      deleteButton?.click();
+      const deleteModal = document.querySelector('#modal-root .modal-mask');
+      const deleteCopy = deleteModal?.querySelector('.modal-body')?.textContent || '';
+      const deleteHeight = deleteButton?.getBoundingClientRect().height || 0;
+      deleteModal?.querySelector('.modal-btns .btn:not(.gold)')?.click();
+      const afterSaveTs = JSON.parse(localStorage.getItem('firpg_save')).ts;
+      const newGameLabelStyle = getComputedStyle(newGame.querySelector('strong'));
+      return {
+        titleVisible: !!root,
+        entryState: Game.entryState,
+        kind: slot?.getAttribute('data-slot-kind'),
+        action: slot?.querySelector('.slot-action span')?.textContent,
+        heroPixels: slot ? Array.from(portrait.getContext('2d')
+          .getImageData(0, 0, 56, 56).data).filter((v, i) => i % 4 === 3 && v > 0).length : 0,
+        portraitMode: portrait?.getAttribute('data-portrait-mode'),
+        portraitSourceFits: !!portraitFrame && portraitFrame.width * 3 <= 44 && portraitFrame.height * 3 <= 44,
+        hasNewGame: !!newGame && !newGame.hidden,
+        newGameText: newGame?.querySelector('strong')?.textContent,
+        newGameSub: newGame?.querySelector('small')?.textContent,
+        newGameHeight,
+        newGameFontSize: parseFloat(newGameLabelStyle.fontSize),
+        deleteVisible: !!deleteButton,
+        deleteHeight,
+        deleteLabel: deleteButton?.getAttribute('aria-label'),
+        deleteCopy,
+        destructiveCopy,
+        confirmationShown: !!modal,
+        beforeSaveTs,
+        afterSaveTs,
+        beforeWorldTime,
+        afterWorldTime,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(existingTitle.titleVisible, true, 'existing saves return to the archive lobby');
+    assert.equal(existingTitle.entryState, 'menu');
+    assert.equal(existingTitle.kind, 'active');
+    assert.equal(existingTitle.action, '继续游戏');
+    assert.ok(existingTitle.heroPixels > 200, 'active save renders its class portrait');
+    assert.equal(existingTitle.portraitMode, 'face', 'save slot uses the dedicated uncropped class portrait');
+    assert.equal(existingTitle.portraitSourceFits, true, 'portrait source fits inside the safe 44px area');
+    assert.equal(existingTitle.hasNewGame, true);
+    assert.equal(existingTitle.newGameText, '开始新游戏');
+    assert.equal(existingTitle.newGameSub, '将覆盖当前档案');
+    assert.ok(existingTitle.newGameHeight >= 44);
+    assert.ok(existingTitle.newGameFontSize >= 11);
+    assert.ok(existingTitle.destructiveCopy.includes('覆盖当前进行中的单档'));
+    assert.equal(existingTitle.confirmationShown, true);
+    assert.equal(existingTitle.deleteVisible, true);
+    assert.ok(existingTitle.deleteHeight >= 44);
+    assert.equal(existingTitle.deleteLabel, '删除此存档');
+    assert.ok(existingTitle.deleteCopy.includes('永久清除角色'));
+    assert.equal(existingTitle.beforeSaveTs, existingTitle.afterSaveTs, 'archive preview does not overwrite the save timestamp');
+    assert.equal(existingTitle.beforeWorldTime, existingTitle.afterWorldTime, 'archive preview keeps the world frozen');
+    assert.equal(existingTitle.noHorizontalOverflow, true);
+    const existingTitleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const existingTitleScreenshot = path.join(os.tmpdir(), 'firpg-title-existing-save-mobile-cdp.png');
+    fs.writeFileSync(existingTitleScreenshot, Buffer.from(existingTitleCapture.data, 'base64'));
+
+    const entryStarted = await cdp.evaluate(`(() => {
+      const slot = document.querySelector('#title-root [data-slot-id="expedition-1"]');
+      slot.click();
+      return {
+        entering: document.getElementById('title-root')?.classList.contains('is-entering'),
+        selected: slot.classList.contains('selected'),
+        state: Game.entryState,
+        disabled: slot.disabled
+      };
+    })()`);
+    assert.equal(entryStarted.entering, true);
+    assert.equal(entryStarted.selected, true);
+    assert.equal(entryStarted.state, 'opening');
+    assert.equal(entryStarted.disabled, true);
+    await delay(380);
+    const entryMid = await cdp.evaluate(`(() => {
+      const root = document.getElementById('title-root');
+      const fx = root?.querySelector('.title-entry-fx');
+      return {
+        entering: root?.classList.contains('is-entering'),
+        fxVisible: fx ? getComputedStyle(fx).visibility === 'visible' : false,
+        entryCopy: fx?.querySelector('.entry-copy')?.textContent || '',
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(entryMid.entering, true);
+    assert.equal(entryMid.fxVisible, true);
+    assert.equal(entryMid.entryCopy, '正在同步远征档案');
+    assert.equal(entryMid.noHorizontalOverflow, true);
+    const entryCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const entryScreenshot = path.join(os.tmpdir(), 'firpg-title-entry-transition-mobile-cdp.png');
+    fs.writeFileSync(entryScreenshot, Buffer.from(entryCapture.data, 'base64'));
+    await delay(1500);
+    const resumedFromArchive = await cdp.evaluate(`(() => ({
+      entryState: Game.entryState,
+      titleGone: !document.getElementById('title-root'),
+      hasClass: Game.player.hasClass(),
+      offlineModal: !!document.querySelector('#modal-root .offline-lines')
+    }))()`);
+    assert.equal(resumedFromArchive.entryState, 'active');
+    assert.equal(resumedFromArchive.titleGone, true);
+    assert.equal(resumedFromArchive.hasClass, true);
+    assert.equal(resumedFromArchive.offlineModal, false);
+
+    // 单槽覆盖确认后完整清档，并自动衔接“开始新游戏”的入场动画与序章。
+    const beforeReplaceCreatedAt = await cdp.evaluate(`Game.state.createdAt`);
+    const replaceReloaded = cdp.event('Page.loadEventFired');
+    await cdp.send('Page.reload', { ignoreCache: true });
+    await replaceReloaded;
+    await delay(420);
+    const replaceTriggered = cdp.event('Page.loadEventFired');
+    await cdp.evaluate(`(() => {
+      document.querySelector('#title-root .title-new-game').click();
+      const yes = document.querySelector('#modal-root .modal-mask .modal-btns .btn.gold');
+      if (!yes) throw new Error('new game overwrite confirmation missing');
+      yes.click();
+      return true;
+    })()`);
+    await replaceTriggered;
+    await delay(1580);
+    const replacedWithFresh = await cdp.evaluate(`(() => ({
+      createdAt: Game.state.createdAt,
+      hasClass: Game.player.hasClass(),
+      entryState: Game.entryState,
+      titleVisible: !!document.getElementById('title-root'),
+      prologueVisible: !!document.querySelector('.prologue-mask'),
+      mainDraft: !!localStorage.getItem('firpg_save'),
+      backupDraft: !!localStorage.getItem('firpg_save_backup'),
+      autoStartFlagCleared: sessionStorage.getItem('firpg_start_new') === null
+    }))()`);
+    assert.notEqual(replacedWithFresh.createdAt, beforeReplaceCreatedAt);
+    assert.equal(replacedWithFresh.hasClass, false);
+    assert.equal(replacedWithFresh.entryState, 'opening');
+    assert.equal(replacedWithFresh.titleVisible, true);
+    assert.equal(replacedWithFresh.prologueVisible, true);
+    assert.equal(replacedWithFresh.mainDraft, true);
+    assert.equal(replacedWithFresh.backupDraft, true);
+    assert.equal(replacedWithFresh.autoStartFlagCleared, true);
+
+    // X 删除只清空当前档案并回到空槽，不自动开启新旅程。
+    const deleteDraftReloaded = cdp.event('Page.loadEventFired');
+    await cdp.send('Page.reload', { ignoreCache: true });
+    await deleteDraftReloaded;
+    await delay(420);
+    const deleteConfirmedReload = cdp.event('Page.loadEventFired');
+    await cdp.evaluate(`(() => {
+      const del = document.querySelector('#title-root .slot-delete');
+      if (!del) throw new Error('delete save button missing');
+      del.click();
+      const yes = document.querySelector('#modal-root .modal-mask .modal-btns .btn.gold');
+      if (!yes) throw new Error('delete save confirmation missing');
+      yes.click();
+      return true;
+    })()`);
+    await deleteConfirmedReload;
+    await delay(520);
+    const deletedToEmpty = await cdp.evaluate(`(() => ({
+      entryState: Game.entryState,
+      slotKind: document.querySelector('#title-root [data-slot-id="expedition-1"]')
+        ?.getAttribute('data-slot-kind'),
+      deleteGone: !document.querySelector('#title-root .slot-delete'),
+      mainGone: localStorage.getItem('firpg_save') === null,
+      backupGone: localStorage.getItem('firpg_save_backup') === null,
+      noAutoStart: sessionStorage.getItem('firpg_start_new') === null &&
+        !document.querySelector('.prologue-mask')
+    }))()`);
+    assert.equal(deletedToEmpty.entryState, 'menu');
+    assert.equal(deletedToEmpty.slotKind, 'empty');
+    assert.equal(deletedToEmpty.deleteGone, true);
+    assert.equal(deletedToEmpty.mainGone, true);
+    assert.equal(deletedToEmpty.backupGone, true);
+    assert.equal(deletedToEmpty.noAutoStart, true);
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
-      titleScene, titleScreenshot, titleTallScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
+      titleScene, englishTitleFit, titleScreenshot, titleTallScreenshot, main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
       desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
-      restartCompleted, restartTitleScreenshot, restartClassScreenshot
+      restartCompleted, restartTitleScreenshot, restartClassScreenshot, existingTitle,
+      existingTitleScreenshot, entryStarted, entryMid, entryScreenshot, resumedFromArchive,
+      replacedWithFresh, deletedToEmpty
     }));
     cdp.ws.close();
   } finally {

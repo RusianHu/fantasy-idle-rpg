@@ -11,6 +11,8 @@
   var Off = Game.offline = {
     /** 计算离线摘要（elapsed 秒）；不足 60s 或时间戳异常返回 null */
     settle: function (elapsedSec) {
+      // 启动页只是存档预览；玩家明确选择档案前不结算、不弹窗。
+      if (Game.entryState === 'menu' || Game.entryState === 'opening') return null;
       // 标题、序章及迁移档补选职业阶段没有可结算的冒险实体。
       // 把校验放在系统入口，启动与 visibilitychange 两条调用链都受保护。
       if (!Game.State.isAdventureStarted()) return null;

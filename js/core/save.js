@@ -10,6 +10,11 @@
 
   var KEY = 'firpg_save';
   var KEY_BAK = 'firpg_save_backup';
+  // UI 与存储层都使用稳定槽位 ID。当前产品只开放一个逻辑槽位；
+  // 后续多档只需追加描述并让 load/save 选择 active slot，无需重做标题界面。
+  var SLOT_DEFS = [
+    { id: 'expedition-1', index: 1, key: KEY, backupKey: KEY_BAK }
+  ];
   var lastLoadedTs = 0;
   var hardResetting = false;
   // 删除存档后停在标题页时保持双槽为空；点击“开始冒险”或已有有效角色
@@ -125,6 +130,12 @@
   var S = Game.save = {
     lastTs: function () { return lastLoadedTs; },
 
+    slots: function () {
+      return SLOT_DEFS.map(function (slot) {
+        return { id: slot.id, index: slot.index };
+      });
+    },
+
     serialize: function () {
       var st = Game.state;
       return {
@@ -159,6 +170,9 @@
       // hardReset 会触发 visibilitychange/pagehide/beforeunload。此时任何自动
       // 存档都会把刚删除的通关档重新写回，因此重载前必须永久抑制本页写入。
       if (hardResetting || !Game.state) return false;
+      // 选择档案前只允许读取预览。否则标题页停留时间会覆盖时间戳，
+      // 进而吞掉玩家应得的离线收益。
+      if (Game.entryState === 'menu') return false;
       if (!persistenceStarted && !Game.State.isAdventureStarted()) return false;
       persistenceStarted = true;
       bus.emit('save:before', { reason: reason });
