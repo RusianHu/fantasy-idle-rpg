@@ -8,6 +8,7 @@ const { spawn } = require('node:child_process');
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const BASE = process.env.FIRPG_URL || 'http://127.0.0.1:4176/';
+const BUILD_ID = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')).buildId;
 const port = 9300 + Math.floor(Math.random() * 400);
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'firpg-cdp-'));
 
@@ -429,7 +430,7 @@ async function run() {
       width: 390, height: 700, deviceScaleFactor: 1, mobile: true
     });
     await cdp.evaluate(`document.querySelector('#title-root .archive-view').click()`);
-    await delay(80);
+    await delay(480);
     const titleShortView = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const prompt = root.querySelector('.title-reveal-prompt').getBoundingClientRect();
@@ -1758,7 +1759,7 @@ async function run() {
       document.querySelector('#title-root .title-reveal').click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       document.querySelector('#title-root .title-start').click();
-      await new Promise((resolve) => setTimeout(resolve, 1250));
+      await new Promise((resolve) => setTimeout(resolve, 1400));
       const story = document.querySelector('.prologue-mask');
       if (!story) throw new Error('prologue did not open after the archive transition');
       for (let i = 0; i < 10; i++) story.click();
@@ -1911,16 +1912,26 @@ async function run() {
     const entryMid = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const fx = root?.querySelector('.title-entry-fx');
+      const crest = fx?.querySelector('.entry-crest');
+      const crestPixels = crest ? Array.from(
+        crest.getContext('2d').getImageData(0, 0, crest.width, crest.height).data
+      ).filter((value, index) => index % 4 === 3 && value > 0).length : 0;
       return {
         entering: root?.classList.contains('is-entering'),
         fxVisible: fx ? getComputedStyle(fx).visibility === 'visible' : false,
         entryCopy: fx?.querySelector('.entry-copy')?.textContent || '',
+        crestReady: crest?.getAttribute('data-crest-ready') === 'true',
+        crestPixels,
+        ringLayers: fx?.querySelectorAll('.entry-ring').length || 0,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
       };
     })()`);
     assert.equal(entryMid.entering, true);
     assert.equal(entryMid.fxVisible, true);
     assert.equal(entryMid.entryCopy, '正在同步远征档案');
+    assert.equal(entryMid.crestReady, true);
+    assert.ok(entryMid.crestPixels > 400, 'guild crest is rendered inside the entry seal');
+    assert.equal(entryMid.ringLayers, 3);
     assert.equal(entryMid.noHorizontalOverflow, true);
     const entryCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const entryScreenshot = path.join(os.tmpdir(), 'firpg-title-entry-transition-mobile-cdp.png');
@@ -2006,6 +2017,29 @@ async function run() {
     assert.equal(deletedToEmpty.mainGone, true);
     assert.equal(deletedToEmpty.backupGone, true);
     assert.equal(deletedToEmpty.noAutoStart, true);
+
+    await cdp.evaluate(`(() => {
+      Game.BUILD_ID = 'browser-stale-build';
+      Game.updateChecker.check();
+    })()`);
+    await delay(420);
+    const updateNotice = await cdp.evaluate(`(() => {
+      const notice = document.getElementById('app-update-notice');
+      if (!notice) return { visible: false };
+      const rect = notice.getBoundingClientRect();
+      return {
+        visible: getComputedStyle(notice).visibility === 'visible',
+        height: rect.height,
+        withinViewport: rect.left >= 0 && rect.right <= innerWidth,
+        build: Game.updateChecker.availableBuild(),
+        copy: notice.textContent.trim()
+      };
+    })()`);
+    assert.equal(updateNotice.visible, true, 'a stale long-running tab receives an update action');
+    assert.ok(updateNotice.height >= 44, 'the update action keeps a touch target');
+    assert.equal(updateNotice.withinViewport, true, 'the update action fits the mobile viewport');
+    assert.equal(updateNotice.build, BUILD_ID);
+    assert.ok(updateNotice.copy.includes(BUILD_ID));
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
 
     console.log('Browser smoke passed: ' + JSON.stringify({
@@ -2017,7 +2051,7 @@ async function run() {
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
       restartCompleted, restartTitleScreenshot, restartClassScreenshot, existingTitle,
       existingTitleScreenshot, entryStarted, entryMid, entryScreenshot, resumedFromArchive,
-      replacedWithFresh, deletedToEmpty
+      replacedWithFresh, deletedToEmpty, updateNotice
     }));
     cdp.ws.close();
   } finally {

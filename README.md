@@ -10,6 +10,13 @@
 - **移动端优先**：设计基准 390×844 竖屏；桌面浏览器居中显示手机比例容器。
 - 无任何构建步骤、无外部网络依赖（EasyStar.js 0.4.4 MIT 与 Fusion Pixel 字体均已本地固定）。
 
+## 发布与缓存
+
+- HTML 始终重新校验；CSS、JS、字体统一使用 `BUILD_ID` 查询版本并长期不可变缓存，避免手机端新旧资源混用。
+- 发布前执行 `.\tools\set-build-id.ps1 -BuildId YYYYMMDD.N`，随后运行 `node tests\cache-version.test.js`。同一发布内 `index.html`、技术演示、`Game.BUILD_ID`、字体 URL 与 `version.json` 必须一致。
+- 长开标签页每 5 分钟及 `pageshow` / 重新可见时以 `no-store` 检查 `version.json`；发现新版后显示中英文更新按钮，点击时先收束过场并保存，再重载页面。
+- VPS 的项目专属 Nginx 规则位于 `deploy/nginx/fantasy-idle-rpg-cache.conf`。部署规则后必须先执行 `nginx -t`，通过后才能 reload。
+
 ## 玩法概览
 
 | 系统 | 说明 |
@@ -26,7 +33,7 @@
 | 装备 | 武器/护甲/饰品 3 槽；5 档稀有度（灰绿蓝紫橙）；随机词条、职业/区域感知的综合对比、一键出售、传说分解魔晶石；武器按职业呈现（长剑/短匕/法杖/战锤/长弓） |
 | 技能 | 每职业 3 主动 + 3 被动（共 30 个），技能点升级（每级 +1 点）；主动技能 0 点可用基础值，每投入 1 点都有真实提升 |
 | **自动养成** | 自动技能加点与智能换装默认开启：逐候选模拟输出/生存/收益后决策；三个装备槽可分别锁定，支持完整手动构筑 |
-| 商店 | 金币：药水/装备箱；魔晶石：史诗装备箱/四种永久强化（可叠 10 层） |
+| 商店 / 交易 | 仅在当前地图的营地范围开放；金币购买药水/装备箱，魔晶石购买史诗装备箱/四种永久强化（可叠 10 层）。地点与商品目录数据驱动，可扩展区域特殊交易 |
 | 返回营地 / 休整 | 按距离显示「返回营地」或「传送回营」，配套手绘像素图标；低于自动喝药阈值时按钮闪烁。休息时主界面切换为营地信息牌与休整进度；Boss 战可安全撤离回营并保留一半讨伐进度；坐下后快速恢复 HP、积累「休整」增益（战斗时 +15% 经验 / +10% 掉率） |
 | 死亡重整 | 零惩罚：约 6.8 秒完成倒下、灵魂回收、营地落地、篝火恢复和复苏；自动操控复战、手动操控留营。同区第三次普通死亡直接撤往上一区域，Boss 失败仅撤场并保留一半进度 |
 | 离线收益 | 关闭页面再回来按公式结算（无时长上限），弹窗确认后入账；休息模式离线则回满 HP + 休整增益积满 |
@@ -51,22 +58,25 @@
 
 ```
 index.html            入口（按序加载脚本）
+version.json          当前发布 BUILD_ID（线上 no-store）
 css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 tech-demos/           技术验证演示页（支持区域/世界种子 URL 参数）
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
-  core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop
+  core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop / update
   i18n/               i18n 核心 + zh-CN + en 语言包
   data/               纯内容配置：formulas(数值公式集中) / regions / monsters / items / affixes / skills / achievements
   sprites/            像素素材（字符网格+调色板，运行时编译为 canvas，自动描边/镜像/呼吸帧）
-  systems/            state / terrain(布局生成) / nav(加权路径) / inventory / automation / combat / world / progression / transitions / ending / offline / shop / meta
+  systems/            state / terrain(布局生成) / nav(加权路径) / inventory / automation / combat / world / trade / progression / transitions / ending / offline / shop / meta
   render/             renderer(镜头/视差/合成) / terrain(地表烘焙+贴花) / particles / daynight / effects
   ui/                 hud / 六 Tab 面板 / transitions(短过场层) / ending(结局层) / 弹窗(逐字叙事/离线/确认/Toast)
   main.js             启动引导
 ```
 
 **扩展方式**：新增一个区域 = 在 `data/regions.js` 注册一条数据（+ 怪物注册 + 语言包 key + 可选精灵），引擎自动生成地图列表、刷怪、掉落与 UI，零引擎改动。所有内容引用一律走稳定字符串 ID；存档遇到已下线 ID 自动优雅降级（装备折算金币、区域回退）。
+
+**交易扩展**：区域以 `tradeAreas[]` 声明运行时地点、半径、优先级与商品目录，商店条目以 `catalogs[]` 声明供应渠道。当前八区各自的营地提供 `camp-general`；未来新增遗物商人、区域兑换点或特殊交易目录，只需增加数据声明与对应双语文案。
 
 **区域顺序**：新档用 `world.worldSeed` 确定性排列前 4 个区域，后 4 个区域固定；怪物强度、奖励与推荐等级按本档推进位置计算。顺序写入存档，旧档迁移不会重新洗牌。
 
@@ -102,6 +112,12 @@ js/
 - 正式档保留清晰的双行「开始新游戏」档案页签，副文案提示将覆盖当前档案；存档卡右侧另有 44px 的「X」删除键。两者分别二次确认：前者清档后自动衔接新档进入动画，后者只删除并返回空槽。
 - 选择档案前不启动主循环、不自动存档、不结算离线收益、不推进世界时间；离线时长在明确进入后才按原时间戳结算。
 - 进入演出由档案卡收束、营火传送光柱、旋转公会符文、星屑与上下像素帘幕组成；摄像机连续缓动，帘幕按像素步进，减少动态效果时保留静态遮罩与相同流程。
+
+## v1.10.1 营地交易域
+
+- 商店入口仍位于背包，但购买能力取决于角色的实时世界坐标：只有进入当前地图的运行时营地安全半径才开放；换区、传送、死亡重整及旧地图状态下均拒绝交易。
+- 域外页面说明限制并提供「返回当前营地」，域内显示当前补给处；浏览期间跨出边界会立即锁定商品，底层购买 API 同步二次校验。
+- 交易地点与商品目录分离：`tradeAreas[]` 解析程序化地标，`catalogs[]` 过滤供应内容，为同地图多商人、区域限定兑换和未来 v1.11「以物换物」预留直接扩展面。
 
 ## 存档
 
@@ -143,6 +159,7 @@ js/
 ```powershell
 node tests\v1_8.test.js
 node tests\v1_9.test.js
+node tests\trade-zones.test.js
 node tests\browser-smoke.js
 ```
 
@@ -150,4 +167,4 @@ node tests\browser-smoke.js
 
 ---
 
-v1.10.0 · 纯 HTML/CSS/JS · UTF-8 · 离线可用
+v1.10.1 · 纯 HTML/CSS/JS · UTF-8 · 离线可用

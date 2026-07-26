@@ -15,6 +15,8 @@
       worldSeedHint: '此存档的八区布局标识',
       copySeed: '复制',
       seedCopied: '已复制世界种子 {seed}',
+      updateAvailable: '检测到新版本 {version}，点击安全更新',
+      updateApplying: '正在保存远征进度并更新…',
       controlTitle: '操控',
       controlAuto: '自动',
       controlManual: '手动',
@@ -83,6 +85,16 @@
       gotItem: '获得 {name}',
       bought: '购买成功',
       cantAfford: '货币不足',
+      tradeUnavailableTitle: '当前无法交易',
+      tradeOutsideCamp: '商店只在当前地图「{region}」的营地范围内开放。',
+      tradeBusy: '正在换区、传送或重整，抵达营地并稳定下来后才可交易。',
+      tradeNoArea: '当前地图没有可用的交易地点。',
+      tradeReturnCamp: '返回当前营地',
+      tradeCampAccess: '已进入「{region}」营地交易范围；此处提供常规补给与强化。',
+      tradeShopOpenHint: '当前位于可交易区域',
+      tradeShopLockedHint: '仅在当前地图的营地范围内开放',
+      tradeUnavailableToast: '你已离开当前交易区域',
+      tradeNoOffers: '这个交易地点目前没有可用商品。',
       sellLow: '出售 普通+精良',
       soldN: '出售 {n} 件，+{g} 金币',
       nothingToSell: '没有可出售的低稀有度装备',
@@ -302,6 +314,8 @@
       play_2h: { name: '沉浸其中', desc: '累计游玩 2 小时' },
       potion_50: { name: '药剂爱好者', desc: '累计使用 50 瓶药水' }
     },
+
+    tradeArea: { camp: '前线营地补给处', generic: '区域交易点' },
 
     shopSec: { consume: '─ 消耗品 ─', gear: '─ 装备补给 ─', perm: '─ 永久强化（魔晶石）─' },
 

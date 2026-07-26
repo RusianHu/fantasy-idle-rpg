@@ -45,6 +45,7 @@
     Game.terrain.update(dt);
     if (Game.transitions) Game.transitions.update(dt);
     if (!Game.transitions || !Game.transitions.blocksWorld()) Game.world.update(dt);
+    if (Game.trade) Game.trade.update();
     Game.particles.update(dt);
     Game.fx.update(dt);
     Game.meta.tick(dt);

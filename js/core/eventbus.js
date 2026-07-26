@@ -12,7 +12,8 @@
  *   player:reviveStart / player:revived
  *   rest:start / rest:end       potion:used {pid}
  *   gold:changed / crystal:changed / exp:gained
- *   achievement:unlocked {aid}  shop:bought {sid}
+ *   achievement:unlocked {aid}  shop:bought {sid, rid, areaId}
+ *   trade:contextChanged {context, previous}
  *   skill:upgraded {sid, lv}    locale:changed {locale}
  *   skills:autoAllocated {count, allocations}
  *   equipment:autoChanged {changes, gain}
