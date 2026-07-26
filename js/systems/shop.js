@@ -45,11 +45,12 @@
       if (def.kind === 'perm') {
         return F.permPrice(s.player.perms[def.id] || 0);
       }
+      if (def.kind === 'exchange') return 0;
       return def.price || 0;
     },
 
     ownedCount: function (def) {
-      if (def.kind === 'perm') return Game.state.player.perms[def.id] || 0;
+      if (def.kind === 'perm' || def.kind === 'exchange') return Game.state.player.perms[def.id] || 0;
       if (def.kind === 'potion') return Game.inv.potionCount(def.ref);
       return 0;
     },
@@ -58,6 +59,17 @@
       if (!Shop.availability(def).ok) return false;
       var s = Game.state, p = s.player;
       if (def.kind === 'perm' && (p.perms[def.id] || 0) >= F.PERM_MAX) return false;
+      if (def.kind === 'exchange') {
+        var recipe = F.exchangeRecipe(def.recipe);
+        if (!recipe) return false;
+        if (recipe.reward.kind === 'perm' &&
+            (p.perms[def.id] || 0) >= (recipe.reward.max || F.PERM_MAX)) return false;
+        if (p.crystal < (recipe.crystal || 0)) return false;
+        for (var material in recipe.costs) {
+          if (Game.inv.materialCount(material) < recipe.costs[material]) return false;
+        }
+        return true;
+      }
       var price = Shop.price(def);
       return def.cur === 'crystal' ? p.crystal >= price : p.gold >= price;
     },
@@ -72,8 +84,10 @@
       var price = Shop.price(def);
       var p = Game.state.player;
 
-      if (def.cur === 'crystal') Game.player.addCrystal(-price);
-      else Game.player.addGold(-price, { raw: true });
+      if (def.kind !== 'exchange') {
+        if (def.cur === 'crystal') Game.player.addCrystal(-price);
+        else Game.player.addGold(-price, { raw: true });
+      }
 
       var result = { ok: true };
       if (def.kind === 'potion') {
@@ -90,6 +104,28 @@
       } else if (def.kind === 'perm') {
         p.perms[def.id] = (p.perms[def.id] || 0) + 1;
         Game.player.recalc();
+      } else if (def.kind === 'exchange') {
+        var recipe = F.exchangeRecipe(def.recipe);
+        // canBuy 已完成全量校验；spendMaterials 仍自行保证原子性。
+        if (!Game.inv.spendMaterials(recipe.costs)) return { ok: false, reason: 'materials' };
+        if (recipe.crystal) Game.player.addCrystal(-recipe.crystal);
+        var reward = recipe.reward;
+        result.exchange = reward;
+        if (reward.kind === 'potion') {
+          Game.inv.addPotion(reward.id, reward.count || 1);
+        } else if (reward.kind === 'gold') {
+          Game.player.addGold(reward.amount || 0);
+        } else if (reward.kind === 'gear') {
+          var exchangeItem = Game.inv.genLoot(p.level, {
+            rarMin: reward.rarMin || 0,
+            luck: 1.6
+          });
+          result.item = Game.inv.addItem(exchangeItem, { source: 'exchange' });
+        } else if (reward.kind === 'perm') {
+          p.perms[def.id] = (p.perms[def.id] || 0) + 1;
+          Game.player.recalc();
+          if (Game.world && Game.world.hero) Game.world.syncHeroStats();
+        }
       }
       bus.emit('shop:bought', {
         sid: sid,

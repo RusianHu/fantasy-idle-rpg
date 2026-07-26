@@ -1,0 +1,45 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]: "1"
+    - generic [ref=e7]:
+      - generic [ref=e8]: 150 / 150
+      - generic [ref=e10]: EXP 0 / 28
+    - generic [ref=e12]:
+      - generic [ref=e13]: "5"
+      - generic [ref=e16]: "0"
+  - main [ref=e19]:
+    - generic:
+      - generic:
+        - generic:
+          - generic: 前线营地 · 第 1 区
+          - strong: 亡灵墓地
+      - generic: 休整 100%
+      - generic:
+        - generic: 休整增益 30分0秒
+        - generic: 营火休息 · 生命快速恢复
+      - switch "切换操控模式，当前为手动" [checked] [ref=e21] [cursor=pointer]:
+        - generic [ref=e24]:
+          - generic [ref=e25]: 操控
+          - strong [ref=e26]: 手动
+      - button "取消回营" [ref=e29] [cursor=pointer]
+      - button "快捷使用小型治疗药水，持有 3 瓶，冷却 0 秒" [ref=e32] [cursor=pointer]:
+        - generic [ref=e34]: 用药
+        - generic [ref=e35]: ×3
+  - navigation [ref=e36]:
+    - button "战斗" [ref=e37] [cursor=pointer]
+    - button "角色" [ref=e41] [cursor=pointer]
+    - button "背包" [ref=e45] [cursor=pointer]
+    - button "技能" [ref=e49] [cursor=pointer]
+    - button "地图" [ref=e53] [cursor=pointer]
+    - button "设置" [ref=e57] [cursor=pointer]
+  - generic [ref=e61]:
+    - generic:
+      - button "点击进入" [ref=e63] [cursor=pointer]:
+        - strong [ref=e65]: 点击进入
+      - button "切换界面语言" [ref=e67] [cursor=pointer]:
+        - generic [ref=e68]: 文
+        - strong [ref=e69]: 中
+      - generic:
+        - text: 幻境远征
+        - generic: FANTASY IDLE RPG
+      - generic: v1.11.0

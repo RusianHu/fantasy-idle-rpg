@@ -87,6 +87,18 @@
         });
       }
     },
+    goldBurst: function (x, y) {
+      for (var i = 0; i < 7; i++) {
+        shapes.push({
+          kind: 'coinp',
+          x: x + U.rand(-4, 4), y: y + U.rand(-6, 2),
+          t: 0, life: U.rand(0.45, 0.75),
+          vx: U.rand(-24, 24), vy: U.rand(-34, -16),
+          s: U.chance(0.3) ? 2 : 1
+        });
+      }
+      capShapes();
+    },
 
     finaleBurst: function (x, y, phase) {
       var impact = phase === 'impact';
@@ -321,6 +333,13 @@
         } else if (s.kind === 'poof') {
           ctx.fillStyle = 'rgba(220,220,230,' + (k * 0.8).toFixed(2) + ')';
           ctx.fillRect(s.x - s.s / 2, s.y - s.s / 2, s.s, s.s);
+        } else if (s.kind === 'coinp') {
+          ctx.globalAlpha = Math.max(0, k);
+          ctx.fillStyle = '#f3d36b';
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s + 1, s.s);
+          ctx.fillStyle = '#fff0a0';
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+          ctx.globalAlpha = 1;
         } else if (s.kind === 'zzz') {
           var zk = s.t / s.life;
           ctx.globalAlpha = zk < 0.8 ? 1 - zk * 0.6 : (1 - zk) * 2;

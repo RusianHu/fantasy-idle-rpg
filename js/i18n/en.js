@@ -84,6 +84,7 @@
       rareDrop: 'Obtained {name}!',
       gotItem: 'Got {name}',
       bought: 'Purchased',
+      exchanged: 'Exchange complete',
       cantAfford: 'Not enough currency',
       tradeUnavailableTitle: 'Trading Unavailable',
       tradeOutsideCamp: 'The shop only serves the camp area of the current map, {region}.',
@@ -95,11 +96,30 @@
       tradeShopLockedHint: 'Only available inside the current map camp',
       tradeUnavailableToast: 'You have left this trading area',
       tradeNoOffers: 'This trading area has no offers right now.',
+      tradeLocationKicker: 'Current trading post',
+      tradeLeftArea: 'You left trading range. Offers are locked until you return.',
+      tradeLockedBrowse: 'Browsing out of range',
+      tradeDirectionDistance: 'The trading post is {direction}, {distance}px away.',
+      tradeGoTo: 'Go to Trading Post',
+      closeTrade: 'Close',
+      tradeHud: 'Trade · {name}',
+      tradeHudAria: 'Open trading at {name}',
+      exchangeAction: 'Exchange',
+      tradeSellLow: 'Sell all Common and Fine gear',
+      tradeSellEstimate: '{n} items · estimated {g} gold',
+      tradeSalvageLegend: 'Dismantle all unequipped Legendary gear',
+      tradeSalvageEstimate: '{n} items · estimated {c} crystals',
+      tradeSalvaged: 'Dismantled {n} Legendary items for {c} crystals',
+      sellAction: 'Sell',
+      salvageAction: 'Dismantle',
       sellLow: 'Sell Common+Fine',
       soldN: 'Sold {n} items, +{g} gold',
       nothingToSell: 'No low-rarity gear to sell',
       bagEmpty: 'Your bag is empty — go hunt some monsters!',
       potionAuto: 'Auto-potion under {p}% HP',
+      quickPotion: 'Potion',
+      materialsTitle: '─ Material Pouch (No Bag Slots) ─',
+      autoCampReturning: 'Rested bonus depleted — returning to camp',
       equip: 'Equip',
       unequip: 'Unequip',
       equippedTag: 'Equipped',
@@ -207,7 +227,9 @@
       kills: 'Total Kills', bossKills: 'Boss Kills', goldEarned: 'Gold Earned', expEarned: 'EXP Earned',
       drops: 'Gear Drops', legendaries: 'Legendaries', potions: 'Potions Used', deaths: 'Times Fallen',
       maxHit: 'Highest Hit', sells: 'Items Sold', playSec: 'Time Played', restSec: 'Time Rested',
-      offlineSec: 'Offline Time', highestRegion: 'Farthest Region'
+      offlineSec: 'Offline Time', highestRegion: 'Farthest Region',
+      pickups: 'Ground Pickups', gathers: 'Gathered Nodes',
+      materials: 'Materials Earned', chests: 'Chests Opened'
     },
 
     slot: { weapon: 'Weapon', armor: 'Armor', ring: 'Ring' },
@@ -218,7 +240,30 @@
       pattern: '{mat} {base}',
       mat: { 1: 'Copper', 2: 'Iron', 3: 'Steel', 4: 'Silver', 5: 'Mithril', 6: 'Flamegold', 7: 'Starlight', 8: 'Dragonsoul' },
       base: { weapon: 'Sword', armor: 'Armor', ring: 'Ring' },
-      weapon: { fighter: 'Sword', rogue: 'Dagger', mage: 'Staff', cleric: 'Mace', ranger: 'Longbow' }
+      weapon: { fighter: 'Sword', rogue: 'Dagger', mage: 'Staff', cleric: 'Mace', ranger: 'Longbow' },
+      potion_small: { name: 'Small Healing Potion' },
+      potion_large: { name: 'Large Healing Potion' },
+      healDesc: 'Restores {p}% of max HP',
+      usableDesc: 'An active-use consumable',
+      useAria: 'Use {name}; {count} remaining',
+      quickAria: 'Quick-use {name}; {count} remaining; {cd}s cooldown',
+      quickHint: 'Use the next healing potion now',
+      reject: {
+        full: 'HP is already full', empty: 'No potion available',
+        cooldown: 'Potion cooldown: {s}s remaining',
+        dead: 'Items cannot be used while down',
+        busy: 'Items cannot be used during this sequence',
+        missing: 'This item cannot be used', 'not-ready': 'The expedition has not begun',
+        unsupported: 'This effect is not available', failed: 'Item use failed'
+      }
+    },
+
+    material: {
+      herb: 'Meadow Herb', berry: 'Red Berry', mushroom: 'Mistcap Mushroom', resin: 'Ancient Resin',
+      ore: 'Iron Ore', crystal_cluster: 'Vein Crystal', ghost_flower: 'Ghost Flower', grave_dust: 'Grave Dust',
+      ice_crystal: 'Ice Crystal', frost_herb: 'Frostleaf', fire_core: 'Fire Core', obsidian: 'Obsidian',
+      rune_stone: 'Rune Stone', aether_shard: 'Aether Shard',
+      miasma_crystal: 'Miasma Core', demon_horn: 'Demon Horn'
     },
 
     'class': {
@@ -312,12 +357,25 @@
       region_8: { name: 'Gates of the Demon Castle', desc: 'Reach the Demon Castle' },
       rest_30m: { name: 'Campfire Bond', desc: 'Rest for 30 minutes in total' },
       play_2h: { name: 'Immersed', desc: 'Play for 2 hours in total' },
-      potion_50: { name: 'Potion Enjoyer', desc: 'Use 50 potions' }
+      potion_50: { name: 'Potion Enjoyer', desc: 'Use 50 potions' },
+      pickup_100: { name: 'Nothing Wasted', desc: 'Pick up 100 ground drops' },
+      gather_50: { name: 'Wild Harvester', desc: 'Complete 50 gathering actions' },
+      material_300: { name: 'Material Stockpile', desc: 'Earn 300 materials' },
+      chest_20: { name: 'Treasure Expert', desc: 'Open 20 random chests' }
     },
 
     tradeArea: { camp: 'Frontline Camp Supply', generic: 'Regional Trading Post' },
 
-    shopSec: { consume: '─ Consumables ─', gear: '─ Gear Supply ─', perm: '─ Permanent Boons (Crystals) ─' },
+    tradeKind: {
+      merchant: 'Camp Supply', exchange: 'Material Exchange',
+      wander: 'Wandering Merchant', event: 'Event Stall'
+    },
+    direction: {
+      north: 'to the north', south: 'to the south', east: 'to the east', west: 'to the west'
+    },
+    shopSec: {
+      consume: 'Supplies', gear: 'Gear', perm: 'Boons', exchange: 'Exchange', sell: 'Buyback', other: 'Other'
+    },
 
     shop: {
       shop_potion_small: { name: 'Minor Healing Potion', desc: 'Restores 40% HP. Auto-used at low HP.' },
@@ -327,13 +385,21 @@
       perm_atk: { name: 'Sigil of Might', desc: 'Permanent ATK +5%. Stacks up to 10.' },
       perm_hp: { name: 'Sigil of Vitality', desc: 'Permanent max HP +5%. Stacks up to 10.' },
       perm_gold: { name: 'Sigil of Fortune', desc: 'Permanent gold gain +10%. Stacks up to 10.' },
-      perm_exp: { name: 'Sigil of Wisdom', desc: 'Permanent EXP gain +10%. Stacks up to 10.' }
+      perm_exp: { name: 'Sigil of Wisdom', desc: 'Permanent EXP gain +10%. Stacks up to 10.' },
+      exchange_potion: { name: 'Herbal Brewing', desc: 'Turn low-tier field materials into 2 Small Healing Potions.' },
+      exchange_gold: { name: 'Guild Material Order', desc: 'Submit woodland materials for a stable gold payment.' },
+      exchange_gear: { name: 'Runic Gear Crate', desc: 'Trade advanced materials for current-level Rare-or-better gear.' },
+      exchange_vitality: { name: 'Lesser Vitality Mark', desc: 'Temper advanced materials with crystals for permanent +1% HP, up to 5 ranks.' }
     },
 
     settings: {
       language: 'Language 语言',
       effects: 'Ambience & Terrain FX',
       effectsHint: 'Turn off to improve performance on low-end devices',
+      groundLoot: 'Ground Loot Pickup',
+      groundLootHint: 'Combat gear and potions land in the world; disabling safely banks every drop',
+      autoCampRest: 'Automatic Camp Rest',
+      autoCampRestHint: 'Auto control only: return when the rested bonus ends, then resume at full charge',
       potion: 'Auto-potion Threshold',
       autoAdvance: 'Auto-advance Regions',
       autoAdvanceHint: 'Automatically move to the next region after beating its boss',

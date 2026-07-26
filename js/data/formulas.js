@@ -47,6 +47,14 @@
     restExpBonus: 0.15, restDropBonus: 0.10,
     // 药水
     potionCd: 8,
+    // 地面物与环境交互
+    groundLootCap: 24, groundLootTtl: 60,
+    gatherDuration: 1.2, gatherCdMin: 90, gatherCdMax: 150,
+    chestOpenDuration: 0.8, chestTtl: 90,
+    chestRareChance: 0.15, chestMinGap: 60,
+    chestMoveMin: 180, chestMoveMax: 300,
+    chestMoveRefSpeed: 70,
+    chestMoveFrameCap: 0.25,
     // 日夜
     dayLength: 1200           // 20 分钟一昼夜（秒）
   };
@@ -146,6 +154,46 @@
     var base = pid === 'potion_small' ? 30 : 220;
     return Math.round(base * Math.pow(1.75, (tier || 1) - 1));
   };
+
+  /* ---------------- 环境采集 / 宝箱 / 以物换物 ---------------- */
+  F.gatherYield = function (tier) {
+    tier = U.clamp(tier || 1, 1, 8);
+    return {
+      min: 1 + Math.floor((tier - 1) / 3),
+      max: 2 + Math.floor(tier / 3),
+      gold: 2 + tier * 3,
+      crystalChance: tier >= 6 ? 0.015 + (tier - 6) * 0.01 : 0
+    };
+  };
+  F.chestYield = function (tier, rare) {
+    tier = U.clamp(tier || 1, 1, 8);
+    return {
+      gold: Math.round((rare ? 75 : 28) * Math.pow(1.72, tier - 1)),
+      materialMin: rare ? 3 : 1,
+      materialMax: rare ? 5 : 3,
+      crystalChance: rare ? 0.16 : 0
+    };
+  };
+  F.exchangeRecipes = {
+    exchange_potion: {
+      costs: { herb: 3, berry: 2 },
+      reward: { kind: 'potion', id: 'potion_small', count: 2 }
+    },
+    exchange_gold: {
+      costs: { mushroom: 3, resin: 2 },
+      reward: { kind: 'gold', amount: 420 }
+    },
+    exchange_gear: {
+      costs: { rune_stone: 5, aether_shard: 5, fire_core: 3 },
+      reward: { kind: 'gear', rarMin: 2 }
+    },
+    exchange_vitality: {
+      costs: { miasma_crystal: 8, demon_horn: 5 },
+      crystal: 8,
+      reward: { kind: 'perm', stat: 'hp', pct: 0.01, max: 5 }
+    }
+  };
+  F.exchangeRecipe = function (id) { return F.exchangeRecipes[id] || null; };
 
   /* ---------------- 商店 ---------------- */
   /** 金币装备箱价格（按玩家等级） */

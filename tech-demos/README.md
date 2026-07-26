@@ -15,4 +15,4 @@
 
 | 验证项 | 入口 | 验证记录 | 范围 |
 | --- | --- | --- | --- |
-| 地图级特效与布局 | `map-effects/map-effects.html?seed=1234ABCD&region=forest` | `map-effects/map-effects.md` | 八区 v1/v2 受约束布局、高密度主题元素、关键点、道路、导航/出生候选、地表、粒子、日夜、视差、实体演出与性能 |
+| 地图级特效与布局 | `map-effects/map-effects.html?seed=1234ABCD&region=forest` | `map-effects/map-effects.md` | 八区 v1/v2 布局、采集节点/冷却/产出、普通与稀有宝箱、动态交易域 TTL 桩、主题元素、导航、粒子、日夜、视差、实体演出与性能 |

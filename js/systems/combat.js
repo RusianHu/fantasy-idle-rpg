@@ -205,18 +205,10 @@
 
     /* ---------------- 药水自动使用 ---------------- */
     potionTick: function (hero, dt) {
-      hero.potionCd = Math.max(0, (hero.potionCd || 0) - dt);
-      if (hero.potionCd > 0) return;
+      if (Game.items.cdLeft('potion') > 0) return;
       var threshold = Game.state.settings.potionThreshold;
       if (Game.player.hpPct() >= threshold) return;
-      var used = Game.inv.consumePotion();
-      if (used) {
-        hero.potionCd = F.BAL.potionCd;
-        if (Game.fx) {
-          Game.fx.heal(hero.x, hero.y - 10);
-          Game.fx.floatText(hero.x, hero.y - hero.spriteH - 4, '+' + Game.i18n.fmtNum(used.heal), { color: '#7ef07e' });
-        }
-      }
+      Game.inv.consumePotion({ source: 'auto' });
       // 无药水：仅靠自然恢复，不中断挂机
     }
   };

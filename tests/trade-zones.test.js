@@ -229,7 +229,8 @@ for (const region of registeredRegions) {
   assert.ok(camp, `${region.id} has a camp trade area`);
   assert.equal(camp.anchor, 'camp');
   assert.equal(camp.radiusFrom, 'campSafeRadius');
-  assert.deepEqual(Array.from(camp.catalogs), ['camp-general']);
+  assert.deepEqual(Array.from(camp.catalogs), ['camp-general', 'camp-exchange']);
+  assert.ok(camp.prop, `${region.id} camp trade area exposes a world prop`);
 }
 assert.ok(
   INDEX_SOURCE.indexOf('js/systems/trade.js') < INDEX_SOURCE.indexOf('js/systems/shop.js'),

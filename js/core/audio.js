@@ -52,14 +52,21 @@
       bus.on('item:dropped', function () { A.playSfx('sfx_drop'); });
       bus.on('item:equipped', function () { A.playSfx('sfx_equip'); });
       bus.on('gold:changed', function (p) { if (p && p.delta > 0) A.playSfx('sfx_gold'); });
-      bus.on('potion:used', function () { A.playSfx('sfx_potion'); });
+      bus.on('item:used', function (p) {
+        A.playSfx(p && p.category === 'potion' ? 'sfx_potion' : 'sfx_item_use');
+      });
+      bus.on('item:pickedUp', function () { A.playSfx('sfx_pickup'); });
+      bus.on('gather:done', function () { A.playSfx('sfx_gather'); });
+      bus.on('chest:opened', function () { A.playSfx('sfx_chest'); });
+      bus.on('shop:bought', function (p) {
+        A.playSfx(p && /^exchange_/.test(p.sid || '') ? 'sfx_exchange' : 'sfx_buy');
+      });
       bus.on('player:death', function () { A.playSfx('sfx_death'); });
       bus.on('region:travelStart', function () { A.playSfx('sfx_region_depart'); });
       bus.on('region:arrived', function () { A.playSfx('sfx_region_arrive'); });
       bus.on('player:reviveStart', function () { A.playSfx('sfx_soul_return'); });
       bus.on('player:revived', function () { A.playSfx('sfx_revive'); });
       bus.on('achievement:unlocked', function () { A.playSfx('sfx_achievement'); });
-      bus.on('shop:bought', function () { A.playSfx('sfx_buy'); });
       bus.on('skill:upgraded', function () { A.playSfx('sfx_skillup'); });
       bus.on('boss:spawned', function () { A.playBgm('bgm_boss'); });
       bus.on('boss:defeated', function () { A.playBgm('bgm_field'); });

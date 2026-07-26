@@ -33,7 +33,7 @@ const completedV7 = makeV7(true);
 localStorage.setItem('firpg_save', JSON.stringify(completedV7));
 localStorage.setItem('firpg_save_backup', JSON.stringify(completedV7));
 const migratedComplete = Game.save.load();
-assert.equal(migratedComplete.v, 8);
+assert.equal(migratedComplete.v, Game.SAVE_VERSION);
 assert.equal(migratedComplete.meta.completedAt, completedV7.ts);
 assert.equal(migratedComplete.meta.endingAcknowledged, false);
 assert.equal(migratedComplete.meta.endingPhase, 'epilogue');
@@ -53,7 +53,7 @@ const incompleteV7 = makeV7(false);
 localStorage.setItem('firpg_save', JSON.stringify(incompleteV7));
 localStorage.setItem('firpg_save_backup', JSON.stringify(incompleteV7));
 const migratedIncomplete = Game.save.load();
-assert.equal(migratedIncomplete.v, 8);
+assert.equal(migratedIncomplete.v, Game.SAVE_VERSION);
 assert.equal(migratedIncomplete.meta.completedAt, null);
 assert.equal(migratedIncomplete.meta.endingPhase, null);
 

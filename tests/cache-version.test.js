@@ -9,6 +9,7 @@ const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 const index = read('index.html');
 const demo = read('tech-demos/map-effects/map-effects.html');
+const demoStyle = read('tech-demos/map-effects/map-effects.css');
 const style = read('css/style.css');
 const utils = read('js/core/utils.js');
 const main = read('js/main.js');
@@ -39,6 +40,7 @@ function assertVersionedHtml(source, name) {
 assertVersionedHtml(index, 'index.html');
 assertVersionedHtml(demo, 'map-effects.html');
 assert.ok(style.includes(`fusion-pixel.woff2?v=${buildId}`), 'CSS font URL must be versioned');
+assert.ok(demoStyle.includes(`fusion-pixel.woff2?v=${buildId}`), 'QA CSS font URL must be versioned');
 assert.match(main, /fusion-pixel\.woff2\?v=' \+ encodeURIComponent\(Game\.BUILD_ID\)/,
   'FontFace preload must use Game.BUILD_ID');
 assert.match(updater, /cache: 'no-store'/, 'release checks must bypass browser caches');

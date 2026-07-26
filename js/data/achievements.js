@@ -24,7 +24,11 @@
     { id: 'region_8', stat: 'highestRegion', threshold: 8, reward: { crystal: 50 } },
     { id: 'rest_30m', stat: 'restSec', threshold: 1800, reward: { gold: 2000 } },
     { id: 'play_2h', stat: 'playSec', threshold: 7200, reward: { crystal: 10 } },
-    { id: 'potion_50', stat: 'potions', threshold: 50, reward: { gold: 5000 } }
+    { id: 'potion_50', stat: 'potions', threshold: 50, reward: { gold: 5000 } },
+    { id: 'pickup_100', stat: 'pickups', threshold: 100, reward: { gold: 4000 } },
+    { id: 'gather_50', stat: 'gathers', threshold: 50, reward: { crystal: 12 } },
+    { id: 'material_300', stat: 'materials', threshold: 300, reward: { crystal: 18 } },
+    { id: 'chest_20', stat: 'chests', threshold: 20, reward: { crystal: 15 } }
   ];
 
   for (var i = 0; i < A.length; i++) Game.register('achievement', A[i]);

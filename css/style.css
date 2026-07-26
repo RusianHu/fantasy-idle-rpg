@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260726.3') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260727.4') format('woff2');
   font-display: swap;
 }
 
@@ -466,6 +466,87 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   .btn-camp.low-hp,
   .btn-camp.is-warping .camp-action-icon { animation: none; }
   .btn-camp.low-hp { box-shadow: 0 0 0 2px #321016, inset 0 2px 0 #ff9a7aaa, 0 0 8px #e84e3f; }
+}
+
+/* 主动用药与交易上下文入口 */
+.btn-potion {
+  position: absolute;
+  right: 11px;
+  bottom: 70px;
+  width: 108px;
+  height: 44px;
+  padding: 4px 7px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 4px;
+  border-color: #7b4d64;
+  background: linear-gradient(180deg, #553247, #332239 58%, #20182d);
+  z-index: 3;
+}
+.btn-potion canvas { width: 22px; height: 22px; }
+#quick-potion-label { min-width: 0; font-size: 10px; white-space: nowrap; }
+#quick-potion-count { font-size: 10px; color: #f0d9bd; }
+#quick-potion-cd {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff3d0;
+  background: #11152dbb;
+  font-size: 11px;
+  opacity: 0;
+  pointer-events: none;
+}
+.btn-potion.cooling #quick-potion-cd { opacity: 1; }
+.btn-potion.empty { opacity: .52; filter: grayscale(.8); }
+.btn-potion.low-hp {
+  border-color: #f27462;
+  animation: campLowHp .72s steps(2, end) infinite;
+}
+.btn-trade {
+  position: absolute;
+  left: 11px;
+  bottom: 70px;
+  width: min(220px, calc(100% - 142px));
+  height: 44px;
+  padding: 5px 9px;
+  justify-content: flex-start;
+  overflow: hidden;
+  border-color: #9a7a3c;
+  background: linear-gradient(180deg, #544526, #342d21 58%, #201c1c);
+  z-index: 3;
+  animation: tradeButtonIn .22s steps(3, end);
+}
+.trade-button-mark {
+  position: relative;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  background: #15172b;
+  border: 1px solid #806a35;
+}
+.trade-button-mark::before,
+.trade-button-mark::after {
+  content: '';
+  position: absolute;
+  background: #e6c566;
+}
+.trade-button-mark::before { left: 5px; right: 5px; top: 6px; height: 3px; }
+.trade-button-mark::after { left: 9px; top: 9px; width: 4px; height: 7px; }
+#trade-button-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+}
+@keyframes tradeButtonIn {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn-potion.low-hp,
+  .btn-trade { animation: none; }
+  .btn-potion.low-hp { box-shadow: 0 0 0 2px #321016, 0 0 8px #e84e3f; }
 }
 
 .control-switch {
@@ -1099,6 +1180,137 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   margin: 10px 0 6px;
   color: var(--gold);
   font-size: 12px;
+}
+
+/* ---------- 可用物品与素材袋 ---------- */
+.item-use-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.item-use-card {
+  position: relative;
+  min-width: 0;
+  min-height: 58px;
+  padding: 6px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+  background: linear-gradient(180deg, #30263f, #1d1b35);
+  border: 2px solid #6c526f;
+  box-shadow: 0 0 0 2px #0a0c1c, inset 0 1px 0 #96739a55;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.item-use-card.empty { filter: grayscale(1); opacity: .5; }
+.item-use-card canvas { width: 30px; height: 30px; }
+.item-use-copy { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.item-use-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #f0d8bb;
+  font-size: 10px;
+  font-weight: normal;
+}
+.item-use-copy small { color: var(--ink-dim); font-size: 8px; line-height: 1.3; }
+.item-use-count { align-self: start; color: #f0c76c; font-size: 10px; }
+.item-use-cd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #bd668c calc(var(--cd) * 100%), transparent 0);
+}
+.item-use-hint { margin: 0 0 9px; text-align: right; font-size: 9px; color: var(--ink-dim); }
+.material-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.material-chip {
+  min-height: 30px;
+  padding: 4px 7px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #d7d9e4;
+  background: #151932;
+  border: 1px solid #454b6f;
+  font-size: 9px;
+}
+.material-chip strong { color: #efd070; font-weight: normal; }
+.material-mark {
+  width: 7px;
+  height: 7px;
+  background: #7fd2ad;
+  transform: rotate(45deg);
+  box-shadow: 0 0 4px #7fd2ad66;
+}
+
+/* ---------- 统一交易面板 ---------- */
+.trade-panel-head {
+  position: relative;
+  min-height: 68px;
+  margin-bottom: 8px;
+  padding: 9px 8px 9px 43px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(120deg, #59482433, transparent 48%),
+    linear-gradient(180deg, #222746, #14172e);
+  border: 2px solid #7f6b38;
+  box-shadow: 0 0 0 2px #090b19, inset 0 1px 0 #b89a4c44;
+}
+.trade-panel-head .trade-status-mark {
+  top: 22px;
+  background: #d0a947;
+  box-shadow: 0 0 0 2px #7a632a, 0 0 9px #e0ba5266;
+}
+.trade-panel-head.kind-exchange { border-color: #755085; }
+.trade-panel-head.kind-wander { border-color: #3f7e79; }
+.trade-panel-head.kind-event { border-color: #895065; }
+.trade-panel-head .grow { min-width: 0; flex: 1; }
+.trade-panel-head .name { color: #f0d27d; font-size: 14px; }
+.trade-panel-head .desc { margin-top: 3px; color: var(--ink-dim); font-size: 9px; }
+.trade-kicker { margin-bottom: 3px; color: #9a9fbe; font-size: 8px; letter-spacing: .8px; }
+.trade-close { flex: 0 0 auto; }
+.trade-lock-banner {
+  margin-bottom: 8px;
+  padding: 8px;
+  background: linear-gradient(90deg, #663e351f, transparent), #181a31;
+  border: 2px solid #704b49;
+}
+.trade-lock-banner .name { color: #e5a894; font-size: 12px; }
+.trade-lock-banner .desc { margin-top: 3px; color: #aaa7b4; font-size: 10px; line-height: 1.5; }
+.trade-section-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 5px;
+  margin-bottom: 9px;
+}
+.trade-section-tabs .subtab { padding: 4px 3px; font-size: 10px; }
+.trade-offer-locked { opacity: .58; filter: saturate(.45); }
+.exchange-costs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.exchange-cost {
+  padding: 2px 4px;
+  color: #b9c8cf;
+  background: #0d1228;
+  border: 1px solid #38415f;
+  font-size: 8px;
+}
+.exchange-cost.missing { color: #ef9d90; border-color: #71423f; }
+.trade-sell-card .btn { flex: 0 0 auto; }
+
+@media (max-width: 360px) {
+  .btn-potion { width: 102px; padding-left: 5px; padding-right: 5px; }
+  .btn-trade { width: min(188px, calc(100% - 126px)); }
+  .item-use-grid { grid-template-columns: 1fr; }
+  .trade-section-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .trade-offer .row,
+  .trade-sell-card .row { gap: 5px; }
+  .trade-offer .buy-btn { padding-left: 6px; padding-right: 6px; }
 }
 
 /* 属性双栏 */

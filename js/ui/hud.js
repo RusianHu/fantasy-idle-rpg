@@ -11,6 +11,7 @@
   var throttle = 0;
   var campIcon = '';
   var controlIcon = '';
+  var potionIcon = '';
 
   var Hud = Game.ui = Game.ui || {};
   Hud.hud = {
@@ -33,7 +34,14 @@
         controlModeLabel: $('#control-mode-label'),
         btnCamp: $('#btn-camp'),
         campIcon: $('#camp-action-icon'),
-        campLabel: $('#camp-action-label')
+        campLabel: $('#camp-action-label'),
+        btnPotion: $('#btn-potion'),
+        potionIcon: $('#quick-potion-icon'),
+        potionLabel: $('#quick-potion-label'),
+        potionCount: $('#quick-potion-count'),
+        potionCd: $('#quick-potion-cd'),
+        btnTrade: $('#btn-trade'),
+        tradeLabel: $('#trade-button-label')
       };
 
       Hud.hud.drawAvatar();
@@ -54,12 +62,35 @@
         }
         Hud.hud.update(true);
       });
+      els.btnPotion.addEventListener('click', function () {
+        var pid = Game.inv.potionCount('potion_small') > 0
+          ? 'potion_small'
+          : 'potion_large';
+        var result = Game.items.use('potion', pid, { source: 'manual' });
+        if (!result.ok) {
+          Game.ui.modals.toast(Game.i18n.t('item.reject.' + result.reason, {
+            s: result.left ? Math.ceil(result.left) : 0
+          }), 'warn');
+        }
+        Hud.hud.update(true);
+      });
+      els.btnTrade.addEventListener('click', function () {
+        var context = Game.trade.current();
+        if (context.available) Game.ui.trade.open(context.areaId);
+      });
 
       bus.on('mode:changed', function () { Hud.hud.update(true); });
       bus.on('control:changed', function () { Hud.hud.update(true); });
       bus.on('locale:changed', function () { Hud.hud.update(true); });
       bus.on('region:changed', function () { Hud.hud.update(true); });
       bus.on('class:chosen', function () { Hud.hud.drawAvatar(); Hud.hud.update(true); });
+      bus.on('trade:contextChanged', function () { Hud.hud.update(true); });
+      bus.on('item:used', function () { Hud.hud.update(true); });
+      bus.on('potion:dropped', function () { Hud.hud.update(true); });
+      bus.on('camp:autoReturn', function () {
+        if (Game.ui.modals) Game.ui.modals.toast(Game.i18n.t('ui.autoCampReturning'));
+        Hud.hud.update(true);
+      });
 
       Hud.hud.update(true);
     },
@@ -160,6 +191,48 @@
       if (campIcon !== campAction.icon || force) {
         Game.assets.drawToDom(els.campIcon, campAction.icon, 'icon');
         campIcon = campAction.icon;
+      }
+
+      // 主动用药快捷入口：自动优先序下一瓶、数量与共享冷却。
+      var nextPotion = Game.inv.potionCount('potion_small') > 0
+        ? 'potion_small'
+        : 'potion_large';
+      var potionCount = Game.inv.potionCount(nextPotion);
+      var potionCd = Game.items.cdLeft('potion');
+      var nextIcon = nextPotion === 'potion_small' ? 'icon_potion_small' : 'icon_potion_large';
+      if (potionIcon !== nextIcon || force) {
+        Game.assets.drawToDom(els.potionIcon, nextIcon, 'icon');
+        potionIcon = nextIcon;
+      }
+      els.potionLabel.textContent = t('ui.quickPotion');
+      els.potionCount.textContent = '×' + potionCount;
+      els.potionCd.textContent = potionCd > 0 ? Math.ceil(potionCd) + 's' : '';
+      els.btnPotion.disabled = false;
+      els.btnPotion.classList.toggle('empty', potionCount <= 0);
+      els.btnPotion.setAttribute('aria-disabled', potionCount <= 0 ? 'true' : 'false');
+      els.btnPotion.classList.toggle('cooling', potionCd > 0);
+      els.btnPotion.classList.toggle('low-hp', lowHp);
+      els.btnPotion.setAttribute('aria-label', t('item.quickAria', {
+        name: t('item.' + nextPotion + '.name'),
+        count: potionCount,
+        cd: potionCd > 0 ? Math.ceil(potionCd) : 0
+      }));
+      els.btnPotion.title = potionCount > 0 ? t('item.quickHint') : t('item.reject.empty');
+      var itemCooldowns = document.querySelectorAll('.item-use-cd[data-cd-group]');
+      for (var ci = 0; ci < itemCooldowns.length; ci++) {
+        var cdEl = itemCooldowns[ci];
+        var group = cdEl.getAttribute('data-cd-group');
+        var maxCd = Number(cdEl.getAttribute('data-cd-max')) || 1;
+        cdEl.style.setProperty('--cd', U.clamp(Game.items.cdLeft(group) / maxCd, 0, 1));
+      }
+
+      // 进入交易域才显示上下文入口；不改变挂机行为。
+      var tradeContext = Game.trade.current();
+      els.btnTrade.classList.toggle('hidden', !tradeContext.available);
+      if (tradeContext.available) {
+        var tradeName = tradeContext.nameKey ? t(tradeContext.nameKey) : t('tradeArea.generic');
+        els.tradeLabel.textContent = t('ui.tradeHud', { name: tradeName });
+        els.btnTrade.setAttribute('aria-label', t('ui.tradeHudAria', { name: tradeName }));
       }
 
       // 增益 chips

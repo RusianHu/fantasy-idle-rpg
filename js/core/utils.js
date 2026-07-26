@@ -5,9 +5,9 @@
   'use strict';
 
   var Game = window.Game = window.Game || {};
-  Game.VERSION = '1.10.1';
-  Game.BUILD_ID = '20260726.3';
-  Game.SAVE_VERSION = 8;
+  Game.VERSION = '1.11.0';
+  Game.BUILD_ID = '20260727.4';
+  Game.SAVE_VERSION = 9;
 
   var U = Game.util = {};
 
@@ -63,6 +63,13 @@
   U.setUidBase = function (n) { if (n > _uid) _uid = n; };
 
   U.now = function () { return Date.now(); };
+
+  /** Canvas 动效统一降级开关；业务逻辑与静态可读状态不受影响。 */
+  U.motionEnabled = function () {
+    if (Game.state && Game.state.settings && Game.state.settings.effects === false) return false;
+    return !(window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  };
 
   U.deepClone = function (obj) { return JSON.parse(JSON.stringify(obj)); };
 

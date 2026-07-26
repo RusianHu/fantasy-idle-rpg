@@ -44,7 +44,12 @@
     st.world.worldTime += dt;
     Game.terrain.update(dt);
     if (Game.transitions) Game.transitions.update(dt);
-    if (!Game.transitions || !Game.transitions.blocksWorld()) Game.world.update(dt);
+    if (!Game.transitions || !Game.transitions.blocksWorld()) {
+      Game.world.update(dt);
+    } else if (Game.environment) {
+      // 节点冷却属于世界时钟；旅行/死亡导演只暂停实体，不冻结环境冷却。
+      Game.environment.update(dt);
+    }
     if (Game.trade) Game.trade.update();
     Game.particles.update(dt);
     Game.fx.update(dt);
@@ -126,7 +131,8 @@
       // 关键事件即时保存
       var saveOn = ['player:levelup', 'boss:defeated', 'item:equipped', 'region:changed',
         'achievement:unlocked', 'shop:bought', 'skill:upgraded',
-        'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged', 'settings:changed'];
+        'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged', 'settings:changed',
+        'item:pickedUp', 'item:used', 'gather:done', 'chest:opened', 'camp:autoReturn'];
       saveOn.forEach(function (evt) {
         Game.bus.on(evt, function () {
           // 轻微防抖：合并密集事件

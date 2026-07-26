@@ -211,38 +211,113 @@
       return Game.state.inv.potions[pid] || 0;
     },
 
-    /** 自动喝药：优先小瓶，小瓶不足时用大瓶（受治疗强化加成） */
-    consumePotion: function () {
+    /** 兼容旧调用：优先小瓶，实际校验/效果/共享冷却统一走 Game.items。 */
+    consumePotion: function (opts) {
+      opts = opts || {};
+      if (!opts.source) opts.source = 'auto';
       var pots = Game.state.inv.potions;
       var pid = null;
       if ((pots.potion_small || 0) > 0) pid = 'potion_small';
       else if ((pots.potion_large || 0) > 0) pid = 'potion_large';
       if (!pid) return null;
-      pots[pid]--;
-      var d = Game.player.derived();
-      var heal = Math.round(d.maxHp * F.potionHeal[pid] * (d.healPow || 1));
-      Game.player.heal(heal, { raw: true });
-      Game.state.meta.stats.potions++;
-      bus.emit('potion:used', { pid: pid, heal: heal });
-      return { pid: pid, heal: heal };
+      var result = Game.items.use('potion', pid, opts);
+      if (!result.ok) return null;
+      return { pid: pid, heal: result.effect.amount, result: result };
     },
 
-    /** 掉落判定（击杀普通怪时调用） */
-    rollDrops: function (tier, isBoss) {
-      var out = [];
+    /* ---------------- 素材 ---------------- */
+    addMaterial: function (id, n, opts) {
+      if (!reg.has('material', id) || !(n > 0)) return 0;
+      var mats = Game.state.inv.materials;
+      mats[id] = (mats[id] || 0) + Math.floor(n);
+      if (!(opts && opts.noStats)) Game.state.meta.stats.materials += Math.floor(n);
+      bus.emit('material:changed', { id: id, delta: Math.floor(n), total: mats[id] });
+      return Math.floor(n);
+    },
+
+    materialCount: function (id) {
+      return Game.state.inv.materials[id] || 0;
+    },
+
+    spendMaterials: function (costs) {
+      costs = costs || {};
+      for (var id in costs) {
+        if (Inv.materialCount(id) < costs[id]) return false;
+      }
+      for (var key in costs) {
+        Game.state.inv.materials[key] = Math.max(0, Inv.materialCount(key) - costs[key]);
+        bus.emit('material:changed', {
+          id: key, delta: -costs[key], total: Game.state.inv.materials[key]
+        });
+      }
+      return true;
+    },
+
+    /* ---------------- 掉落判定 / 发放（严格拆分） ---------------- */
+    rollDropResults: function (tier, isBoss) {
+      var results = [];
       var d = Game.player.derived();
       var dropMul = Game.player.restMults().drop * d.dropMul;
       var lv = Game.state.player.level;
       if (isBoss || U.chance(F.BAL.dropEquip * dropMul)) {
-        var item = Inv.genLoot(lv, isBoss ? { rarMin: 2, luck: 2 } : {});
-        if (Inv.addItem(item, { source: isBoss ? 'boss' : 'loot' })) out.push(item);
+        results.push({
+          category: 'equipment',
+          item: Inv.genLoot(lv, isBoss ? { rarMin: 2, luck: 2 } : {})
+        });
       }
       if (U.chance(F.BAL.dropPotion * (isBoss ? 3 : 1))) {
-        var pid = U.chance(0.8) ? 'potion_small' : 'potion_large';
-        Inv.addPotion(pid, 1);
-        bus.emit('potion:dropped', { pid: pid });
+        results.push({
+          category: 'potion',
+          id: U.chance(0.8) ? 'potion_small' : 'potion_large',
+          count: 1
+        });
       }
-      return out;
+      return results;
+    },
+
+    commitDrop: function (drop, opts) {
+      opts = opts || {};
+      if (!drop) return null;
+      if (drop.category === 'equipment' && drop.item) {
+        return Inv.addItem(drop.item, {
+          source: opts.source || 'loot',
+          offline: !!opts.offline,
+          silent: !!opts.silent
+        });
+      }
+      if (drop.category === 'potion' && drop.id) {
+        Inv.addPotion(drop.id, drop.count || 1);
+        bus.emit('potion:dropped', {
+          pid: drop.id,
+          count: drop.count || 1,
+          source: opts.source || 'loot'
+        });
+        return drop;
+      }
+      return null;
+    },
+
+    deliverDrops: function (results, opts) {
+      opts = opts || {};
+      var delivered = [];
+      for (var i = 0; i < results.length; i++) {
+        var drop = results[i];
+        var ground = !!opts.forceGround ||
+          (opts.source === 'combat' && Game.state.settings.groundLoot !== false);
+        if (ground && Game.world && Game.world.spawnGroundLoot) {
+          if (Game.world.spawnGroundLoot(drop, opts.x, opts.y, opts)) continue;
+        }
+        var got = Inv.commitDrop(drop, opts);
+        if (got) delivered.push(got);
+      }
+      return delivered;
+    },
+
+    /** 兼容入口：Boss/离线/商店等默认直接入包，普通战斗按设置落地。 */
+    rollDrops: function (tier, isBoss, opts) {
+      opts = opts || {};
+      if (!opts.source) opts.source = isBoss ? 'boss' : 'combat';
+      return Inv.deliverDrops(Inv.rollDropResults(tier, isBoss), opts);
     }
   };
 })();

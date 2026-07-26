@@ -59,6 +59,7 @@
       if (!sum || !Game.State.isAdventureStarted()) return;
       var s = Game.state;
       s.meta.stats.offlineSec += sum.seconds;
+      if (Game.environment) Game.environment.restoreOffline(sum.seconds);
 
       if (sum.type === 'rest') {
         s.player.hp = Game.player.derived().maxHp;

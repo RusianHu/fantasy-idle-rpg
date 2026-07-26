@@ -42,6 +42,8 @@
     hero.target = null;
     hero.manualTarget = false;
     hero.moveOrder = null;
+    if (Game.world && Game.world.cancelInteraction) Game.world.cancelInteraction('transition');
+    else hero.interactOrder = null;
     hero.moving = false;
     hero.campWarp = null;
     if (Game.nav) Game.nav.clear(hero);

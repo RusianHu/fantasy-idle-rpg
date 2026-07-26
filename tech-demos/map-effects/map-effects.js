@@ -8,6 +8,8 @@
   var paused = false;
   var timeMode = 'cycle';
   var lastFrame = performance.now();
+  var explorationMessage = '等待交互';
+  var qaRestoreAuto = false;
 
   function queryParams() {
     try { return new URLSearchParams(window.location.search); } catch (e) { return new URLSearchParams(); }
@@ -73,6 +75,10 @@
     return Game.i18n.t('monster.' + id + '.name');
   }
 
+  function materialName(id) {
+    return Game.i18n.t('material.' + id);
+  }
+
   function swatches(colors) {
     return '<span class="swatches">' + colors.map(function (color) {
       return '<i class="swatch" style="background:' + esc(color) + '" title="' + esc(color) + '"></i>';
@@ -119,6 +125,14 @@
     var decoCount = layout.props.length;
     var patchCount = layout.patches.length;
     var flowerCount = layout.flowers.length;
+    var nodes = layout.nodes || [];
+    var readyNodeCount = nodes.filter(function (node) {
+      return Game.environment.nodeReady(node);
+    }).length;
+    var tier = Game.State.regionTier(region.id);
+    var gatherYield = Game.F.gatherYield(tier);
+    var commonChest = Game.F.chestYield(tier, false);
+    var rareChest = Game.F.chestYield(tier, true);
     var propCounts = layout.props.reduce(function (counts, prop) {
       counts[prop.sprite] = (counts[prop.sprite] || 0) + 1;
       return counts;
@@ -140,6 +154,20 @@
     }).join('');
     decoRows += spriteRow('tent', '营帐', trait('固定注入') + trait('软阴影'));
     decoRows += spriteRow('campfire', '四帧篝火', trait('固定注入') + trait('动态光晕', 'accent') + trait('火星/轻烟', 'accent'));
+
+    var gatherRows = region.gather.nodes.map(function (def) {
+      var generated = nodes.filter(function (node) { return node.nodeType === def.id; });
+      var positions = generated.map(function (node) {
+        return '(' + Math.round(node.x) + ',' + Math.round(node.y) + ')';
+      }).join(' / ');
+      return spriteRow(def.sprite, materialName(def.material),
+        trait('× ' + generated.length) +
+        trait(def.id + ' → ' + def.material) +
+        (positions ? trait(positions) : ''));
+    }).join('');
+    var chestRows =
+      spriteRow('chest_common', '普通探索宝箱', trait('木质 / 黄铜') + trait('区域金币与素材')) +
+      spriteRow('chest_rare', '稀有探索宝箱', trait('紫晶 / 暗金', 'accent') + trait('追加装备与魔晶石', 'accent'));
 
     var monsterRows = region.monsters.map(function (id) {
       return spriteRow(id, monsterName(id), trait('普通怪'));
@@ -171,6 +199,8 @@
         '<div class="metric"><strong>' + patchCount + '</strong><span>材质斑块</span></div>' +
         '<div class="metric"><strong>' + layout.tufts.length + '</strong><span>动态草簇</span></div>' +
         '<div class="metric"><strong>' + flowerCount + '</strong><span>烘焙花簇</span></div>' +
+        '<div class="metric"><strong>' + nodes.length + '</strong><span>采集节点</span></div>' +
+        '<div class="metric"><strong id="inspector-ready-count">' + readyNodeCount + '</strong><span>当前成熟</span></div>' +
       '</div>' +
       '<section class="inspect-section"><h3>地表着色与材质反馈</h3><div class="row-list">' + materialRows +
         '<div class="config-row"><span>世界尺寸</span><div>' + region.world.w + ' × ' + region.world.h + ' px / 8 px 材质网格</div></div>' +
@@ -181,6 +211,22 @@
       '<section class="inspect-section"><h3>动态装饰与发光体</h3><div class="sprite-list">' + decoRows + '</div></section>' +
       '<section class="inspect-section"><h3>实体与地形交互载体</h3><div class="sprite-list">' + monsterRows + '</div>' +
         '<p class="note">普通怪同时存在 7 个，由原版世界逻辑分散刷新并持续触发移动、脚步材质反馈与战斗特效；击杀 ' + region.killTarget + ' 只后触发 Boss 登场演出。</p></section>' +
+      '<section class="inspect-section"><h3>可采集物与探索宝箱</h3><div class="sprite-list exploration-sprite-list">' +
+        gatherRows + chestRows + '</div><div class="row-list exploration-rule-list">' +
+        '<div class="config-row"><span>采集产出</span><div>' + gatherYield.min + '–' + gatherYield.max +
+          ' 份主题素材 + ' + gatherYield.gold + ' 金币' +
+          (gatherYield.crystalChance > 0 ? ' / 魔晶石 ' + (gatherYield.crystalChance * 100).toFixed(1) + '%' : '') + '</div></div>' +
+        '<div class="config-row"><span>采集规则</span><div>' + Game.F.BAL.gatherDuration.toFixed(1) +
+          ' 秒交互 / 节点冷却 ' + region.gather.cooldown[0] + '–' + region.gather.cooldown[1] + ' 秒 / 接敌中断</div></div>' +
+        '<div class="config-row"><span>普通宝箱</span><div>' + commonChest.gold + ' 金币 / ' +
+          commonChest.materialMin + '–' + commonChest.materialMax + ' 份区域素材</div></div>' +
+        '<div class="config-row"><span>稀有宝箱</span><div>' + rareChest.gold + ' 金币 / ' +
+          rareChest.materialMin + '–' + rareChest.materialMax + ' 份区域素材 / 稀有以上装备 / 魔晶石 ' +
+          Math.round(rareChest.crystalChance * 100) + '%</div></div>' +
+        '<div class="config-row"><span>发现与保留</span><div>合法移动 ' + Game.F.BAL.chestMoveMin + '–' +
+          Game.F.BAL.chestMoveMax + ' 等效秒 / 稀有率 ' + Math.round(Game.F.BAL.chestRareChance * 100) +
+          '% / 最短间隔 ' + Game.F.BAL.chestMinGap + ' 秒 / 保留 ' + Game.F.BAL.chestTtl + ' 秒</div></div>' +
+      '</div><p class="note">自动 AI 优先级为接敌战斗 → 地面掉落 → 宝箱 → 成熟采集节点 → 游走；节点冷却写入存档，宝箱与发现进度仅驻内存。</p></section>' +
       '<section class="inspect-section"><h3>固定特效锚点</h3><div class="row-list">' +
         '<div class="config-row"><span>世界种子</span><div><code>' + U.hex32(layout.worldSeed) + '</code> / layout v' + layout.version + '</div></div>' +
         '<div class="config-row"><span>营地点</span><div>(' + layout.camp.x + ', ' + layout.camp.y + ')；安全半径 ' + layout.campSafeRadius + ' px</div></div>' +
@@ -199,14 +245,162 @@
     });
   }
 
+  function setExplorationEvent(message) {
+    explorationMessage = message;
+    var output = document.getElementById('exploration-event');
+    if (output) output.textContent = message;
+  }
+
+  function restoreAutoAfterQa() {
+    if (!qaRestoreAuto) return;
+    qaRestoreAuto = false;
+    Game.world.setControlMode('auto');
+  }
+
+  function prepareQaTarget() {
+    var hero = Game.world.hero;
+    if (!hero) return;
+    var shouldRestoreAuto = qaRestoreAuto || Game.world.controlMode() === 'auto';
+    qaRestoreAuto = false;
+    Game.world.cancelInteraction('qa-target');
+    if (Game.world.controlMode() === 'auto') {
+      Game.world.setControlMode('manual');
+    }
+    qaRestoreAuto = shouldRestoreAuto;
+    hero.target = null;
+    hero.manualTarget = false;
+    hero.moveOrder = null;
+    hero.state = 'idle';
+    Game.world.entities.forEach(function (entity) {
+      if (entity.kind === 'monster') entity.engaged = false;
+    });
+    Game.nav.clear(hero);
+  }
+
+  function readyNodes() {
+    return (Game.world.layout.nodes || []).filter(function (node) {
+      return Game.environment.nodeReady(node);
+    });
+  }
+
+  function focusReadyNode() {
+    var nodes = readyNodes();
+    if (!nodes.length) {
+      setExplorationEvent('当前区域没有成熟节点，可先恢复全部节点');
+      return;
+    }
+    prepareQaTarget();
+    var hero = Game.world.hero;
+    var node = nodes.reduce(function (best, candidate) {
+      if (!best) return candidate;
+      return U.dist(hero.x, hero.y, candidate.x, candidate.y) <
+        U.dist(hero.x, hero.y, best.x, best.y) ? candidate : best;
+    }, null);
+    setHeroPosition(node.x - 34, node.y + 8);
+    setExplorationEvent('已定位 ' + materialName(node.material) + '，点击画布中的发光节点开始采集');
+  }
+
+  function resetGatherNodes() {
+    var nodes = Game.world.layout.nodes || [];
+    nodes.forEach(function (node) {
+      Game.state.world.nodeCooldowns[node.id] = 0;
+    });
+    setExplorationEvent('已恢复本区域全部 ' + nodes.length + ' 个采集节点');
+  }
+
+  function spawnQaChest(rare) {
+    if (Game.world.bossEnt) {
+      setExplorationEvent('Boss 登场期间不会生成宝箱，请先切换区域或结束战斗');
+      return null;
+    }
+    prepareQaTarget();
+    Game.environment.resetRegion();
+
+    var originalChance = U.chance;
+    var chest = null;
+    U.chance = function () { return !!rare; };
+    try {
+      chest = Game.environment.spawnChest();
+      if (!chest) {
+        var candidates = (Game.world.layout.spawnCandidates || []).slice(0, 12);
+        for (var i = 0; i < candidates.length && !chest; i++) {
+          setHeroPosition(candidates[i].x, candidates[i].y);
+          chest = Game.environment.spawnChest();
+        }
+      }
+    } finally {
+      U.chance = originalChance;
+    }
+
+    if (!chest) {
+      restoreAutoAfterQa();
+      setExplorationEvent('当前镜头附近没有合法宝箱落点，请切换区域后重试');
+      return null;
+    }
+    Game.render.snapCamera(Game.world.hero.x, Game.world.hero.y);
+    setExplorationEvent('已生成' + (rare ? '稀有' : '普通') + '宝箱，点击画布中的箱体走近开启');
+    return chest;
+  }
+
+  function updateExplorationQa() {
+    if (!Game.world.layout || !Game.environment) return;
+    var nodes = Game.world.layout.nodes || [];
+    var mature = nodes.filter(function (node) {
+      return Game.environment.nodeReady(node);
+    }).length;
+    document.getElementById('gather-runtime').textContent = mature + ' / ' + nodes.length + ' 成熟';
+    var inspectorReady = document.getElementById('inspector-ready-count');
+    if (inspectorReady) inspectorReady.textContent = mature;
+
+    var progress = Game.environment.progressSnapshot();
+    document.getElementById('discovery-runtime').textContent =
+      Math.floor(progress.seconds) + ' / ' + Math.ceil(progress.target) + ' 秒';
+
+    var chest = Game.environment.chests()[0];
+    document.getElementById('chest-runtime').textContent = chest
+      ? (chest.rare ? '稀有' : '普通') + ' · ' + Math.max(0, Math.ceil(chest.ttl - chest.age)) + 's'
+      : '无';
+    document.getElementById('exploration-event').textContent = explorationMessage;
+  }
+
+  function bindExplorationEvents() {
+    Game.bus.on('gather:start', function (payload) {
+      setExplorationEvent('采集中 · ' + materialName(payload.material));
+    });
+    Game.bus.on('gather:done', function (payload) {
+      setExplorationEvent('采集完成 · +' + payload.count + ' ' + materialName(payload.material) +
+        ' / +' + payload.gold + ' 金币');
+      restoreAutoAfterQa();
+    });
+    Game.bus.on('gather:interrupted', function () {
+      setExplorationEvent('采集被接敌或新指令中断，节点仍保持成熟');
+      restoreAutoAfterQa();
+    });
+    Game.bus.on('chest:spawned', function (payload) {
+      setExplorationEvent('探索发现' + (payload.rare ? '稀有' : '普通') + '宝箱，点击箱体走近开启');
+    });
+    Game.bus.on('chest:opened', function (payload) {
+      setExplorationEvent((payload.rare ? '稀有' : '普通') + '宝箱已开启 · +' +
+        payload.gold + ' 金币 / +' + payload.materialCount + ' ' + materialName(payload.material));
+      restoreAutoAfterQa();
+    });
+    Game.bus.on('chest:expired', function () {
+      setExplorationEvent('宝箱已在 90 秒时限结束后消失');
+      restoreAutoAfterQa();
+    });
+  }
+
   function setHeroPosition(x, y) {
     var hero = Game.world.hero;
     if (!hero) return;
+    Game.world.cancelInteraction('qa-focus');
     hero.x = U.clamp(x, 50, Game.world.region.world.w - 50);
     hero.y = U.clamp(y, Game.world.BOUND_TOP + 10, Game.world.region.world.h - 30);
     hero.target = null;
     hero.moveOrder = null;
+    hero.manualTarget = false;
     hero.state = 'idle';
+    Game.nav.clear(hero);
     Game.render.snapCamera(hero.x, hero.y);
   }
 
@@ -214,6 +408,8 @@
     currentIndex = (index + regions.length) % regions.length;
     var region = regions[currentIndex];
 
+    qaRestoreAuto = false;
+    Game.state.settings.controlMode = 'auto';
     Game.state.world.region = region.id;
     Game.state.world.mode = 'battle';
     Game.state.world.deathsRow = 0;
@@ -229,8 +425,10 @@
     document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
     document.getElementById('stage-region-name').textContent = regionName(region);
     document.getElementById('stage-region-id').textContent = 'region / ' + region.id;
+    setExplorationEvent(regionName(region) + '已生成 ' + (Game.world.layout.nodes || []).length + ' 个采集节点');
     renderTabs();
     renderInspector(region);
+    updateExplorationQa();
   }
 
   function setTimeMode(mode) {
@@ -260,6 +458,31 @@
     });
     document.getElementById('effects-toggle').addEventListener('change', function () {
       Game.particles.setEnabled(this.checked);
+    });
+    document.getElementById('spawn-dynamic-trade').addEventListener('click', function () {
+      var hero = Game.world.hero;
+      Game.trade.clearDynamic();
+      Game.trade.registerDynamic({
+        id: 'qa-wanderer',
+        regionId: Game.world.region.id,
+        kind: 'wander',
+        x: U.clamp(hero.x + 74, 40, Game.world.region.world.w - 40),
+        y: U.clamp(hero.y + 22, Game.world.BOUND_TOP + 24, Game.world.region.world.h - 24),
+        radius: 62,
+        catalogs: ['camp-general'],
+        priority: 30,
+        nameKey: 'tradeArea.generic',
+        prop: { style: 'supply-cart' }
+      }, { ttl: 20 });
+      document.getElementById('dynamic-trade-status').textContent = '已注册 · TTL 20s';
+    });
+    document.getElementById('focus-gather').addEventListener('click', focusReadyNode);
+    document.getElementById('reset-gather').addEventListener('click', resetGatherNodes);
+    document.getElementById('spawn-common-chest').addEventListener('click', function () {
+      spawnQaChest(false);
+    });
+    document.getElementById('spawn-rare-chest').addEventListener('click', function () {
+      spawnQaChest(true);
     });
     document.getElementById('seed-form').addEventListener('submit', function (event) {
       event.preventDefault();
@@ -306,9 +529,18 @@
       Game.particles.update(dt);
       Game.fx.update(dt);
       Game.world.update(dt);
+      Game.trade.update();
     }
     Game.render.frame(paused ? 0 : dt);
     document.getElementById('runtime-count').textContent = Game.world.entities.length + ' 个实体';
+    updateExplorationQa();
+    var qaArea = Game.trade.areaById('qa-wanderer');
+    if (!qaArea) {
+      document.getElementById('dynamic-trade-status').textContent = '未注册 / 已过期';
+    } else {
+      document.getElementById('dynamic-trade-status').textContent =
+        '运行中 · 剩余 ' + Math.max(0, Math.ceil(qaArea.expiresAt - Game.state.world.worldTime)) + 's';
+    }
     requestAnimationFrame(frame);
   }
 
@@ -324,6 +556,7 @@
   Game.player.setClass('warrior');
   Game.render.init(document.getElementById('stage'));
   bindControls();
+  bindExplorationEvents();
   var initialId = params.get('region') || window.location.hash.slice(1);
   var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
   activateRegion(initialIndex >= 0 ? initialIndex : 0);

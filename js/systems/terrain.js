@@ -82,6 +82,7 @@
     gw: 0,
     gh: 0,
     props: [],
+    nodes: [],
     glows: [],
     tufts: [],
     flowers: [],
@@ -136,6 +137,9 @@
       var terrainRng = U.seededRng(seedFor(worldSeed, region.id, layoutVersion, 'terrain'));
       var decorRng = U.seededRng(seedFor(worldSeed, region.id, layoutVersion, 'decor'));
       var detailRng = U.seededRng(seedFor(worldSeed, region.id, layoutVersion, 'details'));
+      // nodes 是独立附加流；不得消费 landmarks/terrain/decor/details，
+      // 因而不会扰动 v1/v2 既有布局快照和关键点。
+      var nodeRng = U.seededRng(seedFor(worldSeed, region.id, layoutVersion, 'nodes'));
 
       var campX = pctRange(lc.campZone, 'x', [0.10, 0.20]);
       var campY = pctRange(lc.campZone, 'y', [0.27, 0.70]);
@@ -378,12 +382,76 @@
         addCampProp({ sprite: 'camp_lantern', x: camp.x + 48, y: camp.y + 4, shadow: true, phase: 0.7, flicker: true, animSpd: 0.45, large: true, glow: { color: '#f3b84f', r: 18 } });
         addCampProp({ sprite: 'campfire', x: camp.x, y: camp.y + 8, campfire: true, phase: 0, animSpd: 1, shadow: false, large: false });
         addCampProp({ sprite: 'camp_cookpot', x: camp.x + 1, y: camp.y + 13, shadow: true, steam: true, phase: 0.2, large: false });
-        addCampProp({ sprite: 'camp_supply', x: camp.x - 45, y: camp.y + 19, shadow: true, phase: 0, large: false });
+        // 补给箱斜靠交易摊位（camp-supply 交易域锚点 camp + (-45,+19)）左前方，组成补给角
+        addCampProp({ sprite: 'camp_supply', x: camp.x - 62, y: camp.y + 25, shadow: true, phase: 0, large: false });
         addCampProp({ sprite: 'camp_bedroll', x: camp.x - 13, y: camp.y + 29, shadow: true, phase: 0, large: false });
         addCampProp({ sprite: 'camp_log', x: camp.x + 29, y: camp.y + 27, shadow: true, phase: 0, large: false });
       } else {
         props.push({ sprite: 'tent', x: camp.x - 30, y: camp.y - 4, shadow: true, phase: 0, flipX: false, animSpd: 1, large: true });
         props.push({ sprite: 'campfire', x: camp.x, y: camp.y + 8, campfire: true, phase: 0, flipX: false, animSpd: 1, shadow: false, large: false });
+      }
+
+      /* ---------- 独立采集节点流（不进入导航代价与旧 props 快照） ---------- */
+      var nodes = [];
+      function validNodeSpot(nx, ny) {
+        var nmat = gridMaterialAt(nx, ny);
+        if (nmat === 'water' || nmat === 'lava' || nmat === 'void') return false;
+        if (U.dist(nx, ny, camp.x, camp.y) < campSafe + 18) return false;
+        if (U.dist(nx, ny, bossPoint.x, bossPoint.y) < bossSafe + 18) return false;
+        if (distanceToPath(nx, ny, path) < roadWidth / 2 + 16) return false;
+        if (!hasSpacing(nx, ny, minSpacing + 8)) return false;
+        for (var nsi = 0; nsi < nodes.length; nsi++) {
+          if (U.dist(nx, ny, nodes[nsi].x, nodes[nsi].y) < 58) return false;
+        }
+        return true;
+      }
+
+      function fallbackNode(ordinal) {
+        var step = 14;
+        var cols = Math.floor((w - 68) / step) + 1;
+        var rows = Math.floor((h - BOUND_TOP - 54) / step) + 1;
+        var total = cols * rows;
+        var start = (ordinal * 137) % total;
+        for (var scan = 0; scan < total; scan++) {
+          var cell = (start + scan) % total;
+          var x = 34 + cell % cols * step;
+          var y = BOUND_TOP + 28 + Math.floor(cell / cols) * step;
+          if (validNodeSpot(x, y)) return { x: x, y: y };
+        }
+        throw new Error('No legal gather node spot for ' + region.id);
+      }
+
+      var gather = region.gather;
+      if (gather && Array.isArray(gather.nodes) && gather.nodes.length) {
+        var countRange = gather.count || [3, 5];
+        var nodeCount = Math.max(0, Math.floor(countRange[0] +
+          nodeRng() * (countRange[1] - countRange[0] + 1)));
+        for (var ni = 0; ni < nodeCount; ni++) {
+          var nd = gather.nodes[ni % gather.nodes.length];
+          var placedNode = null;
+          for (var nt = 0; nt < 220; nt++) {
+            var nx = 34 + nodeRng() * (w - 68);
+            var ny = BOUND_TOP + 28 + nodeRng() * (h - BOUND_TOP - 54);
+            if (!validNodeSpot(nx, ny)) continue;
+            placedNode = { x: nx, y: ny };
+            break;
+          }
+          if (!placedNode) placedNode = fallbackNode(ni);
+          var cdRange = gather.cooldown || [90, 150];
+          nodes.push({
+            kind: 'gatherNode',
+            id: region.id + ':' + nd.id + ':' + ni,
+            nodeType: nd.id,
+            sprite: nd.sprite,
+            material: nd.material,
+            color: nd.color,
+            accent: nd.accent,
+            x: placedNode.x,
+            y: placedNode.y,
+            phase: nodeRng() * Math.PI * 2,
+            cooldown: Math.round(cdRange[0] + nodeRng() * (cdRange[1] - cdRange[0]))
+          });
+        }
       }
 
       var nw = Math.ceil(w / NAV_CELL), nh = Math.ceil(h / NAV_CELL);
@@ -458,7 +526,8 @@
           landmarks: seedFor(worldSeed, region.id, layoutVersion, 'landmarks'),
           terrain: seedFor(worldSeed, region.id, layoutVersion, 'terrain'),
           decor: seedFor(worldSeed, region.id, layoutVersion, 'decor'),
-          details: seedFor(worldSeed, region.id, layoutVersion, 'details')
+          details: seedFor(worldSeed, region.id, layoutVersion, 'details'),
+          nodes: seedFor(worldSeed, region.id, layoutVersion, 'nodes')
         },
         world: { w: w, h: h },
         camp: camp,
@@ -479,6 +548,7 @@
         grid: grid,
         colorGrid: colorGrid,
         props: props,
+        nodes: nodes,
         glows: glows,
         tufts: tufts,
         flowers: flowers,
@@ -496,6 +566,7 @@
       T.gw = gw;
       T.gh = gh;
       T.props = props;
+      T.nodes = nodes;
       T.glows = glows;
       T.tufts = tufts;
       T.flowers = flowers;

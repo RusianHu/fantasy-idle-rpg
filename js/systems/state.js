@@ -85,6 +85,7 @@
         settings: {
           lang: 'zh-CN', effects: true, potionThreshold: 0.3,
           autoAdvance: true, autoSkillUpgrade: true, autoEquip: true,
+          groundLoot: true, autoCampRest: false,
           controlMode: 'auto',
           sfx: true, music: true
         },
@@ -100,7 +101,8 @@
           items: [],
           equipped: { weapon: null, armor: null, ring: null },
           lockedSlots: { weapon: false, armor: false, ring: false },
-          potions: { potion_small: 3, potion_large: 0 }
+          potions: { potion_small: 3, potion_large: 0 },
+          materials: {}
         },
         world: {
           region: regionOrder[0],
@@ -111,6 +113,7 @@
           restBuffT: 0,
           worldTime: 300,
           regionProg: {},
+          nodeCooldowns: {},
           deathsRow: 0
         },
         meta: {
@@ -118,7 +121,8 @@
             kills: 0, bossKills: 0, goldEarned: 0, expEarned: 0,
             drops: 0, legendaries: 0, potions: 0, deaths: 0,
             playSec: 0, restSec: 0, offlineSec: 0, sells: 0,
-            maxHit: 0, level: 1, highestRegion: 1
+            maxHit: 0, level: 1, highestRegion: 1,
+            pickups: 0, gathers: 0, materials: 0, chests: 0
           },
           ach: {},
           prologueDone: false,

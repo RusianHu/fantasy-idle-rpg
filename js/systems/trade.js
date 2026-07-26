@@ -12,6 +12,8 @@
   var Game = window.Game;
   var U = Game.util, bus = Game.bus;
   var lastSignature = null;
+  var dynamicAreas = [];
+  var dynamicSeq = 1;
 
   function unavailable(reason, extra) {
     var result = {
@@ -53,7 +55,8 @@
       radius: radius,
       catalogs: Array.isArray(def.catalogs) ? def.catalogs.slice() : [],
       priority: Number(def.priority) || 0,
-      nameKey: def.nameKey || null
+      nameKey: def.nameKey || null,
+      prop: def.prop || null
     };
   }
 
@@ -82,11 +85,22 @@
       var world = Game.world;
       var region = world && world.region;
       var layout = world && world.layout;
-      if (!region || !layout || !Array.isArray(region.tradeAreas)) return [];
+      if (!region || !layout) return [];
       var out = [];
-      for (var i = 0; i < region.tradeAreas.length; i++) {
-        var area = resolveArea(region.tradeAreas[i], layout);
+      var statics = Array.isArray(region.tradeAreas) ? region.tradeAreas : [];
+      for (var i = 0; i < statics.length; i++) {
+        var area = resolveArea(statics[i], layout);
         if (area) out.push(area);
+      }
+      for (var j = 0; j < dynamicAreas.length; j++) {
+        var dyn = dynamicAreas[j];
+        if (dyn.regionId && dyn.regionId !== region.id) continue;
+        var resolved = resolveArea(dyn.def, layout);
+        if (resolved) {
+          resolved.dynamic = true;
+          resolved.expiresAt = dyn.expiresAt;
+          out.push(resolved);
+        }
       }
       return out;
     },
@@ -123,7 +137,9 @@
           distance: distance,
           catalogs: area.catalogs,
           priority: area.priority,
-          nameKey: area.nameKey
+          nameKey: area.nameKey,
+          prop: area.prop,
+          dynamic: !!area.dynamic
         };
         if (!nearest || distance < nearest.distance) nearest = candidate;
         if (distance > area.radius) continue;
@@ -148,6 +164,70 @@
       };
     },
 
+    areaById: function (id) {
+      var areas = Trade.areas();
+      for (var i = 0; i < areas.length; i++) if (areas[i].id === id) return areas[i];
+      return null;
+    },
+
+    /** 玩家显式发起的一次性走近指令；不加入挂机 AI 目标序列。 */
+    requestApproach: function (areaId, opts) {
+      opts = opts || {};
+      var area = Trade.areaById(areaId);
+      if (!area || isBusy(Game.world && Game.world.hero) || Game.world.bossEnt) {
+        return { ok: false, reason: 'busy' };
+      }
+      var current = Trade.current();
+      if (current.available && current.areaId === areaId) {
+        if (opts.open !== false && Game.ui && Game.ui.trade) Game.ui.trade.open(areaId);
+        return { ok: true, opened: true };
+      }
+      if (!Game.world || !Game.world.startInteraction) return { ok: false, reason: 'not-ready' };
+      var started = Game.world.startInteraction({
+        type: 'trade',
+        target: area,
+        areaId: area.id,
+        open: opts.open !== false,
+        source: opts.source || 'world'
+      }, true);
+      return { ok: !!started, opened: false, reason: started ? null : 'busy' };
+    },
+
+    directionTo: function (point) {
+      var h = Game.world && Game.world.hero;
+      if (!h || !point) return '';
+      var dx = point.x - h.x, dy = point.y - h.y;
+      if (Math.abs(dx) > Math.abs(dy)) return dx >= 0 ? 'east' : 'west';
+      return dy >= 0 ? 'south' : 'north';
+    },
+
+    /** 临时交易域：仅运行时存在，切区/读档清空，ttl 由世界时钟驱动。 */
+    registerDynamic: function (area, opts) {
+      opts = opts || {};
+      if (!area || (!area.anchor && !(isFinite(area.x) && isFinite(area.y)))) {
+        return { ok: false, reason: 'invalid' };
+      }
+      var def = {};
+      for (var key in area) def[key] = area[key];
+      if (!def.id) def.id = 'dynamic-trade-' + (dynamicSeq++);
+      if (!def.anchor) def.anchor = { x: Number(def.x), y: Number(def.y) };
+      if (!(Number(def.radius) > 0)) def.radius = 54;
+      var now = Game.state && Game.state.world ? Number(Game.state.world.worldTime) || 0 : 0;
+      var ttl = Math.max(0, Number(opts.ttl) || 0);
+      dynamicAreas.push({
+        id: def.id,
+        def: def,
+        regionId: area.regionId || (Game.state && Game.state.world && Game.state.world.region),
+        expiresAt: ttl ? now + ttl : Infinity
+      });
+      Trade.update();
+      return { ok: true, id: def.id };
+    },
+
+    clearDynamic: function () {
+      dynamicAreas.length = 0;
+    },
+
     /** 商品目录与交易地点目录只要有交集，即可在该地点提供。 */
     allows: function (itemCatalogs, context) {
       context = context || Trade.current();
@@ -164,18 +244,40 @@
 
     /** 主循环轻量轮询，只在跨越交易域边界时发事件。 */
     update: function () {
+      var now = Game.state && Game.state.world ? Number(Game.state.world.worldTime) || 0 : 0;
+      var expired = [];
+      for (var i = dynamicAreas.length - 1; i >= 0; i--) {
+        if (dynamicAreas[i].expiresAt <= now) {
+          expired.push(dynamicAreas[i].id);
+          dynamicAreas.splice(i, 1);
+        }
+      }
       var context = Trade.current();
       var next = signature(context);
       if (next !== lastSignature) {
         var previous = lastSignature;
         lastSignature = next;
-        bus.emit('trade:contextChanged', { context: context, previous: previous });
+        bus.emit('trade:contextChanged', {
+          context: context,
+          previous: previous,
+          expired: expired
+        });
+      } else if (expired.length) {
+        bus.emit('trade:contextChanged', {
+          context: context,
+          previous: lastSignature,
+          expired: expired
+        });
       }
       return context;
     },
 
-    reset: function () {
+    reset: function (opts) {
+      if (opts && opts.dynamic) Trade.clearDynamic();
       lastSignature = null;
-    }
+    },
+
+    resolveArea: resolveArea,
+    isBusy: isBusy
   };
 })();

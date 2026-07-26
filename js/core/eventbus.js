@@ -5,6 +5,9 @@
  *   monster:killed {mid, boss, exp, gold, x, y}
  *   player:levelup {level}      player:death {byBoss}
  *   item:dropped {item}         item:equipped {item}
+ *   loot:spawned / item:pickedUp / item:used
+ *   gather:start / gather:done / gather:interrupted
+ *   chest:spawned / chest:opened / chest:expired
  *   boss:spawned {rid, mid}     boss:defeated {rid, mid, first}
  *   boss:failed {rid, reason:'defeat'|'retreat'}
  *   region:changed {rid}        region:unlocked {rid}
@@ -22,6 +25,7 @@
  *   save:before / save:after    offline:settled {summary}
  *   mode:changed {mode}         control:changed {mode}
  *   camp:teleport {phase, x, y}
+ *   camp:autoReturn
  *   game:completed {rid, mid, tier, completedAt}
  *   game:continued {rid}
  * ============================================================ */

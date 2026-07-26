@@ -192,6 +192,8 @@
         ['goldEarned', fmt(st.goldEarned)], ['expEarned', fmt(st.expEarned)],
         ['drops', fmt(st.drops)], ['legendaries', fmt(st.legendaries)],
         ['potions', fmt(st.potions)], ['deaths', fmt(st.deaths)],
+        ['pickups', fmt(st.pickups)], ['gathers', fmt(st.gathers)],
+        ['materials', fmt(st.materials)], ['chests', fmt(st.chests)],
         ['maxHit', fmt(st.maxHit)], ['sells', fmt(st.sells)],
         ['playSec', fd(st.playSec)], ['restSec', fd(st.restSec)],
         ['offlineSec', fd(st.offlineSec)], ['highestRegion', st.highestRegion + ' / ' + reg.ids('region').length]
@@ -303,12 +305,59 @@
     });
     root.appendChild(strip);
 
-    // 药水
-    var pots = U.el('div', 'card', '<div class="row">' +
-      '<canvas width="22" height="22" data-icon="icon_potion_small"></canvas><span style="font-size:12px">×' + Game.inv.potionCount('potion_small') + '</span>' +
-      '<canvas width="22" height="22" data-icon="icon_potion_large" style="margin-left:12px"></canvas><span style="font-size:12px">×' + Game.inv.potionCount('potion_large') + '</span>' +
-      '<div class="grow"></div><span class="desc" style="font-size:10px">' + t('ui.potionAuto', { p: Math.round(s.settings.potionThreshold * 100) }) + '</span></div>');
-    root.appendChild(pots);
+    // 可用物品由 itemUse 注册表自动渲染；首发为共享冷却的两种药水。
+    var useGrid = U.el('div', 'item-use-grid');
+    reg.all('itemUse').forEach(function (def) {
+      var count = Game.items.count(def.category, def.ref || def.id);
+      var cd = Game.items.cdLeft(def.cdGroup);
+      var description = Game.items.describe(def);
+      var card = U.el('button', 'item-use-card' + (!count ? ' empty' : ''),
+        '<canvas width="30" height="30" data-icon="' + def.icon + '"></canvas>' +
+        '<span class="item-use-copy"><strong>' + t('item.' + def.id + '.name') + '</strong>' +
+        '<small>' + t(description.key, description.params) + '</small></span>' +
+        '<span class="item-use-count">×' + count + '</span>' +
+        '<span class="item-use-cd" data-cd-group="' +
+        U.esc(def.cdGroup || '') + '" data-cd-max="' +
+        (def.cdGroup === 'potion' ? Game.F.BAL.potionCd : (def.cooldown || 0)) +
+        '" style="--cd:' +
+        U.clamp(cd / Math.max(1, def.cdGroup === 'potion'
+          ? Game.F.BAL.potionCd
+          : (def.cooldown || 1)), 0, 1) + '"></span>');
+      card.disabled = !count;
+      card.setAttribute('aria-label', t('item.useAria', {
+        name: t('item.' + def.id + '.name'),
+        count: count
+      }));
+      card.addEventListener('click', function () {
+        var result = Game.items.use(def.category, def.id, { source: 'manual' });
+        if (!result.ok) {
+          Game.ui.modals.toast(t('item.reject.' + result.reason, {
+            s: result.left ? Math.ceil(result.left) : 0
+          }), 'warn');
+        }
+        UI.tabs.rerender();
+      });
+      useGrid.appendChild(card);
+    });
+    root.appendChild(useGrid);
+    root.appendChild(U.el('div', 'item-use-hint desc',
+      t('ui.potionAuto', { p: Math.round(s.settings.potionThreshold * 100) })));
+
+    // 素材字典独立展示，不占 100 格装备容量。
+    var materialDefs = reg.all('material').filter(function (def) {
+      return Game.inv.materialCount(def.id) > 0;
+    });
+    if (materialDefs.length) {
+      root.appendChild(U.el('div', 'shop-section-title', t('ui.materialsTitle')));
+      var materialGrid = U.el('div', 'material-grid');
+      materialDefs.forEach(function (def) {
+        materialGrid.appendChild(U.el('div', 'material-chip',
+          '<span class="material-mark"></span><span>' +
+          t('material.' + def.id) + '</span><strong>×' +
+          fmt(Game.inv.materialCount(def.id)) + '</strong>'));
+      });
+      root.appendChild(materialGrid);
+    }
 
     // 一键出售
     var sellBar = U.el('div', '');
@@ -350,87 +399,6 @@
   }
 
   function renderShop(root) {
-    var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
-    var context = Game.trade.current();
-    var rid = context.regionId || (Game.state && Game.state.world && Game.state.world.region);
-    var regionName = rid ? t('region.' + rid + '.name') : '';
-
-    if (!context.available) {
-      var reasonKey = context.reason === 'busy'
-        ? 'ui.tradeBusy'
-        : (context.reason === 'no-area' ? 'ui.tradeNoArea' : 'ui.tradeOutsideCamp');
-      var gate = U.el('div', 'card trade-gate-card',
-        '<div class="trade-status-mark" aria-hidden="true"></div>' +
-        '<div class="name">' + t('ui.tradeUnavailableTitle') + '</div>' +
-        '<div class="desc">' + t(reasonKey, { region: regionName }) + '</div>');
-      if (context.nearest && context.nearest.anchor === 'camp') {
-        var returnBtn = U.el('button', 'btn small trade-return-btn', t('ui.tradeReturnCamp'));
-        returnBtn.addEventListener('click', function () {
-          if (Game.state.world.mode !== 'rest') Game.world.setMode('rest');
-          UI.tabs.open('battle');
-        });
-        gate.appendChild(returnBtn);
-      }
-      root.appendChild(gate);
-      return;
-    }
-
-    var contextName = context.nameKey ? t(context.nameKey) : t('tradeArea.generic');
-    root.appendChild(U.el('div', 'card trade-context-card',
-      '<div class="trade-status-mark" aria-hidden="true"></div>' +
-      '<div class="grow"><div class="name">' + contextName + '</div>' +
-      '<div class="desc">' + t('ui.tradeCampAccess', { region: regionName }) + '</div></div>'));
-
-    var sections = {};
-    var sectionOrder = ['consume', 'gear', 'perm'];
-    Game.shop.offers(context).forEach(function (d) {
-      (sections[d.section] = sections[d.section] || []).push(d);
-      if (sectionOrder.indexOf(d.section) < 0) sectionOrder.push(d.section);
-    });
-
-    var offerCount = 0;
-    sectionOrder.forEach(function (sec) {
-      if (!sections[sec] || !sections[sec].length) return;
-      var head = U.el('div', 'shop-section-title', t('shopSec.' + sec));
-      root.appendChild(head);
-      sections[sec].forEach(function (d) {
-        offerCount++;
-        var price = Game.shop.price(d);
-        var curIcon = d.cur === 'crystal' ? 'icon_crystal' : 'icon_gold';
-        var ownedTxt = '';
-        if (d.kind === 'perm') {
-          var owned = Game.shop.ownedCount(d);
-          ownedTxt = '<span class="badge">' + owned + '/' + Game.F.PERM_MAX + '</span>';
-        } else if (d.kind === 'potion') {
-          ownedTxt = '<span class="badge">×' + Game.shop.ownedCount(d) + '</span>';
-        }
-        var card = U.el('div', 'card',
-          '<div class="row">' +
-          '<canvas width="30" height="30" data-icon="' + d.icon + '"></canvas>' +
-          '<div class="grow"><div class="name">' + t('shop.' + d.id + '.name') + ownedTxt + '</div>' +
-          '<div class="desc">' + t('shop.' + d.id + '.desc') + '</div></div>' +
-          '<button class="btn small buy-btn"><canvas width="14" height="14" data-icon="' + curIcon + '"></canvas>' + fmt(price) + '</button>' +
-          '</div>');
-        var btn = card.querySelector('.buy-btn');
-        if (!Game.shop.canBuy(d)) btn.disabled = true;
-        btn.addEventListener('click', function () {
-          var r = Game.shop.buy(d.id);
-          if (r.ok) {
-            if (r.item) Game.ui.modals.toast(t('ui.gotItem', { name: UI.itemName(r.item) }), 'r' + r.item.rar);
-            else Game.ui.modals.toast(t('ui.bought'));
-            UI.tabs.rerender();
-          } else if (r.reason !== 'poor') {
-            Game.ui.modals.toast(t('ui.tradeUnavailableToast'), 'warn');
-            UI.tabs.rerender();
-          } else {
-            Game.ui.modals.toast(t('ui.cantAfford'), 'warn');
-          }
-        });
-        root.appendChild(card);
-      });
-    });
-    if (!offerCount) {
-      root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.tradeNoOffers') + '</div>'));
-    }
+    UI.trade.render(root, { embedded: true });
   }
 })();

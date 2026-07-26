@@ -198,6 +198,11 @@
       return (built[id] = placeholder(id));
     },
 
+    /** 精灵 ID 是否已注册（不触发占位降级与告警） */
+    has: function (id) {
+      return !!(built[id] || defs[id]);
+    },
+
     frame: function (id, name) {
       var s = A.sprite(id);
       return s.frames[name] || s.frames.idle0 || s.frames[Object.keys(s.frames)[0]];

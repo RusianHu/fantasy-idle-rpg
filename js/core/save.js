@@ -108,6 +108,27 @@
         data.meta.endingLine = 0;
         data.v = 8;
       }
+    },
+    {
+      // v8 → v9：环境采集只补素材字典与节点冷却；既有养成、
+      // 区域路线、双槽和导入导出协议保持不变。
+      from: 8,
+      fn: function (data) {
+        data.settings = data.settings || {};
+        if (data.settings.groundLoot === undefined) data.settings.groundLoot = true;
+        if (data.settings.autoCampRest === undefined) data.settings.autoCampRest = false;
+        data.inv = data.inv || {};
+        data.inv.materials = data.inv.materials || {};
+        data.world = data.world || {};
+        data.world.nodeCooldowns = data.world.nodeCooldowns || {};
+        data.meta = data.meta || {};
+        data.meta.stats = data.meta.stats || {};
+        var statDefaults = { pickups: 0, gathers: 0, materials: 0, chests: 0 };
+        for (var key in statDefaults) {
+          if (!Number.isFinite(data.meta.stats[key])) data.meta.stats[key] = statDefaults[key];
+        }
+        data.v = 9;
+      }
     }
   ];
 
@@ -149,6 +170,7 @@
           equipped: st.inv.equipped,
           lockedSlots: st.inv.lockedSlots,
           potions: st.inv.potions,
+          materials: st.inv.materials,
           uidSeq: Game.inv.peekUidSeq()
         },
         world: {
@@ -160,6 +182,7 @@
           restBuffT: st.world.restBuffT,
           worldTime: st.world.worldTime,
           regionProg: st.world.regionProg,
+          nodeCooldowns: st.world.nodeCooldowns,
           deathsRow: st.world.deathsRow
         },
         meta: st.meta
@@ -228,6 +251,7 @@
         U.merge(st.inv.equipped, data.inv.equipped || {});
         U.merge(st.inv.lockedSlots, data.inv.lockedSlots || {});
         U.merge(st.inv.potions, data.inv.potions || {});
+        U.merge(st.inv.materials, data.inv.materials || {});
       }
       U.merge(st.world, data.world || {});
       st.world.worldSeed = Number.isFinite(st.world.worldSeed)

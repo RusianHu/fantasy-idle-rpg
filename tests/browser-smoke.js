@@ -574,6 +574,11 @@ async function run() {
       for (let i = 0; i < 20; i++) W.updateHero(hero, 0.1);
       const clickMoved = U.dist(clickStart.x, clickStart.y, hero.x, hero.y);
 
+      // Isolate target acquisition from the higher-priority environment QA that follows.
+      // Mature nearby nodes may legitimately start a gather order before selecting a new monster.
+      hero.interactOrder = null;
+      for (const node of W.layout.nodes || []) Game.state.world.nodeCooldowns[node.id] = 999;
+      Game.environment.resetRegion();
       W.setControlMode('auto');
       hero.target = null;
       W.updateHero(hero, 0.1);
@@ -725,6 +730,242 @@ async function run() {
     assert.equal(worldChecks.bossRetreatReason, 'retreat');
     assert.ok(worldChecks.largeDtStep <= 14.01, 'large dt movement is capped');
     assert.equal(worldChecks.regionSwitchUsesLayout, true);
+
+    const v111Checks = await cdp.evaluate(`(() => {
+      const W = Game.world;
+      const U = Game.util;
+      const hero = W.hero;
+      Game.entryState = 'active';
+      if (Game.transitions.isActive()) Game.transitions.settleBeforeSave();
+      Game.state.world.mode = 'battle';
+      Game.state.settings.groundLoot = true;
+      Game.state.settings.autoCampRest = false;
+      W.setControlMode('manual');
+      hero.state = 'idle';
+      hero.target = null;
+      hero.moveOrder = null;
+      hero.interactOrder = null;
+      W.bossEnt = null;
+      W.cinematic = null;
+      for (const ent of W.entities) {
+        if (ent.kind === 'monster') {
+          ent.x = W.region.world.w - 40;
+          ent.y = W.region.world.h - 30;
+          ent.engaged = false;
+        }
+      }
+
+      // Proximity and click pickup paths plus switch-off reclamation.
+      const potBeforePickup = Game.inv.potionCount('potion_small');
+      W.spawnGroundLoot({ category: 'potion', id: 'potion_small', count: 1 }, hero.x, hero.y, { source: 'combat' });
+      const proxLoot = W.groundLoot[0];
+      hero.x = proxLoot.x;
+      hero.y = proxLoot.y;
+      W.updateHero(hero, 0.1);
+      const proximityPicked = W.groundLoot.length === 0 &&
+        Game.inv.potionCount('potion_small') === potBeforePickup + 1;
+
+      W.spawnGroundLoot({ category: 'potion', id: 'potion_small', count: 1 }, hero.x + 70, hero.y, { source: 'combat' });
+      const clickLoot = W.groundLoot[0];
+      W.handleTap(clickLoot.x, clickLoot.y);
+      const clickPickupOrdered = hero.interactOrder && hero.interactOrder.type === 'loot';
+      for (let i = 0; i < 30 && W.groundLoot.length; i++) W.updateHero(hero, 0.1);
+      const clickPicked = W.groundLoot.length === 0;
+
+      W.spawnGroundLoot({ category: 'potion', id: 'potion_large', count: 1 }, hero.x + 40, hero.y, { source: 'combat' });
+      Game.state.settings.groundLoot = false;
+      Game.bus.emit('settings:changed', { key: 'groundLoot', value: false });
+      const switchReclaimed = W.groundLoot.length === 0;
+      Game.state.settings.groundLoot = true;
+
+      // Gather completion and combat interruption.
+      const node = W.layout.nodes[0];
+      const gatherBefore = Game.inv.materialCount(node.material);
+      Game.state.world.nodeCooldowns[node.id] = 0;
+      hero.x = node.x; hero.y = node.y; hero.state = 'idle';
+      W.startInteraction({ type: 'gather', target: node }, true);
+      for (let i = 0; i < 14; i++) W.updateHero(hero, 0.1);
+      const gatherCompleted = Game.inv.materialCount(node.material) > gatherBefore &&
+        Game.state.world.nodeCooldowns[node.id] > 0;
+
+      let gatherInterruptedEvent = false;
+      Game.bus.once('gather:interrupted', () => { gatherInterruptedEvent = true; });
+      Game.state.world.nodeCooldowns[node.id] = 0;
+      W.startInteraction({ type: 'gather', target: node }, true);
+      W.updateHero(hero, 0);
+      const threat = W.entities.find((ent) => ent.kind === 'monster' && !ent.dead);
+      if (threat) {
+        threat.x = hero.x + 5;
+        threat.y = hero.y;
+        threat.engaged = true;
+      }
+      W.updateHero(hero, 0.1);
+      const gatherInterrupted = gatherInterruptedEvent && !hero.interactOrder;
+      if (threat) {
+        threat.x = W.region.world.w - 40;
+        threat.y = W.region.world.h - 30;
+        threat.engaged = false;
+      }
+      hero.target = null;
+
+      // Chest opening animation and reward.
+      Game.environment.resetRegion();
+      const candidate = W.layout.spawnCandidates.find((p) => Game.environment.isLegalChestSpot(p.x, p.y));
+      if (candidate) { hero.x = candidate.x - 80; hero.y = candidate.y; }
+      let chest = Game.environment.spawnChest();
+      if (!chest) {
+        chest = { kind: 'chest', id: 'smoke-chest', x: hero.x + 20, y: hero.y, rare: false, age: 0, ttl: 90, phase: 0 };
+        Game.environment.chests().push(chest);
+      }
+      hero.x = chest.x; hero.y = chest.y; hero.state = 'idle';
+      const chestsBefore = Game.state.meta.stats.chests;
+      W.startInteraction({ type: 'chest', target: chest }, true);
+      for (let i = 0; i < 10; i++) W.updateHero(hero, 0.1);
+      const chestOpened = Game.state.meta.stats.chests === chestsBefore + 1 &&
+        Game.environment.chests().indexOf(chest) < 0;
+
+      // World trade entity approach, HUD entry, unified panel and leave/re-enter lock.
+      const area = Game.trade.areas()[0];
+      hero.x = area.x + area.radius + 34;
+      hero.y = area.y;
+      hero.state = 'idle';
+      hero.target = null;
+      W.handleTap(area.x, area.y);
+      const tradeApproachOrdered = hero.interactOrder && hero.interactOrder.type === 'trade';
+      for (let i = 0; i < 80 && hero.interactOrder; i++) W.updateHero(hero, 0.1);
+      hero.x = area.x; hero.y = area.y;
+      Game.trade.update();
+      Game.ui.hud.update(true);
+      const tradeHudVisible = !document.getElementById('btn-trade').classList.contains('hidden');
+      Game.ui.trade.open(area.id);
+      const unifiedTradeOpen = Game.ui.tabs.current() === 'trade' &&
+        !!document.querySelector('.trade-panel-head');
+      const exchangeTab = [...document.querySelectorAll('.trade-section-tabs .subtab')]
+        .find((el) => el.textContent.trim() === Game.i18n.t('shopSec.exchange'));
+      exchangeTab?.click();
+      const exchangeOffersVisible = document.querySelectorAll('.trade-offer').length > 0;
+      hero.x = area.x + area.radius + 20;
+      Game.trade.update();
+      Game.ui.tabs.rerender();
+      const tradeLockedOnLeave = !!document.querySelector('.trade-lock-banner') &&
+        [...document.querySelectorAll('.trade-offer .buy-btn')].every((btn) => btn.disabled);
+      hero.x = area.x; hero.y = area.y;
+      Game.trade.update();
+      Game.ui.tabs.rerender();
+      const tradeUnlockedOnReturn = !document.querySelector('.trade-lock-banner');
+      Game.ui.trade.close();
+
+      // Material exchange domain engine path.
+      Game.state.inv.materials.herb = Math.max(3, Game.inv.materialCount('herb'));
+      Game.state.inv.materials.berry = Math.max(2, Game.inv.materialCount('berry'));
+      hero.x = area.x; hero.y = area.y;
+      const exchangeResult = Game.shop.buy('exchange_potion');
+      hero.x = area.x + area.radius + 30;
+      const exchangeBlockedOutside = Game.shop.buy('exchange_potion').reason === 'outside';
+
+      // Manual potion card, HUD quick-use and shared cooldown refusal.
+      Game.state.inv.potions.potion_small = Math.max(2, Game.inv.potionCount('potion_small'));
+      hero.itemCd.potion = 0;
+      hero.potionCd = 0;
+      Game.state.player.hp = hero.maxHp * 0.35;
+      Game.ui.hud.update(true);
+      const quickButton = document.getElementById('btn-potion');
+      const quickBefore = Game.inv.potionCount('potion_small');
+      quickButton.click();
+      const quickAfter = Game.inv.potionCount('potion_small');
+      quickButton.click();
+      const cooldownShared = quickAfter === quickBefore - 1 &&
+        Game.inv.potionCount('potion_small') === quickAfter &&
+        Game.items.cdLeft('potion') > 0;
+      Game.items.update(Game.F.BAL.potionCd);
+      Game.ui.tabs.open('inv');
+      const potionCards = document.querySelectorAll('.item-use-card');
+      const potionCardsTouchable = [...potionCards].every((el) => el.getBoundingClientRect().height >= 44);
+      Game.ui.tabs.open('battle', true);
+
+      // Auto-camp full cycle and manual suppression.
+      hero.itemCd.potion = 0;
+      Game.state.settings.autoCampRest = true;
+      W.setControlMode('auto');
+      Game.state.world.mode = 'battle';
+      Game.state.world.restBuffT = 0;
+      Game.State.regionProg(W.region.id).kills = 0;
+      hero.state = 'idle'; hero.target = null; hero.moveOrder = null; hero.interactOrder = null;
+      hero.x = W.layout.camp.x + 140; hero.y = W.layout.camp.y;
+      W.autoCampSuppressedUntil = 0;
+      W.updateAutoCamp(hero);
+      const autoCampStarted = Game.state.world.mode === 'rest' && W.autoCampCycle;
+      hero.state = 'sitting';
+      Game.state.world.restBuffT = Game.F.BAL.restBuffCap;
+      W.updateAutoCamp(hero);
+      const autoCampResumed = Game.state.world.mode === 'battle' && !W.autoCampCycle;
+      Game.state.world.restBuffT = 0;
+      W.updateAutoCamp(hero);
+      W.setMode('battle');
+      const autoCampSuppressed = W.autoCampSuppressedUntil >= Game.state.world.worldTime + 119;
+      Game.state.settings.autoCampRest = false;
+
+      // 390×844 bilingual fit, 44px targets, and reduced-effects static logic.
+      const targets = ['btn-camp', 'btn-potion', 'btn-trade', 'control-switch']
+        .map((id) => document.getElementById(id))
+        .filter((el) => el && !el.classList.contains('hidden'));
+      const targetsTouchable = targets.every((el) => {
+        const r = el.getBoundingClientRect();
+        return r.width >= 44 && r.height >= 44;
+      });
+      Game.i18n.setLocale('en');
+      Game.ui.hud.update(true);
+      const enNoOverflow = document.documentElement.scrollWidth <= window.innerWidth &&
+        targets.every((el) => el.scrollWidth <= el.clientWidth + 1);
+      Game.i18n.setLocale('zh-CN');
+      Game.state.settings.effects = false;
+      W.spawnGroundLoot({ category: 'potion', id: 'potion_small', count: 1 }, hero.x, hero.y, { source: 'combat' });
+      Game.render.frame(0.016);
+      const reducedKeepsLoot = W.groundLoot.length === 1;
+      W.flushGroundLoot('smoke');
+      Game.state.settings.effects = true;
+
+      return {
+        proximityPicked, clickPickupOrdered, clickPicked, switchReclaimed,
+        gatherCompleted, gatherInterrupted, chestOpened,
+        tradeApproachOrdered, tradeHudVisible, unifiedTradeOpen,
+        exchangeOffersVisible, tradeLockedOnLeave, tradeUnlockedOnReturn,
+        exchangeOk: exchangeResult.ok, exchangeBlockedOutside,
+        potionCardCount: potionCards.length, potionCardsTouchable, cooldownShared,
+        autoCampStarted, autoCampResumed, autoCampSuppressed,
+        targetsTouchable, enNoOverflow, reducedKeepsLoot,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= window.innerWidth
+      };
+    })()`);
+    assert.equal(v111Checks.proximityPicked, true);
+    assert.equal(v111Checks.clickPickupOrdered, true);
+    assert.equal(v111Checks.clickPicked, true);
+    assert.equal(v111Checks.switchReclaimed, true);
+    assert.equal(v111Checks.gatherCompleted, true);
+    assert.equal(v111Checks.gatherInterrupted, true);
+    assert.equal(v111Checks.chestOpened, true);
+    assert.equal(v111Checks.tradeApproachOrdered, true);
+    assert.equal(v111Checks.tradeHudVisible, true);
+    assert.equal(v111Checks.unifiedTradeOpen, true);
+    assert.equal(v111Checks.exchangeOffersVisible, true);
+    assert.equal(v111Checks.tradeLockedOnLeave, true);
+    assert.equal(v111Checks.tradeUnlockedOnReturn, true);
+    assert.equal(v111Checks.exchangeOk, true);
+    assert.equal(v111Checks.exchangeBlockedOutside, true);
+    assert.equal(v111Checks.potionCardCount, 2);
+    assert.equal(v111Checks.potionCardsTouchable, true);
+    assert.equal(v111Checks.cooldownShared, true);
+    assert.equal(v111Checks.autoCampStarted, true);
+    assert.equal(v111Checks.autoCampResumed, true);
+    assert.equal(v111Checks.autoCampSuppressed, true);
+    assert.equal(v111Checks.targetsTouchable, true);
+    assert.equal(v111Checks.enNoOverflow, true);
+    assert.equal(v111Checks.reducedKeepsLoot, true);
+    assert.equal(v111Checks.noHorizontalOverflow, true);
+
+    const v111Capture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v111Screenshot = path.join(os.tmpdir(), 'firpg-v1-11-mobile-cdp.png');
+    fs.writeFileSync(v111Screenshot, Buffer.from(v111Capture.data, 'base64'));
 
     const campStateScreenshots = [];
     for (const campState of ['return', 'teleport', 'low-hp', 'boss-retreat', 'break-camp']) {
@@ -1651,7 +1892,10 @@ async function run() {
 
     await cdp.navigate(BASE + 'tech-demos/map-effects/map-effects.html?seed=89ABCDEF&region=lavacave');
     const demo = await cdp.evaluate(`(() => {
-      const ids = ['prev-region', 'toggle-play', 'next-region', 'seed-input'];
+      const ids = [
+        'prev-region', 'toggle-play', 'next-region', 'seed-input',
+        'focus-gather', 'reset-gather', 'spawn-common-chest', 'spawn-rare-chest'
+      ];
       const within = ids.every((id) => {
         const r = document.getElementById(id).getBoundingClientRect();
         return r.left >= 0 && r.right <= innerWidth && r.width > 0;
@@ -1663,6 +1907,7 @@ async function run() {
       const canvas = document.getElementById('stage');
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       const colors = new Set();
+      const explorationIds = Object.keys(Game.EXPLORATION_SPRITES?.assets || {});
       for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4)) {
         colors.add(pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2]);
       }
@@ -1680,7 +1925,10 @@ async function run() {
         within,
         segments,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
-        canvasColors: colors.size
+        canvasColors: colors.size,
+        explorationAssetCount: explorationIds.length,
+        explorationAssetsRegistered: explorationIds.every((id) => Game.assets.has(id)),
+        explorationScriptCount: document.querySelectorAll('script[src*="sprites/exploration/"]').length
       };
     })()`);
     assert.equal(demo.seed, '89ABCDEF');
@@ -1689,6 +1937,55 @@ async function run() {
     assert.equal(demo.segments, true, 'mobile QA segmented control fits viewport');
     assert.equal(demo.noHorizontalOverflow, true, 'mobile QA page has no horizontal overflow');
     assert.ok(demo.canvasColors > 20, 'QA canvas is nonblank');
+    assert.equal(demo.explorationAssetCount, 18, 'split exploration manifest covers every source cell');
+    assert.equal(demo.explorationAssetsRegistered, true, 'all split exploration assets reach the production registry');
+    assert.equal(demo.explorationScriptCount, 10, 'manifest and nine exploration groups load independently');
+    const demoExploration = await cdp.evaluate(`(() => {
+      const W = Game.world;
+      const nodes = W.layout.nodes;
+      const focusButton = document.getElementById('focus-gather');
+      focusButton.click();
+      const nearest = Math.min(...nodes.map((node) => Game.util.dist(W.hero.x, W.hero.y, node.x, node.y)));
+      const rareButton = document.getElementById('spawn-rare-chest');
+      rareButton.click();
+      const rare = Game.environment.chests()[0];
+      const rareSpawned = !!rare && rare.rare && Game.environment.isLegalChestSpot(rare.x, rare.y);
+      const commonButton = document.getElementById('spawn-common-chest');
+      commonButton.click();
+      const common = Game.environment.chests()[0];
+      return {
+        nodeCount: nodes.length,
+        nearest,
+        rareSpawned,
+        commonSpawned: !!common && !common.rare && Game.environment.isLegalChestSpot(common.x, common.y),
+        touchable: [focusButton, document.getElementById('reset-gather'), rareButton, commonButton]
+          .every((button) => button.getBoundingClientRect().height >= 44),
+        status: document.getElementById('exploration-event').textContent
+      };
+    })()`);
+    assert.ok(demoExploration.nodeCount >= 3 && demoExploration.nodeCount <= 5);
+    assert.ok(demoExploration.nearest <= 42, 'QA focus control positions the hero beside a mature node');
+    assert.equal(demoExploration.rareSpawned, true, 'QA can force the rare visual through production chest placement');
+    assert.equal(demoExploration.commonSpawned, true, 'QA can force the common visual through production chest placement');
+    assert.equal(demoExploration.touchable, true, 'exploration QA controls keep 44px touch targets');
+    const demoDynamicTrade = await cdp.evaluate(`(() => {
+      const button = document.getElementById('spawn-dynamic-trade');
+      const rect = button.getBoundingClientRect();
+      button.click();
+      const active = Game.trade.areaById('qa-wanderer');
+      const registered = !!active && active.kind === 'wander' && !!active.prop;
+      Game.state.world.worldTime += 21;
+      Game.trade.update();
+      return {
+        registered,
+        touchHeight: rect.height,
+        expired: !Game.trade.areaById('qa-wanderer'),
+        status: document.getElementById('dynamic-trade-status').textContent
+      };
+    })()`);
+    assert.equal(demoDynamicTrade.registered, true, 'QA stub calls the production dynamic trade API');
+    assert.ok(demoDynamicTrade.touchHeight >= 44, 'dynamic trade QA control keeps a touch target');
+    assert.equal(demoDynamicTrade.expired, true, 'QA dynamic trade area expires through the production TTL path');
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors');
 
     const capture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -2045,9 +2342,10 @@ async function run() {
     console.log('Browser smoke passed: ' + JSON.stringify({
       titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
       titleScreenshot, titleTallScreenshot, titleShortScreenshot, main, worldChecks,
+      v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
-      desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
+      desktopEnding, demo, demoDynamicTrade, mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
       restartCompleted, restartTitleScreenshot, restartClassScreenshot, existingTitle,
       existingTitleScreenshot, entryStarted, entryMid, entryScreenshot, resumedFromArchive,

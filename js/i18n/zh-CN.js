@@ -84,6 +84,7 @@
       rareDrop: '获得 {name}！',
       gotItem: '获得 {name}',
       bought: '购买成功',
+      exchanged: '兑换成功',
       cantAfford: '货币不足',
       tradeUnavailableTitle: '当前无法交易',
       tradeOutsideCamp: '商店只在当前地图「{region}」的营地范围内开放。',
@@ -95,11 +96,30 @@
       tradeShopLockedHint: '仅在当前地图的营地范围内开放',
       tradeUnavailableToast: '你已离开当前交易区域',
       tradeNoOffers: '这个交易地点目前没有可用商品。',
+      tradeLocationKicker: '当前交易地点',
+      tradeLeftArea: '你已离开交易范围，商品暂时锁定；返回后会自动恢复。',
+      tradeLockedBrowse: '离域浏览',
+      tradeDirectionDistance: '交易点位于{direction}，距离 {distance}px。',
+      tradeGoTo: '前往交易点',
+      closeTrade: '关闭',
+      tradeHud: '交易 · {name}',
+      tradeHudAria: '打开{name}交易面板',
+      exchangeAction: '兑换',
+      tradeSellLow: '批量出售普通与精良装备',
+      tradeSellEstimate: '共 {n} 件，预计获得 {g} 金币',
+      tradeSalvageLegend: '批量分解未装备传说装备',
+      tradeSalvageEstimate: '共 {n} 件，预计获得 {c} 魔晶石',
+      tradeSalvaged: '已分解 {n} 件传说装备，获得 {c} 魔晶石',
+      sellAction: '出售',
+      salvageAction: '分解',
       sellLow: '出售 普通+精良',
       soldN: '出售 {n} 件，+{g} 金币',
       nothingToSell: '没有可出售的低稀有度装备',
       bagEmpty: '背包空空如也，去讨伐魔物吧！',
       potionAuto: '生命 <{p}% 自动喝药',
+      quickPotion: '用药',
+      materialsTitle: '─ 素材袋（不占背包容量）─',
+      autoCampReturning: '休整增益耗尽，自动回营',
       equip: '装备',
       unequip: '卸下',
       equippedTag: '已装备',
@@ -207,7 +227,8 @@
       kills: '总讨伐数', bossKills: '头目讨伐', goldEarned: '累计金币', expEarned: '累计经验',
       drops: '装备掉落', legendaries: '传说装备', potions: '药水使用', deaths: '倒下次数',
       maxHit: '最高单击', sells: '出售件数', playSec: '累计游玩', restSec: '累计休息',
-      offlineSec: '离线挂机', highestRegion: '最远区域'
+      offlineSec: '离线挂机', highestRegion: '最远区域',
+      pickups: '地面拾取', gathers: '采集次数', materials: '累计素材', chests: '开启宝箱'
     },
 
     slot: { weapon: '武器', armor: '护甲', ring: '饰品' },
@@ -218,7 +239,28 @@
       pattern: '{mat}{base}',
       mat: { 1: '铜制', 2: '铁制', 3: '钢制', 4: '白银', 5: '秘银', 6: '炎金', 7: '星辉', 8: '龙魂' },
       base: { weapon: '长剑', armor: '铠甲', ring: '戒指' },
-      weapon: { fighter: '长剑', rogue: '短匕', mage: '法杖', cleric: '战锤', ranger: '长弓' }
+      weapon: { fighter: '长剑', rogue: '短匕', mage: '法杖', cleric: '战锤', ranger: '长弓' },
+      potion_small: { name: '小型治疗药水' },
+      potion_large: { name: '大型治疗药水' },
+      healDesc: '恢复 {p}% 最大生命',
+      usableDesc: '可主动使用的消耗物品',
+      useAria: '使用{name}，持有 {count} 瓶',
+      quickAria: '快捷使用{name}，持有 {count} 瓶，冷却 {cd} 秒',
+      quickHint: '立即使用下一瓶治疗药水',
+      reject: {
+        full: '生命值已满', empty: '没有可用药水',
+        cooldown: '药水共享冷却中，还需 {s} 秒',
+        dead: '倒下时无法使用物品', busy: '当前演出状态无法使用物品',
+        missing: '该物品当前不可使用', 'not-ready': '冒险尚未开始',
+        unsupported: '该效果尚不可用', failed: '物品使用失败'
+      }
+    },
+
+    material: {
+      herb: '草原药草', berry: '红浆果', mushroom: '雾林蘑菇', resin: '古树树脂',
+      ore: '精铁矿', crystal_cluster: '矿脉水晶', ghost_flower: '幽魂花', grave_dust: '墓园灵尘',
+      ice_crystal: '雪山冰晶', frost_herb: '霜叶草', fire_core: '熔岩火髓', obsidian: '黑曜石',
+      rune_stone: '遗迹符石', aether_shard: '以太晶片', miasma_crystal: '瘴气晶核', demon_horn: '魔角'
     },
 
     'class': {
@@ -312,12 +354,22 @@
       region_8: { name: '直捣魔王城', desc: '推进到魔王城' },
       rest_30m: { name: '篝火情谊', desc: '在营地累计休息 30 分钟' },
       play_2h: { name: '沉浸其中', desc: '累计游玩 2 小时' },
-      potion_50: { name: '药剂爱好者', desc: '累计使用 50 瓶药水' }
+      potion_50: { name: '药剂爱好者', desc: '累计使用 50 瓶药水' },
+      pickup_100: { name: '颗粒归仓', desc: '累计拾取 100 件地面战利品' },
+      gather_50: { name: '荒野采集者', desc: '累计完成 50 次环境采集' },
+      material_300: { name: '素材仓库', desc: '累计获得 300 份素材' },
+      chest_20: { name: '寻宝专家', desc: '累计开启 20 只随机宝箱' }
     },
 
     tradeArea: { camp: '前线营地补给处', generic: '区域交易点' },
 
-    shopSec: { consume: '─ 消耗品 ─', gear: '─ 装备补给 ─', perm: '─ 永久强化（魔晶石）─' },
+    tradeKind: {
+      merchant: '营地补给', exchange: '素材兑换', wander: '游商', event: '活动摊位'
+    },
+    direction: { north: '北侧', south: '南侧', east: '东侧', west: '西侧' },
+    shopSec: {
+      consume: '补给', gear: '装备', perm: '强化', exchange: '以物换物', sell: '收购', other: '其他'
+    },
 
     shop: {
       shop_potion_small: { name: '小型治疗药水', desc: '恢复 40% 生命。低血量时自动使用。' },
@@ -327,13 +379,21 @@
       perm_atk: { name: '力量圣印', desc: '永久攻击力 +5%，可叠加 10 层。' },
       perm_hp: { name: '生命圣印', desc: '永久生命上限 +5%，可叠加 10 层。' },
       perm_gold: { name: '财富圣印', desc: '永久金币获取 +10%，可叠加 10 层。' },
-      perm_exp: { name: '智慧圣印', desc: '永久经验获取 +10%，可叠加 10 层。' }
+      perm_exp: { name: '智慧圣印', desc: '永久经验获取 +10%，可叠加 10 层。' },
+      exchange_potion: { name: '草药调制', desc: '将低阶野外素材合成为 2 瓶小型治疗药水。' },
+      exchange_gold: { name: '公会素材委托', desc: '上交林地素材，领取稳定的金币报酬。' },
+      exchange_gear: { name: '符文装备箱', desc: '以高阶素材换取至少稀有品质的当前等级装备。' },
+      exchange_vitality: { name: '微光生命刻印', desc: '高阶素材与魔晶石共同淬炼，永久生命 +1%，最多 5 层。' }
     },
 
     settings: {
       language: '语言 Language',
       effects: '氛围与地形特效',
       effectsHint: '关闭可提升低端设备流畅度（粒子/脚印/涟漪等）',
+      groundLoot: '掉落拾取',
+      groundLootHint: '战斗装备与药水落到世界中自动拾取；关闭会立即保底入包',
+      autoCampRest: '自动回营休整',
+      autoCampRestHint: '仅自动操控：休整增益耗尽后回营，蓄满后自动复战',
       potion: '药水自动使用阈值',
       autoAdvance: '自动推进区域',
       autoAdvanceHint: '击败 Boss 后自动进入下一区域',

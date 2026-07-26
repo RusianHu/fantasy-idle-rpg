@@ -28,14 +28,20 @@
     entities: [],
     hero: null,
     props: [],          // 场景装饰（y 排序渲染）
+    groundLoot: [],     // 当前区域临时落地物（切区/保存前强制结算）
     bossEnt: null,
     cinematic: null,    // {ent, t} Boss 登场运镜
     pendingRespawn: [],
     zzzT: 0,
+    autoCampCycle: false,
+    autoCampSuppressedUntil: 0,
 
     /* ---------------- 初始化区域 ---------------- */
     init: function (rid) {
       W.bindControls();
+      if (W.groundLoot.length) W.flushGroundLoot('region');
+      if (Game.environment) Game.environment.resetRegion();
+      if (Game.trade) Game.trade.reset({ dynamic: true });
       var region = reg.get('region', rid);
       if (!region) { // 已下线区域：回退到第一个有效区域
         rid = Game.State.regionOrder()[0];
@@ -47,13 +53,15 @@
       W.bossEnt = null;
       W.cinematic = null;
       W.pendingRespawn = [];
+      W.groundLoot = [];
+      W.autoCampCycle = false;
 
       W.layout = Game.terrain.build(
         region,
         Game.state.world.worldSeed,
         Game.state.world.layoutVersion
       );
-      W.props = W.layout.props;
+      W.props = W.layout.props.concat(W.layout.nodes || []);
       if (Game.particles) Game.particles.initRegion(region);
 
       var hero = W.hero = W.makeHero();
@@ -85,10 +93,10 @@
         dodge: d.dodge, lifesteal: d.lifesteal, cdr: d.cdr,
         shield: 0, buffs: [],
         atkTimer: 0, animT: 0, animF: 0, flash: 0, lungeT: 0,
-        skillCd: {}, potionCd: 0,
+        skillCd: {}, itemCd: { potion: 0 }, potionCd: 0,
         target: null, stepAcc: 0, spriteH: 20,
         deathT: 0, recoverT: 0, moving: false,
-        moveOrder: null, manualTarget: false, campWarp: null, navRoute: null
+        moveOrder: null, interactOrder: null, manualTarget: false, campWarp: null, navRoute: null
       };
     },
 
@@ -236,6 +244,224 @@
       bus.emit('boss:failed', { rid: region.id, reason: reason || 'defeat' });
     },
 
+    /* ---------------- 地面掉落：生成 / 拾取 / 保底回收 ---------------- */
+    spawnGroundLoot: function (drop, x, y, opts) {
+      if (!drop || !W.region || !Number.isFinite(x) || !Number.isFinite(y)) return false;
+      var angle = U.rand(0, Math.PI * 2);
+      var radius = U.rand(12, 24);
+      var gx = U.clamp(x + Math.cos(angle) * radius, 18, W.region.world.w - 18);
+      var gy = U.clamp(y + Math.sin(angle) * radius * 0.65, BOUND_TOP, W.region.world.h - 14);
+      var rar = drop.category === 'equipment' && drop.item ? drop.item.rar : 1;
+      var ground = {
+        kind: 'groundLoot',
+        id: 'loot:' + U.uid(),
+        drop: drop,
+        source: opts && opts.source || 'combat',
+        x: gx, y: gy,
+        fromX: x, fromY: y,
+        age: 0,
+        ttl: F.BAL.groundLootTtl,
+        rar: rar,
+        phase: U.rand(0, Math.PI * 2)
+      };
+      W.groundLoot.push(ground);
+      bus.emit('loot:spawned', {
+        id: ground.id, category: drop.category, rar: rar, x: gx, y: gy
+      });
+      while (W.groundLoot.length > F.BAL.groundLootCap) {
+        W.settleGroundLoot(W.groundLoot[0], 'cap');
+      }
+      return true;
+    },
+
+    settleGroundLoot: function (ground, reason, pickedUp) {
+      if (!ground) return null;
+      var at = W.groundLoot.indexOf(ground);
+      if (at < 0) return null;
+      W.groundLoot.splice(at, 1);
+      var got = Game.inv.commitDrop(ground.drop, {
+        source: ground.source || 'combat'
+      });
+      if (pickedUp) {
+        Game.state.meta.stats.pickups++;
+        bus.emit('item:pickedUp', {
+          id: ground.id,
+          category: ground.drop.category,
+          item: ground.drop.item || null,
+          ref: ground.drop.id || null,
+          reason: reason || 'proximity'
+        });
+        if (Game.fx) {
+          var label = ground.drop.category === 'equipment' && ground.drop.item
+            ? Game.ui.itemName(ground.drop.item)
+            : Game.i18n.t('item.' + ground.drop.id + '.name');
+          Game.fx.floatText(ground.x, ground.y - 14, label, {
+            color: F.RARITY[ground.rar] ? ['#c5c9cf', '#70d070', '#63a8ed', '#bc78e8', '#f2a23c'][ground.rar] : '#ffffff',
+            small: true
+          });
+          if (U.motionEnabled()) Game.fx.ring(ground.x, ground.y, 15, '#f2d37a');
+        }
+      }
+      return got;
+    },
+
+    flushGroundLoot: function (reason) {
+      var count = 0;
+      while (W.groundLoot.length) {
+        W.settleGroundLoot(W.groundLoot[0], reason || 'flush', false);
+        count++;
+      }
+      if (W.hero && W.hero.interactOrder && W.hero.interactOrder.type === 'loot') {
+        W.cancelInteraction('flushed');
+      }
+      return count;
+    },
+
+    nearestGroundLoot: function (x, y) {
+      var best = null, distance = Infinity;
+      for (var i = 0; i < W.groundLoot.length; i++) {
+        var d = U.dist(x, y, W.groundLoot[i].x, W.groundLoot[i].y);
+        if (d < distance) { distance = d; best = W.groundLoot[i]; }
+      }
+      return best ? { target: best, distance: distance } : null;
+    },
+
+    updateGroundLoot: function (dt) {
+      for (var i = W.groundLoot.length - 1; i >= 0; i--) {
+        var ground = W.groundLoot[i];
+        ground.age += dt;
+        if (ground.age >= ground.ttl) W.settleGroundLoot(ground, 'ttl', false);
+      }
+      if (Game.state.settings.groundLoot === false && W.groundLoot.length) {
+        W.flushGroundLoot('setting');
+      }
+    },
+
+    /* ---------------- 一次性交互指令（拾取 / 宝箱 / 采集 / 交易） ---------------- */
+    startInteraction: function (order, explicit) {
+      var hero = W.hero;
+      if (!hero || !order || Game.state.world.mode !== 'battle') return false;
+      if (Game.transitions && Game.transitions.isActive()) return false;
+      if (Game.ending && Game.ending.isActive && Game.ending.isActive()) return false;
+      if (W.bossEnt || hero.state === 'dead' || hero.state === 'recover' ||
+          hero.state === 'entrance' || hero.state === 'warpOut' || hero.state === 'warpIn') return false;
+      if (hero.target && !hero.target.dead && hero.target.hp > 0) return false;
+      hero.interactOrder = order;
+      hero.moveOrder = null;
+      hero.manualTarget = false;
+      Game.nav.clear(hero);
+      if (explicit) hero.interactOrder.explicit = true;
+      return true;
+    },
+
+    cancelInteraction: function (reason) {
+      var hero = W.hero;
+      if (!hero || !hero.interactOrder) return false;
+      var order = hero.interactOrder;
+      if (order.type === 'gather' && order.phase === 'act' && Game.environment) {
+        Game.environment.interruptGather(order, reason);
+      }
+      hero.interactOrder = null;
+      Game.nav.clear(hero);
+      if (hero.state === 'gather' || hero.state === 'opening') hero.state = 'idle';
+      return true;
+    },
+
+    contactThreat: function (hero) {
+      for (var i = 0; i < W.entities.length; i++) {
+        var e = W.entities[i];
+        if (e.kind !== 'monster' || e.dead || e.hp <= 0) continue;
+        if (e.boss || e.engaged || U.dist(hero.x, hero.y, e.x, e.y) <= MELEE_RANGE + 10) return e;
+      }
+      return null;
+    },
+
+    updateInteraction: function (hero, dt) {
+      var order = hero.interactOrder;
+      if (!order) return false;
+      if (W.bossEnt || Game.state.world.mode !== 'battle') {
+        W.cancelInteraction('boss');
+        return false;
+      }
+      var threat = W.contactThreat(hero);
+      if (threat) {
+        W.cancelInteraction('combat');
+        hero.target = threat;
+        return false;
+      }
+      var target = order.target;
+      if (!target) { W.cancelInteraction('missing'); return false; }
+      if (order.type === 'loot' && W.groundLoot.indexOf(target) < 0) {
+        W.cancelInteraction('missing');
+        return false;
+      }
+      if (order.type === 'chest' && Game.environment.chests().indexOf(target) < 0) {
+        W.cancelInteraction('missing');
+        return false;
+      }
+      if (order.type === 'gather' && !Game.environment.nodeReady(target)) {
+        W.cancelInteraction('cooldown');
+        return false;
+      }
+      if (order.type === 'trade') {
+        target = Game.trade.areaById(order.areaId);
+        order.target = target;
+        if (!target) { W.cancelInteraction('missing'); return false; }
+      }
+      var distance = U.dist(hero.x, hero.y, target.x, target.y);
+      var reach = order.type === 'trade' ? Math.max(8, target.radius - 4) : 26;
+      if (distance > reach) {
+        hero.state = 'walk';
+        W.moveToward(hero, target.x, target.y, HERO_SPEED, dt, 'interact:' + (target.id || order.areaId));
+        return true;
+      }
+
+      if (order.type === 'loot') {
+        W.settleGroundLoot(target, order.explicit ? 'click' : 'proximity', true);
+        hero.interactOrder = null;
+        hero.state = 'idle';
+        return true;
+      }
+      if (order.type === 'trade') {
+        var openArea = order.areaId;
+        var shouldOpen = order.open;
+        hero.interactOrder = null;
+        hero.state = 'idle';
+        if (shouldOpen && Game.ui && Game.ui.trade) Game.ui.trade.open(openArea);
+        return true;
+      }
+      if (order.phase !== 'act') {
+        order.phase = 'act';
+        order.timer = order.type === 'gather' ? F.BAL.gatherDuration : F.BAL.chestOpenDuration;
+        hero.state = order.type === 'gather' ? 'gather' : 'opening';
+        hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
+        if (order.type === 'gather') bus.emit('gather:start', { id: target.id, material: target.material });
+      }
+      order.timer -= dt;
+      if (order.timer > 0) return true;
+      if (order.type === 'gather') Game.environment.completeGather(target);
+      else Game.environment.openChest(target);
+      hero.interactOrder = null;
+      hero.state = 'idle';
+      return true;
+    },
+
+    chooseAmbientInteraction: function (hero) {
+      var loot = W.nearestGroundLoot(hero.x, hero.y);
+      if (loot && (W.controlMode() === 'auto' || loot.distance <= 26)) {
+        return W.startInteraction({ type: 'loot', target: loot.target }, false);
+      }
+      var chest = Game.environment && Game.environment.nearestChest(hero.x, hero.y);
+      if (chest && (W.controlMode() === 'auto' || chest.distance <= 26)) {
+        return W.startInteraction({ type: 'chest', target: chest.target }, false);
+      }
+      if (W.controlMode() === 'auto' && Game.environment) {
+        var node = Game.environment.nearestNode(hero.x, hero.y, 120);
+        if (node) return W.startInteraction({ type: 'gather', target: node.target }, false);
+      }
+      return false;
+    },
+
     /* ---------------- 击杀结算 ---------------- */
     onEntityKilled: function (ent, killer) {
       if (ent.kind === 'monster' && !ent.dead) {
@@ -245,7 +471,12 @@
 
         Game.player.addExp(ent.exp);
         Game.player.addGold(ent.gold);
-        Game.inv.rollDrops(ent.tier, ent.boss);
+        if (Game.fx && U.motionEnabled()) Game.fx.goldBurst(ent.x, ent.y - 8);
+        Game.inv.rollDrops(ent.tier, ent.boss, {
+          source: ent.boss ? 'boss' : 'combat',
+          x: ent.x,
+          y: ent.y
+        });
         Game.state.meta.stats.kills++;
 
         if (!ent.boss) {
@@ -273,6 +504,8 @@
           (Game.transitions && Game.transitions.isActive())) return;
       var byBoss = !!W.bossEnt;
       var fallbackRid = null;
+      W.flushGroundLoot('death');
+      W.cancelInteraction('death');
       Game.state.meta.stats.deaths++;
 
       if (byBoss) {
@@ -311,6 +544,50 @@
       if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance') return;
       var sw = Game.state.world;
 
+      // 交易实体（≥30px 世界命中；三个入口共用 requestApproach）。
+      if (Game.trade) {
+        var areas = Game.trade.areas();
+        for (var ai = 0; ai < areas.length; ai++) {
+          if (!areas[ai].prop || U.dist(wx, wy, areas[ai].x, areas[ai].y) > 30) continue;
+          var approach = Game.trade.requestApproach(areas[ai].id, {
+            open: true,
+            source: 'world'
+          });
+          if (!approach.ok && Game.ui && Game.ui.modals) {
+            Game.ui.modals.toast(Game.i18n.t(
+              approach.reason === 'busy' ? 'ui.tradeBusy' : 'ui.tradeUnavailableToast'
+            ), 'warn');
+          }
+          return;
+        }
+      }
+
+      // 地面物、宝箱、节点优先于点地移动；命中后走统一一次性交互指令。
+      for (var li = 0; li < W.groundLoot.length; li++) {
+        if (U.dist(wx, wy, W.groundLoot[li].x, W.groundLoot[li].y) <= 12) {
+          W.startInteraction({ type: 'loot', target: W.groundLoot[li] }, true);
+          return;
+        }
+      }
+      if (Game.environment) {
+        var chests = Game.environment.chests();
+        for (var chi = 0; chi < chests.length; chi++) {
+          if (U.dist(wx, wy, chests[chi].x, chests[chi].y) <= 16) {
+            W.startInteraction({ type: 'chest', target: chests[chi] }, true);
+            return;
+          }
+        }
+        var nodes = W.layout.nodes || [];
+        for (var ni = 0; ni < nodes.length; ni++) {
+          if (U.dist(wx, wy, nodes[ni].x, nodes[ni].y) <= 18) {
+            if (Game.environment.nodeReady(nodes[ni])) {
+              W.startInteraction({ type: 'gather', target: nodes[ni] }, true);
+            }
+            return;
+          }
+        }
+      }
+
       // 营地交互（篝火附近）
       var cf = Game.terrain.campfirePos;
       if (cf && U.dist(wx, wy, cf.x, cf.y) < 30) {
@@ -332,6 +609,7 @@
       }
       if (best) {
         if (sw.mode === 'rest') W.setMode('battle');
+        W.cancelInteraction('combat');
         hero.target = best;
         hero.manualTarget = true;
         hero.moveOrder = null;
@@ -342,6 +620,7 @@
 
       // 地面移动指令
       if (sw.mode === 'rest') W.setMode('battle');
+      W.cancelInteraction('move');
       hero.moveOrder = {
         x: U.clamp(wx, 18, W.region.world.w - 18),
         y: U.clamp(wy, BOUND_TOP, W.region.world.h - 14),
@@ -367,6 +646,7 @@
 
       var hero = W.hero;
       if (hero) {
+        W.cancelInteraction('control');
         hero.target = null;
         hero.manualTarget = false;
         hero.moveOrder = null;
@@ -424,6 +704,16 @@
         if (W.controlMode() === 'manual') e.preventDefault();
       });
       window.addEventListener('blur', function () { moveKeys = {}; });
+      bus.on('save:before', function () { W.flushGroundLoot('save'); });
+      bus.on('region:travelStart', function () {
+        W.flushGroundLoot('travel');
+        W.cancelInteraction('travel');
+        if (Game.ui && Game.ui.trade) Game.ui.trade.close('travel');
+      });
+      bus.on('boss:spawned', function () { W.cancelInteraction('boss'); });
+      bus.on('settings:changed', function (p) {
+        if (p && p.key === 'groundLoot' && p.value === false) W.flushGroundLoot('setting');
+      });
     },
 
     canManualMove: function (hero) {
@@ -446,7 +736,8 @@
     },
 
     /* ---------------- 模式切换（战斗 / 返回营地） ---------------- */
-    setMode: function (mode) {
+    setMode: function (mode, opts) {
+      opts = opts || {};
       if (Game.transitions && Game.transitions.isActive()) return false;
       var w = Game.state.world;
       if (w.mode === mode) return false;
@@ -454,6 +745,8 @@
       w.mode = mode;
       var hero = W.hero;
       if (mode === 'rest') {
+        W.flushGroundLoot('rest');
+        W.cancelInteraction('rest');
         // 先切换到安全模式，再撤掉 Boss，确保点击后的同一帧不再受击。
         if (bossRetreat) W.onBossFailed('retreat');
         hero.target = null;
@@ -466,6 +759,10 @@
       } else {
         W.cancelCampTeleport(hero);
         if (hero.state === 'sitting' || hero.state === 'goCamp') hero.state = 'idle';
+        if (!opts.auto && W.autoCampCycle) {
+          W.autoCampSuppressedUntil = w.worldTime + 120;
+        }
+        W.autoCampCycle = false;
         bus.emit('rest:end');
       }
       bus.emit('mode:changed', { mode: mode, bossRetreat: bossRetreat });
@@ -562,6 +859,29 @@
       }
     },
 
+    updateAutoCamp: function (hero) {
+      var s = Game.state, sw = s.world;
+      if (sw.mode === 'rest') {
+        if (W.autoCampCycle && hero.state === 'sitting' &&
+            sw.restBuffT >= F.BAL.restBuffCap - 0.001) {
+          W.setMode('battle', { auto: true });
+        }
+        return;
+      }
+      if (!s.settings.autoCampRest || W.controlMode() !== 'auto') return;
+      if (sw.restBuffT > 0 || sw.worldTime < W.autoCampSuppressedUntil) return;
+      if (W.bossEnt || W.cinematic || hero.target || hero.moveOrder || hero.interactOrder) return;
+      if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance' ||
+          hero.state === 'warpOut' || hero.state === 'warpIn') return;
+      var gauge = W.gaugeInfo();
+      if (gauge.kills >= gauge.target) return;
+      if (W.contactThreat(hero)) return;
+      if (W.setMode('rest', { auto: true })) {
+        W.autoCampCycle = true;
+        bus.emit('camp:autoReturn', { rid: sw.region });
+      }
+    },
+
     /* ---------------- 主更新 ---------------- */
     update: function (dt) {
       var hero = W.hero;
@@ -569,6 +889,10 @@
       var sw = Game.state.world;
 
       W.syncHeroStats();
+      if (Game.items) Game.items.update(dt);
+      if (Game.environment) Game.environment.update(dt);
+      W.updateGroundLoot(dt);
+      W.updateAutoCamp(hero);
 
       // 讨伐进度满 → Boss 登场
       W.trySpawnBoss();
@@ -697,6 +1021,7 @@
       if (W.controlMode() === 'manual') {
         var mv = W.manualMoveVector();
         if (mv.x || mv.y) {
+          W.cancelInteraction('manual-move');
           hero.target = null;
           hero.manualTarget = false;
           hero.moveOrder = null;
@@ -705,6 +1030,16 @@
           W.moveVector(hero, mv.x, mv.y, HERO_SPEED, dt);
           return;
         }
+      }
+
+      // 新增互动统一优先级：接敌战斗 > 地面拾取 > 宝箱 > 采集 > 游走。
+      if (hero.interactOrder) {
+        if (W.updateInteraction(hero, dt)) return;
+      }
+      var existingTarget = hero.target;
+      if (!existingTarget || existingTarget.dead || existingTarget.hp <= 0) {
+        hero.target = null;
+        if (W.chooseAmbientInteraction(hero) && W.updateInteraction(hero, 0)) return;
       }
 
       // 玩家移动指令：自动模式抵达后恢复 AI，手动模式抵达后原地待命
@@ -850,6 +1185,7 @@
       W.clampToWorld(ent);
       var moved = U.dist(ox, oy, ent.x, ent.y);
       W.stepFx(ent, moved);
+      if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(moved, dt);
       return moved;
     },
 
@@ -866,6 +1202,7 @@
       ent.moving = true;
       W.clampToWorld(ent);
       W.stepFx(ent, step);
+      if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(step, dt);
       return d - step;
     },
 

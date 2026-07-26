@@ -26,6 +26,22 @@
     g.fillRect(0, 0, cw, ch);
   }
 
+  /* ================= 交易实体外观解析 =================
+   * 前线临时营地不设固定商铺，一切交易点都是马车商棚：
+   * prop.sprite 直接指定 > kind 换色兜底；未注册的精灵 ID
+   * 一律落回 kind 兜底，不触发占位色块。 */
+  var TRADE_SPRITE_BY_KIND = {
+    merchant: 'trade_wagon',
+    exchange: 'trade_wagon_exchange',
+    wander: 'trade_wagon_wander',
+    event: 'trade_wagon_event'
+  };
+  function tradePropSprite(area) {
+    var prop = area.prop || {};
+    if (prop.sprite && Game.assets.has(prop.sprite)) return prop.sprite;
+    return TRADE_SPRITE_BY_KIND[area.kind] || 'trade_wagon';
+  }
+
   /* ================= 视差条带生成器 ================= */
   function genLayer(layer, region, seed) {
     var h = 120;
@@ -203,7 +219,7 @@
   /* ================= 帧选择 ================= */
   function heroFrame(h) {
     var d = h.dir;
-    if (h.state === 'sitting' || h.state === 'recover') {
+    if (h.state === 'sitting' || h.state === 'recover' || h.state === 'gather') {
       return (h.animT % 1.7) < 0.9 ? 'sit0' : 'sit1';
     }
     if (h.state === 'dead') return 'walk_d0';
@@ -366,6 +382,25 @@
         drawables.push(p);
       }
       for (j = 0; j < W.entities.length; j++) drawables.push(W.entities[j]);
+      for (j = 0; j < W.groundLoot.length; j++) drawables.push(W.groundLoot[j]);
+      if (Game.environment) {
+        var sceneChests = Game.environment.chests();
+        for (j = 0; j < sceneChests.length; j++) drawables.push(sceneChests[j]);
+      }
+      if (Game.trade) {
+        var sceneAreas = Game.trade.areas();
+        for (j = 0; j < sceneAreas.length; j++) {
+          if (!sceneAreas[j].prop) continue;
+          drawables.push({
+            kind: 'tradeProp',
+            id: sceneAreas[j].id,
+            area: sceneAreas[j],
+            phase: j * 0.7,
+            x: sceneAreas[j].x,
+            y: sceneAreas[j].y
+          });
+        }
+      }
       drawables.sort(function (a, b) { return a.y - b.y; });
 
       // 手动锁定目标：金色选中圈；移动指令：绿色标记
@@ -392,8 +427,13 @@
       for (j = 0; j < drawables.length; j++) {
         e = drawables[j];
         if (e.kind === 'hero' || e.kind === 'monster') R.drawEntity(e);
+        else if (e.kind === 'groundLoot') R.drawGroundLoot(e, t);
+        else if (e.kind === 'gatherNode') R.drawGatherNode(e, t);
+        else if (e.kind === 'chest') R.drawChest(e, t);
+        else if (e.kind === 'tradeProp') R.drawTradeProp(e, t);
         else R.drawProp(e, t);
       }
+      R.drawInteractionProgress(hero0);
 
       // 6) 篝火光晕（半径/透明度随机抖动）
       var fxOn = !Game.particles || Game.particles.isEnabled();
@@ -565,6 +605,201 @@
         ctx.fillStyle = e.kind === 'hero' ? '#5ad05a' : (e.boss ? '#e05050' : '#d8a03c');
         ctx.fillRect(bx, by, Math.round(bw * pct), 2);
       }
+    },
+
+    drawGroundLoot: function (loot, t) {
+      var colors = ['#c5c9cf', '#70d070', '#63a8ed', '#bc78e8', '#f2a23c'];
+      var color = colors[loot.rar] || colors[0];
+      var motion = U.motionEnabled();
+      var ageK = U.clamp(loot.age / loot.ttl, 0, 1);
+      var blink = ageK > 0.78 && motion ? (0.45 + 0.55 * Math.abs(Math.sin(t * 9))) : 1;
+      var bounce = 0;
+      if (motion) {
+        if (loot.age < 0.45) {
+          var entry = loot.age / 0.45;
+          bounce = -Math.sin(entry * Math.PI) * 10 * (1 - entry * 0.35);
+        } else {
+          bounce = Math.sin(t * 2.8 + loot.phase) * 1.5;
+        }
+      }
+      var y = loot.y + bounce;
+      ctx.save();
+      ctx.globalAlpha = blink;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha *= 0.3;
+      ctx.drawImage(Game.assets.glowTex(color, 16), loot.x - 11, y - 14, 22, 22);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = blink;
+      ctx.fillStyle = '#15172a';
+      ctx.fillRect(Math.round(loot.x - 5), Math.round(y - 9), 10, 10);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(Math.round(loot.x - 5.5), Math.round(y - 9.5), 11, 11);
+      var largePotion = loot.drop.category === 'potion' &&
+        loot.drop.id === 'potion_large';
+      ctx.fillStyle = loot.drop.category === 'potion'
+        ? (largePotion ? '#a96ddd' : '#d94f65')
+        : '#e7e2cd';
+      if (loot.drop.category === 'potion') {
+        ctx.fillRect(
+          Math.round(loot.x - (largePotion ? 3 : 2)),
+          Math.round(y - (largePotion ? 8 : 7)),
+          largePotion ? 7 : 5,
+          largePotion ? 6 : 5
+        );
+        ctx.fillStyle = '#e8edf2';
+        ctx.fillRect(Math.round(loot.x - 1), Math.round(y - (largePotion ? 10 : 9)), 3, 2);
+      } else {
+        var slot = loot.drop.item && loot.drop.item.base;
+        if (slot === 'weapon') {
+          ctx.fillRect(Math.round(loot.x - 1), Math.round(y - 8), 2, 7);
+          ctx.fillRect(Math.round(loot.x - 3), Math.round(y - 3), 6, 1);
+        } else if (slot === 'armor') {
+          ctx.fillRect(Math.round(loot.x - 3), Math.round(y - 7), 6, 6);
+          ctx.fillStyle = '#80899b';
+          ctx.fillRect(Math.round(loot.x - 1), Math.round(y - 6), 2, 4);
+        } else {
+          ctx.strokeStyle = '#e7e2cd';
+          ctx.beginPath();
+          ctx.arc(Math.round(loot.x), Math.round(y - 4), 3, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    },
+
+    drawGatherNode: function (node, t) {
+      var ready = !Game.environment || Game.environment.nodeReady(node);
+      var motion = U.motionEnabled();
+      var spriteId = node.sprite || ('gather_' + node.nodeType);
+      var sp = Game.assets.sprite(spriteId);
+      var bob = ready && motion ? Math.sin(t * 1.8 + node.phase) * 0.65 : 0;
+      var x = Math.round(node.x), y = Math.round(node.y + bob);
+      ctx.save();
+      ctx.globalAlpha = ready ? 0.22 : 0.14;
+      ctx.fillStyle = '#202236';
+      ctx.beginPath();
+      ctx.ellipse(x, y + 1, Math.max(7, sp.w * 0.34), 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (!ready) {
+        Game.assets.draw(ctx, spriteId, 'idle0', x, y, { alpha: 0.22 });
+        ctx.globalAlpha = 0.66;
+        ctx.fillStyle = '#584b43';
+        ctx.fillRect(x - 5, y - 2, 10, 2);
+        ctx.fillStyle = '#817266';
+        ctx.fillRect(x - 2, y - 3, 4, 1);
+        ctx.restore();
+        return;
+      }
+      if (motion) {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.24 + 0.1 * Math.sin(t * 2 + node.phase);
+        ctx.drawImage(Game.assets.glowTex(node.accent, 16), x - 15, y - 18, 30, 30);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+      var frame = Game.assets.hasFrame(spriteId, 'idle1') &&
+        (((t / 0.55) + node.phase) | 0) % 2 === 1 ? 'idle1' : 'idle0';
+      Game.assets.draw(ctx, spriteId, frame, x, y, {});
+      ctx.restore();
+    },
+
+    drawChest: function (chest, t) {
+      var motion = U.motionEnabled();
+      var remain = chest.ttl - chest.age;
+      var alpha = remain < 12 ? U.clamp(remain / 12, 0, 1) : 1;
+      var y = chest.y + (motion ? Math.sin(t * 1.7 + chest.phase) * 1.2 : 0);
+      var color = chest.rare ? '#c377e2' : '#d8a94d';
+      var spriteId = chest.rare ? 'chest_rare' : 'chest_common';
+      var sp = Game.assets.sprite(spriteId);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(12,13,28,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(chest.x, y + 2, Math.max(9, sp.w * 0.35), 3, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = alpha * (chest.rare ? 0.42 : 0.22);
+      ctx.drawImage(Game.assets.glowTex(color, 16), chest.x - 18, y - 20, 36, 36);
+      ctx.globalCompositeOperation = 'source-over';
+      Game.assets.draw(ctx, spriteId, 'idle0', chest.x, y, { alpha: alpha });
+      if (motion && (!chest.rare || (((t * 4 + chest.phase) | 0) % 9 < 2))) {
+        var sx = Math.round(chest.x + (chest.rare ? 7 : 5));
+        var sy = Math.round(y - (chest.rare ? 12 : 10));
+        ctx.globalAlpha = alpha * (chest.rare ? 0.95 : 0.55);
+        ctx.fillStyle = chest.rare ? '#fff4b0' : '#f4dd8a';
+        ctx.fillRect(sx, sy - 1, 1, 3);
+        ctx.fillRect(sx - 1, sy, 3, 1);
+      }
+      ctx.restore();
+    },
+
+    drawTradeProp: function (entity, t) {
+      var A = Game.assets;
+      var area = entity.area;
+      var spriteId = tradePropSprite(area);
+      var sp = A.sprite(spriteId);
+      var x = Math.round(entity.x), y = Math.round(entity.y);
+      var context = Game.trade.current();
+      var active = context.available && context.areaId === area.id;
+      var fxOn = !Game.particles || Game.particles.isEnabled();
+
+      ctx.save();
+      // 落地阴影（与其余营地道具一致的椭圆脚影）
+      ctx.globalAlpha = 0.20;
+      ctx.fillStyle = '#101024';
+      ctx.beginPath();
+      ctx.ellipse(x, y + 1, Math.max(6, sp.w * 0.30), 2.8, 0, 0, 6.29);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // 营业暖光：进入交易域后点亮马车，夜晚更醒目；画在精灵之下不遮细节
+      if (active && fxOn) {
+        var nf = Game.daynight.nightFactor();
+        var pulse = U.motionEnabled() ? 0.5 + 0.5 * Math.sin(t * 2.6 + entity.phase) : 0.5;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.10 + 0.08 * pulse + 0.18 * nf;
+        ctx.drawImage(A.glowTex('#f2b45c', 16), x - 30, y - sp.h * 0.5 - 30, 60, 60);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+
+      // 篷布垂帘双帧微动
+      var frame = 'idle0';
+      if (A.hasFrame(spriteId, 'idle1') &&
+        (((t / 0.6) + entity.phase) | 0) % 2 === 1) frame = 'idle1';
+      A.draw(ctx, spriteId, frame, x, y, {});
+
+      // 激活态：篷下悬挂金币招牌位置的像素十字星闪烁（不用浮空面板，避免遮挡后景）
+      if (active) {
+        var twk = ((t / 0.16) | 0) % 8;
+        if (twk < 3) {
+          var sy = y - sp.h + 9;
+          ctx.fillStyle = twk === 1 ? '#fff6d2' : '#f6d888';
+          ctx.fillRect(x, sy - 1, 1, 3);
+          ctx.fillRect(x - 1, sy, 3, 1);
+        }
+      }
+      ctx.restore();
+    },
+
+    drawInteractionProgress: function (hero) {
+      if (!hero || !hero.interactOrder || hero.interactOrder.phase !== 'act') return;
+      var order = hero.interactOrder;
+      var total = order.type === 'gather' ? Game.F.BAL.gatherDuration : Game.F.BAL.chestOpenDuration;
+      var pct = U.clamp(1 - order.timer / total, 0, 1);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(10,12,28,0.82)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(hero.x, hero.y - hero.spriteH - 7, 6, -Math.PI / 2, Math.PI * 1.5);
+      ctx.stroke();
+      ctx.strokeStyle = order.type === 'gather' ? '#87d57c' : '#f0c45d';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(hero.x, hero.y - hero.spriteH - 7, 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * pct);
+      ctx.stroke();
+      ctx.restore();
     },
 
     drawProp: function (p, t) {

@@ -295,9 +295,53 @@
       { patches: 2.1, decor: 3.8, details: 2.2, waterDecor: 1.8 })
   };
 
+  /*
+   * 节点内容完全由区域注册表提供。引擎只读取节点类型、产物与冷却，
+   * 因而未来新增区域或替换产物无需修改 terrain/environment。
+   */
+  var GATHER = {
+    grassland: [
+      { id: 'herb_patch', sprite: 'gather_herb_patch', material: 'herb', color: '#7bd46a', accent: '#d8f09a' },
+      { id: 'berry_bush', sprite: 'gather_berry_bush', material: 'berry', color: '#4f9b48', accent: '#dc5976' }
+    ],
+    forest: [
+      { id: 'mushroom_ring', sprite: 'gather_mushroom_ring', material: 'mushroom', color: '#8b6bc0', accent: '#e6b5ef' },
+      { id: 'resin_tree', sprite: 'gather_resin_tree', material: 'resin', color: '#7e5b36', accent: '#edba5c' }
+    ],
+    mine: [
+      { id: 'ore_vein', sprite: 'gather_ore_vein', material: 'ore', color: '#7c8290', accent: '#d7c483' },
+      { id: 'crystal_cluster', sprite: 'gather_crystal_cluster', material: 'crystal_cluster', color: '#4fa5be', accent: '#b8f1ff' }
+    ],
+    graveyard: [
+      { id: 'ghost_flower', sprite: 'gather_ghost_flower', material: 'ghost_flower', color: '#6c688f', accent: '#c7bcff' },
+      { id: 'grave_dust', sprite: 'gather_grave_dust', material: 'grave_dust', color: '#77717d', accent: '#d1cad7' }
+    ],
+    snowpass: [
+      { id: 'ice_crystal', sprite: 'gather_ice_crystal', material: 'ice_crystal', color: '#7eb6d8', accent: '#e5f7ff' },
+      { id: 'frost_herb', sprite: 'gather_frost_herb', material: 'frost_herb', color: '#729c8e', accent: '#d5fff2' }
+    ],
+    lavacave: [
+      { id: 'fire_core', sprite: 'gather_fire_core', material: 'fire_core', color: '#a63e24', accent: '#ffca52' },
+      { id: 'obsidian_outcrop', sprite: 'gather_obsidian_outcrop', material: 'obsidian', color: '#403348', accent: '#c064e6' }
+    ],
+    skyruins: [
+      { id: 'rune_stone', sprite: 'gather_rune_stone', material: 'rune_stone', color: '#777f9c', accent: '#ebd67f' },
+      { id: 'aether_shard', sprite: 'gather_aether_shard', material: 'aether_shard', color: '#55a8a7', accent: '#bafff4' }
+    ],
+    darkcastle: [
+      { id: 'miasma_crystal', sprite: 'gather_miasma_crystal', material: 'miasma_crystal', color: '#63347e', accent: '#d585ff' },
+      { id: 'demon_horn', sprite: 'gather_demon_horn', material: 'demon_horn', color: '#6e3c45', accent: '#ec9a82' }
+    ]
+  };
+
   for (var i = 0; i < R.length; i++) {
     R[i].order = i;
     R[i].layout = LAYOUTS[R[i].id];
+    R[i].gather = {
+      count: [3, 5],
+      cooldown: [90, 150],
+      nodes: GATHER[R[i].id]
+    };
     var tradeAreas = (R[i].tradeAreas || []).slice();
     var hasCampSupply = false;
     for (var ti = 0; ti < tradeAreas.length; ti++) {
@@ -306,12 +350,14 @@
     if (!hasCampSupply) {
       tradeAreas.unshift({
         id: 'camp-supply',
-        kind: 'camp',
+        kind: 'merchant',
         anchor: 'camp',
+        offset: { x: -45, y: 19 },
         radiusFrom: 'campSafeRadius',
-        catalogs: ['camp-general'],
+        catalogs: ['camp-general', 'camp-exchange'],
         priority: 10,
-        nameKey: 'tradeArea.camp'
+        nameKey: 'tradeArea.camp',
+        prop: { style: 'supply-cart' }
       });
     }
     R[i].tradeAreas = tradeAreas;

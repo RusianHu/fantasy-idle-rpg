@@ -207,7 +207,30 @@
     root.appendChild(toggleRow(t('settings.effects'), t('settings.effectsHint'), s.settings.effects, function (v) {
       s.settings.effects = v;
       Game.particles.setEnabled(v);
+      bus.emit('settings:changed', { key: 'effects', value: v });
     }));
+
+    // 战利品落地拾取（运行中关闭会由 world 立即保底结算全部在地物）。
+    root.appendChild(toggleRow(
+      t('settings.groundLoot'),
+      t('settings.groundLootHint'),
+      s.settings.groundLoot !== false,
+      function (v) {
+        s.settings.groundLoot = v;
+        bus.emit('settings:changed', { key: 'groundLoot', value: v });
+      }
+    ));
+
+    // 自动回营只在自动操控生效；完整休整后自动拔营。
+    root.appendChild(toggleRow(
+      t('settings.autoCampRest'),
+      t('settings.autoCampRestHint'),
+      !!s.settings.autoCampRest,
+      function (v) {
+        s.settings.autoCampRest = v;
+        bus.emit('settings:changed', { key: 'autoCampRest', value: v });
+      }
+    ));
 
     // 药水阈值
     var potRow = U.el('div', 'setting-row', '<div><div>' + t('settings.potion') + '</div>' +
@@ -218,6 +241,7 @@
     slider.addEventListener('input', function () {
       s.settings.potionThreshold = slider.value / 100;
       potRow.querySelector('#pot-val').textContent = slider.value + '%';
+      bus.emit('settings:changed', { key: 'potionThreshold', value: s.settings.potionThreshold });
     });
     potRow.appendChild(slider);
     root.appendChild(potRow);
@@ -225,6 +249,7 @@
     // 自动推进
     root.appendChild(toggleRow(t('settings.autoAdvance'), t('settings.autoAdvanceHint'), s.settings.autoAdvance, function (v) {
       s.settings.autoAdvance = v;
+      bus.emit('settings:changed', { key: 'autoAdvance', value: v });
     }));
 
     // 自动技能与智能换装

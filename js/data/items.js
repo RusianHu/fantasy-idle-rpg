@@ -14,6 +14,24 @@
   /* ---------- 药水 ---------- */
   Game.register('potion', { id: 'potion_small', icon: 'icon_potion_small' });
   Game.register('potion', { id: 'potion_large', icon: 'icon_potion_large' });
+  Game.register('itemUse', {
+    id: 'potion_small', category: 'potion', ref: 'potion_small',
+    icon: 'icon_potion_small', effect: 'heal', cdGroup: 'potion'
+  });
+  Game.register('itemUse', {
+    id: 'potion_large', category: 'potion', ref: 'potion_large',
+    icon: 'icon_potion_large', effect: 'heal', cdGroup: 'potion'
+  });
+
+  /* ---------- 素材（不占装备背包容量） ---------- */
+  [
+    'herb', 'berry', 'mushroom', 'resin', 'ore', 'crystal_cluster',
+    'ghost_flower', 'grave_dust', 'ice_crystal', 'frost_herb',
+    'fire_core', 'obsidian', 'rune_stone', 'aether_shard',
+    'miasma_crystal', 'demon_horn'
+  ].forEach(function (id) {
+    Game.register('material', { id: id, icon: 'icon_material' });
+  });
 
   /* ---------- 商店条目 ----------
    * cur: 'gold' | 'crystal'；kind: potion | gearbox | perm
@@ -58,5 +76,19 @@
     id: 'perm_exp', kind: 'perm', stat: 'expMul', pct: 0.10,
     cur: 'crystal', icon: 'icon_orb_buff', section: 'perm',
     catalogs: ['camp-general']
+  });
+
+  /* ---------- 营地以物换物 ---------- */
+  [
+    { id: 'exchange_potion', icon: 'icon_potion_small' },
+    { id: 'exchange_gold', icon: 'icon_gold' },
+    { id: 'exchange_gear', icon: 'icon_chest' },
+    { id: 'exchange_vitality', icon: 'icon_orb_buff', stat: 'hp', pct: 0.01 }
+  ].forEach(function (def) {
+    Game.register('shopItem', {
+      id: def.id, kind: 'exchange', recipe: def.id,
+      cur: 'materials', icon: def.icon, section: 'exchange',
+      catalogs: ['camp-exchange'], stat: def.stat, pct: def.pct
+    });
   });
 })();

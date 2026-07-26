@@ -108,6 +108,447 @@
     }
   });
 
+  /* ---------------- 采集节点与探索宝箱（缺图回退） ----------------
+   * 造型源：assets/sprite-source/gatherables-chests-concept.png
+   * 正常入口随后加载 sprites/exploration/ 下的区域生成模块覆盖这些定义；
+   * 此处保留轻量手绘网格，确保模块缺失时仍可见且 file:// 可同步运行。
+   */
+  D({
+    id: 'gather_herb_patch',
+    pal: { d: '#28552f', g: '#438447', l: '#75b95b', h: '#b6da79', w: '#f4efcf', y: '#e2c95f' },
+    anchor: { x: 8, y: 13 },
+    frames: {
+      idle0: [
+        '.....l..........',
+        '..l..g...h..l...',
+        '..g..l...g..g...',
+        '.lgl.d.w.g.lg...',
+        '..gdgwwwg.gd....',
+        '...dgwygdglg....',
+        '.lgggwwwggdg.l..',
+        '..dgddgddggggg..',
+        '.gglggggdggldg..',
+        'ddggdgggddgggd..',
+        '.dgggddggdggd...',
+        '..dddggddddd....',
+        '....dddddd......',
+        '................'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'sway' } }
+  });
+
+  D({
+    id: 'gather_berry_bush',
+    pal: { d: '#234a2c', g: '#3f7440', l: '#6aa34c', h: '#92c864', r: '#c63f4d', R: '#f06a58' },
+    anchor: { x: 8, y: 13 },
+    frames: {
+      idle0: [
+        '......l.........',
+        '...lgggl..l.....',
+        '..gglhgggggl....',
+        '.lgggRgglgRgg...',
+        '.ggdggglggggl...',
+        'ggRggdggRggggg..',
+        'gdggglggggdRgg..',
+        'ggglggRgdggggg..',
+        '.ggdgggggglgg...',
+        '.dggggdggggdg...',
+        '..dgdggggddg....',
+        '...ddddgddd.....',
+        '.....dddd.......',
+        '................'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'sway' } }
+  });
+
+  D({
+    id: 'gather_mushroom_ring',
+    pal: { d: '#403855', e: '#6a5b78', c: '#a591c2', h: '#ded3ef', s: '#cdbfa8', g: '#4f7042', l: '#77a451' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '....cc....cc......',
+        '...chc...chhc.....',
+        '..chhhc..chhhc....',
+        '...sss....sss.....',
+        '.cc.s..gg..s.cc...',
+        'chhc..gllg..chhc..',
+        'chhhc.gggg.chhhc..',
+        '.sss.ggddgg.sss...',
+        '..s.ggdggdg.s.....',
+        'cc..ggdggd..cc....',
+        'chc..gggg..chc....',
+        '.ss...gg...ss.....',
+        '..eeeeeeeeee......',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_resin_tree',
+    pal: { D: '#3c281b', d: '#5d3b24', b: '#80522e', l: '#a66d38', a: '#d9892f', A: '#ffc552', g: '#42633a' },
+    anchor: { x: 9, y: 15 },
+    frames: {
+      idle0: [
+        '.....dddddd.......',
+        '...ddbllllbdd.....',
+        '..dblbaAalbbd.....',
+        '..dblaAAAalbd.....',
+        '..dblbAAablbd.....',
+        '..ddbbaAabbdd.....',
+        '...dbbaabbdd......',
+        '...dbdaddbdd......',
+        '..ddbdAaabd.......',
+        '.dddbdAAbdd..g....',
+        'ddddbdAabdddgg....',
+        '.ddddbaabddggg....',
+        '..dddbbddddgg.....',
+        '.DDDddddddDDD.....',
+        'DDD.DDDDDD.DDD....',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_ore_vein',
+    pal: { D: '#323541', d: '#4b5260', m: '#69727e', l: '#929aa3', h: '#c7c8bd', o: '#b87531', y: '#e1b85a' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '.....dd...........',
+        '...dmlld..ddd.....',
+        '..dmhhmddmllmd....',
+        '.dmhllmdmlhhmd....',
+        'dmmloyddmllmmd....',
+        'dmloyodmmhllmd....',
+        'dmlomodmllmddd....',
+        '.dmloyddmmdmmd....',
+        '..dmoyomlhmmd.....',
+        '.ddmmoomlmmddd....',
+        'dmmmdodmmmmmmd....',
+        '.dDDddddddddD.....',
+        '..DDDDDDDDDD......',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_crystal_cluster',
+    pal: { D: '#173859', d: '#1d5d86', b: '#218bb5', c: '#39bdd6', l: '#8be4ee', w: '#e8ffff', s: '#4e596b' },
+    anchor: { x: 9, y: 15 },
+    frames: {
+      idle0: [
+        '........c.........',
+        '.......clc........',
+        '.......cwc........',
+        '...c...clc..c.....',
+        '..clc..cbc.clc....',
+        '..cwc..cbc.cwc....',
+        '..clc.cbbbcclc....',
+        'c.cbc.cblc.cbc.c..',
+        'clcbccbbbc.cbclc..',
+        'cwcbbcbwbcbbccwc..',
+        'clcbbcbllcbbcbcl..',
+        '.cbbbbbbbbbbbbc...',
+        'ssdbbbdbbbdbbdss..',
+        '.ssddddddddddss...',
+        '..ssssssssssss....',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_ghost_flower',
+    pal: { D: '#203650', d: '#285774', b: '#398aa0', c: '#6fd1d7', l: '#b8f0e7', w: '#effff7', v: '#8980c5' },
+    anchor: { x: 8, y: 15 },
+    frames: {
+      idle0: [
+        '......cwc.........',
+        '....cwwwwwc.......',
+        '...cwwlwlwwc......',
+        '..cwwwwwwwwwc.....',
+        '...ccwwwwwcc......',
+        '.....clwlc........',
+        '......cbc.........',
+        '..d...cbc...d.....',
+        '..db..cbc..bd.....',
+        '.dbb..cbc..bbd....',
+        'dbbcb.cbc.bcbbd...',
+        '.dbbcbbbbbcbbd....',
+        '..dbbbbbbbbbd.....',
+        '...ddbbbbbdd......',
+        '.....dddd.........',
+        '..................'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'sway' } }
+  });
+
+  D({
+    id: 'gather_grave_dust',
+    pal: { D: '#34313d', d: '#514d5a', m: '#77717d', l: '#aaa2ad', h: '#d8d0d9', u: '#6c5239', U: '#a18456', c: '#bce9ea' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '........c.........',
+        '.......ccc........',
+        '......cchc........',
+        '.......ccc........',
+        '............UU....',
+        '...ll......UuuU...',
+        '..lmmll...UuuuuU..',
+        '.lmddmll..UuDuuU..',
+        'lmddddml..UuDDuU..',
+        'mmddDddml..UuuU...',
+        'dmmddmmmldd.U....',
+        '.ddmmmmddddd......',
+        '..DDddddDDDD......',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_ice_crystal',
+    pal: { D: '#31577b', d: '#4d81aa', b: '#65acd0', c: '#91d6ec', l: '#c8f0fa', w: '#f6ffff', s: '#a6c8d7' },
+    anchor: { x: 9, y: 15 },
+    frames: {
+      idle0: [
+        '.......c..........',
+        '......clc.........',
+        '.....clwc.........',
+        '.....cwwc.........',
+        '..c..cllc..c......',
+        '.clc.cbbc.clc.....',
+        '.cwc.cbbc.cwc.....',
+        '.clccbwbc.clc.....',
+        'c.cbcbllc.cb.c....',
+        'clcbbcbwbcbbclc...',
+        'cwcbbcllccbbcwc...',
+        'clcbbbbbbbbbbclc...',
+        '.cbbbbbbbbbbbbc...',
+        'ssddddddddddddss..',
+        '.ssssssssssssss...',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_frost_herb',
+    pal: { D: '#294954', d: '#3f6c77', b: '#5c91a0', c: '#8bc4cd', l: '#c6eef0', w: '#efffff' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '....l....l........',
+        '...clc..clc..l....',
+        '..cwwc..cwc.clc...',
+        '...cbc..cbc.cwc...',
+        '.l.cbc.l.cbc.c....',
+        'clccbcclccbc......',
+        'cwccbccwccbc..l...',
+        '.cbcbccbcbbc.clc..',
+        '..cbbbbbbbbc.cwc..',
+        '.cbbcbccbcbbc.c...',
+        'cbbbcbbbbcbbbc....',
+        '.cbbbbbcbbdbbbc....',
+        '..DDddddddddDD....',
+        '..................'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'sway' } }
+  });
+
+  D({
+    id: 'gather_fire_core',
+    pal: { D: '#3c2020', d: '#5e2c27', r: '#8f3c27', o: '#d85a24', a: '#f58a28', y: '#ffd45a', w: '#fff2a0' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '......oooo........',
+        '....oorrrroo......',
+        '...ordddddro......',
+        '..ordoaayydro.....',
+        '.ordoaaywydro.....',
+        '.ordoaayyyddro....',
+        'ordddoaayodddro...',
+        'ordrddoooodrdro...',
+        '.ordrddddddrdro...',
+        '..orddrrrddro.....',
+        '.ddorrddddrodd.....',
+        'dDDddrrrrddDDd....',
+        '.DDDDddddDDDD.....',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_obsidian_outcrop',
+    pal: { D: '#1f1b2d', d: '#30283f', b: '#443457', v: '#6c4384', l: '#a366c0', h: '#d1a0ea' },
+    anchor: { x: 9, y: 15 },
+    frames: {
+      idle0: [
+        '..........v.......',
+        '.....v...vlv......',
+        '....vlv..vlv......',
+        '....vhlv.vbv......',
+        '..v.vlvv.vbv......',
+        '.vlv.vbv.vbv.v....',
+        '.vhlvvbv.vbvvlv...',
+        '.vlvbbvbbvbbvhlv...',
+        'v.vbbbbbbbbbbvlv...',
+        'vlvbbvbbvbbbbbv...',
+        'vhlvbbbbvbbvbbv...',
+        'vlvbbbbbbbbbbbbv...',
+        '.vddddddddddddv...',
+        'DDddddddddddddDD..',
+        '.DDDDDDDDDDDDDD...',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_rune_stone',
+    pal: { D: '#3d4552', d: '#56616d', m: '#78848c', l: '#a4aaa0', g: '#506b49', y: '#d9c66c', h: '#f4e59b' },
+    anchor: { x: 8, y: 15 },
+    frames: {
+      idle0: [
+        '.....mmmm.........',
+        '...mmllllmm.......',
+        '..mlllllllm.......',
+        '..mlllyyllm.......',
+        '.mlllyhylldm......',
+        '.mllyyyllddm......',
+        '.mllyylldddm......',
+        '.mllyhyldddm......',
+        '.mllyylddddm......',
+        '.mllyldddddm......',
+        '.mlllddddddm......',
+        'gmlddddddddm.g....',
+        'ggmdddddddmmgg....',
+        'gDDmmmmmmmDDgg....',
+        '.gDDDDDDDDDg......',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_aether_shard',
+    pal: { D: '#27616c', d: '#338995', c: '#52c5c7', l: '#a3f0df', w: '#ecfff6' },
+    anchor: { x: 7, y: 15 },
+    frames: {
+      idle0: [
+        '......c.........',
+        '.....clc........',
+        '..c..cwc........',
+        '.....cwc...c....',
+        '....clllc.......',
+        '.c..clwlc.......',
+        '....clllc..c....',
+        '.....clc........',
+        '..c..clc........',
+        '.....clc...c....',
+        '......c.........',
+        '......c.........',
+        '................',
+        '....c...c.......',
+        '................',
+        '................'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'bob', dy: 1 } }
+  });
+
+  D({
+    id: 'gather_miasma_crystal',
+    pal: { D: '#281a38', d: '#3e2452', b: '#5b2e72', v: '#8541a0', l: '#bd66d5', h: '#eca4f5' },
+    anchor: { x: 9, y: 15 },
+    frames: {
+      idle0: [
+        '.......v..........',
+        '......vlv.........',
+        '.....vlhv.........',
+        '.....vlhv.........',
+        '..v..vlvv..v......',
+        '.vlv.vbvv.vlv.....',
+        '.vhv.vbvv.vhv.....',
+        '.vlvvblvv.vlv.....',
+        'v.vbvlhvbbv.v.....',
+        'vlvbbvlvvbbvlv....',
+        'vhvbbbbvbbbbvhv...',
+        'vlvbbbbbbbbbbvlv...',
+        '.vddddddddddddv...',
+        'DDddddddddddddDD..',
+        '.DDDDDDDDDDDDDD...',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'gather_demon_horn',
+    pal: { D: '#2f2027', d: '#4a3034', b: '#68423f', m: '#8b5d4c', l: '#b78662', h: '#dfb481' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '...h..............',
+        '..hl..............',
+        '.hlm..............',
+        '.lmb.........h....',
+        'lmbd........hl....',
+        'mbdD..DDD..hlm....',
+        'bdD..DdddD.lmb....',
+        'dD..DdDDdDmbd.....',
+        'D..DddddddDbd.....',
+        '..DddDDdddddD.....',
+        '.DddddddddddD.....',
+        'DDdddDdddddddDD...',
+        '.DDDD.DDDDD.DDD...',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'chest_common',
+    pal: { D: '#352315', d: '#56371f', b: '#79502d', l: '#a9753d', y: '#d7ad55', h: '#f3d47a' },
+    anchor: { x: 9, y: 13 },
+    frames: {
+      idle0: [
+        '....bbbbbbbb......',
+        '..bbllllllllbb....',
+        '.bllbbbbbbbbllb...',
+        'blbbddddddddbblb..',
+        'blddddddddddddlb..',
+        'byyyyyyyyyyyyyyb..',
+        'bybbbbyhhybbbbyb..',
+        'bybbbbyhhybbbbyb..',
+        'bybbbbhD hbbbbyb..',
+        'bybbbbbbbbbbbbyb..',
+        'bddddddddddddddb..',
+        '.bDDDDDDDDDDDDb...',
+        '..bbbbbbbbbbbb....',
+        '..................'
+      ]
+    }
+  });
+
+  D({
+    id: 'chest_rare',
+    variantOf: 'chest_common',
+    pal: { D: '#291d42', d: '#3d285f', b: '#5a3482', l: '#8050ad', y: '#e3b64e', h: '#fff0a0' },
+    anchor: { x: 9, y: 13 }
+  });
+
   /* ---------------- 前线营地陈设 ---------------- */
   D({
     id: 'camp_banner',
@@ -179,6 +620,99 @@
         '..................'
       ]
     }
+  });
+
+  /* ---------------- 马车商棚（交易点世界实体） ----------------
+   * 行商马车：拱形条纹篷布 + 垂帘 + 车斗柜台货品 + 双辐条车轮 + 落地车辕，
+   * 悬挂金币招牌位于篷下开口中央（激活闪烁锚点）。前线临时营地不设固定商铺，
+   * 营地补给点与临时游商等交易域统一用此马车形态。
+   * 按交易类型以 variantOf 换色：merchant 红 / exchange 紫 / wander 青 / event 玫。
+   */
+  var wagonFrames = {
+    idle0: [
+      '........WWxxxxWWWxxxxW........',
+      '.....wxxxxwwwxxxxwwwxxxxw.....',
+      '...wwwxxxxwwwxxxxwwwxxxxwww...',
+      '...wwwxxxxwwwxxxxwwwxxxxwww...',
+      '...rrrrwwwwrrrrrrrrwwwwrrrr...',
+      '....RR..WW..RR..RR..WW..RR....',
+      '....dddddddddayyaddddddddd....',
+      '....ddgggddeeeddsssddyyydd....',
+      '....aaaaaaaaaaaaaaaaaaaaaa....',
+      '...abbbbbbbbbbbbbbbbbbbbbba...',
+      '...abbbbcbbbbbbcbbbbbbcbbba...',
+      '...abbbbcbbbbbbcbbbbbbcbbba...',
+      '...cccccccccccccccccccccccc...',
+      '......cccc..........cccc......',
+      '..pp.cbaabccccccccccbaabc.....',
+      '.pp..cbayac........cbayac.....',
+      'pp...cbaabc........cbaabc.....',
+      '......cccc..........cccc......'
+    ],
+    idle1: [
+      '........WWxxxxWWWxxxxW........',
+      '.....wxxxxwwwxxxxwwwxxxxw.....',
+      '...wwwxxxxwwwxxxxwwwxxxxwww...',
+      '...wwwxxxxwwwxxxxwwwxxxxwww...',
+      '...rrrrwwwwrrrrrrrrwwwwrrrr...',
+      '.....RR..WW..RR..RR..WW..RR...',
+      '....dddddddddaYYaddddddddd....',
+      '....ddgggddeEeddsssddyyydd....',
+      '....aaaaaaaaaaaaaaaaaaaaaa....',
+      '...abbbbbbbbbbbbbbbbbbbbbba...',
+      '...abbbbcbbbbbbcbbbbbbcbbba...',
+      '...abbbbcbbbbbbcbbbbbbcbbba...',
+      '...cccccccccccccccccccccccc...',
+      '......cccc..........cccc......',
+      '..pp.cbaabccccccccccbaabc.....',
+      '.pp..cbayac........cbayac.....',
+      'pp...cbaabc........cbaabc.....',
+      '......cccc..........cccc......'
+    ]
+  };
+  var wagonWood = {
+    p: P.woodDark, a: '#b98a50', b: '#865d32', c: '#4b321d',
+    d: '#2e1c10', y: P.gold, Y: '#fff3c2'
+  };
+  function wagonPal(cloth) {
+    var pal = {};
+    var key;
+    for (key in wagonWood) pal[key] = wagonWood[key];
+    for (key in cloth) pal[key] = cloth[key];
+    return pal;
+  }
+  D({
+    id: 'trade_wagon',
+    pal: wagonPal({
+      w: '#e8dcc0', W: '#c2b592', r: '#a34433', R: '#7c3226', x: '#c96a52',
+      e: '#d94f65', E: '#f0929f', g: '#5fae4a', s: '#c8a060'
+    }),
+    anchor: { x: 14, y: 17 },
+    frames: wagonFrames
+  });
+  D({
+    id: 'trade_wagon_exchange',
+    variantOf: 'trade_wagon',
+    pal: wagonPal({
+      w: '#e6dcf2', W: '#b9aad4', r: '#7a4fb0', R: '#54357e', x: '#9b74cc',
+      e: '#c783e7', E: '#e6bcf6', g: '#68c8c0', s: '#a898c8'
+    })
+  });
+  D({
+    id: 'trade_wagon_wander',
+    variantOf: 'trade_wagon',
+    pal: wagonPal({
+      w: '#e2efe6', W: '#adcabb', r: '#2f7a6e', R: '#1f574e', x: '#5aa091',
+      e: '#d94f65', E: '#f0929f', g: '#5fae4a', s: '#c8a060'
+    })
+  });
+  D({
+    id: 'trade_wagon_event',
+    variantOf: 'trade_wagon',
+    pal: wagonPal({
+      w: '#f0dce6', W: '#cfa9bc', r: '#b0517a', R: '#7c3756', x: '#c97a9c',
+      e: '#d94f65', E: '#f0929f', g: '#5fae4a', s: '#c8a060'
+    })
   });
 
   D({
