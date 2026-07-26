@@ -75,11 +75,20 @@
         '</section>' +
         '<div class="title-ver">v' + Game.VERSION + '</div>' +
         '<div class="title-entry-fx" aria-hidden="true">' +
-        '<div class="entry-beam"></div><div class="entry-ring"><i></i></div>' +
+        '<div class="entry-beam"><i></i></div>' +
+        '<div class="entry-seal">' +
+        '<div class="entry-aura"></div>' +
+        '<div class="entry-ring entry-ring-outer"><i></i></div>' +
+        '<div class="entry-ring entry-ring-middle"></div>' +
+        '<div class="entry-ring entry-ring-core"></div>' +
+        '<canvas class="entry-crest" width="64" height="64"></canvas>' +
+        '<div class="entry-scan"></div>' +
+        '</div>' +
         '<div class="entry-pixels"></div><div class="entry-copy"></div>' +
         '</div>' +
         '</div>';
       document.getElementById('app').appendChild(titleRoot);
+      T._drawEntryCrest(titleRoot.querySelector('.entry-crest'));
 
       var slotsRoot = titleRoot.querySelector('.title-slots');
       titleSlots.forEach(function (slot) {
@@ -215,6 +224,59 @@
       g.fillRect(22, 18, 5, 2);
     },
 
+    _drawEntryCrest: function (canvas) {
+      if (!canvas) return;
+      var g = canvas.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      g.clearRect(0, 0, 64, 64);
+
+      // 2px 字符网格绘制羽翼剑公会纹章。轮廓、暗面与高光分层，
+      // 在传送环膨胀时仍保留清楚的像素识别度。
+      var cell = 2, cx = 32, cy = 31;
+      for (var row = -13; row <= 13; row++) {
+        var span = 13 - Math.abs(row);
+        var y = cy + row * cell;
+        g.fillStyle = (Math.abs(row) === 13 || span === 0) ? '#f7dd7b' : '#5b421d';
+        g.fillRect(cx - span * cell, y, (span * 2 + 1) * cell, cell);
+        if (span > 1) {
+          g.fillStyle = '#11182d';
+          g.fillRect(cx - (span - 1) * cell, y, (span * 2 - 1) * cell, cell);
+        }
+      }
+
+      // 对称羽翼：深金描边、亮金羽片。
+      g.fillStyle = '#6e4718';
+      [
+        [14, 22, 16, 4], [10, 27, 20, 4], [14, 32, 16, 4], [19, 37, 11, 4],
+        [34, 22, 16, 4], [34, 27, 20, 4], [34, 32, 16, 4], [34, 37, 11, 4]
+      ].forEach(function (r) { g.fillRect(r[0], r[1], r[2], r[3]); });
+      g.fillStyle = '#d9ad4f';
+      [
+        [16, 22, 13, 2], [12, 27, 17, 2], [16, 32, 13, 2], [21, 37, 8, 2],
+        [35, 22, 13, 2], [35, 27, 17, 2], [35, 32, 13, 2], [35, 37, 8, 2]
+      ].forEach(function (r) { g.fillRect(r[0], r[1], r[2], r[3]); });
+      g.fillStyle = '#ffe895';
+      g.fillRect(18, 22, 8, 2);
+      g.fillRect(38, 22, 8, 2);
+
+      // 中央长剑与护手。
+      g.fillStyle = '#4b3013';
+      g.fillRect(29, 13, 6, 31);
+      g.fillRect(23, 39, 18, 5);
+      g.fillRect(29, 43, 6, 10);
+      g.fillRect(27, 51, 10, 4);
+      g.fillStyle = '#f5dc87';
+      g.fillRect(31, 13, 3, 29);
+      g.fillRect(25, 40, 14, 2);
+      g.fillRect(31, 44, 3, 8);
+      g.fillStyle = '#fff7c2';
+      g.fillRect(31, 15, 1, 24);
+      g.fillStyle = '#d9ad4f';
+      g.fillRect(30, 10, 4, 4);
+      g.fillRect(28, 12, 8, 2);
+      canvas.setAttribute('data-crest-ready', 'true');
+    },
+
     _refreshTitleCopy: function () {
       if (!titleRoot) return;
       var t = Game.i18n.t;
@@ -311,7 +373,7 @@
       titleEnterTimer = setTimeout(function () {
         titleEnterTimer = 0;
         if (onReady) onReady();
-      }, reduced ? 100 : 1180);
+      }, reduced ? 100 : 1320);
     },
 
     hide: function () {
