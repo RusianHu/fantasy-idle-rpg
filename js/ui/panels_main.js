@@ -78,7 +78,8 @@
       var rerenderOn = ['item:dropped', 'item:equipped', 'gold:changed', 'crystal:changed',
         'skill:upgraded', 'achievement:unlocked', 'player:levelup', 'shop:bought',
         'region:changed', 'boss:defeated', 'potion:used', 'potion:dropped',
-        'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged'];
+        'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged',
+        'trade:contextChanged'];
       rerenderOn.forEach(function (evt) {
         bus.on(evt, function () {
           if (current !== 'battle' && current !== 'settings') UI.tabs.queueRerender();
@@ -230,8 +231,16 @@
     root.appendChild(U.el('div', 'panel-title', t('ui.tab.inv')));
 
     var subs = U.el('div', 'subtabs');
+    var tradeContext = Game.trade.current();
     [['bag', t('ui.sub.bag')], ['shop', t('ui.sub.shop')]].forEach(function (pair) {
-      var b = U.el('button', 'subtab' + (invSub === pair[0] ? ' active' : ''), pair[1]);
+      var isShop = pair[0] === 'shop';
+      var cls = 'subtab' + (invSub === pair[0] ? ' active' : '') +
+        (isShop && !tradeContext.available ? ' trade-locked' : '');
+      var b = U.el('button', cls, pair[1]);
+      if (isShop) {
+        b.title = t(tradeContext.available ? 'ui.tradeShopOpenHint' : 'ui.tradeShopLockedHint');
+        b.setAttribute('aria-label', pair[1] + ' · ' + b.title);
+      }
       b.addEventListener('click', function () { invSub = pair[0]; UI.tabs.rerender(); });
       subs.appendChild(b);
     });
@@ -342,15 +351,50 @@
 
   function renderShop(root) {
     var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
-    var sections = { consume: [], gear: [], perm: [] };
-    reg.all('shopItem').forEach(function (d) { (sections[d.section] = sections[d.section] || []).push(d); });
+    var context = Game.trade.current();
+    var rid = context.regionId || (Game.state && Game.state.world && Game.state.world.region);
+    var regionName = rid ? t('region.' + rid + '.name') : '';
 
-    ['consume', 'gear', 'perm'].forEach(function (sec) {
+    if (!context.available) {
+      var reasonKey = context.reason === 'busy'
+        ? 'ui.tradeBusy'
+        : (context.reason === 'no-area' ? 'ui.tradeNoArea' : 'ui.tradeOutsideCamp');
+      var gate = U.el('div', 'card trade-gate-card',
+        '<div class="trade-status-mark" aria-hidden="true"></div>' +
+        '<div class="name">' + t('ui.tradeUnavailableTitle') + '</div>' +
+        '<div class="desc">' + t(reasonKey, { region: regionName }) + '</div>');
+      if (context.nearest && context.nearest.anchor === 'camp') {
+        var returnBtn = U.el('button', 'btn small trade-return-btn', t('ui.tradeReturnCamp'));
+        returnBtn.addEventListener('click', function () {
+          if (Game.state.world.mode !== 'rest') Game.world.setMode('rest');
+          UI.tabs.open('battle');
+        });
+        gate.appendChild(returnBtn);
+      }
+      root.appendChild(gate);
+      return;
+    }
+
+    var contextName = context.nameKey ? t(context.nameKey) : t('tradeArea.generic');
+    root.appendChild(U.el('div', 'card trade-context-card',
+      '<div class="trade-status-mark" aria-hidden="true"></div>' +
+      '<div class="grow"><div class="name">' + contextName + '</div>' +
+      '<div class="desc">' + t('ui.tradeCampAccess', { region: regionName }) + '</div></div>'));
+
+    var sections = {};
+    var sectionOrder = ['consume', 'gear', 'perm'];
+    Game.shop.offers(context).forEach(function (d) {
+      (sections[d.section] = sections[d.section] || []).push(d);
+      if (sectionOrder.indexOf(d.section) < 0) sectionOrder.push(d.section);
+    });
+
+    var offerCount = 0;
+    sectionOrder.forEach(function (sec) {
       if (!sections[sec] || !sections[sec].length) return;
-      var head = U.el('div', '', t('shopSec.' + sec));
-      head.style.cssText = 'font-size:12px;color:var(--gold);margin:10px 0 6px;';
+      var head = U.el('div', 'shop-section-title', t('shopSec.' + sec));
       root.appendChild(head);
       sections[sec].forEach(function (d) {
+        offerCount++;
         var price = Game.shop.price(d);
         var curIcon = d.cur === 'crystal' ? 'icon_crystal' : 'icon_gold';
         var ownedTxt = '';
@@ -375,6 +419,9 @@
             if (r.item) Game.ui.modals.toast(t('ui.gotItem', { name: UI.itemName(r.item) }), 'r' + r.item.rar);
             else Game.ui.modals.toast(t('ui.bought'));
             UI.tabs.rerender();
+          } else if (r.reason !== 'poor') {
+            Game.ui.modals.toast(t('ui.tradeUnavailableToast'), 'warn');
+            UI.tabs.rerender();
           } else {
             Game.ui.modals.toast(t('ui.cantAfford'), 'warn');
           }
@@ -382,5 +429,8 @@
         root.appendChild(card);
       });
     });
+    if (!offerCount) {
+      root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.tradeNoOffers') + '</div>'));
+    }
   }
 })();

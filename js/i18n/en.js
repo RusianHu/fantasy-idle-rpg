@@ -85,6 +85,16 @@
       gotItem: 'Got {name}',
       bought: 'Purchased',
       cantAfford: 'Not enough currency',
+      tradeUnavailableTitle: 'Trading Unavailable',
+      tradeOutsideCamp: 'The shop only serves the camp area of the current map, {region}.',
+      tradeBusy: 'Trading pauses during travel, warping, and regrouping. Settle at camp first.',
+      tradeNoArea: 'This map has no available trading area.',
+      tradeReturnCamp: 'Return to Current Camp',
+      tradeCampAccess: 'Inside the {region} camp trade area. Standard supplies and boons are available.',
+      tradeShopOpenHint: 'You are inside a trading area',
+      tradeShopLockedHint: 'Only available inside the current map camp',
+      tradeUnavailableToast: 'You have left this trading area',
+      tradeNoOffers: 'This trading area has no offers right now.',
       sellLow: 'Sell Common+Fine',
       soldN: 'Sold {n} items, +{g} gold',
       nothingToSell: 'No low-rarity gear to sell',
@@ -304,6 +314,8 @@
       play_2h: { name: 'Immersed', desc: 'Play for 2 hours in total' },
       potion_50: { name: 'Potion Enjoyer', desc: 'Use 50 potions' }
     },
+
+    tradeArea: { camp: 'Frontline Camp Supply', generic: 'Regional Trading Post' },
 
     shopSec: { consume: '─ Consumables ─', gear: '─ Gear Supply ─', perm: '─ Permanent Boons (Crystals) ─' },
 
