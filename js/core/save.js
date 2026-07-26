@@ -11,6 +11,7 @@
   var KEY = 'firpg_save';
   var KEY_BAK = 'firpg_save_backup';
   var lastLoadedTs = 0;
+  var hardResetting = false;
 
   /* 版本迁移流水线：旧存档逐版本升级 */
   var MIGRATIONS = [
@@ -152,7 +153,9 @@
     },
 
     save: function (reason) {
-      if (!Game.state) return false;
+      // hardReset 会触发 visibilitychange/pagehide/beforeunload。此时任何自动
+      // 存档都会把刚删除的通关档重新写回，因此重载前必须永久抑制本页写入。
+      if (hardResetting || !Game.state) return false;
       bus.emit('save:before', { reason: reason });
       try {
         var json = JSON.stringify(S.serialize());
@@ -313,16 +316,20 @@
       Game.world.init(Game.state.world.region);
       Game.ui.hud.update(true);
       Game.ui.tabs.queueRerender();
+      if (Game.transitions && Game.state.player.hp <= 0) Game.transitions.restoreZeroHp();
       if (Game.ending) Game.ending.restorePending();
       S.save('import');
     },
 
     hardReset: function () {
+      if (hardResetting) return false;
+      hardResetting = true;
       try {
         localStorage.removeItem(KEY);
         localStorage.removeItem(KEY_BAK);
       } catch (e) {}
       location.reload();
+      return true;
     }
   };
 })();

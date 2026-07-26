@@ -5,7 +5,7 @@
   'use strict';
 
   var Game = window.Game = window.Game || {};
-  Game.VERSION = '1.8.0';
+  Game.VERSION = '1.9.0';
   Game.SAVE_VERSION = 8;
 
   var U = Game.util = {};

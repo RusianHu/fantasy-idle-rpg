@@ -376,6 +376,297 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   html[lang="en"] .camp-action-label { font-size: 8px; }
 }
 
+/* ---------- 区域旅行 / 死亡重整短过场 ---------- */
+.transition-root {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  overflow: hidden;
+  pointer-events: auto;
+  isolation: isolate;
+}
+.transition-shade,
+.transition-pixel-curtain,
+.transition-beam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.transition-shade {
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 48%, #14244d18 0 24%, #050611c9 82%),
+    linear-gradient(180deg, #080a1740, #05061194);
+  opacity: .72;
+}
+.transition-pixel-curtain {
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+}
+.transition-pixel-curtain i {
+  display: block;
+  background:
+    linear-gradient(180deg, #111735 0%, #080a1b 45%, #050611 100%);
+  border-left: 1px solid #27305d44;
+  transform: scaleY(0);
+}
+.transition-pixel-curtain i:nth-child(odd) { transform-origin: top; }
+.transition-pixel-curtain i:nth-child(even) { transform-origin: bottom; }
+.transition-beam {
+  z-index: 4;
+  left: 50%;
+  right: auto;
+  width: 76px;
+  transform: translateX(-50%) scaleX(.1);
+  opacity: 0;
+  background: linear-gradient(90deg, #8eeaff00, #a8efff42 28%, #fff0b875 50%, #8eeaff42 72%, #8eeaff00);
+  mix-blend-mode: screen;
+}
+.transition-card {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 48%;
+  width: min(calc(100% - 32px), 390px);
+  min-height: 188px;
+  padding: 15px 16px 13px;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  background:
+    linear-gradient(180deg, #1b2146f2, #11152ff5 56%, #0b0d21f7);
+  box-shadow:
+    0 0 0 2px #070919,
+    0 10px 35px #000b,
+    inset 0 0 28px #6076bf12;
+}
+.transition-eyebrow {
+  min-height: 14px;
+  font-size: 9px;
+  color: #aeb6d9;
+  letter-spacing: 2px;
+}
+.transition-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 5px;
+  margin: 7px 0 9px;
+  font-size: 10px;
+  color: var(--ink-dim);
+}
+.transition-route span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.transition-route b {
+  color: var(--gold);
+  font-size: 15px;
+  font-weight: normal;
+  text-shadow: 0 0 8px #e6c65a99;
+  animation: transitionRune 1s steps(4) infinite;
+}
+.transition-title {
+  margin: 0;
+  color: #f3d77d;
+  font-size: 18px;
+  line-height: 1.35;
+  font-weight: normal;
+  text-shadow: 2px 2px 0 #080916, 0 0 13px #dca84b66;
+}
+.transition-sub {
+  min-height: 16px;
+  margin: 5px 0 6px;
+  color: #b8bfdf;
+  font-size: 10px;
+  line-height: 1.45;
+}
+.transition-phase {
+  min-height: 20px;
+  color: #eff3ff;
+  font-size: 12px;
+  text-shadow: 1px 1px 0 #000;
+}
+.transition-meter {
+  position: relative;
+  height: 8px;
+  margin: 5px 4px 9px;
+  padding: 2px;
+  border: 1px solid #4f5988;
+  background: #07091a;
+  box-shadow: inset 0 0 0 1px #111637;
+}
+.transition-meter span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #659ed2, #91e4ee 58%, #f2d26e);
+  box-shadow: 0 0 7px #80dce6aa;
+}
+.transition-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  margin-top: 7px;
+}
+.transition-actions .btn {
+  min-height: 44px;
+  padding: 7px 8px;
+  font-size: 11px;
+}
+.transition-hint {
+  min-height: 14px;
+  margin-top: 6px;
+  color: #8e96bc;
+  font-size: 8px;
+  line-height: 1.4;
+}
+.transition-root.phase-depart .transition-card {
+  animation: transitionCardOut .45s steps(5) forwards;
+}
+.transition-root.phase-depart .transition-pixel-curtain i {
+  animation: transitionCurtainIn .45s steps(6) forwards;
+}
+.transition-root.phase-depart .transition-pixel-curtain i:nth-child(2),
+.transition-root.phase-depart .transition-pixel-curtain i:nth-child(5) {
+  animation-duration: .41s;
+  animation-delay: .04s;
+}
+.transition-root.phase-depart .transition-beam,
+.transition-root.kind-death.phase-soul .transition-beam,
+.transition-root.kind-death.phase-land .transition-beam {
+  animation: transitionBeamIn .45s steps(6) forwards;
+}
+.transition-root.phase-swap .transition-pixel-curtain i { transform: scaleY(1); }
+.transition-root.kind-death.phase-land .transition-pixel-curtain i {
+  transform: scaleY(1);
+  animation: transitionCurtainOut .45s steps(5) forwards;
+}
+.transition-root.phase-swap .transition-card { opacity: 0; }
+.transition-root.phase-arrive .transition-pixel-curtain i {
+  transform: scaleY(1);
+  animation: transitionCurtainOut .85s steps(8) forwards;
+}
+.transition-root.phase-arrive .transition-pixel-curtain i:nth-child(odd) {
+  animation-duration: .81s;
+  animation-delay: .04s;
+}
+.transition-root.phase-arrive .transition-card {
+  animation: transitionCardIn .85s steps(7) both;
+}
+
+.transition-root.kind-death .transition-shade {
+  background:
+    radial-gradient(circle at 50% 42%, #b5d9ef10 0 12%, #1b183a9c 46%, #080711ed 100%),
+    repeating-linear-gradient(0deg, #07081212 0 2px, #311d3a18 2px 4px);
+}
+.transition-root.kind-death .transition-card {
+  top: auto;
+  bottom: 13%;
+  min-height: 164px;
+  transform: translateX(-50%);
+  border-color: #6f688f;
+  background: linear-gradient(180deg, #181a37ed, #0d1027f5);
+}
+.transition-root.kind-death .transition-title { color: #dcecff; text-shadow: 2px 2px 0 #080916, 0 0 14px #8ddff088; }
+.transition-root.kind-death .transition-meter span {
+  background: linear-gradient(90deg, #4f6ba6, #7be0d4 62%, #fff0a2);
+}
+.transition-root.kind-death.phase-down .transition-shade {
+  animation: deathShadeIn .65s steps(6) forwards;
+}
+.transition-root.kind-death.phase-soul .transition-pixel-curtain i {
+  animation: transitionCurtainIn .8s steps(8) forwards;
+}
+.transition-root.kind-death.phase-soul .transition-card {
+  animation: deathCardPulse .8s steps(5) both;
+}
+.transition-root.kind-death.phase-land .transition-card {
+  animation: deathCardIn .45s steps(4) both;
+}
+.transition-root.kind-death.phase-recover .transition-shade { opacity: .48; }
+.transition-root.kind-death.phase-recover .transition-card {
+  box-shadow:
+    0 0 0 2px #070919,
+    0 8px 30px #000a,
+    0 0 22px #e6b85b20,
+    inset 0 0 28px #ebbf6a12;
+}
+.transition-root.kind-death.phase-rise .transition-shade {
+  animation: reviveShadeOut .75s steps(7) forwards;
+}
+.transition-root.kind-death.phase-rise .transition-card {
+  animation: transitionCardOut .75s steps(6) forwards;
+}
+
+.scene-locked #battle-overlay .btn,
+.scene-locked #battle-overlay .control-switch,
+.scene-locked #tabbar,
+.scene-locked #panel-container {
+  pointer-events: none;
+}
+.scene-locked #battle-overlay .btn,
+.scene-locked #battle-overlay .control-switch {
+  opacity: 0;
+}
+.scene-locked #battle-overlay { filter: saturate(.82) brightness(.88); }
+
+@keyframes transitionRune {
+  50% { color: #e9f8ff; filter: brightness(1.5); transform: rotate(90deg); }
+}
+@keyframes transitionCurtainIn { to { transform: scaleY(1); } }
+@keyframes transitionCurtainOut { to { transform: scaleY(0); } }
+@keyframes transitionBeamIn {
+  0% { opacity: 0; transform: translateX(-50%) scaleX(.1); }
+  55% { opacity: .95; transform: translateX(-50%) scaleX(1); }
+  100% { opacity: 0; transform: translateX(-50%) scaleX(.35); }
+}
+@keyframes transitionCardOut {
+  to { opacity: 0; transform: translate(-50%, calc(-50% - 18px)) scale(.96); }
+}
+@keyframes transitionCardIn {
+  0% { opacity: 0; transform: translate(-50%, calc(-50% + 20px)) scale(.96); }
+  35% { opacity: 0; }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes deathShadeIn {
+  from { opacity: .15; filter: saturate(1); }
+  to { opacity: .9; filter: saturate(.35); }
+}
+@keyframes deathCardPulse {
+  50% { filter: brightness(1.2); }
+}
+@keyframes deathCardIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+@keyframes reviveShadeOut {
+  from { opacity: .7; }
+  to { opacity: 0; }
+}
+
+@media (max-width: 350px) {
+  .transition-card { width: calc(100% - 22px); padding: 12px 11px 10px; }
+  .transition-title { font-size: 16px; }
+  .transition-actions { gap: 6px; }
+  .transition-actions .btn { font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .transition-root *,
+  .transition-root *::before,
+  .transition-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+.transition-root.reduced * { animation: none !important; transition: none !important; }
+.transition-root.reduced.phase-depart .transition-pixel-curtain i,
+.transition-root.reduced.phase-swap .transition-pixel-curtain i,
+.transition-root.reduced.kind-death.phase-land .transition-pixel-curtain i { transform: scaleY(1); }
+.transition-root.reduced.phase-arrive .transition-pixel-curtain i { opacity: 0; }
+.transition-root.reduced.phase-rise .transition-shade { opacity: 0; }
+
 /* ---------- 通用按钮 ---------- */
 .btn {
   display: inline-flex;

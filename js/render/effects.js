@@ -19,6 +19,10 @@
     arrow: { color: '#a0722f', glow: '#d8c090', speed: 300 }
   };
 
+  function capShapes() {
+    if (shapes.length > 150) shapes.splice(0, shapes.length - 150);
+  }
+
   var FX = Game.fx = {
     /* ---------- 弹道 ---------- */
     projectile: function (x, y, target, kind, onHit) {
@@ -106,6 +110,67 @@
             : (U.chance(0.68) ? '#a665d8' : '#e0b8ff')
         });
       }
+      capShapes();
+    },
+
+    travelBurst: function (x, y, phase) {
+      var inward = phase === 'out';
+      for (var i = 0; i < 18; i++) {
+        var angle = i / 18 * Math.PI * 2 + U.rand(-0.12, 0.12);
+        var radius = inward ? U.rand(15, 27) : U.rand(3, 12);
+        shapes.push({
+          kind: 'travelp',
+          x: x + Math.cos(angle) * radius,
+          y: y - U.rand(2, 22) + Math.sin(angle) * radius * 0.25,
+          t: 0,
+          life: U.rand(0.38, 0.72),
+          vx: Math.cos(angle) * (inward ? -U.rand(10, 24) : U.rand(12, 28)),
+          vy: U.rand(-28, -10),
+          color: U.chance(0.55) ? '#92e9ff' : '#f2d57b',
+          s: U.chance(0.2) ? 2 : 1
+        });
+      }
+      capShapes();
+    },
+
+    soulReturn: function (x, y, phase) {
+      var outward = phase === 'out';
+      shapes.push({ kind: 'ring', x: x, y: y + 9, r: outward ? 25 : 20, color: '#9ddff0', t: 0, life: 0.72 });
+      shapes.push({ kind: 'ring', x: x, y: y + 9, r: outward ? 16 : 12, color: '#dfc8ff', t: 0, life: 0.52 });
+      for (var i = 0; i < 24; i++) {
+        var angle = U.rand(0, Math.PI * 2);
+        var radius = outward ? U.rand(2, 12) : U.rand(16, 30);
+        shapes.push({
+          kind: 'soulp',
+          x: x + Math.cos(angle) * radius,
+          y: y + Math.sin(angle) * radius * 0.45,
+          t: 0,
+          life: U.rand(0.55, 1.05),
+          vx: Math.cos(angle) * (outward ? U.rand(-4, 8) : -U.rand(8, 20)),
+          vy: outward ? U.rand(-38, -16) : U.rand(-16, -6),
+          s: U.chance(0.24) ? 2 : 1
+        });
+      }
+      capShapes();
+    },
+
+    revivePulse: function (x, y, step) {
+      var color = step >= 3 ? '#fff0a2' : (step === 2 ? '#80e0d3' : '#83b8ee');
+      shapes.push({ kind: 'ring', x: x, y: y + 9, r: 18 + step * 5, color: color, t: 0, life: 0.7 });
+      for (var i = 0; i < 10 + step * 2; i++) {
+        shapes.push({
+          kind: 'revivep',
+          x: x + U.rand(-15, 15),
+          y: y + U.rand(-1, 14),
+          t: 0,
+          life: U.rand(0.55, 0.95),
+          vx: U.rand(-5, 5),
+          vy: U.rand(-34, -16),
+          color: color,
+          s: U.chance(0.18) ? 2 : 1
+        });
+      }
+      capShapes();
     },
 
     /* ---------- 震屏 ---------- */
@@ -307,6 +372,28 @@
             ctx.fillStyle = '#ffffff';
             ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
           }
+          ctx.globalAlpha = 1;
+        } else if (s.kind === 'travelp') {
+          var tk = 1 - s.t / s.life;
+          ctx.globalAlpha = Math.max(0, tk);
+          ctx.fillStyle = s.color;
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
+          if (s.s > 1 && tk > 0.45) {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+          }
+          ctx.globalAlpha = 1;
+        } else if (s.kind === 'soulp') {
+          var sk = 1 - s.t / s.life;
+          ctx.globalAlpha = Math.max(0, sk * 0.9);
+          ctx.fillStyle = sk > 0.5 ? '#d9f7ff' : '#a79adf';
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s + 1);
+          ctx.globalAlpha = 1;
+        } else if (s.kind === 'revivep') {
+          var rk = 1 - s.t / s.life;
+          ctx.globalAlpha = Math.max(0, rk);
+          ctx.fillStyle = s.color;
+          ctx.fillRect(Math.round(s.x), Math.round(s.y), s.s, s.s);
           ctx.globalAlpha = 1;
         } else if (s.kind === 'finalp') {
           var fk = 1 - s.t / s.life;

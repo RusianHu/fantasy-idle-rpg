@@ -46,6 +46,16 @@
       return true;
     },
 
+    /** 玩家可见的换区入口：校验后交由短过场导演处理。 */
+    requestRegion: function (rid, opts) {
+      opts = opts || {};
+      if (!reg.has('region', rid)) return false;
+      if (!Prog.isUnlocked(rid)) return false;
+      if (rid === Game.state.world.region) return false;
+      if (!Game.transitions || Game.transitions.isActive()) return false;
+      return Game.transitions.startRegion(rid, opts);
+    },
+
     init: function () {
       // Boss 击败 → 解锁下一区域；自动推进开关（默认开启）
       bus.on('boss:defeated', function (p) {
@@ -56,22 +66,17 @@
         })();
         if (next) bus.emit('region:unlocked', { rid: next });
         if (next && Game.state.settings.autoAdvance) {
-          setTimeout(function () {
-            // 延迟期间玩家可能已手动换图/关页面
-            if (Game.state && Game.state.world.region === p.rid) {
-              Prog.gotoRegion(next);
-              bus.emit('prog:autoAdvance', { rid: next });
-            }
-          }, 2200);
+          // 无需确认：默认 3 秒后出发；玩家可取消本次旅行。
+          Prog.requestRegion(next, { source: 'auto', boss: p });
         }
       });
 
-      // 卡关保护：同区域连败 3 次 → 自动回退上一区域
+      // 兼容旧调用：新死亡流程会将回退目标并入灵魂返营，不再走双重换区。
       bus.on('protect:fallback', function () {
+        if (Game.transitions && Game.transitions.isDeathActive()) return;
         var prev = Prog.prevRegion();
         if (prev) {
-          Prog.gotoRegion(prev);
-          bus.emit('prog:fellback', { rid: prev });
+          Prog.requestRegion(prev, { source: 'fallback' });
         }
       });
     }

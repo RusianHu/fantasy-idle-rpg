@@ -7,6 +7,7 @@
   var U = Game.util, bus = Game.bus, reg = Game.reg;
 
   var root = null;
+  var deferredToasts = [];
 
   var M = Game.ui.modals = {
     init: function () {
@@ -30,6 +31,7 @@
         M.toast('🗺 ' + t('ui.regionUnlocked', { name: t('region.' + p.rid + '.name') }));
       });
       bus.on('prog:autoAdvance', function (p) {
+        if (p && p.cinematic) return;
         M.toast(t('ui.autoAdvanced', { name: t('region.' + p.rid + '.name') }));
       });
       bus.on('prog:fellback', function (p) {
@@ -37,6 +39,7 @@
       });
       bus.on('boss:defeated', function (p) {
         if (p.first && Game.ending && Game.ending.isActive()) return;
+        if (Game.transitions && Game.transitions.isRegionActive()) return;
         if (p.first) M.toast('💎 ' + t('ui.bossFirstKill', { n: Game.F.bossCrystal(p.tier) }), 'gold', 3600);
         else M.toast(t('ui.bossKilled'));
       });
@@ -50,6 +53,7 @@
         }
       });
       bus.on('player:death', function () {
+        if (Game.transitions && Game.transitions.isDeathActive()) return;
         Game.fx.flashScreen();
         M.toast(t('ui.heroDown'), 'warn');
       });
@@ -105,6 +109,10 @@
 
     toast: function (msg, cls, life) {
       if (Game.ending && Game.ending.isActive()) return;
+      if (Game.transitions && Game.transitions.isActive()) {
+        if (deferredToasts.length < 4) deferredToasts.push({ msg: msg, cls: cls, life: life });
+        return;
+      }
       var box = document.getElementById('toasts');
       if (!box) return;
       var el = U.el('div', 'toast jrpg-box', msg);
@@ -120,6 +128,19 @@
     clearToasts: function () {
       var box = document.getElementById('toasts');
       if (box) box.replaceChildren();
+    },
+
+    clearDeferredToasts: function () {
+      deferredToasts = [];
+    },
+
+    flushDeferredToasts: function () {
+      if (!deferredToasts.length) return;
+      var list = deferredToasts.slice(0, 3);
+      deferredToasts = [];
+      for (var i = 0; i < list.length; i++) {
+        M.toast(list[i].msg, list[i].cls, list[i].life);
+      }
     },
 
     /* ---------------- 装备详情（含对比） ---------------- */

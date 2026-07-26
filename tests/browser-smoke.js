@@ -283,9 +283,11 @@ async function run() {
       hero.state = 'idle';
       Game.state.player.hp = hero.maxHp;
       W.onHeroDeath();
-      W.updateHero(hero, 1.1);
+      Game.transitions.update(1.95);
       const deathAtCamp = hero.state === 'recover' &&
         U.dist(hero.x, hero.y, W.layout.camp.x + 26, W.layout.camp.y + 24) < 0.01;
+      Game.transitions.settleBeforeSave();
+      W.setMode('battle');
 
       hero.state = 'idle';
       Game.state.player.hp = hero.maxHp * Game.state.settings.potionThreshold * 0.5;
@@ -460,6 +462,414 @@ async function run() {
     assert.equal(englishCampFit.fits, true, 'English camp label fits its allocated width');
     assert.equal(englishCampFit.buttonFits, true, 'English camp button has no internal overflow');
 
+    const transitionScreenshots = [];
+    const transitionCountdown = await cdp.evaluate(`(() => {
+      if (Game.transitions.isActive()) Game.transitions.settleBeforeSave();
+      Game.i18n.setLocale('zh-CN');
+      Game.ui.tabs.open('battle', true);
+      const order = Game.State.regionOrder();
+      const firstRid = order[0];
+      const nextRid = order[1];
+      Game.state.world.region = firstRid;
+      Game.world.init(firstRid);
+      Game.state.meta.stats.highestRegion = 1;
+      Game.State.regionProg(firstRid).cleared = true;
+      Game.state.settings.autoAdvance = true;
+      Game.world.setControlMode('auto');
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      document.getElementById('toasts').replaceChildren();
+
+      const started = Game.prog.requestRegion(nextRid, {
+        source: 'auto',
+        boss: { first: true, tier: 1 }
+      });
+      const duplicateRejected = !Game.prog.requestRegion(nextRid, { source: 'auto' });
+      const root = document.getElementById('transition-root');
+      const card = root.querySelector('.transition-card');
+      const rr = root.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      const buttons = Array.from(root.querySelectorAll('.transition-actions .btn')).map((button) => {
+        const r = button.getBoundingClientRect();
+        return { text: button.textContent, height: r.height, fits: button.scrollWidth <= button.clientWidth };
+      });
+      const hero = Game.world.hero;
+      hero.moveOrder = null;
+      Game.world.handleTap(hero.x + 80, hero.y);
+      const inputBlocked = !hero.moveOrder;
+      const tabBlocked = Game.ui.tabs.open('map') === false &&
+        document.querySelector('#tabbar .tab-btn[data-tab="battle"]').classList.contains('active');
+      const controlsLocked = document.getElementById('control-switch').disabled &&
+        document.getElementById('btn-camp').disabled &&
+        Array.from(document.querySelectorAll('#tabbar .tab-btn')).every((button) => button.disabled);
+
+      Game.i18n.setLocale('en');
+      const englishFits = Array.from(root.querySelectorAll('.transition-actions .btn')).every(
+        (button) => button.scrollWidth <= button.clientWidth
+      ) && card.scrollWidth <= card.clientWidth;
+      Game.i18n.setLocale('zh-CN');
+      return {
+        started,
+        duplicateRejected,
+        firstRid,
+        nextRid,
+        region: Game.state.world.region,
+        phase: Game.transitions.snapshot().phase,
+        title: root.querySelector('.transition-title').textContent,
+        buttons,
+        inputBlocked,
+        tabBlocked,
+        blocksWorld: Game.transitions.blocksWorld(),
+        heroX: hero.x,
+        controlsLocked,
+        englishFits,
+        cardWithinStage: cr.left >= rr.left && cr.right <= rr.right && cr.top >= rr.top && cr.bottom <= rr.bottom,
+        noToast: !document.getElementById('toasts').textContent.trim(),
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(transitionCountdown.started, true);
+    assert.equal(transitionCountdown.duplicateRejected, true);
+    assert.equal(transitionCountdown.region, transitionCountdown.firstRid);
+    assert.equal(transitionCountdown.phase, 'countdown');
+    assert.equal(transitionCountdown.inputBlocked, true);
+    assert.equal(transitionCountdown.tabBlocked, true);
+    assert.equal(transitionCountdown.blocksWorld, true);
+    assert.equal(transitionCountdown.controlsLocked, true);
+    assert.equal(transitionCountdown.englishFits, true);
+    assert.equal(transitionCountdown.cardWithinStage, true);
+    assert.equal(transitionCountdown.noToast, true);
+    assert.equal(transitionCountdown.noHorizontalOverflow, true);
+    assert.ok(transitionCountdown.buttons.every((button) => button.height >= 44 && button.fits));
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'rawKeyDown', code: 'KeyD', key: 'd', text: 'd',
+      windowsVirtualKeyCode: 68, nativeVirtualKeyCode: 68
+    });
+    await delay(60);
+    await cdp.send('Input.dispatchKeyEvent', {
+      type: 'keyUp', code: 'KeyD', key: 'd',
+      windowsVirtualKeyCode: 68, nativeVirtualKeyCode: 68
+    });
+    const transitionKeyboardBlocked = await cdp.evaluate(
+      `Math.abs(Game.world.hero.x - ${JSON.stringify(transitionCountdown.heroX)}) < .001`
+    );
+    assert.equal(transitionKeyboardBlocked, true, 'WASD is blocked during travel');
+    const countdownCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const countdownScreenshot = path.join(os.tmpdir(), 'firpg-transition-countdown-mobile-cdp.png');
+    fs.writeFileSync(countdownScreenshot, Buffer.from(countdownCapture.data, 'base64'));
+    transitionScreenshots.push(countdownScreenshot);
+
+    const transitionCancelled = await cdp.evaluate(`(() => {
+      document.querySelector('.travel-stay').click();
+      return {
+        active: Game.transitions.isActive(),
+        region: Game.state.world.region,
+        autoAdvance: Game.state.settings.autoAdvance,
+        hidden: document.getElementById('transition-root').classList.contains('hidden'),
+        controlsUnlocked: !document.getElementById('control-switch').disabled &&
+          !document.getElementById('btn-camp').disabled
+      };
+    })()`);
+    assert.equal(transitionCancelled.active, false);
+    assert.equal(transitionCancelled.region, transitionCountdown.firstRid);
+    assert.equal(transitionCancelled.autoAdvance, true);
+    assert.equal(transitionCancelled.hidden, true);
+    assert.equal(transitionCancelled.controlsUnlocked, true);
+
+    const transitionSwap = await cdp.evaluate(`(() => {
+      Game.prog.requestRegion(${JSON.stringify(transitionCountdown.nextRid)}, {
+        source: 'auto',
+        boss: { first: true, tier: 1 }
+      });
+      document.querySelector('.travel-now').click();
+      Game.transitions.update(.47);
+      const snap = Game.transitions.snapshot();
+      return {
+        phase: snap.phase,
+        region: Game.state.world.region,
+        active: Game.transitions.isActive(),
+        curtainColumns: document.querySelectorAll('.transition-pixel-curtain i').length
+      };
+    })()`);
+    assert.equal(transitionSwap.phase, 'swap');
+    assert.equal(transitionSwap.region, transitionCountdown.nextRid);
+    assert.equal(transitionSwap.active, true);
+    assert.equal(transitionSwap.curtainColumns, 6);
+    const swapCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const swapScreenshot = path.join(os.tmpdir(), 'firpg-transition-swap-mobile-cdp.png');
+    fs.writeFileSync(swapScreenshot, Buffer.from(swapCapture.data, 'base64'));
+    transitionScreenshots.push(swapScreenshot);
+
+    const transitionArrive = await cdp.evaluate(`(() => {
+      Game.transitions.update(.3);
+      const snap = Game.transitions.snapshot();
+      const root = document.getElementById('transition-root');
+      return {
+        phase: snap.phase,
+        title: root.querySelector('.transition-title').textContent,
+        arrivalMode: snap.arrivalMode,
+        heroState: Game.world.hero.state
+      };
+    })()`);
+    assert.equal(transitionArrive.phase, 'arrive');
+    assert.equal(transitionArrive.arrivalMode, 'battle');
+    assert.equal(transitionArrive.heroState, 'arrival');
+    await delay(180);
+    const arriveCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const arriveScreenshot = path.join(os.tmpdir(), 'firpg-transition-arrive-mobile-cdp.png');
+    fs.writeFileSync(arriveScreenshot, Buffer.from(arriveCapture.data, 'base64'));
+    transitionScreenshots.push(arriveScreenshot);
+
+    const transitionFinished = await cdp.evaluate(`(() => {
+      Game.transitions.update(2);
+      return {
+        active: Game.transitions.isActive(),
+        region: Game.state.world.region,
+        mode: Game.state.world.mode,
+        heroState: Game.world.hero.state
+      };
+    })()`);
+    assert.equal(transitionFinished.active, false);
+    assert.equal(transitionFinished.region, transitionCountdown.nextRid);
+    assert.equal(transitionFinished.mode, 'battle');
+    assert.equal(transitionFinished.heroState, 'idle');
+
+    const manualFirstArrival = await cdp.evaluate(`(() => {
+      const order = Game.State.regionOrder();
+      const current = order[1];
+      const next = order[2];
+      Game.State.regionProg(current).cleared = true;
+      Game.world.setControlMode('manual');
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      const started = Game.prog.requestRegion(next, { source: 'map' });
+      const initial = Game.transitions.snapshot();
+      Game.transitions.update(2);
+      return {
+        started,
+        initialPhase: initial.phase,
+        firstEntry: initial.firstEntry,
+        region: Game.state.world.region,
+        mode: Game.state.world.mode,
+        heroState: Game.world.hero.state
+      };
+    })()`);
+    assert.equal(manualFirstArrival.started, true);
+    assert.equal(manualFirstArrival.initialPhase, 'depart');
+    assert.equal(manualFirstArrival.firstEntry, true);
+    assert.equal(manualFirstArrival.mode, 'rest');
+    assert.equal(manualFirstArrival.heroState, 'goCamp');
+
+    const deathStart = await cdp.evaluate(`(() => {
+      Game.world.setControlMode('auto');
+      Game.state.world.mode = 'battle';
+      if (Game.world.bossEnt) {
+        const index = Game.world.entities.indexOf(Game.world.bossEnt);
+        if (index >= 0) Game.world.entities.splice(index, 1);
+      }
+      Game.world.bossEnt = null;
+      Game.world.cinematic = null;
+      Game.state.world.deathsRow = 0;
+      Game.world.hero.state = 'idle';
+      Game.state.player.hp = 0;
+      Game.world.onHeroDeath();
+      const root = document.getElementById('transition-root');
+      const card = root.querySelector('.transition-card').getBoundingClientRect();
+      const stage = root.getBoundingClientRect();
+      return {
+        phase: Game.transitions.snapshot().phase,
+        kind: Game.transitions.snapshot().kind,
+        controlLocked: document.getElementById('control-switch').disabled,
+        progressText: root.querySelector('.transition-phase').textContent,
+        cardWithinStage: card.left >= stage.left && card.right <= stage.right &&
+          card.top >= stage.top && card.bottom <= stage.bottom
+      };
+    })()`);
+    assert.equal(deathStart.kind, 'death');
+    assert.equal(deathStart.phase, 'down');
+    assert.equal(deathStart.controlLocked, true);
+    assert.equal(deathStart.cardWithinStage, true);
+    const deathPhases = [{ phase: deathStart.phase, progressText: deathStart.progressText }];
+    const deathDownCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const deathDownScreenshot = path.join(os.tmpdir(), 'firpg-death-down-mobile-cdp.png');
+    fs.writeFileSync(deathDownScreenshot, Buffer.from(deathDownCapture.data, 'base64'));
+    transitionScreenshots.push(deathDownScreenshot);
+    for (const deathStep of [
+      { expected: 'soul' },
+      { expected: 'land' },
+      { expected: 'recover' },
+      { expected: 'rise' }
+    ]) {
+      const metrics = await cdp.evaluate(`(() => {
+        let snap = Game.transitions.snapshot();
+        if (snap.phase !== ${JSON.stringify(deathStep.expected)}) {
+          Game.transitions.update(snap.timeLeft + .05);
+          snap = Game.transitions.snapshot();
+        }
+        const root = document.getElementById('transition-root');
+        return {
+          phase: snap.phase,
+          timeLeft: snap.timeLeft,
+          hp: Game.state.player.hp,
+          maxHp: Game.world.hero.maxHp,
+          recoveryPct: snap.recoveryPct,
+          meterWidth: parseFloat(root.querySelector('.transition-meter span').style.width),
+          progressText: root.querySelector('.transition-phase').textContent
+        };
+      })()`);
+      assert.equal(metrics.phase, deathStep.expected);
+      if (deathStep.expected === 'recover') {
+        assert.ok(metrics.hp > 0 && metrics.hp < metrics.maxHp);
+        assert.ok(metrics.recoveryPct > 0 && metrics.recoveryPct < 1);
+        assert.ok(metrics.meterWidth > 0 && metrics.meterWidth < 100);
+      }
+      deathPhases.push(metrics);
+      if (deathStep.expected === 'land' && metrics.timeLeft > .2) await delay(110);
+      const deathCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+      const deathScreenshot = path.join(os.tmpdir(), 'firpg-death-' + deathStep.expected + '-mobile-cdp.png');
+      fs.writeFileSync(deathScreenshot, Buffer.from(deathCapture.data, 'base64'));
+      transitionScreenshots.push(deathScreenshot);
+    }
+    const deathFinished = await cdp.evaluate(`(() => {
+      Game.transitions.update(1);
+      return {
+        active: Game.transitions.isActive(),
+        hp: Game.state.player.hp,
+        maxHp: Game.world.hero.maxHp,
+        mode: Game.state.world.mode,
+        heroState: Game.world.hero.state
+      };
+    })()`);
+    assert.equal(deathFinished.active, false);
+    assert.equal(deathFinished.hp, deathFinished.maxHp);
+    assert.equal(deathFinished.mode, 'battle');
+    assert.equal(deathFinished.heroState, 'idle');
+
+    const transitionRules = await cdp.evaluate(`(() => {
+      Game.world.setControlMode('manual');
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      Game.state.player.hp = 0;
+      Game.state.world.deathsRow = 0;
+      Game.world.onHeroDeath();
+      Game.transitions.update(20);
+      const manual = {
+        mode: Game.state.world.mode,
+        heroState: Game.world.hero.state,
+        hp: Game.state.player.hp
+      };
+
+      Game.world.setControlMode('auto');
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      const currentRid = Game.state.world.region;
+      const progress = Game.State.regionProg(currentRid);
+      progress.kills = Game.world.region.killTarget;
+      Game.world.trySpawnBoss();
+      Game.state.world.deathsRow = 1;
+      Game.state.player.hp = 0;
+      Game.world.onHeroDeath();
+      const bossSnap = Game.transitions.snapshot();
+      const boss = {
+        byBoss: bossSnap.byBoss,
+        bossGone: !Game.world.bossEnt,
+        keptProgress: progress.kills,
+        expectedProgress: Math.ceil(Game.world.region.killTarget / 2),
+        deathsRow: Game.state.world.deathsRow
+      };
+      Game.transitions.settleBeforeSave();
+
+      const order = Game.State.regionOrder();
+      const previousRid = order[order.indexOf(currentRid) - 1];
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      Game.world.bossEnt = null;
+      Game.state.world.deathsRow = 2;
+      Game.state.player.hp = 0;
+      Game.world.onHeroDeath();
+      const fallbackRid = Game.transitions.snapshot().fallbackRid;
+      Game.transitions.update(2);
+      const fallbackLandedRid = Game.state.world.region;
+      Game.transitions.update(20);
+
+      const firstRid = order[0];
+      Game.state.world.region = firstRid;
+      Game.world.init(firstRid);
+      Game.state.world.mode = 'battle';
+      Game.state.world.deathsRow = 2;
+      Game.world.hero.state = 'idle';
+      Game.state.player.hp = 0;
+      Game.world.onHeroDeath();
+      const firstFallback = Game.transitions.snapshot().fallbackRid;
+      Game.transitions.settleBeforeSave();
+      Game.state.settings.effects = false;
+      Game.state.player.hp = 0;
+      const restoredStarted = Game.transitions.restoreZeroHp();
+      const restoredSnap = Game.transitions.snapshot();
+      const reducedStyle = Game.transitions.entityStyle(Game.world.hero);
+      const reduced = {
+        restoredStarted,
+        phase: restoredSnap.phase,
+        markedReduced: restoredSnap.reduced,
+        rootReduced: document.getElementById('transition-root').classList.contains('reduced'),
+        ghosts: reducedStyle.ghosts
+      };
+      Game.transitions.settleBeforeSave();
+      Game.state.settings.effects = true;
+      const firstRegionAfter = Game.state.world.region;
+      Game.State.regionProg(firstRid).cleared = true;
+      const pagehideTarget = order[1];
+      Game.prog.requestRegion(pagehideTarget, { source: 'auto' });
+      window.dispatchEvent(new Event('pagehide'));
+      const pagehide = {
+        active: Game.transitions.isActive(),
+        region: Game.state.world.region,
+        target: pagehideTarget,
+        savedRegion: JSON.parse(localStorage.getItem('firpg_save')).world.region
+      };
+      return {
+        manual,
+        boss,
+        fallbackRid,
+        expectedFallbackRid: previousRid,
+        fallbackLandedRid,
+        firstFallback,
+        firstRegionAfter,
+        reduced,
+        pagehide
+      };
+    })()`);
+    assert.equal(transitionRules.manual.mode, 'rest');
+    assert.equal(transitionRules.manual.heroState, 'sitting');
+    assert.ok(transitionRules.manual.hp > 0);
+    assert.equal(transitionRules.boss.byBoss, true);
+    assert.equal(transitionRules.boss.bossGone, true);
+    assert.equal(transitionRules.boss.keptProgress, transitionRules.boss.expectedProgress);
+    assert.equal(transitionRules.boss.deathsRow, 1);
+    assert.equal(transitionRules.fallbackRid, transitionRules.expectedFallbackRid);
+    assert.equal(transitionRules.fallbackLandedRid, transitionRules.expectedFallbackRid);
+    assert.equal(transitionRules.firstFallback, null);
+    assert.equal(transitionRules.firstRegionAfter, transitionCountdown.firstRid);
+    assert.equal(transitionRules.reduced.restoredStarted, true);
+    assert.equal(transitionRules.reduced.phase, 'land');
+    assert.equal(transitionRules.reduced.markedReduced, true);
+    assert.equal(transitionRules.reduced.rootReduced, true);
+    assert.equal(transitionRules.reduced.ghosts, 0);
+    assert.equal(transitionRules.pagehide.active, false);
+    assert.equal(transitionRules.pagehide.region, transitionRules.pagehide.target);
+    assert.equal(transitionRules.pagehide.savedRegion, transitionRules.pagehide.target);
+    const transitionChecks = {
+      countdown: transitionCountdown,
+      cancelled: transitionCancelled,
+      swap: transitionSwap,
+      arrive: transitionArrive,
+      finished: transitionFinished,
+      manualFirstArrival,
+      deathPhases,
+      deathFinished,
+      rules: transitionRules
+    };
+
     const endingStart = await cdp.evaluate(`(() => {
       Game.i18n.setLocale('zh-CN');
       Game.ui.tabs.open('battle');
@@ -513,9 +923,9 @@ async function run() {
 
     await delay(1100);
     const endingEpilogue = await cdp.evaluate(`(() => {
-      Game.ending.advance();
-      Game.ending.advance();
-      Game.ending.advance();
+      for (let guard = 0; guard < 4 && Game.ending.phase() === 'cinematic'; guard++) {
+        Game.ending.advance();
+      }
       Game.ui.ending.advanceStory();
       const story = document.querySelector('.ending-story');
       const text = document.querySelector('.ending-story .story-text');
@@ -574,7 +984,10 @@ async function run() {
     assert.ok(endingSummary.buttons.every((button) => button.height >= 44 && button.fits));
     assert.equal(endingSummary.withinViewport, true);
     assert.equal(endingSummary.noHorizontalOverflow, true);
-    assert.ok(endingSummary.warmPixels > 0, 'ending keeps the live nonblank canvas behind its dawn treatment');
+    assert.ok(
+      endingSummary.warmPixels > 0,
+      'ending keeps the live nonblank canvas behind its dawn treatment: ' + JSON.stringify(endingSummary)
+    );
     assert.equal(endingSummary.playFrozen, true);
     assert.equal(endingSummary.timeFrozen, true);
 
@@ -807,6 +1220,40 @@ async function run() {
     const desktopScreenshot = path.join(os.tmpdir(), 'firpg-density-forest-desktop-cdp.png');
     fs.writeFileSync(desktopScreenshot, Buffer.from(desktopCapture.data, 'base64'));
 
+    const desktopTransition = await cdp.evaluate(`(() => {
+      if (Game.transitions.isActive()) Game.transitions.settleBeforeSave();
+      Game.ui.tabs.open('battle', true);
+      const order = Game.State.regionOrder();
+      const currentIndex = order.indexOf(Game.state.world.region);
+      const targetIndex = currentIndex < order.length - 1 ? currentIndex + 1 : currentIndex - 1;
+      const targetRid = order[targetIndex];
+      if (targetIndex > 0) Game.State.regionProg(order[targetIndex - 1]).cleared = true;
+      Game.state.world.mode = 'battle';
+      Game.world.setControlMode('auto');
+      const started = Game.prog.requestRegion(targetRid, { source: 'auto' });
+      const root = document.getElementById('transition-root').getBoundingClientRect();
+      const card = document.querySelector('.transition-card').getBoundingClientRect();
+      const buttons = Array.from(document.querySelectorAll('.transition-actions .btn')).map((button) => {
+        const r = button.getBoundingClientRect();
+        return { height: r.height, fits: button.scrollWidth <= button.clientWidth };
+      });
+      const result = {
+        started,
+        cardWithinRoot: card.left >= root.left && card.right <= root.right &&
+          card.top >= root.top && card.bottom <= root.bottom,
+        cardWidth: card.width,
+        buttons,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+      Game.transitions.cancel('desktop-qa');
+      return result;
+    })()`);
+    assert.equal(desktopTransition.started, true);
+    assert.equal(desktopTransition.cardWithinRoot, true);
+    assert.ok(desktopTransition.cardWidth <= 390);
+    assert.ok(desktopTransition.buttons.every((button) => button.height >= 44 && button.fits));
+    assert.equal(desktopTransition.noHorizontalOverflow, true);
+
     const desktopEnding = await cdp.evaluate(`(() => {
       Game.state.meta.completedAt = Date.now();
       Game.state.meta.endingAcknowledged = false;
@@ -879,10 +1326,122 @@ async function run() {
     const capture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const screenshot = path.join(os.tmpdir(), 'firpg-demo-mobile-cdp.png');
     fs.writeFileSync(screenshot, Buffer.from(capture.data, 'base64'));
+
+    // 真正走完“通关摘要 → 重开确认 → 页面重载 → 序章 → 新角色”。
+    // 这能捕获删档后又被 pagehide/beforeunload 自动存档写回的竞态。
+    await cdp.navigate(BASE);
+    const restartBefore = await cdp.evaluate(`(() => {
+      if (!Game.player.hasClass()) Game.player.setClass('fighter');
+      Game.state.meta.prologueDone = true;
+      Game.state.meta.completedAt = Date.now();
+      Game.state.meta.endingAcknowledged = false;
+      Game.state.meta.endingPhase = 'summary';
+      Game.state.meta.endingLine = 5;
+      Game.save.save('restart-browser-fixture');
+      Game.ending.restorePending();
+      document.getElementById('ending-restart').click();
+      const mask = document.querySelector('#modal-root .modal-mask');
+      return {
+        createdAt: Game.state.createdAt,
+        summary: !!document.getElementById('ending-root'),
+        confirm: !!mask,
+        mainSave: !!localStorage.getItem('firpg_save'),
+        backupSave: !!localStorage.getItem('firpg_save_backup')
+      };
+    })()`);
+    assert.equal(restartBefore.summary, true);
+    assert.equal(restartBefore.confirm, true);
+    assert.equal(restartBefore.mainSave, true);
+    assert.equal(restartBefore.backupSave, true);
+
+    const restartedLoad = cdp.event('Page.loadEventFired');
+    await cdp.evaluate(`(() => {
+      const yes = document.querySelector('#modal-root .modal-mask .modal-btns .btn.gold');
+      if (!yes) throw new Error('restart confirmation button missing');
+      setTimeout(() => yes.click(), 0);
+      return true;
+    })()`);
+    await restartedLoad;
+    await delay(500);
+    const restartTitle = await cdp.evaluate(`(() => ({
+      titleVisible: !!document.getElementById('title-root'),
+      classVisible: !!document.getElementById('class-root'),
+      endingGone: !document.getElementById('ending-root'),
+      hasClass: Game.player.hasClass(),
+      prologueDone: Game.state.meta.prologueDone,
+      completedAt: Game.state.meta.completedAt,
+      createdAt: Game.state.createdAt,
+      mainSaveIsFresh: JSON.parse(localStorage.getItem('firpg_save')).meta.completedAt === null,
+      backupSaveIsFresh: JSON.parse(localStorage.getItem('firpg_save_backup')).meta.completedAt === null
+    }))()`);
+    assert.equal(restartTitle.titleVisible, true, 'confirmed restart returns to the title screen');
+    assert.equal(restartTitle.classVisible, false);
+    assert.equal(restartTitle.endingGone, true);
+    assert.equal(restartTitle.hasClass, false);
+    assert.equal(restartTitle.prologueDone, false);
+    assert.equal(restartTitle.completedAt, null);
+    assert.notEqual(restartTitle.createdAt, restartBefore.createdAt);
+    assert.equal(restartTitle.mainSaveIsFresh, true);
+    assert.equal(restartTitle.backupSaveIsFresh, true);
+    const restartTitleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const restartTitleScreenshot = path.join(os.tmpdir(), 'firpg-restart-title-mobile-cdp.png');
+    fs.writeFileSync(restartTitleScreenshot, Buffer.from(restartTitleCapture.data, 'base64'));
+
+    const restartClassSelect = await cdp.evaluate(`(() => {
+      document.querySelector('#title-root .title-start').click();
+      const story = document.querySelector('.prologue-mask');
+      for (let i = 0; i < 10; i++) story.click();
+      const root = document.getElementById('class-root');
+      return {
+        titleVisible: !!document.getElementById('title-root'),
+        classVisible: !!root,
+        classCount: root ? Game.reg.all('class').length : 0,
+        confirmButton: !!root?.querySelector('.cs-confirm'),
+        prologueDone: Game.state.meta.prologueDone
+      };
+    })()`);
+    assert.equal(restartClassSelect.titleVisible, true);
+    assert.equal(restartClassSelect.classVisible, true, 'new character creation opens after the fresh prologue');
+    assert.ok(restartClassSelect.classCount >= 5);
+    assert.equal(restartClassSelect.confirmButton, true);
+    assert.equal(restartClassSelect.prologueDone, true);
+    const restartClassCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const restartClassScreenshot = path.join(os.tmpdir(), 'firpg-restart-class-select-mobile-cdp.png');
+    fs.writeFileSync(restartClassScreenshot, Buffer.from(restartClassCapture.data, 'base64'));
+
+    await cdp.evaluate(`(() => {
+      document.querySelector('#class-root .cs-confirm').click();
+      document.querySelector('#modal-root .modal-mask .modal-btns .btn.gold').click();
+      return true;
+    })()`);
+    await delay(850);
+    const restartCompleted = await cdp.evaluate(`(() => {
+      const saved = JSON.parse(localStorage.getItem('firpg_save'));
+      const backup = JSON.parse(localStorage.getItem('firpg_save_backup'));
+      return {
+        hasClass: Game.player.hasClass(),
+        classId: Game.state.player.classId,
+        titleGone: !document.getElementById('title-root'),
+        classGone: !document.getElementById('class-root'),
+        saveMatches: saved.player.classId === Game.state.player.classId,
+        backupMatches: backup.player.classId === Game.state.player.classId,
+        endingCleared: saved.meta.completedAt === null && backup.meta.completedAt === null
+      };
+    })()`);
+    assert.equal(restartCompleted.hasClass, true);
+    assert.equal(restartCompleted.titleGone, true);
+    assert.equal(restartCompleted.classGone, true);
+    assert.equal(restartCompleted.saveMatches, true);
+    assert.equal(restartCompleted.backupMatches, true);
+    assert.equal(restartCompleted.endingCleared, true);
+    assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors after restart');
+
     console.log('Browser smoke passed: ' + JSON.stringify({
-      main, worldChecks, campStateScreenshots, englishCampFit, endingChecks, densityChecks, desktop,
+      main, worldChecks, campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
+      endingChecks, densityChecks, desktop, desktopTransition,
       desktopEnding, demo, mainScreenshot, densityScreenshots, desktopScreenshot,
-      desktopEndingScreenshot, screenshot
+      desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
+      restartCompleted, restartTitleScreenshot, restartClassScreenshot
     }));
     cdp.ws.close();
   } finally {

@@ -157,9 +157,8 @@
       var btn = card.querySelector('.go-btn');
       btn.disabled = !unlocked || isCurrent;
       btn.addEventListener('click', function () {
-        if (Game.prog.gotoRegion(r.id)) {
-          Game.ui.tabs.open('battle');
-          Game.ui.modals.toast(t('ui.movedTo', { name: t('region.' + r.id + '.name') }));
+        if (Game.prog.requestRegion(r.id, { source: 'map' })) {
+          Game.ui.tabs.open('battle', true);
         }
       });
       root.appendChild(card);

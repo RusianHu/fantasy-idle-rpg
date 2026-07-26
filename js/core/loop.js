@@ -29,7 +29,8 @@
     }
     st.world.worldTime += dt;
     Game.terrain.update(dt);
-    Game.world.update(dt);
+    if (Game.transitions) Game.transitions.update(dt);
+    if (!Game.transitions || !Game.transitions.blocksWorld()) Game.world.update(dt);
     Game.particles.update(dt);
     Game.fx.update(dt);
     Game.meta.tick(dt);
@@ -71,6 +72,7 @@
     init: function () {
       document.addEventListener('visibilitychange', function () {
         if (document.hidden) {
+          if (Game.transitions) Game.transitions.settleBeforeSave();
           hiddenAt = U.now();
           Game.save.save('hidden');
         } else {
@@ -90,8 +92,14 @@
           }
         }
       });
-      window.addEventListener('pagehide', function () { Game.save.save('pagehide'); });
-      window.addEventListener('beforeunload', function () { Game.save.save('unload'); });
+      window.addEventListener('pagehide', function () {
+        if (Game.transitions) Game.transitions.settleBeforeSave();
+        Game.save.save('pagehide');
+      });
+      window.addEventListener('beforeunload', function () {
+        if (Game.transitions) Game.transitions.settleBeforeSave();
+        Game.save.save('unload');
+      });
 
       // 关键事件即时保存
       var saveOn = ['player:levelup', 'boss:defeated', 'item:equipped', 'region:changed',

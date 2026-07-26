@@ -267,10 +267,14 @@
       var zoomT = 2.0;
       var mode = Game.state.world.mode;
       var endingCam = Game.ending && Game.ending.cameraTarget();
+      var transitionCam = Game.transitions && Game.transitions.cameraTarget();
 
       if (endingCam) {
         focusX = endingCam.x; focusY = endingCam.y;
         zoomT = endingCam.zoom;
+      } else if (transitionCam) {
+        focusX = transitionCam.x; focusY = transitionCam.y;
+        zoomT = transitionCam.zoom;
       } else if (W.cinematic && W.cinematic.ent) {
         focusX = W.cinematic.ent.x; focusY = W.cinematic.ent.y;
         zoomT = 2.9;
@@ -287,7 +291,7 @@
       }
       if (cw < 400) zoomT *= 0.92;
 
-      var cinematic = endingCam || W.cinematic;
+      var cinematic = endingCam || transitionCam || W.cinematic;
       cam.zoom = U.approach(cam.zoom, zoomT, cinematic ? 5 : 2.6, dt);
       var rate = cinematic ? 6 : 3.6;
       cam.x = U.approach(cam.x, focusX, rate, dt);
@@ -397,14 +401,15 @@
       var cf = Game.terrain.campfirePos;
       if (cf) {
         var flick = 0.86 + 0.14 * Math.sin(t * 9.7) * Math.sin(t * 5.3 + 1.7);
-        var glowR = (26 + 7 * nightF) * flick;
-        var alpha = (0.16 + 0.22 * nightF) * flick;
+        var campBoost = Game.transitions ? Game.transitions.campfireBoost() : 1;
+        var glowR = (26 + 7 * nightF) * flick * (1 + (campBoost - 1) * 0.35);
+        var alpha = Math.min(0.72, (0.16 + 0.22 * nightF) * flick * campBoost);
         var gr = ctx.createRadialGradient(cf.x, cf.y - 4, 2, cf.x, cf.y - 4, glowR);
         gr.addColorStop(0, 'rgba(255,190,90,' + alpha.toFixed(3) + ')');
         gr.addColorStop(1, 'rgba(255,120,30,0)');
         ctx.fillStyle = gr;
         ctx.fillRect(cf.x - glowR, cf.y - 4 - glowR, glowR * 2, glowR * 2);
-        var resting = W.hero && W.hero.state === 'sitting';
+        var resting = W.hero && (W.hero.state === 'sitting' || W.hero.state === 'recover');
         Game.particles.campfire(dt, cf.x, cf.y - 2, resting);
       }
 
@@ -453,6 +458,13 @@
         }
       }
       Game.daynight.drawTint(ctx, cw, ch);
+      if (Game.ending && Game.ending.isPending && Game.ending.isPending()) {
+        var dawn = ctx.createLinearGradient(0, ch * 0.38, 0, ch);
+        dawn.addColorStop(0, 'rgba(255,205,120,0)');
+        dawn.addColorStop(1, 'rgba(255,164,72,0.16)');
+        ctx.fillStyle = dawn;
+        ctx.fillRect(0, 0, cw, ch);
+      }
       if (fxOn) {
         if (!vignetteC) buildVignette();
         ctx.drawImage(vignetteC, 0, 0);
@@ -473,6 +485,8 @@
       var mat = Game.terrain.materialAt(e.x, e.y);
       var sink = mat === 'water' ? 3 : 0;
       var alpha = 1;
+      var sceneStyle = Game.transitions && Game.transitions.entityStyle(e);
+      var visualLift = sceneStyle ? (sceneStyle.lift || 0) : 0;
 
       if (e.kind === 'monster' && e.dead) {
         alpha = e.finaleFade !== undefined
@@ -480,7 +494,7 @@
           : Math.max(0, e.deathT / 0.5);
         sink += Math.round((1 - alpha) * 4);
       }
-      if (e.kind === 'hero' && e.state === 'dead') {
+      if (e.kind === 'hero' && e.state === 'dead' && !sceneStyle) {
         alpha = Math.max(0.15, e.deathT / 1.0);
       }
       if (e.kind === 'hero' && e.campWarp) {
@@ -490,6 +504,7 @@
           alpha = U.clamp(1 - e.campWarp.t / 0.42, 0, 1);
         }
       }
+      if (sceneStyle) alpha *= U.clamp(sceneStyle.alpha, 0, 1);
 
       // 阴影
       ctx.globalAlpha = 0.22 * alpha;
@@ -521,7 +536,18 @@
         flip = true;
       }
 
-      A.draw(ctx, e.sprite, frame, e.x + ox, e.y + oy, {
+      if (sceneStyle && sceneStyle.ghosts && alpha > 0.02) {
+        for (var gi = sceneStyle.ghosts; gi >= 1; gi--) {
+          A.draw(ctx, e.sprite, frame, e.x + ox, e.y + oy - visualLift - gi * 3, {
+            alpha: Math.min(0.24, alpha * (0.08 + gi * 0.045)),
+            white: 0.7,
+            sinkPx: sink,
+            flip: flip
+          });
+        }
+      }
+
+      A.draw(ctx, e.sprite, frame, e.x + ox, e.y + oy - visualLift, {
         alpha: alpha,
         white: e.flash > 0 ? Math.min(1, e.flash / 0.14) : 0,
         sinkPx: sink,

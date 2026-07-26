@@ -52,8 +52,13 @@
     Game.ui.hud.init();
     Game.ui.tabs.init();
     Game.ui.modals.init();
+    Game.ui.transitions.init();
+    Game.transitions.init();
     Game.auto.init();
     Game.loop.init();
+    if (!isNew && Game.player.hasClass() && Game.state.player.hp <= 0) {
+      Game.transitions.restoreZeroHp();
+    }
 
     // 选职业（新档全屏选择；v1 旧档迁移补选，等价一次免费洗点）
     function classFlow(cb) {
@@ -77,6 +82,7 @@
     // 离线结算（防系统时间回调：ts 在未来 → 收益按 0）
     function settleOffline() {
       if (isNew) return;
+      if (Game.transitions.isActive()) return;
       if (Game.ending.isPending()) {
         Game.ending.restorePending();
         return;

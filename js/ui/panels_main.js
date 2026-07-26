@@ -83,7 +83,8 @@
       });
     },
 
-    open: function (tab) {
+    open: function (tab, force) {
+      if (!force && Game.transitions && Game.transitions.isActive()) return false;
       current = tab;
       U.$$('#tabbar .tab-btn').forEach(function (b) {
         b.classList.toggle('active', b.getAttribute('data-tab') === tab);
@@ -91,10 +92,11 @@
       var pc = $('#panel-container');
       if (tab === 'battle') {
         pc.classList.add('hidden');
-        return;
+        return true;
       }
       pc.classList.remove('hidden');
       UI.tabs.rerender();
+      return true;
     },
 
     queueRerender: function () {

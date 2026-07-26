@@ -8,6 +8,8 @@
  *   boss:spawned {rid, mid}     boss:defeated {rid, mid, first}
  *   boss:failed {rid, reason:'defeat'|'retreat'}
  *   region:changed {rid}        region:unlocked {rid}
+ *   region:travelStart / region:travelCancelled / region:arrived
+ *   player:reviveStart / player:revived
  *   rest:start / rest:end       potion:used {pid}
  *   gold:changed / crystal:changed / exp:gained
  *   achievement:unlocked {aid}  shop:bought {sid}

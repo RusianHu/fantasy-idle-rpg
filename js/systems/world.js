@@ -175,6 +175,7 @@
     },
 
     trySpawnBoss: function () {
+      if (Game.transitions && Game.transitions.isActive()) return;
       if (W.bossEnt || Game.state.world.mode !== 'battle') return;
       var region = W.region;
       var prog = Game.State.regionProg(region.id);
@@ -268,19 +269,11 @@
 
     onHeroDeath: function () {
       var hero = W.hero;
-      if (hero.state === 'dead' || hero.state === 'recover') return;
+      if (hero.state === 'dead' || hero.state === 'recover' ||
+          (Game.transitions && Game.transitions.isActive())) return;
       var byBoss = !!W.bossEnt;
-      hero.state = 'dead';
-      hero.deathT = 1.0;
-      hero.target = null;
-      hero.moveOrder = null;
-      Game.nav.clear(hero);
-      hero.manualTarget = false;
-      hero.campWarp = null;
-      hero.shield = 0;
-      hero.buffs = [];
+      var fallbackRid = null;
       Game.state.meta.stats.deaths++;
-      bus.emit('player:death', { byBoss: byBoss });
 
       if (byBoss) {
         W.onBossFailed('defeat'); // Boss 战失败不计入卡关计数
@@ -288,9 +281,25 @@
         Game.state.world.deathsRow++;
         if (Game.state.world.deathsRow >= 3) {
           Game.state.world.deathsRow = 0;
-          bus.emit('protect:fallback', { rid: W.region.id });
+          fallbackRid = Game.prog && Game.prog.prevRegion ? Game.prog.prevRegion() : null;
         }
       }
+      if (Game.transitions) {
+        Game.transitions.startDeath({ byBoss: byBoss, fallbackRid: fallbackRid });
+      } else {
+        // 降级兼容：导演模块缺失时仍落回原有安全状态。
+        hero.state = 'dead';
+        hero.deathT = 1.0;
+        hero.target = null;
+        hero.moveOrder = null;
+        Game.nav.clear(hero);
+        hero.manualTarget = false;
+        hero.campWarp = null;
+        hero.shield = 0;
+        hero.buffs = [];
+        if (fallbackRid) bus.emit('protect:fallback', { rid: W.region.id });
+      }
+      bus.emit('player:death', { byBoss: byBoss, fallbackRid: fallbackRid });
     },
 
     /* ---------------- 点击/触摸指令 ---------------- */
@@ -298,6 +307,7 @@
     handleTap: function (wx, wy) {
       var hero = W.hero;
       if (!hero || !Game.player.hasClass()) return;
+      if (Game.transitions && Game.transitions.isActive()) return;
       if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance') return;
       var sw = Game.state.world;
 
@@ -363,7 +373,8 @@
         Game.nav.clear(hero);
         var protectedState = hero.state === 'dead' || hero.state === 'recover' ||
           hero.state === 'entrance' || hero.state === 'warpOut' ||
-          hero.state === 'warpIn' || Game.state.world.mode === 'rest';
+          hero.state === 'warpIn' || Game.state.world.mode === 'rest' ||
+          (Game.transitions && Game.transitions.isActive());
         if (!protectedState) hero.state = 'idle';
       }
       bus.emit('control:changed', { mode: mode });
@@ -385,6 +396,7 @@
       function canCapture(e) {
         var tag = e.target && e.target.tagName;
         return W.controlMode() === 'manual' &&
+          !(Game.transitions && Game.transitions.isActive()) &&
           !(Game.ending && Game.ending.isActive()) &&
           Game.state && Game.state.world.mode === 'battle' &&
           tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' &&
@@ -416,6 +428,7 @@
 
     canManualMove: function (hero) {
       return !!hero && Game.player.hasClass() &&
+        !(Game.transitions && Game.transitions.isActive()) &&
         !(Game.ending && Game.ending.isActive()) &&
         Game.state.world.mode === 'battle' &&
         hero.state !== 'dead' && hero.state !== 'recover' &&
@@ -434,6 +447,7 @@
 
     /* ---------------- 模式切换（战斗 / 返回营地） ---------------- */
     setMode: function (mode) {
+      if (Game.transitions && Game.transitions.isActive()) return false;
       var w = Game.state.world;
       if (w.mode === mode) return false;
       var bossRetreat = mode === 'rest' && !!W.bossEnt;
@@ -599,6 +613,7 @@
 
     /* ---------------- 主角 AI ---------------- */
     updateHero: function (hero, dt) {
+      if (Game.transitions && Game.transitions.isActive()) return;
       var sw = Game.state.world;
       hero.flash = Math.max(0, hero.flash - dt);
       hero.lungeT = Math.max(0, hero.lungeT - dt);

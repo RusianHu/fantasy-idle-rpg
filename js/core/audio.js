@@ -54,6 +54,10 @@
       bus.on('gold:changed', function (p) { if (p && p.delta > 0) A.playSfx('sfx_gold'); });
       bus.on('potion:used', function () { A.playSfx('sfx_potion'); });
       bus.on('player:death', function () { A.playSfx('sfx_death'); });
+      bus.on('region:travelStart', function () { A.playSfx('sfx_region_depart'); });
+      bus.on('region:arrived', function () { A.playSfx('sfx_region_arrive'); });
+      bus.on('player:reviveStart', function () { A.playSfx('sfx_soul_return'); });
+      bus.on('player:revived', function () { A.playSfx('sfx_revive'); });
       bus.on('achievement:unlocked', function () { A.playSfx('sfx_achievement'); });
       bus.on('shop:bought', function () { A.playSfx('sfx_buy'); });
       bus.on('skill:upgraded', function () { A.playSfx('sfx_skillup'); });
