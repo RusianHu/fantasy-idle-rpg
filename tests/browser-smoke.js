@@ -1759,7 +1759,7 @@ async function run() {
       document.querySelector('#title-root .title-reveal').click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       document.querySelector('#title-root .title-start').click();
-      await new Promise((resolve) => setTimeout(resolve, 1250));
+      await new Promise((resolve) => setTimeout(resolve, 1400));
       const story = document.querySelector('.prologue-mask');
       if (!story) throw new Error('prologue did not open after the archive transition');
       for (let i = 0; i < 10; i++) story.click();
@@ -1912,16 +1912,26 @@ async function run() {
     const entryMid = await cdp.evaluate(`(() => {
       const root = document.getElementById('title-root');
       const fx = root?.querySelector('.title-entry-fx');
+      const crest = fx?.querySelector('.entry-crest');
+      const crestPixels = crest ? Array.from(
+        crest.getContext('2d').getImageData(0, 0, crest.width, crest.height).data
+      ).filter((value, index) => index % 4 === 3 && value > 0).length : 0;
       return {
         entering: root?.classList.contains('is-entering'),
         fxVisible: fx ? getComputedStyle(fx).visibility === 'visible' : false,
         entryCopy: fx?.querySelector('.entry-copy')?.textContent || '',
+        crestReady: crest?.getAttribute('data-crest-ready') === 'true',
+        crestPixels,
+        ringLayers: fx?.querySelectorAll('.entry-ring').length || 0,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
       };
     })()`);
     assert.equal(entryMid.entering, true);
     assert.equal(entryMid.fxVisible, true);
     assert.equal(entryMid.entryCopy, '正在同步远征档案');
+    assert.equal(entryMid.crestReady, true);
+    assert.ok(entryMid.crestPixels > 400, 'guild crest is rendered inside the entry seal');
+    assert.equal(entryMid.ringLayers, 3);
     assert.equal(entryMid.noHorizontalOverflow, true);
     const entryCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const entryScreenshot = path.join(os.tmpdir(), 'firpg-title-entry-transition-mobile-cdp.png');
