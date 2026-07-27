@@ -413,6 +413,9 @@ assert.match(read('js/render/renderer.js'), /if \(mo\.ai\)/,
   'AI travel and player click markers must remain visually distinct');
 assert.match(read('js/render/renderer.js'), /Game\.actionBubbles\.visit/,
   'the renderer consumes generic entity anchors instead of hero-only bubble state');
+assert.doesNotMatch(read('js/render/renderer.js'),
+  /ctx\.fillStyle = bubble\.style\.accent;\s*ctx\.fillRect\(x \+ 2, y \+ 3, 2, h - 6\)/,
+  'action bubbles must not paint a solid type-color strip along the left paper edge');
 assert.ok(aiSource.indexOf('var guardian = guardianTarget(hero);') <
   aiSource.indexOf("setMove(hero, boss.target, 'ai-boss')"),
   'guardian decision remains ahead of Boss execution');

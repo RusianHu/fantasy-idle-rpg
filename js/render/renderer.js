@@ -331,8 +331,6 @@
     ctx.fillRect(tailX - 1, y + h - 1, 2, 3);
     ctx.fillStyle = 'rgba(255,255,255,0.34)';
     ctx.fillRect(x + 4, y + 2, Math.max(4, w - 9), 1);
-    ctx.fillStyle = bubble.style.accent;
-    ctx.fillRect(x + 2, y + 3, 2, h - 6);
 
     drawBubbleIcon(ctx, bubble.icon, x + 4, y + 3, bubble.style.accent, bubble.style.ink);
     ctx.restore();
