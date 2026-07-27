@@ -10,9 +10,10 @@
  *   chest:spawned / chest:opened / chest:expired
  *   boss:spawned {rid, mid}     boss:defeated {rid, mid, first}
  *   boss:failed {rid, reason:'defeat'|'retreat'}
- *   region:changed {rid}        region:unlocked {rid}
+ *   region:changed {rid}        region:unlocked {rid, reopened}
+ *   region:relocked {rid, fallbackRid, byBoss}
  *   region:travelStart / region:travelCancelled / region:arrived
- *   player:reviveStart / player:revived
+ *   player:reviveStart / player:revived {finalRegionLost}
  *   rest:start / rest:end       potion:used {pid}
  *   gold:changed / crystal:changed / exp:gained
  *   achievement:unlocked {aid}  shop:bought {sid, rid, areaId}

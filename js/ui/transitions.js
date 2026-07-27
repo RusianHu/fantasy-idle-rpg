@@ -67,14 +67,20 @@
   }
 
   function renderDeath(s) {
-    els.eyebrow.textContent = s.fallbackRid ? t('ui.recoveryFallbackTitle') : t('ui.recoveryTitle');
+    els.eyebrow.textContent = s.finalRegionLost
+      ? t('ui.finalRegionLostTitle')
+      : (s.fallbackRid ? t('ui.recoveryFallbackTitle') : t('ui.recoveryTitle'));
     els.route.classList.toggle('hidden', !s.fallbackRid);
     els.from.textContent = regionName(s.fromRid);
     els.to.textContent = regionName(s.fallbackRid);
-    els.title.textContent = s.fallbackRid
-      ? t('ui.recoveryFallback', { name: regionName(s.fallbackRid) })
-      : t('ui.recoveryAtCamp');
-    els.sub.textContent = s.byBoss ? t('ui.recoveryBossNote') : t('ui.recoveryNoPenalty');
+    els.title.textContent = s.finalRegionLost
+      ? t('ui.finalRegionRetreat', { name: regionName(s.fallbackRid) })
+      : (s.fallbackRid
+        ? t('ui.recoveryFallback', { name: regionName(s.fallbackRid) })
+        : t('ui.recoveryAtCamp'));
+    els.sub.textContent = s.finalRegionLost
+      ? t('ui.finalRegionRelockNote')
+      : (s.byBoss ? t('ui.recoveryBossNote') : t('ui.recoveryNoPenalty'));
     els.actions.classList.add('hidden');
     var canFast = s.phase === 'soul' || (s.phase === 'down' && s.phaseProgress >= 0.9);
     els.hint.textContent = canFast ? t('ui.recoveryFastForwardHint') : '';

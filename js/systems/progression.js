@@ -7,13 +7,49 @@
   var bus = Game.bus, reg = Game.reg;
 
   var Prog = Game.prog = {
-    /** 区域是否已解锁（首区域恒解锁；其余需前一区域 Boss 已击败） */
+    finalRegion: function () {
+      var list = Game.State.regionOrder();
+      return list.length ? list[list.length - 1] : null;
+    },
+
+    isFinalRegion: function (rid) {
+      return !!rid && rid === Prog.finalRegion();
+    },
+
+    isFinalRegionLocked: function (rid) {
+      return Prog.isFinalRegion(rid) && Game.state.world.finalRegionLocked === true;
+    },
+
+    /** 区域是否已解锁（首区域恒解锁；其余需前一区域 Boss 已击败）。 */
     isUnlocked: function (rid) {
       var list = Game.State.regionOrder();
       var idx = list.indexOf(rid);
       if (idx <= 0) return idx === 0;
+      if (idx === list.length - 1 && Game.state.world.finalRegionLocked === true) return false;
       var prev = list[idx - 1];
       return Game.State.regionProg(prev).cleared;
+    },
+
+    /**
+     * 最终区域战败后失守。返回值为必须撤回的上一地区；
+     * 首杀、cleared、结局与奖励记录一律保留。
+     */
+    lockFinalRegion: function (rid, opts) {
+      if (!Prog.isFinalRegion(rid)) return null;
+      var list = Game.State.regionOrder();
+      var fallbackRid = list.length > 1 ? list[list.length - 2] : null;
+      if (!fallbackRid) return null;
+      var alreadyLocked = Game.state.world.finalRegionLocked === true;
+      Game.state.world.finalRegionLocked = true;
+      Game.state.world.deathsRow = 0;
+      if (!alreadyLocked) {
+        bus.emit('region:relocked', {
+          rid: rid,
+          fallbackRid: fallbackRid,
+          byBoss: !!(opts && opts.byBoss)
+        });
+      }
+      return fallbackRid;
     },
 
     currentIndex: function () {
@@ -64,7 +100,11 @@
           var idx = list.indexOf(p.rid);
           return idx >= 0 && idx < list.length - 1 ? list[idx + 1] : null;
         })();
-        if (next) bus.emit('region:unlocked', { rid: next });
+        var reopened = !!(
+          next && Prog.isFinalRegion(next) && Game.state.world.finalRegionLocked === true
+        );
+        if (reopened) Game.state.world.finalRegionLocked = false;
+        if (next) bus.emit('region:unlocked', { rid: next, reopened: reopened });
         if (next && Game.state.settings.autoAdvance) {
           // 无需确认：默认 3 秒后出发；玩家可取消本次旅行。
           Prog.requestRegion(next, { source: 'auto', boss: p });

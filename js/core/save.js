@@ -129,6 +129,16 @@
         }
         data.v = 9;
       }
+    },
+    {
+      // v9 → v10：最终区域可在战败后失守。旧档保持既有准入状态，
+      // 仅新增独立锁位，首杀、通关与区域清理记录不受影响。
+      from: 9,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.finalRegionLocked = false;
+        data.v = 10;
+      }
     }
   ];
 
@@ -183,6 +193,7 @@
           worldTime: st.world.worldTime,
           regionProg: st.world.regionProg,
           nodeCooldowns: st.world.nodeCooldowns,
+          finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
         },
         meta: st.meta
@@ -262,6 +273,7 @@
       st.world.regionOrder = Game.State.normalizeRegionOrder(
         data.world && data.world.regionOrder
       );
+      st.world.finalRegionLocked = !!st.world.finalRegionLocked;
       U.merge(st.meta, data.meta || {});
       st.meta.completedAt = Number.isFinite(st.meta.completedAt) && st.meta.completedAt > 0
         ? st.meta.completedAt
@@ -290,6 +302,13 @@
       // 区域已下线 → 回退到最近有效区域
       if (!Game.reg.has('region', st.world.region)) {
         st.world.region = st.world.regionOrder[0];
+      }
+      // 若页面在魔王城战败过场落地前意外终止，存档可能已经写入失守锁、
+      // 但仍指向末区。读档时原子修正到上一地区，禁止绕过重新解锁。
+      var finalRid = st.world.regionOrder[st.world.regionOrder.length - 1];
+      if (st.world.finalRegionLocked && st.world.region === finalRid && st.world.regionOrder.length > 1) {
+        st.world.region = st.world.regionOrder[st.world.regionOrder.length - 2];
+        st.world.mode = 'rest';
       }
       // uid 续接，避免冲突
       var maxUid = data.inv && data.inv.uidSeq ? data.inv.uidSeq : 1;

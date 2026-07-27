@@ -132,7 +132,8 @@
       var saveOn = ['player:levelup', 'boss:defeated', 'item:equipped', 'region:changed',
         'achievement:unlocked', 'shop:bought', 'skill:upgraded',
         'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged', 'settings:changed',
-        'item:pickedUp', 'item:used', 'gather:done', 'chest:opened', 'camp:autoReturn'];
+        'item:pickedUp', 'item:used', 'gather:done', 'chest:opened', 'camp:autoReturn',
+        'region:relocked'];
       saveOn.forEach(function (evt) {
         Game.bus.on(evt, function () {
           // 轻微防抖：合并密集事件

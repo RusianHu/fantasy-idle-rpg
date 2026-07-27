@@ -1519,6 +1519,150 @@ async function run() {
       rules: transitionRules
     };
 
+    const finalRegionLock = await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('zh-CN');
+      Game.ui.tabs.open('battle', true);
+      const order = Game.State.regionOrder();
+      const finalRid = order[order.length - 1];
+      const previousRid = order[order.length - 2];
+      const finalProgress = Game.State.regionProg(finalRid);
+      const previousProgress = Game.State.regionProg(previousRid);
+      for (let index = 0; index < order.length - 1; index++) {
+        Game.State.regionProg(order[index]).cleared = true;
+      }
+      Game.state.settings.autoAdvance = false;
+      Game.state.settings.effects = true;
+      Game.state.settings.controlMode = 'auto';
+      Game.state.world.finalRegionLocked = false;
+      Game.state.world.region = finalRid;
+      Game.state.world.mode = 'battle';
+      Game.state.world.deathsRow = 0;
+      Game.state.meta.completedAt = 123456789;
+      Game.state.meta.endingAcknowledged = true;
+      finalProgress.kills = 3;
+      finalProgress.cleared = true;
+      finalProgress.firstKill = true;
+      previousProgress.cleared = true;
+      previousProgress.firstKill = true;
+      Game.world.init(finalRid);
+      Game.state.player.hp = 0;
+      Game.world.hero.state = 'idle';
+      Game.world.onHeroDeath();
+      const snap = Game.transitions.snapshot();
+      const transitionRoot = document.getElementById('transition-root');
+      const lossCopy = {
+        eyebrow: transitionRoot.querySelector('.transition-eyebrow')?.textContent,
+        title: transitionRoot.querySelector('.transition-title')?.textContent,
+        sub: transitionRoot.querySelector('.transition-sub')?.textContent
+      };
+      Game.transitions.update(20);
+      const afterLoss = {
+        region: Game.state.world.region,
+        locked: Game.state.world.finalRegionLocked,
+        canEnter: Game.prog.isUnlocked(finalRid),
+        finalCleared: finalProgress.cleared,
+        finalFirstKill: finalProgress.firstKill,
+        completedAt: Game.state.meta.completedAt,
+        savedLocked: Game.save.serialize().world.finalRegionLocked,
+        toast: document.getElementById('toasts').textContent
+      };
+
+      Game.ui.tabs.open('map', true);
+      const zhCard = Array.from(document.querySelectorAll('#panel-container .region-card')).at(-1);
+      const zhMap = {
+        text: zhCard?.textContent || '',
+        disabled: !!zhCard?.querySelector('.go-btn')?.disabled
+      };
+      Game.i18n.setLocale('en');
+      Game.ui.tabs.open('map', true);
+      const enCard = Array.from(document.querySelectorAll('#panel-container .region-card')).at(-1);
+      const enMap = {
+        text: enCard?.textContent || '',
+        disabled: !!enCard?.querySelector('.go-btn')?.disabled,
+        overflow: enCard ? enCard.scrollWidth > enCard.clientWidth : true
+      };
+
+      Game.i18n.setLocale('zh-CN');
+      Game.ui.tabs.open('battle', true);
+      const crystalsBefore = Game.state.player.crystal;
+      const unlockEvents = [];
+      const unlockListener = (payload) => unlockEvents.push(payload);
+      Game.bus.on('region:unlocked', unlockListener);
+      previousProgress.kills = Game.world.region.killTarget;
+      Game.world.onBossDefeated({ mid: Game.world.region.boss });
+      Game.bus.off('region:unlocked', unlockListener);
+      const afterReopen = {
+        locked: Game.state.world.finalRegionLocked,
+        canEnter: Game.prog.isUnlocked(finalRid),
+        crystalsUnchanged: Game.state.player.crystal === crystalsBefore,
+        reopened: unlockEvents.some((event) => event.rid === finalRid && event.reopened),
+        previousFirstKill: previousProgress.firstKill,
+        savedLocked: Game.save.serialize().world.finalRegionLocked
+      };
+
+      Game.state.world.region = finalRid;
+      Game.state.world.mode = 'battle';
+      Game.world.init(finalRid);
+      Game.state.player.hp = Game.player.derived().maxHp;
+      const retryProgress = Game.State.regionProg(finalRid);
+      retryProgress.kills = Game.world.region.killTarget;
+      Game.world.trySpawnBoss({ manual: true });
+      const voluntaryStarted = !!Game.world.bossEnt;
+      Game.world.setMode('rest');
+      const voluntary = {
+        started: voluntaryStarted,
+        region: Game.state.world.region,
+        locked: Game.state.world.finalRegionLocked,
+        bossGone: !Game.world.bossEnt
+      };
+      return {
+        finalRid,
+        previousRid,
+        snap: {
+          finalRegionLost: snap.finalRegionLost,
+          fallbackRid: snap.fallbackRid,
+          byBoss: snap.byBoss
+        },
+        lossCopy,
+        afterLoss,
+        zhMap,
+        enMap,
+        afterReopen,
+        voluntary
+      };
+    })()`);
+    assert.equal(finalRegionLock.finalRid, 'darkcastle');
+    assert.equal(finalRegionLock.snap.finalRegionLost, true);
+    assert.equal(finalRegionLock.snap.fallbackRid, finalRegionLock.previousRid);
+    assert.equal(finalRegionLock.snap.byBoss, false);
+    assert.equal(finalRegionLock.lossCopy.eyebrow, '魔王城失守');
+    assert.ok(finalRegionLock.lossCopy.title.includes(finalRegionLock.previousRid === 'skyruins' ? '浮空遗迹' : ''));
+    assert.ok(finalRegionLock.lossCopy.sub.includes('重新封锁'));
+    assert.equal(finalRegionLock.afterLoss.region, finalRegionLock.previousRid);
+    assert.equal(finalRegionLock.afterLoss.locked, true);
+    assert.equal(finalRegionLock.afterLoss.canEnter, false);
+    assert.equal(finalRegionLock.afterLoss.finalCleared, true);
+    assert.equal(finalRegionLock.afterLoss.finalFirstKill, true);
+    assert.equal(finalRegionLock.afterLoss.completedAt, 123456789);
+    assert.equal(finalRegionLock.afterLoss.savedLocked, true);
+    assert.ok(finalRegionLock.afterLoss.toast.includes('魔王城失守'));
+    assert.ok(finalRegionLock.zhMap.text.includes('失守 · 需重新解锁'));
+    assert.equal(finalRegionLock.zhMap.disabled, true);
+    assert.ok(finalRegionLock.enMap.text.includes('Lost · Reunlock Required'));
+    assert.equal(finalRegionLock.enMap.disabled, true);
+    assert.equal(finalRegionLock.enMap.overflow, false);
+    assert.equal(finalRegionLock.afterReopen.locked, false);
+    assert.equal(finalRegionLock.afterReopen.canEnter, true);
+    assert.equal(finalRegionLock.afterReopen.crystalsUnchanged, true);
+    assert.equal(finalRegionLock.afterReopen.reopened, true);
+    assert.equal(finalRegionLock.afterReopen.previousFirstKill, true);
+    assert.equal(finalRegionLock.afterReopen.savedLocked, false);
+    assert.equal(finalRegionLock.voluntary.started, true);
+    assert.equal(finalRegionLock.voluntary.region, 'darkcastle');
+    assert.equal(finalRegionLock.voluntary.locked, false);
+    assert.equal(finalRegionLock.voluntary.bossGone, true);
+    transitionChecks.finalRegionLock = finalRegionLock;
+
     const endingStart = await cdp.evaluate(`(() => {
       Game.i18n.setLocale('zh-CN');
       Game.ui.tabs.open('battle');

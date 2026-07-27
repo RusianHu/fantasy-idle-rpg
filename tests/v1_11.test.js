@@ -587,7 +587,7 @@ assert.deepEqual(
 );
 
 /* ------------------------------------------------------------------ *
- * v8→v9 migration defaults, serialization and script ordering.
+ * v8→v10 migration defaults, serialization and script ordering.
  * ------------------------------------------------------------------ */
 Game.state = Game.State.newGame();
 const v8 = Game.save.serialize();
@@ -599,15 +599,29 @@ delete v8.settings.autoCampRest;
 for (const key of ['pickups', 'gathers', 'materials', 'chests']) delete v8.meta.stats[key];
 localStorage.setItem('firpg_save', JSON.stringify(v8));
 localStorage.setItem('firpg_save_backup', JSON.stringify(v8));
-const migratedV9 = Game.save.load();
-assert.equal(migratedV9.v, 9);
-assert.deepEqual(Object.keys(migratedV9.inv.materials), []);
-assert.deepEqual(Object.keys(migratedV9.world.nodeCooldowns), []);
-assert.equal(migratedV9.settings.groundLoot, true);
-assert.equal(migratedV9.settings.autoCampRest, false);
-delete migratedV9.settings.autoBoss;
-Game.save.applyLoaded(migratedV9);
+const migratedV10 = Game.save.load();
+assert.equal(migratedV10.v, 10);
+assert.deepEqual(Object.keys(migratedV10.inv.materials), []);
+assert.deepEqual(Object.keys(migratedV10.world.nodeCooldowns), []);
+assert.equal(migratedV10.world.finalRegionLocked, false);
+assert.equal(migratedV10.settings.groundLoot, true);
+assert.equal(migratedV10.settings.autoCampRest, false);
+delete migratedV10.settings.autoBoss;
+Game.save.applyLoaded(migratedV10);
 assert.equal(Game.state.settings.autoBoss, true, 'old saves inherit automatic boss hunts');
+
+const interruptedFinalLoss = Game.save.serialize();
+interruptedFinalLoss.world.finalRegionLocked = true;
+interruptedFinalLoss.world.region = interruptedFinalLoss.world.regionOrder.at(-1);
+interruptedFinalLoss.player.hp = 0;
+Game.save.applyLoaded(interruptedFinalLoss);
+assert.equal(
+  Game.state.world.region,
+  interruptedFinalLoss.world.regionOrder.at(-2),
+  'a save interrupted before final-loss landing resumes in the previous region'
+);
+assert.equal(Game.state.world.mode, 'rest');
+assert.equal(Game.state.world.finalRegionLocked, true);
 
 const index = read('index.html');
 assert.ok(index.indexOf('js/systems/items.js') < index.indexOf('js/systems/combat.js'));
@@ -632,5 +646,5 @@ for (const event of [
 
 console.log(
   `v1.11 tests passed: ${nodeLayouts} node layouts, drops, item-use, ground guarantees, ` +
-  'movement chests, gathering, auto-camp, dynamic trade and v9 migration.'
+  'movement chests, gathering, auto-camp, dynamic trade and v10 migration.'
 );

@@ -119,12 +119,15 @@
     Game.State.regionOrder().forEach(function (rid) {
       var r = reg.get('region', rid);
       var unlocked = Game.prog.isUnlocked(r.id);
+      var finalRelocked = Game.prog.isFinalRegionLocked(r.id);
       var prog = Game.State.regionProg(r.id);
       var isCurrent = s.world.region === r.id;
       var lvMin = (Game.State.regionTier(r.id) - 1) * 8 + 1;
 
       var status = '';
       if (isCurrent) status = '<span class="badge" style="color:var(--gold)">' + t('ui.current') + '</span>';
+      else if (finalRelocked) status = '<span class="badge" style="color:var(--danger)">🔒 ' +
+        t('ui.finalRegionRelocked') + '</span>';
       else if (!unlocked) status = '<span class="badge">🔒 ' + t('ui.locked') + '</span>';
       if (prog.cleared) status += '<span class="badge" style="color:var(--ok)">✓ ' + t('ui.cleared') + '</span>';
 

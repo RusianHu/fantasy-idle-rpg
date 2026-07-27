@@ -28,14 +28,18 @@
         M.toast('🏆 ' + t('ui.achUnlocked', { name: t('ach.' + p.aid + '.name') }), 'gold');
       });
       bus.on('region:unlocked', function (p) {
-        M.toast('🗺 ' + t('ui.regionUnlocked', { name: t('region.' + p.rid + '.name') }));
+        M.toast('🗺 ' + t(p.reopened ? 'ui.regionReopened' : 'ui.regionUnlocked', {
+          name: t('region.' + p.rid + '.name')
+        }));
       });
       bus.on('prog:autoAdvance', function (p) {
         if (p && p.cinematic) return;
         M.toast(t('ui.autoAdvanced', { name: t('region.' + p.rid + '.name') }));
       });
       bus.on('prog:fellback', function (p) {
-        M.toast(t('ui.fellback', { name: t('region.' + p.rid + '.name') }), 'warn', 4200);
+        M.toast(t(p.finalRegionLost ? 'ui.finalRegionLostToast' : 'ui.fellback', {
+          name: t('region.' + p.rid + '.name')
+        }), 'warn', p.finalRegionLost ? 5200 : 4200);
       });
       bus.on('boss:defeated', function (p) {
         if (p.first && Game.ending && Game.ending.isActive()) return;
@@ -44,6 +48,7 @@
         else M.toast(t('ui.bossKilled'));
       });
       bus.on('boss:failed', function (p) {
+        if (p && p.reason === 'defeat' && Game.prog && Game.prog.isFinalRegion(p.rid)) return;
         M.toast(t(p && p.reason === 'retreat' ? 'ui.bossRetreated' : 'ui.bossFailed'), 'warn', 3600);
       });
       bus.on('item:dropped', function (p) {

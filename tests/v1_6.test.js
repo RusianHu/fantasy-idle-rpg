@@ -347,7 +347,7 @@ function runSaveTests() {
   assert.equal(upgradedV6.world.worldSeed, 0x0BADCAFE);
   assert.equal(upgradedV6.world.layoutVersion, 2, 'v6 layout changes exactly once to dense v2');
   Game.save.applyLoaded(upgradedV6);
-  assert.equal(Game.save.serialize().world.layoutVersion, 2, 'v9 reload keeps the migrated layout version');
+  assert.equal(Game.save.serialize().world.layoutVersion, 2, 'current save reload keeps the migrated layout version');
 }
 
 runSaveTests();

@@ -268,13 +268,19 @@
       fallbackRid: a.fallbackRid,
       autoResume: finalMode === 'battle',
       restored: a.restored,
+      finalRegionLost: a.finalRegionLost,
       settled: !!settled
     };
     active = null;
     if (ui() && ui().hide) ui().hide();
     bus.emit('player:revived', payload);
     if (a.fallbackRid) {
-      bus.emit('prog:fellback', { rid: a.fallbackRid, cinematic: true });
+      bus.emit('prog:fellback', {
+        rid: a.fallbackRid,
+        cinematic: true,
+        finalRegionLost: a.finalRegionLost,
+        fromRid: a.fromRid
+      });
     }
     if (Game.ui && Game.ui.modals && Game.ui.modals.flushDeferredToasts) {
       Game.ui.modals.flushDeferredToasts();
@@ -402,6 +408,7 @@
         fallbackRid: opts.fallbackRid || null,
         byBoss: !!opts.byBoss,
         restored: !!opts.restored,
+        finalRegionLost: !!opts.finalRegionLost,
         arrivalMode: Game.world.controlMode() === 'manual' ? 'rest' : 'battle',
         deathX: hero.x,
         deathY: hero.y,
@@ -421,6 +428,7 @@
         rid: active.fromRid,
         byBoss: active.byBoss,
         fallbackRid: active.fallbackRid,
+        finalRegionLost: active.finalRegionLost,
         restored: active.restored
       });
       if (active.restored) enterDeathPhase('land');
@@ -503,6 +511,7 @@
         boss: active.boss,
         byBoss: !!active.byBoss,
         fallbackRid: active.fallbackRid || null,
+        finalRegionLost: !!active.finalRegionLost,
         recoveryPct: active.healPct || 0,
         reduced: !!active.reduced
       };

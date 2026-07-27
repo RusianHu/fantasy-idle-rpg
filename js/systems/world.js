@@ -509,13 +509,20 @@
           (Game.transitions && Game.transitions.isActive())) return;
       var byBoss = !!W.bossEnt;
       var fallbackRid = null;
+      var finalRegionLost = !!(
+        Game.prog && Game.prog.isFinalRegion && Game.prog.isFinalRegion(W.region.id)
+      );
       W.flushGroundLoot('death');
       W.cancelInteraction('death');
       Game.state.meta.stats.deaths++;
 
       if (byBoss) {
         W.onBossFailed('defeat'); // Boss 战失败不计入卡关计数
-      } else {
+      }
+      if (finalRegionLost) {
+        // 魔王城不适用三连败保护：任意实际战败都会失守并退回上一地区。
+        fallbackRid = Game.prog.lockFinalRegion(W.region.id, { byBoss: byBoss });
+      } else if (!byBoss) {
         Game.state.world.deathsRow++;
         if (Game.state.world.deathsRow >= 3) {
           Game.state.world.deathsRow = 0;
@@ -523,7 +530,11 @@
         }
       }
       if (Game.transitions) {
-        Game.transitions.startDeath({ byBoss: byBoss, fallbackRid: fallbackRid });
+        Game.transitions.startDeath({
+          byBoss: byBoss,
+          fallbackRid: fallbackRid,
+          finalRegionLost: finalRegionLost
+        });
       } else {
         // 降级兼容：导演模块缺失时仍落回原有安全状态。
         hero.state = 'dead';
@@ -535,9 +546,19 @@
         hero.campWarp = null;
         hero.shield = 0;
         hero.buffs = [];
-        if (fallbackRid) bus.emit('protect:fallback', { rid: W.region.id });
+        if (fallbackRid) {
+          bus.emit('protect:fallback', {
+            rid: W.region.id,
+            fallbackRid: fallbackRid,
+            finalRegionLost: finalRegionLost
+          });
+        }
       }
-      bus.emit('player:death', { byBoss: byBoss, fallbackRid: fallbackRid });
+      bus.emit('player:death', {
+        byBoss: byBoss,
+        fallbackRid: fallbackRid,
+        finalRegionLost: finalRegionLost
+      });
     },
 
     /* ---------------- 点击/触摸指令 ---------------- */

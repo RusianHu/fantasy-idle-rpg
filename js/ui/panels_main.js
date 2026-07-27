@@ -79,7 +79,7 @@
         'skill:upgraded', 'achievement:unlocked', 'player:levelup', 'shop:bought',
         'region:changed', 'boss:defeated', 'potion:used', 'potion:dropped',
         'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged',
-        'trade:contextChanged'];
+        'trade:contextChanged', 'region:unlocked', 'region:relocked'];
       rerenderOn.forEach(function (evt) {
         bus.on(evt, function () {
           if (current !== 'battle' && current !== 'settings') UI.tabs.queueRerender();

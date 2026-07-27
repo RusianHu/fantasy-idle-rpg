@@ -201,6 +201,7 @@
       var order = Game.State.regionOrder();
       var frontier = order[0];
       for (var i = 1; i < order.length; i++) {
+        if (Game.prog && !Game.prog.isUnlocked(order[i])) break;
         var prev = Game.State.regionProg(order[i - 1]);
         if (!prev.cleared) break;
         frontier = order[i];

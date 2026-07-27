@@ -213,6 +213,23 @@ function makeHarness(options = {}) {
 }
 
 {
+  const finalLoss = makeHarness({ hp: 0, region: 'r3', highestRegion: 3 });
+  finalLoss.Game.transitions.startDeath({
+    byBoss: true,
+    fallbackRid: 'r2',
+    finalRegionLost: true
+  });
+  assert.equal(finalLoss.Game.transitions.snapshot().finalRegionLost, true);
+  finalLoss.Game.transitions.update(20);
+  const revived = finalLoss.events.find((event) => event.name === 'player:revived');
+  const fallback = finalLoss.events.find((event) => event.name === 'prog:fellback');
+  assert.equal(revived.payload.finalRegionLost, true);
+  assert.equal(revived.payload.rid, 'r2');
+  assert.equal(fallback.payload.finalRegionLost, true);
+  assert.equal(fallback.payload.fromRid, 'r3');
+}
+
+{
   const settled = makeHarness();
   settled.Game.transitions.startRegion('r2', { source: 'map' });
   assert.equal(settled.Game.transitions.settleBeforeSave(), true);

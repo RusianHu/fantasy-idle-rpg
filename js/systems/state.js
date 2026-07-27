@@ -115,6 +115,7 @@
           worldTime: 300,
           regionProg: {},
           nodeCooldowns: {},
+          finalRegionLocked: false,
           deathsRow: 0
         },
         meta: {
