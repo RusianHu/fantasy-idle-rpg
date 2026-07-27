@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260727.15") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260728.1") format("woff2");
   font-display: swap;
 }
 
@@ -27,16 +27,12 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    var(--bg);
-  background-size: 16px 16px;
+  background: var(--bg);
   font-family: "Fusion Pixel", "Microsoft YaHei", sans-serif;
   letter-spacing: 0;
 }
 
-button, input, a { font: inherit; }
+button, input, select, a { font: inherit; letter-spacing: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, input:focus-visible {
@@ -69,7 +65,7 @@ h1, h2, h3, p { margin-top: 0; }
 
 h1 {
   margin-bottom: 14px;
-  font-size: clamp(24px, 3vw, 36px);
+  font-size: 34px;
   line-height: 1.05;
   font-weight: 600;
 }
@@ -81,6 +77,16 @@ h1 {
   color: var(--text);
   text-decoration: none;
   border-bottom: 1px solid var(--gold);
+}
+
+.top-actions { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.locale-control { display: grid; gap: 3px; color: var(--muted); font-size: 9px; }
+.locale-control select {
+  min-height: 44px;
+  padding: 6px 28px 6px 9px;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  background: var(--surface);
 }
 
 .region-tabs {
@@ -235,7 +241,7 @@ h1 {
 }
 .seed-control span { grid-column: 2 / 4; color: #777869; font-size: 9px; }
 
-.segmented, .focus-actions {
+.segmented, .focus-actions, .strategy-actions {
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(58px, auto);
@@ -243,7 +249,7 @@ h1 {
   border-radius: 3px;
 }
 
-.segmented button, .focus-actions button {
+.segmented button, .focus-actions button, .strategy-actions button {
   min-height: 42px;
   padding: 0 11px;
   border: 0;
@@ -253,9 +259,9 @@ h1 {
   cursor: pointer;
 }
 
-.segmented button:last-child, .focus-actions button:last-child { border-right: 0; }
-.segmented button.active { color: #171711; background: var(--gold); }
-.focus-actions button:hover { color: var(--text); background: var(--surface-2); }
+.segmented button:last-child, .focus-actions button:last-child, .strategy-actions button:last-child { border-right: 0; }
+.segmented button.active, .strategy-actions button.active { color: #171711; background: var(--gold); }
+.focus-actions button:hover, .strategy-actions button:hover { color: var(--text); background: var(--surface-2); }
 
 .check-control {
   min-height: 44px;
@@ -291,9 +297,7 @@ h1 {
 .exploration-lab {
   margin-top: 14px;
   border: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(212, 182, 95, 0.07), transparent 46%),
-    var(--surface);
+  background: var(--surface);
 }
 
 .lab-heading {
@@ -477,9 +481,7 @@ h1 {
   margin-bottom: 14px;
   padding: 8px;
   border: 1px solid rgba(212, 182, 95, 0.18);
-  background:
-    linear-gradient(135deg, rgba(212, 182, 95, 0.06), transparent 48%),
-    rgba(22, 23, 20, 0.64);
+  background: #161714;
 }
 
 .exploration-sprite-list .sprite-row + .sprite-row {
@@ -488,14 +490,7 @@ h1 {
 
 .exploration-sprite-list .sprite-preview {
   border-color: rgba(212, 182, 95, 0.34);
-  background:
-    linear-gradient(45deg, #20211d 25%, transparent 25%),
-    linear-gradient(-45deg, #20211d 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #20211d 75%),
-    linear-gradient(-45deg, transparent 75%, #20211d 75%),
-    #292a24;
-  background-position: 0 0, 0 4px, 4px -4px, -4px 0;
-  background-size: 8px 8px;
+  background: #292a24;
 }
 
 .exploration-rule-list {
@@ -535,6 +530,9 @@ h1 {
   .app-shell { padding: 14px 12px 30px; }
   .topbar { align-items: flex-start; flex-wrap: wrap; }
   .topbar > div { min-width: 0; }
+  .top-actions { width: 100%; justify-content: flex-start; }
+  .locale-control { flex: 1 1 128px; }
+  .locale-control select { width: 100%; }
   .back-link { margin-bottom: 10px; }
   .eyebrow { font-size: 9px; }
   h1 { font-size: 24px; }
@@ -549,10 +547,11 @@ h1 {
   .seed-control { width: 100%; min-width: 0; grid-template-columns: minmax(0, 1fr) minmax(88px, 96px) 64px; }
   .seed-control input { width: 100%; }
   .seed-control span { grid-column: 2 / 4; }
-  .segmented, .focus-actions { width: 100%; min-width: 0; grid-auto-flow: row; }
+  .segmented, .focus-actions, .strategy-actions { width: 100%; min-width: 0; grid-auto-flow: row; }
   .segmented { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .focus-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .segmented button, .focus-actions button { min-width: 0; padding-inline: 4px; }
+  .strategy-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .segmented button, .focus-actions button, .strategy-actions button { min-width: 0; padding-inline: 4px; }
   .check-control { margin-left: 0; }
   .dynamic-trade-qa { width: 100%; }
   .lab-heading { align-items: flex-start; flex-direction: column; gap: 10px; }

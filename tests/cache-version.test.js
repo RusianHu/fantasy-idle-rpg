@@ -8,12 +8,13 @@ const ROOT = path.resolve(__dirname, '..');
 const read = (relative) => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 const index = read('index.html');
-const demo = read('tech-demos/map-effects/map-effects.html');
-const demoStyle = read('tech-demos/map-effects/map-effects.css');
-const explorationDemo = read('tech-demos/exploration-v3/exploration-v3.html');
-const explorationDemoStyle = read('tech-demos/exploration-v3/exploration-v3.css');
+const demoFiles = [
+  ['tech-demos/index.html', 'tech-demos/demo-index.css'],
+  ['tech-demos/map-effects/map-effects.html', 'tech-demos/map-effects/map-effects.css'],
+  ['tech-demos/exploration-v3/exploration-v3.html', 'tech-demos/exploration-v3/exploration-v3.css'],
+  ['tech-demos/units/units.html', 'tech-demos/units/units.css']
+].map(([html, css]) => ({ html, css, source: read(html), style: read(css) }));
 const unitsDemo = read('tech-demos/units/units.html');
-const unitsDemoStyle = read('tech-demos/units/units.css');
 const unitsDemoScript = read('tech-demos/units/units.js');
 const style = read('css/style.css');
 const utils = read('js/core/utils.js');
@@ -43,15 +44,16 @@ function assertVersionedHtml(source, name) {
 }
 
 assertVersionedHtml(index, 'index.html');
-assertVersionedHtml(demo, 'map-effects.html');
-assertVersionedHtml(explorationDemo, 'exploration-v3.html');
-assertVersionedHtml(unitsDemo, 'units.html');
+for (const demo of demoFiles) assertVersionedHtml(demo.source, demo.html);
 assert.ok(style.includes(`fusion-pixel.woff2?v=${buildId}`), 'CSS font URL must be versioned');
-assert.ok(demoStyle.includes(`fusion-pixel.woff2?v=${buildId}`), 'QA CSS font URL must be versioned');
-assert.ok(explorationDemoStyle.includes(`fusion-pixel.woff2?v=${buildId}`),
-  'v3 QA CSS font URL must be versioned');
-assert.ok(unitsDemoStyle.includes(`fusion-pixel.woff2?v=${buildId}`),
-  'units QA CSS font URL must be versioned');
+for (const demo of demoFiles) {
+  assert.ok(demo.style.includes(`fusion-pixel.woff2?v=${buildId}`),
+    `${demo.css} font URL must be versioned`);
+}
+assert.match(read('tech-demos/demo-i18n.js'), /window\.DemoI18n/,
+  'technical demos must share the bilingual QA locale helper');
+assert.match(unitsDemo, /systems\/terrain_v3\.js\?v=/,
+  'units QA must load the production v3 terrain override');
 assert.match(unitsDemo, /systems\/action_bubbles\.js\?v=/,
   'units QA must load the production action bubble manager');
 assert.match(unitsDemoScript, /Game\.actionBubbles\.show/,

@@ -1,6 +1,6 @@
 # 角色与怪物技术验证
 
-入口：`units.html`。页面直接调用生产注册表、职业系统、怪物表、战斗核心、世界逻辑与渲染器，不复制模拟实现；支持 `file://` 直开与静态服务器路径。
+入口：`units.html?lang=zh-CN`。页面直接调用生产注册表、开放探索 v3、职业系统、怪物表、战斗核心、世界逻辑与渲染器，不复制模拟实现；支持 `file://` 直开与中英文即时切换。
 
 ## QA 控制
 
@@ -18,7 +18,8 @@
 
 ## 战斗循环演示
 
-- 舞台使用原版 `Game.world`、`Game.combat`、`Game.render`，在第一个区域（新手草原）生成主角与陪练目标。
+- 舞台使用 `layoutVersion:3` 的正式 `Game.world`、`Game.combat`、`Game.render`；职业与等级先完成计算，再初始化世界，避免旧页面的空主角/空画布。
+- 主角与陪练会投影到营地附近的合法可行走点，同时揭示对应迷雾；单位切换不会穿入硬阻挡。
 - 选择职业时舞台只显示主角；选择怪物/Boss 时自动刷新对应陪练目标，Boss 会触发原版登场运镜与震屏。
 - 「刷新陪练」：职业页随机刷新一只普通怪；怪物/Boss 页重新刷新当前单位。
 - 「召唤 Boss」：随机召唤一只 Boss 作为目标。
@@ -27,12 +28,12 @@
 
 ## 检查器内容
 
-- 职业：Lv.60 裸属性、派生属性（含被动加成）、六职业技能列表与图标。
+- 职业：Lv.60 裸属性、派生属性（含被动加成）、五职业技能列表与图标。
 - 怪物/Boss：精灵预览、属性面板、所属区域、经典阶位、攻击间隔。
 
 ## 复用链路
 
-`classes.js` / `monsters.js` → `state.js` → `action_bubbles.js` / `combat.js` → `world.js` → `renderer.js` / `effects.js` / `particles.js` / `daynight.js`
+`classes.js` / `monsters.js` → `terrain_v3.js` → `exploration.js` / `expedition_ai.js` → `combat.js` / `action_bubbles.js` → `world.js` → `renderer.js`
 
 ## 自动验证
 

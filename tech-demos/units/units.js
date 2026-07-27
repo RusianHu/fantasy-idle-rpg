@@ -4,6 +4,7 @@
 
   var U = Game.util;
   var F = Game.F;
+  var D = window.DemoI18n;
   var regions = Game.reg.all('region');
   var classes = Game.reg.all('class');
   var monsters = Game.reg.all('monster');
@@ -27,16 +28,12 @@
   var paused = false;
   var timeMode = 'cycle';
   var lastFrame = performance.now();
-  var battleMessage = '等待战斗指令';
+  var battleMessage = '';
   var bubbleAnchor = 'hero';
   var bubbleAuto = true;
   var bubbleAutoT = 0.35;
   var bubbleSequence = 0;
   var bubbleDemoSeq = 0;
-  var BUBBLE_LABELS = {
-    resource: '资源', gather: '采集', enemy: '接敌',
-    alert: '警戒', chest: '宝箱', loot: '掉落'
-  };
   var AUTO_BUBBLES = [
     { hero: 'resource' },
     { hero: 'gather' },
@@ -44,6 +41,46 @@
     { hero: 'chest' },
     { hero: 'loot' }
   ];
+
+  var COPY = {
+    'zh-CN': {
+      maxHp: '最大生命', atk: '攻击', def: '防御', speed: '速度', crit: '暴击率', critDmg: '暴击伤害',
+      range: '攻击距离', projectile: '弹道', growth: '成长', none: '无', active: '主动', passive: '被动',
+      baseAtk: '裸攻 Lv.60', baseHp: '裸血 Lv.60', baseDef: '裸防 Lv.60',
+      derived: 'Lv.60 派生属性（含被动/装备位占位）', skills: '职业技能',
+      heroNote: '派生属性按 Lv.60、无永久强化、三槽空位计算；舞台使用相同生产公式。',
+      hp: '生命', exp: '经验', gold: '金币', interval: '攻击间隔', region: '区域', tier: '经典阶位',
+      normal: '普通怪', target: '讨伐目标', panel: '面板',
+      monsterNote: '属性由 formulas.monsterStats 按区域阶位与变体系数推导，Boss 叠加首领倍率。',
+      entered: '已入场', spawned: '已刷新', spawnNormal: '已刷新普通陪练', summoned: '已召唤 Boss',
+      reset: '主角已重置', hit: '命中', critical: '暴击', basic: '普攻', dodge: '闪避', defeated: '击败',
+      death: '主角阵亡，正在重整', bossEntered: 'Boss 登场', noBubble: '手动检查 · 当前无气泡',
+      autoWaiting: '自动轮播 · 等待气泡', hero: '主角', monster: '怪物', manual: '手动', auto: '自动', noneTarget: '无'
+    },
+    en: {
+      maxHp: 'Max HP', atk: 'Attack', def: 'Defense', speed: 'Speed', crit: 'Critical chance', critDmg: 'Critical damage',
+      range: 'Attack range', projectile: 'Projectile', growth: 'Growth', none: 'None', active: 'Active', passive: 'Passive',
+      baseAtk: 'Base ATK Lv.60', baseHp: 'Base HP Lv.60', baseDef: 'Base DEF Lv.60',
+      derived: 'Lv.60 derived stats (passives, empty gear slots)', skills: 'Class skills',
+      heroNote: 'Stats use the production Lv.60 formula with no permanent upgrades and empty gear slots.',
+      hp: 'HP', exp: 'EXP', gold: 'Gold', interval: 'Attack interval', region: 'Region', tier: 'Classic tier',
+      normal: 'Enemy', target: 'Hunt target', panel: 'panel',
+      monsterNote: 'formulas.monsterStats derives these values from region tier and variant modifiers; bosses add boss multipliers.',
+      entered: 'entered the stage', spawned: 'Respawned', spawnNormal: 'Spawned sparring enemy', summoned: 'Summoned boss',
+      reset: 'Hero reset', hit: 'Hit', critical: 'critical', basic: 'basic attack', dodge: 'Dodged', defeated: 'Defeated',
+      death: 'Hero down; regrouping', bossEntered: 'Boss entered', noBubble: 'Manual check · no active bubble',
+      autoWaiting: 'Auto sequence · waiting', hero: 'Hero', monster: 'Enemy', manual: 'Manual', auto: 'Auto', noneTarget: 'None'
+    }
+  };
+
+  function tr(key) {
+    var locale = D ? D.locale() : 'zh-CN';
+    return (COPY[locale] && COPY[locale][key]) || COPY['zh-CN'][key] || key;
+  }
+
+  function bubbleLabel(type) {
+    return D ? D.t('units.' + type) : type;
+  }
 
   function esc(value) { return U.esc(String(value)); }
 
@@ -127,18 +164,18 @@
     var preview = Game.player.previewDerived({ classId: unit.id, level: 60 });
     var skills = Game.reg.all('skill').filter(function (s) { return s.cls === unit.id; });
     var statRows =
-      statRow('最大生命', preview.maxHp) +
-      statRow('攻击', preview.atk) +
-      statRow('防御', preview.def) +
-      statRow('速度', preview.spd) +
-      statRow('暴击率', fmtPct(preview.crit)) +
-      statRow('暴击伤害', '×' + preview.critDmg.toFixed(2)) +
-      statRow('攻击距离', cls.range + ' px') +
-      statRow('弹道', cls.projectile || '无') +
-      statRow('成长', 'HP×' + cls.grow.hp + ' / ATK×' + cls.grow.atk + ' / DEF×' + cls.grow.def);
+      statRow(tr('maxHp'), preview.maxHp) +
+      statRow(tr('atk'), preview.atk) +
+      statRow(tr('def'), preview.def) +
+      statRow(tr('speed'), preview.spd) +
+      statRow(tr('crit'), fmtPct(preview.crit)) +
+      statRow(tr('critDmg'), '×' + preview.critDmg.toFixed(2)) +
+      statRow(tr('range'), cls.range + ' px') +
+      statRow(tr('projectile'), cls.projectile || tr('none')) +
+      statRow(tr('growth'), 'HP×' + cls.grow.hp + ' / ATK×' + cls.grow.atk + ' / DEF×' + cls.grow.def);
 
     var skillRows = skills.map(function (s) {
-      var kind = s.type === 'active' ? (s.kind || '主动') : '被动';
+      var kind = s.type === 'active' ? (s.kind || tr('active')) : tr('passive');
       var desc = Game.i18n.t('skill.' + s.id + '.desc', s.descVars ? s.descVars(10) : {});
       return '<div class="skill-row">' +
         '<canvas width="24" height="24" data-sprite="' + esc(s.icon || 'icon_skill_strike') + '"></canvas>' +
@@ -153,34 +190,34 @@
         '<p>' + esc(Game.i18n.t('class.' + unit.id + '.desc')) + '</p>' +
       '</div>' +
       '<div class="metric-grid">' +
-        '<div class="metric"><strong>' + d.atk + '</strong><span>裸攻 Lv.60</span></div>' +
-        '<div class="metric"><strong>' + d.hp + '</strong><span>裸血 Lv.60</span></div>' +
-        '<div class="metric"><strong>' + d.def + '</strong><span>裸防 Lv.60</span></div>' +
+        '<div class="metric"><strong>' + d.atk + '</strong><span>' + esc(tr('baseAtk')) + '</span></div>' +
+        '<div class="metric"><strong>' + d.hp + '</strong><span>' + esc(tr('baseHp')) + '</span></div>' +
+        '<div class="metric"><strong>' + d.def + '</strong><span>' + esc(tr('baseDef')) + '</span></div>' +
       '</div>' +
-      '<section class="inspect-section"><h3>Lv.60 派生属性（含被动/装备位占位）</h3>' +
+      '<section class="inspect-section"><h3>' + esc(tr('derived')) + '</h3>' +
         '<div class="row-list">' + statRows + '</div>' +
       '</section>' +
-      '<section class="inspect-section"><h3>职业技能</h3>' + skillRows + '</section>' +
-      '<p class="note">派生属性按 Lv.60、无永久强化、三槽空位计算；右侧舞台中的主角会自动装备与等级匹配的占位装备并投入等额技能点。</p>';
+      '<section class="inspect-section"><h3>' + esc(tr('skills')) + '</h3>' + skillRows + '</section>' +
+      '<p class="note">' + esc(tr('heroNote')) + '</p>';
   }
 
   function renderMonsterInspector(unit) {
     var def = Game.reg.get('monster', unit.id);
     var tier = def.tier || Game.State.regionTier(unit.id);
     var st = F.monsterStats(tier, def.mods, def.boss);
-    var traits = def.boss ? trait('Boss', 'boss') + trait('讨伐目标', 'accent') : trait('普通怪');
+    var traits = def.boss ? trait('Boss', 'boss') + trait(tr('target'), 'accent') : trait(tr('normal'));
     var region = regions.find(function (r) { return (def.boss ? r.boss : r.monsters.indexOf(unit.id)) >= 0; });
 
     var statRows =
-      statRow('生命', st.hp) +
-      statRow('攻击', st.atk) +
-      statRow('防御', st.def) +
-      statRow('速度', st.spd) +
-      statRow('经验', st.exp) +
-      statRow('金币', st.gold) +
-      statRow('攻击间隔', F.atkInterval(st.spd).toFixed(2) + 's') +
-      statRow('区域', region ? Game.i18n.t('region.' + region.id + '.name') : '-') +
-      statRow('经典阶位', 'Tier ' + tier);
+      statRow(tr('hp'), st.hp) +
+      statRow(tr('atk'), st.atk) +
+      statRow(tr('def'), st.def) +
+      statRow(tr('speed'), st.spd) +
+      statRow(tr('exp'), st.exp) +
+      statRow(tr('gold'), st.gold) +
+      statRow(tr('interval'), F.atkInterval(st.spd).toFixed(2) + 's') +
+      statRow(tr('region'), region ? Game.i18n.t('region.' + region.id + '.name') : '-') +
+      statRow(tr('tier'), 'Tier ' + tier);
 
     document.getElementById('inspector').innerHTML =
       '<div class="inspector-header">' +
@@ -192,11 +229,11 @@
         '<div class="metric"><strong>' + st.atk + '</strong><span>ATK</span></div>' +
         '<div class="metric"><strong>' + st.def + '</strong><span>DEF</span></div>' +
       '</div>' +
-      '<section class="inspect-section"><h3>' + (def.boss ? 'Boss' : '普通怪') + ' 面板</h3>' +
+      '<section class="inspect-section"><h3>' + (def.boss ? 'Boss' : esc(tr('normal'))) + ' ' + esc(tr('panel')) + '</h3>' +
         spriteRow(unit.sprite, monsterName(unit.id), traits) +
         '<div class="row-list">' + statRows + '</div>' +
       '</section>' +
-      '<p class="note">属性由 formulas.monsterStats 按区域经典阶位与变体系数推导；Boss 额外乘以 bossHp/bossAtk/bossDef。</p>';
+      '<p class="note">' + esc(tr('monsterNote')) + '</p>';
   }
 
   function renderInspector() {
@@ -226,23 +263,26 @@
 
   function setupStageForUnit(unit) {
     var region = regions[0];
+    var classId = unit.type === 'hero' ? unit.id : 'fighter';
+    var level = unit.type === 'hero' ? 60 : Math.max(1, (unit.type === 'boss' ? 70 : 55));
+    Game.player.setClass(classId);
+    Game.state.player.level = level;
+    Game.state.player.exp = 0;
+    Game.state.player.skills = {};
+    Game.player.recalc();
+    Game.state.player.hp = Game.state.derived.maxHp;
     Game.state.world.region = region.id;
+    Game.state.world.layoutVersion = 3;
     Game.state.world.mode = 'battle';
     Game.state.world.deathsRow = 0;
     Game.state.settings.controlMode = 'auto';
     Game.world.init(region.id);
 
-    Game.player.setClass(unit.type === 'hero' ? unit.id : 'fighter');
-    var level = unit.type === 'hero' ? 60 : Math.max(1, (unit.type === 'boss' ? 70 : 55));
-    Game.state.player.level = level;
-    Game.state.player.exp = 0;
-    Game.state.player.skills = {};
-    Game.state.player.hp = 1;
-    Game.player.recalc();
-
     var hero = Game.world.hero;
-    hero.x = 200;
-    hero.y = 280;
+    clearSparring();
+    var start = Game.terrain.projectPoint(Game.world.layout.camp.x + 34, Game.world.layout.camp.y + 18, 1) || Game.world.layout.camp;
+    hero.x = start.x;
+    hero.y = start.y;
     hero.dir = 'r';
     hero.state = 'idle';
     hero.target = null;
@@ -251,17 +291,15 @@
     hero.campWarp = null;
     Game.nav.clear(hero);
 
-    if (unit.type !== 'hero') {
-      spawnSparring(unit.id, unit.type === 'boss');
-    } else {
-      clearSparring();
-    }
+    Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: region.id });
+    if (unit.type !== 'hero') spawnSparring(unit.id, unit.type === 'boss');
     Game.state.player.hp = Game.state.derived.maxHp;
     Game.world.syncHeroStats();
     Game.render.snapCamera(hero.x, hero.y);
   }
 
   function clearSparring() {
+    if (Game.actionBubbles) Game.actionBubbles.clear();
     Game.world.entities = Game.world.entities.filter(function (e) { return e.kind === 'hero'; });
     Game.world.bossEnt = null;
     Game.world.cinematic = null;
@@ -270,8 +308,12 @@
   function spawnSparring(mid, isBoss) {
     clearSparring();
     var ent = Game.world.makeMonster(mid, isBoss);
-    ent.x = 620;
-    ent.y = 290;
+    var hero = Game.world.hero;
+    var target = Game.terrain.projectPoint(hero.x + 92, hero.y + 6, 1) || { x: hero.x + 72, y: hero.y };
+    ent.x = target.x;
+    ent.y = target.y;
+    ent.spawnX = ent.x;
+    ent.spawnY = ent.y;
     ent.dir = 'l';
     ent.state = isBoss ? 'fight' : 'wander';
     ent.engaged = isBoss;
@@ -282,6 +324,7 @@
       Game.fx.shake(5, 0.9);
       Game.fx.banner('ui.bossAppear', { name: Game.i18n.t('monster.' + mid + '.name') });
     }
+    Game.exploration.revealAt(ent.x, ent.y, { force: true, rid: Game.world.region.id });
     return ent;
   }
 
@@ -395,12 +438,12 @@
       return bubble.state === 'visible';
     });
     if (!active.length) {
-      output.textContent = bubbleAuto ? '自动轮播 · 等待气泡' : '手动检查 · 当前无气泡';
+      output.textContent = bubbleAuto ? tr('autoWaiting') : tr('noBubble');
       return;
     }
     output.textContent = active.map(function (bubble) {
-      var anchorName = bubble.entityKind === 'monster' ? '怪物' : '主角';
-      return anchorName + ' · ' + (BUBBLE_LABELS[bubble.type] || bubble.type);
+      var anchorName = bubble.entityKind === 'monster' ? tr('monster') : tr('hero');
+      return anchorName + ' · ' + bubbleLabel(bubble.type);
     }).join(' / ');
   }
 
@@ -412,7 +455,7 @@
     bubbleAutoT = 0.2;
     updateHeader();
     renderInspector();
-    setBattleEvent(unit.type === 'hero' ? className(unit.id) + '已入场' : monsterName(unit.id) + '已入场');
+    setBattleEvent((unit.type === 'hero' ? className(unit.id) : monsterName(unit.id)) + ' · ' + tr('entered'));
   }
 
   function setBattleEvent(message) {
@@ -446,9 +489,9 @@
     document.getElementById('toggle-play').addEventListener('click', function () {
       paused = !paused;
       this.textContent = paused ? '▶' : 'Ⅱ';
-      this.title = paused ? '继续演示' : '暂停演示';
+      this.title = paused ? D.t('common.resume') : D.t('common.pause');
       this.setAttribute('aria-label', this.title);
-      document.getElementById('runtime-status').textContent = paused ? '战斗循环已暂停' : '原版战斗循环运行中';
+      document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('units.runtime');
     });
     document.querySelector('.mode-controls').addEventListener('click', function (event) {
       var button = event.target.closest('[data-kind]');
@@ -492,16 +535,16 @@
         var list = normalMonsters;
         var pick = list[Math.floor(Math.random() * list.length)];
         spawnSparring(pick.id, false);
-        setBattleEvent('已刷新普通陪练：' + monsterName(pick.id));
+        setBattleEvent(tr('spawnNormal') + ' · ' + monsterName(pick.id));
       } else {
         spawnSparring(unit.id, unit.type === 'boss');
-        setBattleEvent('已刷新：' + monsterName(unit.id));
+        setBattleEvent(tr('spawned') + ' · ' + monsterName(unit.id));
       }
     });
     document.getElementById('spawn-boss').addEventListener('click', function () {
       var pick = bossMonsters[Math.floor(Math.random() * bossMonsters.length)];
       spawnSparring(pick.id, true);
-      setBattleEvent('已召唤 Boss：' + monsterName(pick.id));
+      setBattleEvent(tr('summoned') + ' · ' + monsterName(pick.id));
     });
     document.getElementById('toggle-control').addEventListener('click', function () {
       Game.world.toggleControlMode();
@@ -509,8 +552,9 @@
     document.getElementById('reset-hero').addEventListener('click', function () {
       var hero = Game.world.hero;
       if (!hero) return;
-      hero.x = 200;
-      hero.y = 280;
+      var start = Game.terrain.projectPoint(Game.world.layout.camp.x + 34, Game.world.layout.camp.y + 18, 1) || Game.world.layout.camp;
+      hero.x = start.x;
+      hero.y = start.y;
       hero.dir = 'r';
       hero.state = 'idle';
       hero.target = null;
@@ -519,7 +563,8 @@
       hero.hp = Game.state.derived.maxHp;
       Game.nav.clear(hero);
       Game.render.snapCamera(hero.x, hero.y);
-      setBattleEvent('主角已重置');
+      Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: Game.world.region.id });
+      setBattleEvent(tr('reset'));
     });
     document.getElementById('inspector').addEventListener('click', function (event) {
       var button = event.target.closest('[data-global]');
@@ -535,29 +580,29 @@
 
   function bindBattleEvents() {
     Game.bus.on('combat:hit', function (p) {
-      if (p.from === 'hero') setBattleEvent('命中 · ' + (p.crit ? '暴击' : '普攻'));
+      if (p.from === 'hero') setBattleEvent(tr('hit') + ' · ' + (p.crit ? tr('critical') : tr('basic')));
     });
-    Game.bus.on('combat:miss', function () { setBattleEvent('闪避'); });
+    Game.bus.on('combat:miss', function () { setBattleEvent(tr('dodge')); });
     Game.bus.on('monster:killed', function (p) {
-      setBattleEvent('击败 · ' + monsterName(p.mid) + (p.boss ? ' (Boss)' : ''));
+      setBattleEvent(tr('defeated') + ' · ' + monsterName(p.mid) + (p.boss ? ' (Boss)' : ''));
     });
-    Game.bus.on('player:death', function () { setBattleEvent('主角阵亡，正在重整'); });
-    Game.bus.on('boss:spawned', function (p) { setBattleEvent('Boss 登场 · ' + monsterName(p.mid)); });
+    Game.bus.on('player:death', function () { setBattleEvent(tr('death')); });
+    Game.bus.on('boss:spawned', function (p) { setBattleEvent(tr('bossEntered') + ' · ' + monsterName(p.mid)); });
     Game.bus.on('control:changed', function (p) {
-      document.getElementById('control-runtime').textContent = p.mode === 'manual' ? '手动' : '自动';
+      document.getElementById('control-runtime').textContent = p.mode === 'manual' ? tr('manual') : tr('auto');
     });
   }
 
   function updateBattleQa() {
     var hero = Game.world.hero;
     var target = hero ? hero.target : null;
-    var targetName = target ? (target.boss ? 'Boss ' : '') + monsterName(target.mid) : '无';
+    var targetName = target ? (target.boss ? 'Boss ' : '') + monsterName(target.mid) : tr('noneTarget');
     var rt = document.getElementById('target-runtime');
     if (rt) rt.textContent = targetName;
     var hr = document.getElementById('hero-runtime');
     if (hr && hero) hr.textContent = hero.state;
     var cr = document.getElementById('control-runtime');
-    if (cr) cr.textContent = Game.world.controlMode() === 'manual' ? '手动' : '自动';
+    if (cr) cr.textContent = Game.world.controlMode() === 'manual' ? tr('manual') : tr('auto');
     var ev = document.getElementById('battle-event');
     if (ev) ev.textContent = battleMessage;
     updateBubbleQa();
@@ -588,14 +633,16 @@
     requestAnimationFrame(frame);
   }
 
-  Game.i18n.setLocale('zh-CN');
+  D.init();
   Game.state = Game.State.newGame();
+  Game.i18n.setLocale(D.locale());
   Game.state.world.regionOrder = Game.reg.ids('region');
   Game.state.settings.autoAdvance = false;
   Game.state.settings.autoEquip = false;
   Game.state.settings.autoCampRest = false;
   Game.state.settings.groundLoot = false;
   Game.state.settings.effects = true;
+  Game.state.settings.expeditionStrategy = 'balanced';
   Game.render.init(document.getElementById('stage'));
   Game.unitsBubbleDemo = {
     show: function (type, anchor) {
@@ -614,5 +661,9 @@
   bindBattleEvents();
   paintBubbleControls();
   activateUnit(0);
+  window.addEventListener('demo:locale', function () {
+    activateUnit(currentIndex);
+    paintBubbleControls();
+  });
   requestAnimationFrame(frame);
 })();

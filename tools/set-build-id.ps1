@@ -7,13 +7,6 @@ param(
 
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $indexPath = Join-Path $projectRoot 'index.html'
-$demoPath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.html'
-$demoStylePath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.css'
-$explorationDemoPath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.html'
-$explorationDemoStylePath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.css'
-$unitsDemoPath = Join-Path $projectRoot 'tech-demos\units\units.html'
-$unitsDemoStylePath = Join-Path $projectRoot 'tech-demos\units\units.css'
-$stylePath = Join-Path $projectRoot 'css\style.css'
 $utilsPath = Join-Path $projectRoot 'js\core\utils.js'
 $versionPath = Join-Path $projectRoot 'version.json'
 
@@ -24,31 +17,23 @@ if (-not $match.Success) {
 }
 $currentBuild = $match.Groups[1].Value
 
-$files = @(
-    $indexPath,
-    $demoPath,
-    $demoStylePath,
-    $explorationDemoPath,
-    $explorationDemoStylePath,
-    $unitsDemoPath,
-    $unitsDemoStylePath,
-    $stylePath,
-    $utilsPath,
-    $versionPath
-)
+$candidateExtensions = @('.html', '.css', '.js', '.json')
+$files = Get-ChildItem -LiteralPath $projectRoot -Recurse -File |
+    Where-Object {
+        $candidateExtensions -contains $_.Extension.ToLowerInvariant() -and
+        $_.FullName -notmatch '[\\/](?:\.git|node_modules)[\\/]'
+    } |
+    ForEach-Object { $_.FullName }
 $contents = @{}
 foreach ($path in $files) {
     $contents[$path] = [IO.File]::ReadAllText($path)
 }
 
-if ($contents[$demoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
-    throw '技术演示页 build-id 与 index.html 不一致。'
-}
-if ($contents[$explorationDemoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
-    throw '开放探索演示页 build-id 与 index.html 不一致。'
-}
-if ($contents[$unitsDemoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
-    throw '角色与怪物演示页 build-id 与 index.html 不一致。'
+$demoHtml = Get-ChildItem -LiteralPath (Join-Path $projectRoot 'tech-demos') -Recurse -Filter '*.html' -File
+foreach ($demo in $demoHtml) {
+    if ($contents[$demo.FullName] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
+        throw "技术演示页 build-id 与 index.html 不一致：$($demo.FullName)"
+    }
 }
 if ($contents[$utilsPath] -notmatch [regex]::Escape("Game.BUILD_ID = '$currentBuild'")) {
     throw 'Game.BUILD_ID 与 index.html 不一致。'
@@ -57,11 +42,13 @@ if ($contents[$versionPath] -notmatch [regex]::Escape("`"buildId`": `"$currentBu
     throw 'version.json 与 index.html 不一致。'
 }
 
-foreach ($path in $files) {
-    $updated = $contents[$path].Replace($currentBuild, $BuildId)
-    if ($updated -eq $contents[$path] -and $currentBuild -ne $BuildId) {
-        throw "未在 $path 中找到当前 BUILD_ID。"
+foreach ($path in @($files)) {
+    if (-not $contents[$path].Contains($currentBuild)) {
+        $contents.Remove($path)
+        $files = @($files | Where-Object { $_ -ne $path })
+        continue
     }
+    $updated = $contents[$path].Replace($currentBuild, $BuildId)
     $contents[$path] = $updated
 }
 

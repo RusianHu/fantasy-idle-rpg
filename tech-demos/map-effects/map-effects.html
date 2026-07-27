@@ -4,22 +4,28 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#151614">
-<meta name="build-id" content="20260727.15">
+<meta name="build-id" content="20260728.1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23151614'/%3E%3C/svg%3E">
-<title>地图级特效技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="map-effects.css?v=20260727.15">
+<title data-demo-page-title="map.pageTitle">开放世界现场技术验证 · 幻境远征</title>
+<link rel="stylesheet" href="map-effects.css?v=20260728.1">
 </head>
 <body>
 <div class="app-shell">
   <header class="topbar">
     <div>
       <p class="eyebrow">FANTASY IDLE RPG / EFFECTS LAB / MAP-FX-01</p>
-      <h1>地图级特效技术验证</h1>
+      <h1 data-demo-i18n="map.title">开放世界现场技术验证</h1>
     </div>
-    <a class="back-link" href="../../index.html">返回原游戏</a>
+    <div class="top-actions">
+      <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
+        <select data-demo-locale><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+      </label>
+      <a class="back-link" href="../index.html" data-demo-i18n="common.demoHub">演示中心</a>
+      <a class="back-link" href="../../index.html" data-demo-i18n="common.backGame">返回游戏</a>
+    </div>
   </header>
 
-  <nav id="region-tabs" class="region-tabs" aria-label="特效验证区域"></nav>
+  <nav id="region-tabs" class="region-tabs" aria-label="开放世界验证区域" data-demo-i18n-aria="map.regionNav"></nav>
 
   <main class="workspace">
     <section class="preview-column" aria-labelledby="stage-region-name">
@@ -32,45 +38,50 @@
           </div>
         </div>
         <div class="icon-actions">
-          <button id="prev-region" class="icon-button" type="button" title="上一个区域" aria-label="上一个区域">&#8592;</button>
-          <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示">&#8545;</button>
-          <button id="next-region" class="icon-button" type="button" title="下一个区域" aria-label="下一个区域">&#8594;</button>
+          <button id="prev-region" class="icon-button" type="button" title="上一个" aria-label="上一个" data-demo-i18n-title="common.previous" data-demo-i18n-aria="common.previous">&#8592;</button>
+          <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示" data-demo-i18n-title="common.pause" data-demo-i18n-aria="common.pause">&#8545;</button>
+          <button id="next-region" class="icon-button" type="button" title="下一个" aria-label="下一个" data-demo-i18n-title="common.next" data-demo-i18n-aria="common.next">&#8594;</button>
         </div>
       </div>
 
       <div id="stage-wrap" class="stage-wrap">
-        <canvas id="stage" aria-label="原版地图级特效实时画布"></canvas>
+        <canvas id="stage" aria-label="开放探索 v3 实时世界画布" data-demo-i18n-aria="map.stageAria"></canvas>
         <div class="stage-badges" aria-hidden="true">
-          <span id="runtime-status">原版特效运行中</span>
+          <span id="runtime-status" data-demo-i18n="map.runtime">开放探索 v3 运行中</span>
           <span id="runtime-count">0 个实体</span>
         </div>
       </div>
 
       <div class="control-strip">
         <form id="seed-form" class="seed-control">
-          <label for="seed-input">世界种子</label>
+          <label for="seed-input" data-demo-i18n="common.seed">世界种子</label>
           <input id="seed-input" type="text" inputmode="text" maxlength="8" spellcheck="false" autocomplete="off" aria-describedby="seed-format">
-          <button type="submit">应用</button>
-          <span id="seed-format">8 位十六进制</span>
+          <button type="submit" data-demo-i18n="common.apply">应用</button>
+          <span id="seed-format" data-demo-i18n="map.seedFormat">1–8 位十六进制</span>
         </form>
-        <div class="segmented" aria-label="日夜阶段">
-          <button type="button" data-time="cycle" class="active">循环</button>
-          <button type="button" data-time="day">昼间</button>
-          <button type="button" data-time="dusk">黄昏</button>
-          <button type="button" data-time="night">夜晚</button>
+        <div class="segmented" aria-label="日夜阶段" data-demo-i18n-aria="map.time">
+          <button type="button" data-time="cycle" class="active" data-demo-i18n="common.dayCycle">循环</button>
+          <button type="button" data-time="day" data-demo-i18n="common.day">昼间</button>
+          <button type="button" data-time="dusk" data-demo-i18n="common.dusk">黄昏</button>
+          <button type="button" data-time="night" data-demo-i18n="common.night">夜晚</button>
         </div>
-        <div class="focus-actions" aria-label="镜头视点">
-          <button type="button" data-focus="camp">营地</button>
-          <button type="button" data-focus="center">中部</button>
-          <button type="button" data-focus="boss">Boss 点</button>
+        <div class="focus-actions" aria-label="镜头视点" data-demo-i18n-aria="map.camera">
+          <button type="button" data-focus="camp" data-demo-i18n="map.camp">营地</button>
+          <button type="button" data-focus="center" data-demo-i18n="map.landmark">地标</button>
+          <button type="button" data-focus="boss" data-demo-i18n="map.lair">Boss 巢穴</button>
+        </div>
+        <div class="strategy-actions" aria-label="远征策略" data-demo-i18n-aria="map.strategyAria">
+          <button type="button" data-strategy="safe" data-demo-i18n="map.safe">安全</button>
+          <button type="button" data-strategy="balanced" class="active" data-demo-i18n="map.balanced">均衡</button>
+          <button type="button" data-strategy="loot" data-demo-i18n="map.loot">掠夺</button>
         </div>
         <label class="check-control">
           <input id="effects-toggle" type="checkbox" checked>
-          <span>环境效果</span>
+          <span data-demo-i18n="common.effects">环境效果</span>
         </label>
-        <div class="dynamic-trade-qa" aria-label="动态交易域接口验证">
-          <button id="spawn-dynamic-trade" type="button">注入临时游商</button>
-          <output id="dynamic-trade-status">未注册</output>
+        <div class="dynamic-trade-qa" aria-label="动态交易域接口验证" data-demo-i18n-aria="map.tradeQa">
+          <button id="spawn-dynamic-trade" type="button" data-demo-i18n="map.merchant">注入临时游商</button>
+          <output id="dynamic-trade-status" data-demo-i18n="map.merchantIdle">未注册</output>
         </div>
       </div>
 
@@ -78,86 +89,96 @@
         <div class="lab-heading">
           <div>
             <p class="lab-kicker">WORLD INTERACTION / LIVE QA</p>
-            <h3 id="exploration-lab-title">可采集物 / 宝箱</h3>
-            <p>直接验证生产环境中的节点冷却、点击交互、合法移动发现与宝箱过期。</p>
+            <h3 id="exploration-lab-title" data-demo-i18n="map.interactions">资源 / 宝箱 / 交易域</h3>
+            <p data-demo-i18n="map.interactionCopy">验证 v3 资源揭示、节点冷却、宝箱与动态交易域的生产链路。</p>
           </div>
-          <output id="exploration-event" class="lab-event" aria-live="polite">等待交互</output>
+          <output id="exploration-event" class="lab-event" aria-live="polite" data-demo-i18n="map.waiting">等待交互</output>
         </div>
-        <div class="lab-runtime" aria-label="探索交互运行状态">
-          <div><span>采集节点</span><strong id="gather-runtime">0 / 0 成熟</strong></div>
-          <div><span>发现进度</span><strong id="discovery-runtime">0 / 0 秒</strong></div>
-          <div><span>场上宝箱</span><strong id="chest-runtime">无</strong></div>
+        <div class="lab-runtime" aria-label="探索交互运行状态" data-demo-i18n-aria="map.runtimeAria">
+          <div><span data-demo-i18n="map.nodes">资源节点</span><strong id="gather-runtime">0 / 0 成熟</strong></div>
+          <div><span data-demo-i18n="map.readiness">准备度</span><strong id="discovery-runtime">0 / 100</strong></div>
+          <div><span data-demo-i18n="map.chest">场上宝箱</span><strong id="chest-runtime">—</strong></div>
         </div>
         <div class="lab-actions">
           <div class="lab-action-group">
-            <span>采集节点</span>
-            <button id="focus-gather" type="button">定位成熟节点</button>
-            <button id="reset-gather" type="button">恢复全部节点</button>
+            <span data-demo-i18n="map.nodes">资源节点</span>
+            <button id="focus-gather" type="button" data-demo-i18n="map.focusResource">定位成熟资源</button>
+            <button id="reset-gather" type="button" data-demo-i18n="map.revealResources">揭示附近资源</button>
           </div>
           <div class="lab-action-group">
-            <span>宝箱变体</span>
-            <button id="spawn-common-chest" type="button">生成普通宝箱</button>
-            <button id="spawn-rare-chest" type="button">生成稀有宝箱</button>
+            <span data-demo-i18n="map.chestVariants">宝箱变体</span>
+            <button id="spawn-common-chest" type="button" data-demo-i18n="map.spawnCommon">生成普通宝箱</button>
+            <button id="spawn-rare-chest" type="button" data-demo-i18n="map.spawnRare">生成稀有宝箱</button>
           </div>
         </div>
-        <p class="lab-hint">定位或生成后，点击画布中的节点/宝箱即可观察角色走近、1.2 秒采集或 0.8 秒开箱；接敌会中断当前交互。</p>
+        <p class="lab-hint" data-demo-i18n="map.hint">定位后点击画布中的资源或宝箱，实际走完寻路与交互链路。</p>
       </section>
 
       <div class="source-line">
-        <span>验证链路</span>
-        <code>regions.js</code><b>&#8594;</b><code>terrain.build(seed)</code><b>&#8594;</b><code>environment.js</code><b>&#8594;</b><code>world.update()</code><b>&#8594;</b><code>renderer.frame()</code>
+        <span data-demo-i18n="common.source">生产链路</span>
+        <code>terrain_v3.js</code><b>&#8594;</b><code>exploration.js</code><b>&#8594;</b><code>expedition_ai.js</code><b>&#8594;</b><code>world.js</code><b>&#8594;</b><code>renderer.js</code>
       </div>
     </section>
 
-    <aside id="inspector" class="inspector" aria-label="地图级特效配置明细"></aside>
+    <aside id="inspector" class="inspector" aria-label="开放世界生成与运行指标" data-demo-i18n-aria="map.inspector"></aside>
   </main>
 </div>
 
-<script src="../../js/core/utils.js?v=20260727.15"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260727.15"></script>
-<script src="../../js/core/eventbus.js?v=20260727.15"></script>
-<script src="../../js/core/registry.js?v=20260727.15"></script>
-<script src="../../js/i18n/i18n.js?v=20260727.15"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260727.15"></script>
-<script src="../../js/i18n/en.js?v=20260727.15"></script>
-<script src="../../js/core/assets.js?v=20260727.15"></script>
-<script src="../../js/data/formulas.js?v=20260727.15"></script>
-<script src="../../js/sprites/palettes.js?v=20260727.15"></script>
-<script src="../../js/sprites/hero.js?v=20260727.15"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260727.15"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260727.15"></script>
-<script src="../../js/sprites/props.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260727.15"></script>
-<script src="../../js/sprites/flora.js?v=20260727.15"></script>
-<script src="../../js/data/affixes.js?v=20260727.15"></script>
-<script src="../../js/data/items.js?v=20260727.15"></script>
-<script src="../../js/data/classes.js?v=20260727.15"></script>
-<script src="../../js/data/skills.js?v=20260727.15"></script>
-<script src="../../js/data/monsters.js?v=20260727.15"></script>
-<script src="../../js/data/regions.js?v=20260727.15"></script>
-<script src="../../js/systems/state.js?v=20260727.15"></script>
-<script src="../../js/systems/terrain.js?v=20260727.15"></script>
-<script src="../../js/systems/nav.js?v=20260727.15"></script>
-<script src="../../js/systems/inventory.js?v=20260727.15"></script>
-<script src="../../js/systems/items.js?v=20260727.15"></script>
-<script src="../../js/systems/combat.js?v=20260727.15"></script>
-<script src="../../js/systems/trade.js?v=20260727.15"></script>
-<script src="../../js/systems/environment.js?v=20260727.15"></script>
-<script src="../../js/render/terrain.js?v=20260727.15"></script>
-<script src="../../js/render/particles.js?v=20260727.15"></script>
-<script src="../../js/render/daynight.js?v=20260727.15"></script>
-<script src="../../js/render/effects.js?v=20260727.15"></script>
-<script src="../../js/render/renderer.js?v=20260727.15"></script>
-<script src="../../js/systems/world.js?v=20260727.15"></script>
-<script src="map-effects.js?v=20260727.15"></script>
+<script src="../../js/core/utils.js?v=20260728.1"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260728.1"></script>
+<script src="../../js/core/eventbus.js?v=20260728.1"></script>
+<script src="../../js/core/registry.js?v=20260728.1"></script>
+<script src="../../js/i18n/i18n.js?v=20260728.1"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260728.1"></script>
+<script src="../../js/i18n/en.js?v=20260728.1"></script>
+<script src="../../js/core/assets.js?v=20260728.1"></script>
+<script src="../../js/data/formulas.js?v=20260728.1"></script>
+<script src="../../js/sprites/palettes.js?v=20260728.1"></script>
+<script src="../../js/sprites/hero.js?v=20260728.1"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260728.1"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260728.1"></script>
+<script src="../../js/sprites/props.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration_v3.manifest.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260728.1"></script>
+<script src="../../js/sprites/flora.js?v=20260728.1"></script>
+<script src="../../js/data/affixes.js?v=20260728.1"></script>
+<script src="../../js/data/items.js?v=20260728.1"></script>
+<script src="../../js/data/classes.js?v=20260728.1"></script>
+<script src="../../js/data/skills.js?v=20260728.1"></script>
+<script src="../../js/data/monsters.js?v=20260728.1"></script>
+<script src="../../js/data/regions.js?v=20260728.1"></script>
+<script src="../../js/systems/state.js?v=20260728.1"></script>
+<script src="../../js/systems/terrain.js?v=20260728.1"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260728.1"></script>
+<script src="../../js/systems/nav.js?v=20260728.1"></script>
+<script src="../../js/systems/inventory.js?v=20260728.1"></script>
+<script src="../../js/systems/items.js?v=20260728.1"></script>
+<script src="../../js/systems/automation.js?v=20260728.1"></script>
+<script src="../../js/systems/combat.js?v=20260728.1"></script>
+<script src="../../js/systems/environment.js?v=20260728.1"></script>
+<script src="../../js/systems/exploration.js?v=20260728.1"></script>
+<script src="../../js/systems/expedition.js?v=20260728.1"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260728.1"></script>
+<script src="../../js/systems/expedition_ai.js?v=20260728.1"></script>
+<script src="../../js/systems/world.js?v=20260728.1"></script>
+<script src="../../js/systems/trade.js?v=20260728.1"></script>
+<script src="../../js/render/terrain.js?v=20260728.1"></script>
+<script src="../../js/render/exploration.js?v=20260728.1"></script>
+<script src="../../js/render/particles.js?v=20260728.1"></script>
+<script src="../../js/render/daynight.js?v=20260728.1"></script>
+<script src="../../js/render/effects.js?v=20260728.1"></script>
+<script src="../../js/render/renderer.js?v=20260728.1"></script>
+<script src="../demo-i18n.js?v=20260728.1"></script>
+<script src="map-effects.js?v=20260728.1"></script>
 </body>
 </html>

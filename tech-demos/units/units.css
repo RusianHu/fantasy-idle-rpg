@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260727.15") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260728.1") format("woff2");
   font-display: swap;
 }
 
@@ -27,16 +27,12 @@ body {
   margin: 0;
   min-width: 320px;
   color: var(--text);
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px),
-    var(--bg);
-  background-size: 16px 16px;
+  background: var(--bg);
   font-family: "Fusion Pixel", "Microsoft YaHei", sans-serif;
   letter-spacing: 0;
 }
 
-button, input, a { font: inherit; }
+button, input, select, a { font: inherit; letter-spacing: 0; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 button:focus-visible, a:focus-visible, input:focus-visible {
@@ -69,7 +65,7 @@ h1, h2, h3, p { margin-top: 0; }
 
 h1 {
   margin-bottom: 14px;
-  font-size: clamp(24px, 3vw, 36px);
+  font-size: 34px;
   line-height: 1.05;
   font-weight: 600;
 }
@@ -81,6 +77,16 @@ h1 {
   color: var(--text);
   text-decoration: none;
   border-bottom: 1px solid var(--gold);
+}
+
+.top-actions { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; justify-content: flex-end; }
+.locale-control { display: grid; gap: 3px; color: var(--muted); font-size: 9px; }
+.locale-control select {
+  min-height: 44px;
+  padding: 6px 28px 6px 9px;
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  background: var(--surface);
 }
 
 .workspace {
@@ -352,9 +358,7 @@ h1 {
 .battle-lab {
   margin-top: 14px;
   border: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(182, 107, 79, 0.07), transparent 46%),
-    var(--surface);
+  background: var(--surface);
 }
 
 .lab-heading {
@@ -609,6 +613,9 @@ h1 {
   .app-shell { padding: 14px 12px 30px; }
   .topbar { align-items: flex-start; flex-wrap: wrap; }
   .topbar > div { min-width: 0; }
+  .top-actions { width: 100%; justify-content: flex-start; }
+  .locale-control { flex: 1 1 128px; }
+  .locale-control select { width: 100%; }
   .back-link { margin-bottom: 10px; }
   .eyebrow { font-size: 9px; }
   h1 { font-size: 24px; }

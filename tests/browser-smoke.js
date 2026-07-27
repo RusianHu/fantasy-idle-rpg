@@ -2837,6 +2837,56 @@ async function run() {
       width: 390, height: 844, deviceScaleFactor: 1, mobile: true
     });
 
+    await cdp.navigate(BASE + 'tech-demos/index.html?lang=en');
+    const demoHub = await cdp.evaluate(`(() => ({
+      cards: document.querySelectorAll('.demo-grid article').length,
+      linksCarryLocale: Array.from(document.querySelectorAll('[data-demo-link]')).every((link) =>
+        new URL(link.href).searchParams.get('lang') === 'en'),
+      title: document.querySelector('h1')?.textContent,
+      controlsTouchable: Array.from(document.querySelectorAll('.hub-actions a, .hub-actions select, .demo-grid a'))
+        .every((el) => el.getBoundingClientRect().height >= 44),
+      noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+    }))()`);
+    assert.equal(demoHub.cards, 3, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
+    assert.equal(demoHub.title, 'Technical Demo Hub');
+    assert.equal(demoHub.controlsTouchable, true);
+    assert.equal(demoHub.noHorizontalOverflow, true);
+
+    await cdp.navigate(BASE + 'tech-demos/exploration-v3/exploration-v3.html?seed=20260727&region=grassland&lang=en');
+    const generatorDemo = await cdp.evaluate(`(() => {
+      const canvas = document.getElementById('layout');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let visible = 0;
+      for (let i = 3; i < pixels.length; i += 64) if (pixels[i]) visible++;
+      const report = JSON.parse(document.getElementById('report').textContent);
+      return {
+        region: report.region,
+        seed: report.seed,
+        layoutVersion: report.layoutVersion,
+        resources: report.metrics.resources,
+        chunks: report.metrics.chunks,
+        valid: report.metrics.walkableRatio >= 0.6 && report.metrics.walkableRatio <= 0.7,
+        metricCount: document.querySelectorAll('#metrics .metric').length,
+        chunkToggle: !!document.getElementById('show-chunks'),
+        visible,
+        controlsTouchable: [document.getElementById('generate'), document.getElementById('audit')]
+          .every((el) => el.getBoundingClientRect().height >= 44),
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(generatorDemo.region, 'grassland');
+    assert.equal(generatorDemo.seed, '20260727');
+    assert.equal(generatorDemo.layoutVersion, 3);
+    assert.ok(generatorDemo.resources >= 16 && generatorDemo.resources <= 22);
+    assert.equal(generatorDemo.chunks, 15);
+    assert.equal(generatorDemo.valid, true);
+    assert.equal(generatorDemo.metricCount, 8);
+    assert.equal(generatorDemo.chunkToggle, true);
+    assert.ok(generatorDemo.visible > 1000, 'v3 generator canvas is nonblank');
+    assert.equal(generatorDemo.controlsTouchable, true);
+    assert.equal(generatorDemo.noHorizontalOverflow, true);
+
     await cdp.navigate(BASE + 'tech-demos/map-effects/map-effects.html?seed=89ABCDEF&region=lavacave');
     const demo = await cdp.evaluate(`(() => {
       const ids = [
@@ -2861,6 +2911,10 @@ async function run() {
       return {
         seed: document.getElementById('seed-input').value,
         region: Game.world.region.id,
+        layoutVersion: Game.world.layout.version,
+        world: [Game.world.layout.world.w, Game.world.layout.world.h],
+        strategyControls: document.querySelectorAll('[data-strategy]').length,
+        v3TerrainLoaded: !!document.querySelector('script[src*="systems/terrain_v3.js"]'),
         rects: Object.fromEntries(ids.concat(['toggle-play', 'next-region']).map((id) => {
           const r = document.getElementById(id).getBoundingClientRect();
           return [id, [r.left, r.top, r.right, r.bottom, r.width]];
@@ -2880,6 +2934,10 @@ async function run() {
     })()`);
     assert.equal(demo.seed, '89ABCDEF');
     assert.equal(demo.region, 'lavacave');
+    assert.equal(demo.layoutVersion, 3);
+    assert.deepEqual(demo.world, [2400, 1440]);
+    assert.equal(demo.strategyControls, 3);
+    assert.equal(demo.v3TerrainLoaded, true);
     assert.equal(demo.within, true, 'mobile QA toolbar controls fit viewport');
     assert.equal(demo.segments, true, 'mobile QA segmented control fits viewport');
     assert.equal(demo.noHorizontalOverflow, true, 'mobile QA page has no horizontal overflow');
@@ -2910,7 +2968,7 @@ async function run() {
         status: document.getElementById('exploration-event').textContent
       };
     })()`);
-    assert.ok(demoExploration.nodeCount >= 3 && demoExploration.nodeCount <= 5);
+    assert.ok(demoExploration.nodeCount >= 16 && demoExploration.nodeCount <= 22);
     assert.ok(demoExploration.nearest <= 42, 'QA focus control positions the hero beside a mature node');
     assert.equal(demoExploration.rareSpawned, true, 'QA can force the rare visual through production chest placement');
     assert.equal(demoExploration.commonSpawned, true, 'QA can force the common visual through production chest placement');
