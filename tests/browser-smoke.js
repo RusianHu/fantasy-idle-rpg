@@ -51,7 +51,12 @@ class Cdp {
         else request.resolve(message.result);
         return;
       }
-      if (message.method === 'Runtime.exceptionThrown') this.errors.push(message.params.exceptionDetails.text);
+      if (message.method === 'Runtime.exceptionThrown') {
+        this.errors.push(
+          message.params.exceptionDetails.exception?.description ||
+          message.params.exceptionDetails.text
+        );
+      }
       if (message.method === 'Log.entryAdded' && message.params.entry.level === 'error') this.errors.push(message.params.entry.text);
       const queue = this.waiters.get(message.method);
       if (queue && queue.length) queue.shift()(message.params);
@@ -537,8 +542,19 @@ async function run() {
       Game.ui.tabs.open('battle');
       Game.world.setControlMode('manual');
       const hero = Game.world.hero;
-      hero.x = Game.world.region.world.w * 0.5;
-      hero.y = Game.world.region.world.h * 0.5;
+      const nav = Game.world.layout.nav;
+      let spot = { x: Game.world.layout.camp.x, y: Game.world.layout.camp.y };
+      for (let y = 3; y < nav.h - 3; y++) {
+        for (let x = 3; x < nav.w - 4; x++) {
+          if (nav.distance[y][x] >= 3 && nav.distance[y][x + 1] >= 3) {
+            spot = { x: x * nav.cell + nav.cell / 2, y: y * nav.cell + nav.cell / 2 };
+            y = nav.h;
+            break;
+          }
+        }
+      }
+      hero.x = spot.x;
+      hero.y = spot.y;
       hero.state = 'idle';
       hero.target = null;
       hero.moveOrder = null;
@@ -569,6 +585,22 @@ async function run() {
     const worldChecks = await cdp.evaluate(`(() => {
       const W = Game.world;
       const U = Game.util;
+      const v3Probe = {
+        version: W.layout.version,
+        world: [W.layout.world.w, W.layout.world.h],
+        landmarks: W.layout.landmarks.length,
+        resources: W.layout.nodes.length,
+        curios: W.layout.curios.length,
+        ecology: W.layout.ecology.length,
+        threats: W.layout.threats.length,
+        chunks: W.layout.chunks.length,
+        readiness: Game.exploration.readiness(W.region.id).total,
+        fog: Game.exploration.coverage(W.region.id)
+      };
+      // The long-standing movement/interaction block below is the v1/v2
+      // compatibility regression. v3 has its own probe and dedicated suite.
+      Game.state.world.layoutVersion = 2;
+      W.init(Game.state.world.region);
       const hero = W.hero;
       Game.state.player.hp = hero.maxHp;
       W.setControlMode('manual');
@@ -728,7 +760,7 @@ async function run() {
         W.hero.x === W.layout.camp.x + 30 && W.hero.y === W.layout.camp.y + 26;
 
       return {
-        clickHadOrder, clickMoved, autoAcquired, movingTargetRepathed, monsterInterceptPath, monsterWanderPath,
+        v3Probe, clickHadOrder, clickMoved, autoAcquired, movingTargetRepathed, monsterInterceptPath, monsterWanderPath,
         nearCampAction: nearCampAction.id, nearButtonText, campIconVisiblePixels, campButtonEmojiFree,
         nearCampSitting, nearCampState, nearCampDistance, sittingCampAction: sittingCampAction.id,
         farCampAction: farCampAction.id, farWarpStarted, warpCampAction: warpCampAction.id, farCampSitting,
@@ -738,6 +770,14 @@ async function run() {
         bossCampEnabled, bossRetreatSafe, bossRetreatReason, largeDtStep, regionSwitchUsesLayout
       };
     })()`);
+    assert.equal(worldChecks.v3Probe.version, 3);
+    assert.deepEqual(worldChecks.v3Probe.world, [2400, 1440]);
+    assert.equal(worldChecks.v3Probe.landmarks, 4);
+    assert.ok(worldChecks.v3Probe.resources >= 16 && worldChecks.v3Probe.resources <= 22);
+    assert.equal(worldChecks.v3Probe.curios, 3);
+    assert.equal(worldChecks.v3Probe.ecology, 2);
+    assert.ok(worldChecks.v3Probe.threats >= 6 && worldChecks.v3Probe.threats <= 9);
+    assert.equal(worldChecks.v3Probe.chunks, 15);
     assert.equal(worldChecks.clickHadOrder, true);
     assert.ok(worldChecks.clickMoved > 5, 'click movement follows a path');
     assert.equal(worldChecks.autoAcquired, true);
@@ -2120,7 +2160,7 @@ async function run() {
     assert.equal(demo.within, true, 'mobile QA toolbar controls fit viewport');
     assert.equal(demo.segments, true, 'mobile QA segmented control fits viewport');
     assert.equal(demo.noHorizontalOverflow, true, 'mobile QA page has no horizontal overflow');
-    assert.ok(demo.canvasColors > 20, 'QA canvas is nonblank');
+    assert.ok(demo.canvasColors > 20, 'QA canvas is nonblank: ' + JSON.stringify({ demo, errors: cdp.errors }));
     assert.equal(demo.explorationAssetCount, 18, 'split exploration manifest covers every source cell');
     assert.equal(demo.explorationAssetsRegistered, true, 'all split exploration assets reach the production registry');
     assert.equal(demo.explorationScriptCount, 10, 'manifest and nine exploration groups load independently');

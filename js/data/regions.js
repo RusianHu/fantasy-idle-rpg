@@ -334,6 +334,165 @@
     ]
   };
 
+  /* v3 开放远征内容。所有区域差异均由注册表声明，生成器不判断区域 ID。 */
+  var PRESETS = {
+    grassland: 'open-field',
+    forest: 'porous-forest',
+    mine: 'eroded-cavern',
+    graveyard: 'ruined-fortress',
+    snowpass: 'ridge-pass',
+    lavacave: 'eroded-cavern',
+    skyruins: 'island-chain',
+    darkcastle: 'ruined-fortress'
+  };
+
+  var EXTRA_RESOURCES = {
+    grassland: [
+      ['moon_dew', 'gather_moon_dew', '#5f8fc1', '#d8f3ff', 'common'],
+      ['river_reed', 'gather_river_reed', '#6f9853', '#d8d67d', 'common'],
+      ['sunseed', 'gather_sunseed', '#b27b38', '#ffe27a', 'rare']
+    ],
+    forest: [
+      ['silk_moss', 'gather_silk_moss', '#487c69', '#a9f2cf', 'common'],
+      ['ancient_bark', 'gather_ancient_bark', '#745138', '#d5a56c', 'common'],
+      ['glow_spore', 'gather_glow_spore', '#576f9c', '#b9edff', 'rare']
+    ],
+    mine: [
+      ['coal_shard', 'gather_coal_shard', '#3b3c48', '#9da1b2', 'common'],
+      ['cave_salt', 'gather_cave_salt', '#9b8f82', '#f1e4d4', 'common'],
+      ['deep_geode', 'gather_deep_geode', '#565074', '#d0a8ff', 'rare']
+    ],
+    graveyard: [
+      ['bone_fragment', 'gather_bone_fragment', '#a39786', '#eee2cc', 'common'],
+      ['spirit_wax', 'gather_spirit_wax', '#786d85', '#e6ddff', 'common'],
+      ['nightshade', 'gather_nightshade', '#543d69', '#ce8cff', 'rare']
+    ],
+    snowpass: [
+      ['snow_lotus', 'gather_snow_lotus', '#93afc1', '#f6fbff', 'common'],
+      ['frozen_ore', 'gather_frozen_ore', '#617f96', '#bdeaff', 'common'],
+      ['griffin_feather', 'gather_griffin_feather', '#a79562', '#fff0a8', 'rare']
+    ],
+    lavacave: [
+      ['magma_bloom', 'gather_magma_bloom', '#9f372d', '#ffb04f', 'common'],
+      ['sulfur_stone', 'gather_sulfur_stone', '#8a6b2d', '#f5d85b', 'common'],
+      ['ember_scale', 'gather_ember_scale', '#8c2f37', '#ffc05e', 'rare']
+    ],
+    skyruins: [
+      ['cloud_silk', 'gather_cloud_silk', '#8ca4bd', '#f2fbff', 'common'],
+      ['star_metal', 'gather_star_metal', '#64718c', '#d8e5ff', 'common'],
+      ['wind_crystal', 'gather_wind_crystal', '#4b9a9b', '#bafff3', 'rare']
+    ],
+    darkcastle: [
+      ['void_ash', 'gather_void_ash', '#443b52', '#a79ab8', 'common'],
+      ['blood_rose', 'gather_blood_rose', '#812e43', '#ff8aa1', 'common'],
+      ['fallen_sigil', 'gather_fallen_sigil', '#59416f', '#d99cff', 'rare']
+    ]
+  };
+
+  var CONTENT_IDS = {
+    grassland: {
+      landmarks: ['river_watch', 'old_waystone', 'windmill_ruin', 'slime_nest'],
+      curios: ['sun_dial', 'wanderer_pack', 'silver_bell'],
+      ecology: ['golden_hare', 'brook_sprite']
+    },
+    forest: {
+      landmarks: ['whisper_grove', 'moss_shrine', 'sunken_bridge', 'elder_hollow'],
+      curios: ['root_crown', 'green_lantern', 'hunter_totem'],
+      ecology: ['moon_moth', 'antler_owl']
+    },
+    mine: {
+      landmarks: ['lift_ruin', 'echo_gallery', 'foreman_post', 'golem_foundry'],
+      curios: ['miners_dice', 'blue_lamp', 'sealed_charge'],
+      ecology: ['crystal_beetle', 'blind_newt']
+    },
+    graveyard: {
+      landmarks: ['mourning_gate', 'bell_crypt', 'saint_court', 'black_mausoleum'],
+      curios: ['votive_chain', 'empty_mask', 'last_letter'],
+      ecology: ['candle_crow', 'pale_fox']
+    },
+    snowpass: {
+      landmarks: ['ice_bridge', 'pilgrim_shelter', 'signal_peak', 'giant_crater'],
+      curios: ['warm_stone', 'storm_compass', 'white_banner'],
+      ecology: ['aurora_stag', 'snow_wisp']
+    },
+    lavacave: {
+      landmarks: ['basalt_gate', 'forge_ruin', 'ember_lake', 'demon_caldera'],
+      curios: ['smiths_tongs', 'ash_hourglass', 'cinder_idol'],
+      ecology: ['glass_salamander', 'ember_moth']
+    },
+    skyruins: {
+      landmarks: ['broken_aqueduct', 'star_archive', 'wind_bridge', 'guardian_core'],
+      curios: ['sky_chart', 'singing_key', 'cloud_prism'],
+      ecology: ['ribbon_ray', 'clockwork_swallow']
+    },
+    darkcastle: {
+      landmarks: ['fallen_bastion', 'silent_throne', 'miasma_well', 'demon_keep'],
+      curios: ['oath_blade', 'cracked_crown', 'dawn_reliquary'],
+      ecology: ['void_raven', 'red_moon_bat']
+    }
+  };
+
+  function makeExploration(region) {
+    var rid = region.id;
+    var ids = CONTENT_IDS[rid];
+    var baseResources = GATHER[rid].map(function (x) {
+      return {
+        id: x.id, material: x.material, sprite: x.sprite,
+        color: x.color, accent: x.accent, rarity: 'common',
+        nameKey: 'material.' + x.material
+      };
+    });
+    var extras = EXTRA_RESOURCES[rid].map(function (x) {
+      return {
+        id: x[0], material: x[0], sprite: x[1],
+        color: x[2], accent: x[3], rarity: x[4],
+        nameKey: 'material.' + x[0]
+      };
+    });
+    var landmarks = ids.landmarks.map(function (id, index) {
+      return {
+        id: id,
+        nameKey: 'explore.content.' + rid + '.' + id,
+        function: index === 0 ? 'intel' : (index === 1 ? 'shelter' : (index === 2 ? 'shortcut' : 'boss')),
+        sprite: index === 3 ? 'exp_boss_lair' : 'exp_landmark'
+      };
+    });
+    return {
+      world: { w: 2400, h: 1440 },
+      macroPreset: PRESETS[rid],
+      blockerTheme: PRESETS[rid],
+      landmarks: landmarks,
+      resources: baseResources.concat(extras),
+      curios: ids.curios.map(function (id, index) {
+        return {
+          id: id, nameKey: 'explore.content.' + rid + '.' + id,
+          sprite: 'exp_curio', choices: index % 2 ? ['ward', 'haste'] : ['scout', 'fortune']
+        };
+      }),
+      ecology: ids.ecology.map(function (id) {
+        return { id: id, nameKey: 'explore.content.' + rid + '.' + id, sprite: 'exp_ecology' };
+      }),
+      threats: [
+        { id: 'patrol', nameKey: 'explore.threat.patrol' },
+        { id: 'nest', nameKey: 'explore.threat.nest' },
+        { id: 'ambush', nameKey: 'explore.threat.ambush' }
+      ],
+      affixes: ['alert', 'sturdy', 'swift', 'miasma', 'sentry'],
+      guardian: {
+        nameKey: 'explore.guardian.' + rid,
+        monster: region.monsters[1] || region.monsters[0],
+        sprite: 'exp_guardian_mark'
+      },
+      anomalies: ['dense_fog', 'rich_veins', 'restless', 'tailwind', 'miasma_tide'],
+      commissions: [
+        { id: rid + '_supplies', reward: 'potions', costs: [0, 1, 2] },
+        { id: rid + '_coffer', reward: 'gold', costs: [1, 2, 3] },
+        { id: rid + '_relic', reward: 'gear', costs: [2, 3, 4] },
+        { id: rid + '_mastery', reward: 'perm', costs: [0, 3, 4], cap: 3 }
+      ]
+    };
+  }
+
   for (var i = 0; i < R.length; i++) {
     R[i].order = i;
     R[i].layout = LAYOUTS[R[i].id];
@@ -342,6 +501,7 @@
       cooldown: [90, 150],
       nodes: GATHER[R[i].id]
     };
+    R[i].exploration = makeExploration(R[i]);
     var tradeAreas = (R[i].tradeAreas || []).slice();
     var hasCampSupply = false;
     for (var ti = 0; ti < tradeAreas.length; ti++) {

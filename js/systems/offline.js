@@ -40,6 +40,73 @@
       var g = F.offlineGains(elapsedSec, dps, mHp, mExp, mGold, {});
       var d = Game.player.derived();
 
+      if (Game.state.world.layoutVersion >= 3 && Game.exploration && region.exploration) {
+        var ers = Game.exploration.regionState(region.id);
+        var known = Object.keys(ers.discovered.resources || {});
+        var knownDefs = region.exploration.resources.filter(function (def) {
+          return known.indexOf(def.id) >= 0;
+        });
+        var routeLength = knownDefs.length ? 420 + knownDefs.length * 240 : 0;
+        var routeSeconds = routeLength / 56 + knownDefs.length * F.BAL.gatherDuration;
+        var loopSeconds = Math.max(90, routeSeconds);
+        var loops = knownDefs.length ? Math.floor(elapsedSec / loopSeconds) : 0;
+        var travelCap = Math.floor(elapsedSec / Math.max(8, routeSeconds / Math.max(1, knownDefs.length)));
+        var materials = {};
+        var gatherActions = 0;
+        for (var ki = 0; ki < knownDefs.length; ki++) {
+          var kd = knownDefs[ki];
+          var cooldown = kd.rarity === 'rare' ? 1200 : 600;
+          var actions = Math.min(loops, Math.floor(elapsedSec / cooldown) + 1);
+          gatherActions += actions;
+          materials[kd.material] = actions * Math.max(1, Math.floor((F.gatherYield(tier).min + F.gatherYield(tier).max) / 2));
+        }
+        if (gatherActions > travelCap && gatherActions > 0) {
+          var scale = travelCap / gatherActions;
+          for (var mk in materials) materials[mk] = Math.floor(materials[mk] * scale);
+          gatherActions = travelCap;
+        }
+        var knownCoverage = Game.exploration.coverage ?
+          Game.exploration.coverage(region.id) : 0;
+        var routeDanger = U.clamp(0.22 + tier * 0.055, 0.2, 0.78);
+        var dangerTotal = 0, dangerSamples = 0;
+        if (knownDefs.length && Game.world && Game.world.layout &&
+            Game.terrain && Game.terrain.dangerAt) {
+          var knownIds = {};
+          for (var di = 0; di < knownDefs.length; di++) knownIds[knownDefs[di].id] = true;
+          var routeNodes = Game.world.layout.nodes || [];
+          for (var ni = 0; ni < routeNodes.length; ni++) {
+            if (!knownIds[routeNodes[ni].defId]) continue;
+            dangerTotal += Game.terrain.dangerAt(routeNodes[ni].x, routeNodes[ni].y);
+            dangerSamples++;
+          }
+          if (dangerSamples) routeDanger = U.clamp(dangerTotal / dangerSamples, 0, 1);
+        }
+        // 已登记资源走实际路线；只有已揭示但尚未登记资源时保留极低效率遭遇。
+        var combatFactor = knownDefs.length ?
+          U.clamp(0.18 + routeDanger * 0.16, 0.2, 0.36) :
+          (knownCoverage > 0 ? U.clamp(0.06 + knownCoverage * 0.16, 0.06, 0.12) : 0);
+        var expeditionKills = Math.floor(g.kills * combatFactor);
+        return {
+          type: 'expedition',
+          seconds: elapsedSec,
+          knownResources: knownDefs.length,
+          knownCoverage: knownCoverage,
+          routeDanger: routeDanger,
+          routeLength: routeLength,
+          routeLoops: loops,
+          gatherActions: gatherActions,
+          materials: materials,
+          kills: expeditionKills,
+          expBase: Math.round(expeditionKills * mExp + gatherActions * mExp * 0.28),
+          goldBase: Math.round(expeditionKills * mGold),
+          expShow: Math.round((expeditionKills * mExp + gatherActions * mExp * 0.28) * d.expMul),
+          goldShow: Math.round(expeditionKills * mGold * d.goldMul),
+          items: Math.min(Math.floor(expeditionKills * F.BAL.dropEquip), F.BAL.offlineItemCap),
+          potions: Math.min(Math.floor(expeditionKills * F.BAL.dropPotion), 20),
+          noDiscoveries: true
+        };
+      }
+
       return {
         type: 'battle',
         seconds: elapsedSec,
@@ -75,6 +142,11 @@
         Game.player.addExp(sum.expBase);
         Game.player.addGold(sum.goldBase);
         s.meta.stats.kills += sum.kills;
+        if (sum.type === 'expedition' && sum.materials) {
+          for (var material in sum.materials) {
+            if (sum.materials[material] > 0) Game.inv.addMaterial(material, sum.materials[material]);
+          }
+        }
 
         var lv = s.player.level;
         var generated = [];

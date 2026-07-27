@@ -328,6 +328,28 @@
     },
 
     /* ---------------- 离线结算 ---------------- */
+    curioChoice: function (entity, choices, onChoose) {
+      var t = Game.i18n.t;
+      var c = U.el('div', 'curio-choice');
+      c.innerHTML = '<h3>' + t('explore.curioTitle') + '</h3>' +
+        '<div class="modal-body"><div class="name">' +
+        U.esc(t(entity && entity.nameKey || 'explore.curioUnknown')) + '</div>' +
+        '<div class="desc">' + t('explore.curioPrompt') + '</div></div>';
+      var btns = U.el('div', 'modal-btns curio-buttons');
+      var api = M.show(c, { dismissable: false });
+      choices.forEach(function (choice) {
+        var btn = U.el('button', 'btn', '<strong>' + U.esc(t('explore.curio.' + choice)) +
+          '</strong><small>' + U.esc(t('explore.curio.' + choice + 'Hint')) + '</small>');
+        btn.addEventListener('click', function () {
+          api.close();
+          if (onChoose) onChoose(choice);
+        });
+        btns.appendChild(btn);
+      });
+      c.appendChild(btns);
+      return api;
+    },
+
     offline: function (sum, onOk) {
       var t = Game.i18n.t, fmt = Game.i18n.fmtNum, fd = Game.i18n.fmtDur;
       var c = U.el('div', '');
@@ -341,11 +363,25 @@
         html += '<div class="row"><span>' + t('offline.buffFull') + '</span><span class="v">' + fd(Game.F.BAL.restBuffCap) + '</span></div>';
         html += '<div style="font-size:10px;color:var(--ink-dim);margin-top:6px;">' + t('offline.restNote') + '</div>';
       } else {
+        if (sum.type === 'expedition') {
+          html += '<div class="row"><span>' + t('offline.knownRoute') +
+            '</span><span class="v">' + fmt(sum.knownResources) + '</span></div>';
+          html += '<div class="row"><span>' + t('offline.routeLoops') +
+            '</span><span class="v">' + fmt(sum.routeLoops) + '</span></div>';
+          var materialTotal = 0;
+          for (var mat in sum.materials) materialTotal += sum.materials[mat] || 0;
+          html += '<div class="row"><span>' + t('offline.materials') +
+            '</span><span class="v">+' + fmt(materialTotal) + '</span></div>';
+        }
         html += '<div class="row"><span>' + t('offline.kills') + '</span><span class="v">' + fmt(sum.kills) + '</span></div>';
         html += '<div class="row"><span>' + t('offline.exp') + '</span><span class="v">+' + fmt(sum.expShow) + '</span></div>';
         html += '<div class="row"><span>' + t('offline.gold') + '</span><span class="v">+' + fmt(sum.goldShow) + '</span></div>';
         if (sum.items > 0) html += '<div class="row"><span>' + t('offline.items') + '</span><span class="v">×' + sum.items + '</span></div>';
         if (sum.potions > 0) html += '<div class="row"><span>' + t('offline.potions') + '</span><span class="v">×' + sum.potions + '</span></div>';
+        if (sum.type === 'expedition') {
+          html += '<div style="font-size:10px;color:var(--ink-dim);margin-top:6px;">' +
+            t('offline.noDiscoveries') + '</div>';
+        }
       }
       html += '</div></div>';
       c.innerHTML = html;

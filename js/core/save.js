@@ -139,6 +139,23 @@
         data.world.finalRegionLocked = false;
         data.v = 10;
       }
+    },
+    {
+      // v10 → v11：升级到开放远征布局。角色养成、路线、首杀、
+      // 通关和魔王城失守状态全部保留；新探索记录从空白开始。
+      from: 10,
+      fn: function (data) {
+        data.settings = data.settings || {};
+        if (!/^(safe|balanced|loot)$/.test(data.settings.expeditionStrategy || '')) {
+          data.settings.expeditionStrategy = 'balanced';
+        }
+        data.world = data.world || {};
+        data.world.layoutVersion = 3;
+        data.world.exploration = data.world.exploration || {};
+        data.meta = data.meta || {};
+        data.meta.explorationMigrationGift = data.meta.explorationMigrationGift || false;
+        data.v = 11;
+      }
     }
   ];
 
@@ -193,6 +210,7 @@
           worldTime: st.world.worldTime,
           regionProg: st.world.regionProg,
           nodeCooldowns: st.world.nodeCooldowns,
+          exploration: st.world.exploration,
           finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
         },
@@ -256,6 +274,9 @@
       if (data.createdAt) st.createdAt = data.createdAt;
       U.merge(st.settings, data.settings || {});
       st.settings.controlMode = st.settings.controlMode === 'manual' ? 'manual' : 'auto';
+      st.settings.expeditionStrategy = /^(safe|balanced|loot)$/.test(st.settings.expeditionStrategy)
+        ? st.settings.expeditionStrategy
+        : 'balanced';
       st.settings.autoBoss = st.settings.autoBoss !== false;
       U.merge(st.player, data.player || {});
       if (data.inv) {
@@ -269,7 +290,9 @@
       st.world.worldSeed = Number.isFinite(st.world.worldSeed)
         ? (st.world.worldSeed >>> 0)
         : U.strSeed('legacy:' + (data.createdAt || data.ts || 0));
-      st.world.layoutVersion = data.world && data.world.layoutVersion === 1 ? 1 : 2;
+      st.world.layoutVersion = 3;
+      st.world.exploration = data.world && data.world.exploration &&
+        typeof data.world.exploration === 'object' ? data.world.exploration : {};
       st.world.regionOrder = Game.State.normalizeRegionOrder(
         data.world && data.world.regionOrder
       );
@@ -319,6 +342,12 @@
       Game.inv.setUidSeq(maxUid);
 
       Game.state = st;
+      // 损坏或尺寸不匹配的 bitset 只重置对应区域探索，不影响角色档。
+      if (Game.exploration) {
+        Game.State.normalizeRegionOrder(st.world.regionOrder).forEach(function (rid) {
+          Game.exploration.regionState(rid);
+        });
+      }
       return st;
     },
 

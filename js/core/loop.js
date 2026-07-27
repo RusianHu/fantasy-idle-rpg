@@ -133,7 +133,9 @@
         'achievement:unlocked', 'shop:bought', 'skill:upgraded',
         'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged', 'settings:changed',
         'item:pickedUp', 'item:used', 'gather:done', 'chest:opened', 'camp:autoReturn',
-        'region:relocked'];
+        'region:relocked', 'landmark:discovered', 'resource:registered',
+        'curio:found', 'curio:chosen', 'ecology:recorded', 'guardian:defeated',
+        'expedition:finished', 'commission:completed', 'region:completed100'];
       saveOn.forEach(function (evt) {
         Game.bus.on(evt, function () {
           // 轻微防抖：合并密集事件

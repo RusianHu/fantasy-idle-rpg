@@ -9,6 +9,8 @@ $projectRoot = Split-Path -Parent $PSScriptRoot
 $indexPath = Join-Path $projectRoot 'index.html'
 $demoPath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.html'
 $demoStylePath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.css'
+$explorationDemoPath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.html'
+$explorationDemoStylePath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.css'
 $stylePath = Join-Path $projectRoot 'css\style.css'
 $utilsPath = Join-Path $projectRoot 'js\core\utils.js'
 $versionPath = Join-Path $projectRoot 'version.json'
@@ -20,7 +22,16 @@ if (-not $match.Success) {
 }
 $currentBuild = $match.Groups[1].Value
 
-$files = @($indexPath, $demoPath, $demoStylePath, $stylePath, $utilsPath, $versionPath)
+$files = @(
+    $indexPath,
+    $demoPath,
+    $demoStylePath,
+    $explorationDemoPath,
+    $explorationDemoStylePath,
+    $stylePath,
+    $utilsPath,
+    $versionPath
+)
 $contents = @{}
 foreach ($path in $files) {
     $contents[$path] = [IO.File]::ReadAllText($path)
@@ -28,6 +39,9 @@ foreach ($path in $files) {
 
 if ($contents[$demoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
     throw '技术演示页 build-id 与 index.html 不一致。'
+}
+if ($contents[$explorationDemoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
+    throw '开放探索演示页 build-id 与 index.html 不一致。'
 }
 if ($contents[$utilsPath] -notmatch [regex]::Escape("Game.BUILD_ID = '$currentBuild'")) {
     throw 'Game.BUILD_ID 与 index.html 不一致。'

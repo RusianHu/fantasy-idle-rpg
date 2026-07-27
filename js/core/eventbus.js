@@ -29,6 +29,12 @@
  *   camp:autoReturn
  *   game:completed {rid, mid, tier, completedAt}
  *   game:continued {rid}
+ *   fog:revealed {rid, cells, coverage}（短窗聚合）
+ *   landmark:discovered / landmark:activated / resource:registered
+ *   curio:found / curio:chosen / ecology:recorded / guardian:defeated
+ *   readiness:changed / region:completed100
+ *   expedition:started / expedition:finished / commission:completed
+ *   ai:intentChanged / ai:strategyChanged
  * ============================================================ */
 (function () {
   'use strict';

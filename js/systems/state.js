@@ -87,7 +87,7 @@
           autoAdvance: true, autoBoss: true,
           autoSkillUpgrade: true, autoEquip: true,
           groundLoot: true, autoCampRest: false,
-          controlMode: 'auto',
+          controlMode: 'auto', expeditionStrategy: 'balanced',
           sfx: true, music: true
         },
         player: {
@@ -109,12 +109,13 @@
           region: regionOrder[0],
           regionOrder: regionOrder,
           worldSeed: worldSeed,
-          layoutVersion: 2,
+          layoutVersion: 3,
           mode: 'battle',
           restBuffT: 0,
           worldTime: 300,
           regionProg: {},
           nodeCooldowns: {},
+          exploration: {},
           finalRegionLocked: false,
           deathsRow: 0
         },
@@ -236,6 +237,11 @@
       for (var pid in p.perms) {
         var pdef = reg.get('shopItem', pid);
         var n = p.perms[pid];
+        if (!pdef && /^commission_/.test(pid) && n) {
+          pctAcc.hpPct += 0.01 * n;
+          pctAcc.atkPct += 0.01 * n;
+          continue;
+        }
         if (!pdef || !n) continue;
         if (pdef.stat === 'atk') pctAcc.atkPct += pdef.pct * n;
         else if (pdef.stat === 'hp') pctAcc.hpPct += pdef.pct * n;

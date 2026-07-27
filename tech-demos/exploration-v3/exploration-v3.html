@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="build-id" content="20260727.9">
+<title>开放远征 v3 生成实验室</title>
+<link rel="stylesheet" href="exploration-v3.css?v=20260727.9">
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>开放远征 v3 生成实验室</h1>
+      <p>宏观图、硬阻挡、距离场、内容角色与结构验证</p>
+    </div>
+    <div class="controls">
+      <label>区域<select id="region"></select></label>
+      <label>种子<input id="seed" maxlength="8" value="12345678"></label>
+      <button id="generate" type="button">生成</button>
+    </div>
+  </header>
+  <section class="metrics" id="metrics"></section>
+  <section class="canvas-wrap">
+    <canvas id="layout" width="1200" height="720"></canvas>
+    <aside>
+      <label><input id="show-distance" type="checkbox"> 距离场</label>
+      <label><input id="show-graph" type="checkbox" checked> 宏观拓扑</label>
+      <label><input id="show-content" type="checkbox" checked> 内容角色</label>
+      <div class="legend">
+        <span class="camp">营地</span><span class="boss">Boss 巢穴</span>
+        <span class="landmark">地标</span><span class="resource">资源</span>
+        <span class="curio">奇物</span><span class="threat">威胁</span>
+      </div>
+    </aside>
+  </section>
+  <pre id="report"></pre>
+</main>
+<script src="../../js/core/utils.js?v=20260727.9"></script>
+<script src="../../js/core/eventbus.js?v=20260727.9"></script>
+<script src="../../js/core/registry.js?v=20260727.9"></script>
+<script src="../../js/data/regions.js?v=20260727.9"></script>
+<script src="../../js/systems/terrain.js?v=20260727.9"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260727.9"></script>
+<script src="exploration-v3.js?v=20260727.9"></script>
+</body>
+</html>

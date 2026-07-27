@@ -488,4 +488,101 @@
       5: '净化八方瘴气，直捣魔王城吧！'
     }
   });
+
+  Game.i18n.addPack('zh-CN', {
+    material: {
+      moon_dew: '月露', river_reed: '河湾芦芯', sunseed: '日辉种',
+      silk_moss: '丝绒苔', ancient_bark: '古树皮', glow_spore: '辉光孢子',
+      coal_shard: '黑煤晶', cave_salt: '洞盐', deep_geode: '深层晶洞',
+      bone_fragment: '遗骨碎片', spirit_wax: '灵烛蜡', nightshade: '夜影草',
+      snow_lotus: '雪莲', frozen_ore: '冻矿', griffin_feather: '狮鹫羽',
+      magma_bloom: '熔火花', sulfur_stone: '硫磺石', ember_scale: '余烬鳞',
+      cloud_silk: '云丝', star_metal: '星铁', wind_crystal: '风晶',
+      void_ash: '虚空灰', blood_rose: '血蔷薇', fallen_sigil: '堕落徽记'
+    },
+    explore: {
+      mapTab: '区域地图', codexTab: '区域图鉴',
+      coverageLine: '探索覆盖 {p}%', mapAria: '已探索区域地图',
+      zoomOut: '缩小地图', zoomIn: '放大地图', centerHero: '定位冒险者',
+      readiness: '远征准备度', readinessHint: '当前准备度 {value}/100；发现巢穴并达到 70 方可挑战',
+      readyExplore: '探索', readyLandmarks: '地标', readyResources: '资源',
+      readyCurios: '奇物', readyGuardian: '守门精英', readyLair: '巢穴',
+      yes: '已发现', no: '未发现',
+      landmarks: '关键地标', resources: '区域资源', curios: '远征奇物',
+      ecology: '稀有生态', registeredHint: '永久登记，不随远征周期重置',
+      unknownEntry: '未知记录',
+      commissions: '区域委托', exchange: '兑换',
+      exchangeDone: '区域委托已完成', exchangeFail: '素材不足或已达强化上限',
+      commission: { potions: '前线药剂补给', gold: '公会素材收购', gear: '遗物装备箱', perm: '区域勘察强化' },
+      strategy: { safe: '安全', balanced: '均衡', loot: '掠夺' },
+      strategyAria: '当前自动远征策略：{strategy}，点击切换',
+      aiIntent: 'AI 意图',
+      intent: {
+        idle: '观察环境', survival: '生存回营', combat: '接敌战斗',
+        'player-order': '执行指令', loot: '回收掉落', frontier: '探索未知',
+        discovery: '调查记录', gather: '采集资源', guardian: '讨伐精英',
+        boss: '前往巢穴', circuit: '采集巡回', camp: '返回营地'
+      },
+      searchClues: '搜寻线索', viewReadiness: '查看准备', goLair: '前往巢穴', challengeBoss: '挑战 Boss',
+      curioTitle: '发现远征奇物', curioUnknown: '无名奇物',
+      curioPrompt: '选择一种本轮远征效果；另一种效果将被放弃。',
+      curio: {
+        scout: '洞察', scoutHint: '扩大视野，但不提高直接收益',
+        fortune: '寻宝', fortuneHint: '提高掉落，仍需承担原路线风险',
+        ward: '守护', wardHint: '降低危险，但不加快探索速度',
+        haste: '疾行', hasteHint: '提高移速，但不降低敌人强度'
+      },
+      threat: { patrol: '巡逻领地', nest: '魔物巢群', ambush: '伏击地带' },
+      guardian: {
+        grassland: '河湾獠牙', forest: '苔冠守卫', mine: '深井监工', graveyard: '墓门执刑者',
+        snowpass: '霜脊哨卫', lavacave: '熔炉看守', skyruins: '天穹裁决者', darkcastle: '黑门禁卫'
+      },
+      content: {
+        grassland: {
+          river_watch: '河湾瞭望台', old_waystone: '旧王道碑', windmill_ruin: '风车遗址', slime_nest: '黏液巨巢',
+          sun_dial: '苔痕日晷', wanderer_pack: '失落行囊', silver_bell: '银风铃',
+          golden_hare: '金原兔', brook_sprite: '溪流精灵'
+        },
+        forest: {
+          whisper_grove: '低语林地', moss_shrine: '苔石神龛', sunken_bridge: '沉没古桥', elder_hollow: '古树空洞',
+          root_crown: '根冠', green_lantern: '长明绿灯', hunter_totem: '猎人图腾',
+          moon_moth: '月纹蛾', antler_owl: '角羽鸮'
+        },
+        mine: {
+          lift_ruin: '废弃升降台', echo_gallery: '回声矿廊', foreman_post: '监工哨站', golem_foundry: '魔像铸造间',
+          miners_dice: '矿工骨骰', blue_lamp: '深蓝矿灯', sealed_charge: '封存爆药',
+          crystal_beetle: '晶壳甲虫', blind_newt: '盲眼洞螈'
+        },
+        graveyard: {
+          mourning_gate: '哀悼之门', bell_crypt: '钟鸣地穴', saint_court: '无名圣徒院', black_mausoleum: '黑石陵寝',
+          votive_chain: '祈愿锁链', empty_mask: '空面具', last_letter: '未寄出的信',
+          candle_crow: '烛羽鸦', pale_fox: '苍白灵狐'
+        },
+        snowpass: {
+          ice_bridge: '断冰桥', pilgrim_shelter: '朝圣者庇所', signal_peak: '烽火峰', giant_crater: '巨人陨坑',
+          warm_stone: '恒温石', storm_compass: '风暴罗盘', white_banner: '无字白旗',
+          aurora_stag: '极光鹿', snow_wisp: '雪原微灵'
+        },
+        lavacave: {
+          basalt_gate: '玄武岩门', forge_ruin: '失落锻炉', ember_lake: '余烬湖', demon_caldera: '恶魔火山口',
+          smiths_tongs: '不熄火钳', ash_hourglass: '灰烬沙漏', cinder_idol: '焦炭神像',
+          glass_salamander: '琉璃火蜥', ember_moth: '余烬蛾'
+        },
+        skyruins: {
+          broken_aqueduct: '断裂天渠', star_archive: '星历馆', wind_bridge: '风之桥', guardian_core: '守卫核心',
+          sky_chart: '浮空星图', singing_key: '鸣唱钥匙', cloud_prism: '云光棱镜',
+          ribbon_ray: '绸带鳐', clockwork_swallow: '发条燕'
+        },
+        darkcastle: {
+          fallen_bastion: '陷落堡垒', silent_throne: '寂静王座', miasma_well: '瘴气井', demon_keep: '魔王主堡',
+          oath_blade: '折断誓剑', cracked_crown: '裂冠', dawn_reliquary: '黎明圣匣',
+          void_raven: '虚空渡鸦', red_moon_bat: '赤月蝠'
+        }
+      }
+    },
+    offline: {
+      knownRoute: '已知资源路线', routeLoops: '巡回次数', materials: '采集素材',
+      noDiscoveries: '离线远征只使用已登记情报，没有发现新地点。'
+    }
+  });
 })();

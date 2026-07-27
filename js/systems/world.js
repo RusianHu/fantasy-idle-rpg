@@ -36,6 +36,11 @@
     autoCampCycle: false,
     autoCampSuppressedUntil: 0,
 
+    heroMoveSpeed: function () {
+      if (!W.layout || W.layout.version < 3 || !Game.expedition) return HERO_SPEED;
+      return HERO_SPEED * Game.expedition.currentModifier().move;
+    },
+
     /* ---------------- 初始化区域 ---------------- */
     init: function (rid) {
       W.bindControls();
@@ -61,15 +66,31 @@
         Game.state.world.worldSeed,
         Game.state.world.layoutVersion
       );
+      // v3 运行时使用大地图边界；注册表仍保留 900×520 的 v1/v2
+      // 兼容尺寸，避免破坏历史布局快照。
+      if (W.layout.version >= 3) {
+        W.region = Object.assign({}, region, { world: W.layout.world });
+      }
       W.props = W.layout.props.concat(W.layout.nodes || []);
-      if (Game.particles) Game.particles.initRegion(region);
+      if (W.layout.version >= 3) {
+        W.props = W.props.concat(W.layout.landmarks || [], W.layout.curios || [], W.layout.ecology || []);
+      }
+      if (Game.particles) Game.particles.initRegion(W.region);
 
       var hero = W.hero = W.makeHero();
       hero.x = W.layout.camp.x + 30;
       hero.y = W.layout.camp.y + 26;
       W.entities.push(hero);
 
-      for (var i = 0; i < POPULATION; i++) W.spawnMonster(true);
+      if (W.layout.version >= 3) {
+        if (Game.expedition) Game.expedition.start(rid);
+        if (Game.expeditionAI) Game.expeditionAI.reset();
+        for (var ti = 0; ti < W.layout.threats.length; ti++) W.spawnMonster(true, W.layout.threats[ti]);
+        W.spawnGuardian();
+        if (Game.exploration) Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: rid });
+      } else {
+        for (var i = 0; i < POPULATION; i++) W.spawnMonster(true);
+      }
 
       if (Game.state.world.mode === 'rest') {
         hero.state = 'goCamp';
@@ -127,11 +148,11 @@
     },
 
     /* ---------------- 刷怪 ---------------- */
-    spawnMonster: function (initial) {
+    spawnMonster: function (initial, threat) {
       var region = W.region;
-      var mid = U.choice(region.monsters);
+      var mid = threat && threat.monster || U.choice(region.monsters);
       var ent = W.makeMonster(mid, false);
-      var candidates = W.layout.spawnCandidates;
+      var candidates = threat ? [{ x: threat.x, y: threat.y, threatId: threat.id }] : W.layout.spawnCandidates;
       var fallback = W.layout.corridorCandidates;
       var point = null;
       for (var tries = 0; tries < 24 && candidates.length; tries++) {
@@ -151,6 +172,37 @@
       ent.x = point.x;
       ent.y = point.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
+      if (threat) {
+        ent.threatId = threat.id;
+        ent.territory = threat;
+        ent.affix = Game.expedition ? Game.expedition.threatAffix(threat.id) : threat.affix;
+        var expeditionMod = Game.expedition ? Game.expedition.currentModifier() : { danger: 1, exp: 1 };
+        ent.hp = ent.maxHp = Math.round(ent.maxHp * expeditionMod.danger);
+        ent.atk = Math.round(ent.atk * Math.sqrt(expeditionMod.danger));
+        ent.exp = Math.round(ent.exp * expeditionMod.exp);
+        if (ent.affix === 'sturdy') { ent.hp = ent.maxHp = Math.round(ent.maxHp * 1.3); ent.def = Math.round(ent.def * 1.18); }
+        else if (ent.affix === 'swift') ent.spd += 3;
+        else if (ent.affix === 'miasma') ent.atk = Math.round(ent.atk * 1.18);
+      }
+      W.entities.push(ent);
+      return ent;
+    },
+
+    spawnGuardian: function () {
+      if (!W.layout || W.layout.version < 3 || !W.layout.guardian || !Game.exploration) return null;
+      var state = Game.exploration.regionState(W.region.id);
+      if (state.discovered.guardian) return null;
+      var def = W.layout.guardian;
+      var ent = W.makeMonster(def.monster, false);
+      ent.x = def.x; ent.y = def.y;
+      ent.spawnX = ent.x; ent.spawnY = ent.y;
+      ent.guardian = true;
+      ent.hp = ent.maxHp = Math.round(ent.maxHp * 4.2);
+      ent.atk = Math.round(ent.atk * 1.55);
+      ent.def = Math.round(ent.def * 1.45);
+      ent.exp = Math.round(ent.exp * 6);
+      ent.gold = Math.round(ent.gold * 4);
+      ent.territory = { id: def.id, x: def.x, y: def.y, radius: def.radius || 120 };
       W.entities.push(ent);
       return ent;
     },
@@ -179,6 +231,13 @@
     /* ---------------- 讨伐进度 / Boss ---------------- */
     gaugeInfo: function () {
       var prog = Game.State.regionProg(W.region.id);
+      if (W.layout && W.layout.version >= 3 && Game.exploration) {
+        var ready = Game.exploration.readiness(W.region.id);
+        return {
+          kills: ready.total, target: 100, required: 70, cleared: prog.cleared,
+          readiness: ready, lair: ready.lair
+        };
+      }
       return { kills: Math.min(prog.kills, W.region.killTarget), target: W.region.killTarget, cleared: prog.cleared };
     },
 
@@ -190,12 +249,29 @@
       if (W.bossEnt || Game.state.world.mode !== 'battle') return false;
       var region = W.region;
       var prog = Game.State.regionProg(region.id);
-      if (prog.kills < region.killTarget) return false;
+      if (W.layout.version >= 3 && Game.exploration) {
+        var readiness = Game.exploration.readiness(region.id);
+        var retryAt = Game.exploration.regionState(region.id).bossRetryAt || 0;
+        if (!readiness.lair || readiness.total < 70 || Game.state.world.worldTime < retryAt) return false;
+      } else if (prog.kills < region.killTarget) return false;
       // 状态不佳时暂缓登场，避免登场即团灭的循环
       var hero = W.hero;
       if (!hero || hero.state === 'dead' || hero.state === 'recover') return false;
       // 玩家主动发起时尊重其挑战意愿；自动讨伐仍等生命恢复到安全线。
-      if (!manual && Game.player.hpPct() < 0.6) return false;
+      if (!manual && Game.player.hpPct() < (W.layout.version >= 3 ? 0.8 : 0.6)) return false;
+
+      if (W.layout.version >= 3) {
+        var lairDistance = U.dist(hero.x, hero.y, W.layout.bossPoint.x, W.layout.bossPoint.y);
+        if (lairDistance > 74) {
+          hero.moveOrder = {
+            x: W.layout.bossPoint.x, y: W.layout.bossPoint.y,
+            id: 'boss-lair:' + region.id, ai: !manual
+          };
+          hero.target = null;
+          Game.nav.clear(hero);
+          return true;
+        }
+      }
 
       var ent = W.makeMonster(region.boss, true);
       ent.x = W.layout.bossPoint.x;
@@ -230,6 +306,7 @@
       W.bossEnt = null;
       var tier = Game.State.regionTier(region.id);
       if (first) Game.player.addCrystal(F.bossCrystal(tier));
+      if (W.layout.version >= 3 && Game.expedition) Game.expedition.finish('boss-defeated', region.id);
       Game.state.meta.stats.bossKills++;
       if (Game.fx) Game.fx.shake(4, 0.6);
       bus.emit('boss:defeated', { rid: region.id, mid: ent.mid, first: first, tier: tier });
@@ -240,6 +317,10 @@
       var prog = Game.State.regionProg(region.id);
       // 进度保留一半：撤场重攒，不清零（卡关不惩罚过头）
       prog.kills = Math.ceil(region.killTarget / 2);
+      if (W.layout.version >= 3 && Game.exploration) {
+        Game.exploration.regionState(region.id).bossRetryAt = Game.state.world.worldTime + 60;
+        if (Game.expedition && reason !== 'retreat') Game.expedition.finish('boss-failed', region.id);
+      }
       if (W.bossEnt) {
         var i = W.entities.indexOf(W.bossEnt);
         if (i >= 0) W.entities.splice(i, 1);
@@ -417,7 +498,7 @@
       var reach = order.type === 'trade' ? Math.max(8, target.radius - 4) : 26;
       if (distance > reach) {
         hero.state = 'walk';
-        W.moveToward(hero, target.x, target.y, HERO_SPEED, dt, 'interact:' + (target.id || order.areaId));
+        W.moveToward(hero, target.x, target.y, W.heroMoveSpeed(), dt, 'interact:' + (target.id || order.areaId));
         return true;
       }
 
@@ -477,17 +558,29 @@
         Game.player.addExp(ent.exp);
         Game.player.addGold(ent.gold);
         if (Game.fx && U.motionEnabled()) Game.fx.goldBurst(ent.x, ent.y - 8);
+        var expeditionDrop = W.layout.version >= 3 && Game.expedition
+          ? Game.expedition.currentModifier().drop : 1;
         Game.inv.rollDrops(ent.tier, ent.boss, {
           source: ent.boss ? 'boss' : 'combat',
           x: ent.x,
-          y: ent.y
+          y: ent.y,
+          luck: Math.max(0, (expeditionDrop - 1) * 2)
         });
         Game.state.meta.stats.kills++;
 
         if (!ent.boss) {
           var prog = Game.State.regionProg(W.region.id);
-          if (!W.bossEnt) prog.kills = Math.min(prog.kills + 1, W.region.killTarget);
-          W.pendingRespawn.push(RESPAWN_T);
+          if (W.layout.version < 3 && !W.bossEnt) prog.kills = Math.min(prog.kills + 1, W.region.killTarget);
+          if (ent.guardian && Game.collection) {
+            Game.collection.record('guardian', 'guardian', { rid: W.region.id, entity: ent });
+          } else if (W.layout.version >= 3 && ent.territory) {
+            var cooldown = ent.territory.respawn || 240;
+            Game.exploration.regionState(W.region.id).threatCooldowns[ent.threatId] =
+              Game.state.world.worldTime + cooldown;
+            W.pendingRespawn.push({ t: cooldown, threat: ent.territory });
+          } else {
+            W.pendingRespawn.push(RESPAWN_T);
+          }
           Game.state.world.deathsRow = 0; // 击杀成功重置连败
         }
         if (Game.fx) {
@@ -720,7 +813,7 @@
           W.hero.moveOrder = null;
           Game.nav.clear(W.hero);
           W.hero.state = 'walk';
-          W.moveVector(W.hero, v.x, v.y, HERO_SPEED, 1 / 30);
+          W.moveVector(W.hero, v.x, v.y, W.heroMoveSpeed(), 1 / 30);
         }
         e.preventDefault();
       });
@@ -914,6 +1007,7 @@
       if (!hero) return;
       var sw = Game.state.world;
 
+      if (Game.nav && Game.nav.update) Game.nav.update(2);
       W.syncHeroStats();
       if (Game.items) Game.items.update(dt);
       if (Game.environment) Game.environment.update(dt);
@@ -921,7 +1015,12 @@
       W.updateAutoCamp(hero);
 
       // 自动讨伐开启时，进度满且状态安全才让 Boss 登场；关闭时等待手动按钮。
-      if (Game.state.settings.autoBoss !== false) W.trySpawnBoss();
+      if (Game.state.settings.autoBoss !== false) {
+        if (W.layout.version < 3 ||
+            U.dist(hero.x, hero.y, W.layout.bossPoint.x, W.layout.bossPoint.y) <= 78) {
+          W.trySpawnBoss();
+        }
+      }
 
       // Boss 登场演出计时
       if (W.cinematic) {
@@ -948,16 +1047,23 @@
 
       // 重生队列
       for (var r = W.pendingRespawn.length - 1; r >= 0; r--) {
-        W.pendingRespawn[r] -= dt;
-        if (W.pendingRespawn[r] <= 0) {
-          W.pendingRespawn.splice(r, 1);
-          W.spawnMonster(false);
+        var pending = W.pendingRespawn[r];
+        if (typeof pending === 'number') W.pendingRespawn[r] -= dt;
+        else pending.t -= dt;
+        if ((typeof W.pendingRespawn[r] === 'number' && W.pendingRespawn[r] <= 0) ||
+            (typeof W.pendingRespawn[r] === 'object' && W.pendingRespawn[r].t <= 0)) {
+          var respawn = W.pendingRespawn.splice(r, 1)[0];
+          W.spawnMonster(false, respawn && respawn.threat);
         }
       }
 
       // 休整增益在战斗模式下倒计时
       if (sw.mode === 'battle' && sw.restBuffT > 0) {
         sw.restBuffT = Math.max(0, sw.restBuffT - dt);
+      }
+      if (Game.exploration) Game.exploration.update(dt);
+      if (Game.terrain && Game.terrain.rebuildDynamicSpatial && W.layout.version >= 3) {
+        Game.terrain.rebuildDynamicSpatial(W.entities.concat(W.groundLoot));
       }
     },
 
@@ -1015,7 +1121,7 @@
       if (sw.mode === 'rest') {
         if (hero.state === 'goCamp') {
           var cx = W.layout.camp.x + 22, cy = W.layout.camp.y + 22;
-          if (W.moveToward(hero, cx, cy, HERO_SPEED, dt, 'camp') < 4) {
+          if (W.moveToward(hero, cx, cy, W.heroMoveSpeed(), dt, 'camp') < 4) {
             hero.state = 'sitting';
             hero.dir = 'l'; // 面向篝火
           }
@@ -1053,9 +1159,13 @@
           hero.moveOrder = null;
           Game.nav.clear(hero);
           hero.state = 'walk';
-          W.moveVector(hero, mv.x, mv.y, HERO_SPEED, dt);
+          W.moveVector(hero, mv.x, mv.y, W.heroMoveSpeed(), dt);
           return;
         }
+      }
+
+      if (Game.expeditionAI && W.layout.version >= 3 && W.controlMode() === 'auto') {
+        Game.expeditionAI.update(hero, dt);
       }
 
       // 新增互动统一优先级：接敌战斗 > 地面拾取 > 宝箱 > 采集 > 游走。
@@ -1072,7 +1182,7 @@
       if (hero.moveOrder) {
         var mo = hero.moveOrder;
         hero.state = 'walk';
-        if (W.moveToward(hero, mo.x, mo.y, HERO_SPEED, dt, mo.id) < 5) {
+        if (W.moveToward(hero, mo.x, mo.y, W.heroMoveSpeed(), dt, mo.id) < 5) {
           hero.moveOrder = null;
           hero.state = 'idle';
         }
@@ -1086,7 +1196,7 @@
         target = null;
         if (W.controlMode() === 'auto') {
           if (W.bossEnt && !W.bossEnt.dead) target = W.bossEnt;
-          else {
+          else if (W.layout.version < 3 || !Game.expeditionAI) {
             var best = 1e9;
             for (var i = 0; i < W.entities.length; i++) {
               var e = W.entities[i];
@@ -1105,7 +1215,7 @@
           hero.state = 'idle';
           return;
         }
-        W.wanderTick(hero, dt, HERO_SPEED * 0.5);
+        if (W.layout.version < 3) W.wanderTick(hero, dt, HERO_SPEED * 0.5);
         hero.state = hero.moving ? 'walk' : 'idle';
         return;
       }
@@ -1115,7 +1225,7 @@
       var distTo = U.dist(hero.x, hero.y, target.x, target.y);
       if (distTo > range) {
         hero.state = 'walk';
-        W.moveToward(hero, target.x, target.y, HERO_SPEED, dt, target);
+        W.moveToward(hero, target.x, target.y, W.heroMoveSpeed(), dt, target);
       } else {
         hero.state = 'fight';
         hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
@@ -1193,7 +1303,8 @@
 
       e.engaged = false;
       if (e.state === 'fight') e.state = 'wander';
-      W.wanderTick(e, dt, MONSTER_WANDER_SPEED, e.spawnX, e.spawnY, 64);
+      var territoryRadius = e.territory && e.territory.radius || 64;
+      W.wanderTick(e, dt, MONSTER_WANDER_SPEED, e.spawnX, e.spawnY, territoryRadius);
     },
 
     /* ---------------- 移动辅助 ---------------- */
@@ -1204,14 +1315,21 @@
       speed /= Math.max(1, Game.terrain.costAt(ent.x, ent.y));
       dt = Math.min(Math.max(0, dt), 0.25);
       var ox = ent.x, oy = ent.y;
-      ent.x += dx * speed * dt;
-      ent.y += dy * speed * dt;
+      var nx = dx * speed * dt, ny = dy * speed * dt;
+      if (W.layout && W.layout.version >= 3) {
+        var swept = Game.terrain.sweepMove(ent.x, ent.y, nx, ny, ent.kind === 'hero' ? 7 : 6);
+        ent.x = swept.x; ent.y = swept.y;
+      } else {
+        ent.x += nx;
+        ent.y += ny;
+      }
       ent.dir = U.dirOf(dx, dy);
       ent.moving = true;
       W.clampToWorld(ent);
       var moved = U.dist(ox, oy, ent.x, ent.y);
       W.stepFx(ent, moved);
       if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(moved, dt);
+      if (ent.kind === 'hero' && moved > 0.01 && Game.exploration) Game.exploration.revealAt(ent.x, ent.y);
       return moved;
     },
 
@@ -1222,13 +1340,20 @@
       speed /= Math.max(1, Game.terrain.costAt(ent.x, ent.y));
       dt = Math.min(Math.max(0, dt), 0.25);
       var step = Math.min(d, speed * dt);
-      ent.x += dx / d * step;
-      ent.y += dy / d * step;
+      if (W.layout && W.layout.version >= 3) {
+        var swept = Game.terrain.sweepMove(ent.x, ent.y, dx / d * step, dy / d * step, ent.kind === 'hero' ? 7 : 6);
+        ent.x = swept.x; ent.y = swept.y;
+        step = swept.moved;
+      } else {
+        ent.x += dx / d * step;
+        ent.y += dy / d * step;
+      }
       ent.dir = U.dirOf(dx, dy);
       ent.moving = true;
       W.clampToWorld(ent);
       W.stepFx(ent, step);
       if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(step, dt);
+      if (ent.kind === 'hero' && step > 0.01 && Game.exploration) Game.exploration.revealAt(ent.x, ent.y);
       return d - step;
     },
 

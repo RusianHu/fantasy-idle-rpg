@@ -494,4 +494,101 @@
       5: 'Purify the eight lands, and storm the Demon Castle!'
     }
   });
+
+  Game.i18n.addPack('en', {
+    material: {
+      moon_dew: 'Moon Dew', river_reed: 'River Reed', sunseed: 'Sunseed',
+      silk_moss: 'Silk Moss', ancient_bark: 'Ancient Bark', glow_spore: 'Glow Spore',
+      coal_shard: 'Coal Shard', cave_salt: 'Cave Salt', deep_geode: 'Deep Geode',
+      bone_fragment: 'Bone Fragment', spirit_wax: 'Spirit Wax', nightshade: 'Nightshade',
+      snow_lotus: 'Snow Lotus', frozen_ore: 'Frozen Ore', griffin_feather: 'Griffin Feather',
+      magma_bloom: 'Magma Bloom', sulfur_stone: 'Sulfur Stone', ember_scale: 'Ember Scale',
+      cloud_silk: 'Cloud Silk', star_metal: 'Star Metal', wind_crystal: 'Wind Crystal',
+      void_ash: 'Void Ash', blood_rose: 'Blood Rose', fallen_sigil: 'Fallen Sigil'
+    },
+    explore: {
+      mapTab: 'Region Map', codexTab: 'Region Codex',
+      coverageLine: '{p}% explored', mapAria: 'Map of explored terrain',
+      zoomOut: 'Zoom out', zoomIn: 'Zoom in', centerHero: 'Center on hero',
+      readiness: 'Readiness', readinessHint: 'Readiness {value}/100. Find the lair and reach 70 to challenge its boss.',
+      readyExplore: 'Explore', readyLandmarks: 'Landmarks', readyResources: 'Resources',
+      readyCurios: 'Curios', readyGuardian: 'Guardian', readyLair: 'Lair',
+      yes: 'Found', no: 'Unknown',
+      landmarks: 'Key Landmarks', resources: 'Regional Resources', curios: 'Expedition Curios',
+      ecology: 'Rare Ecology', registeredHint: 'Permanent records that survive expedition cycles',
+      unknownEntry: 'Unknown record',
+      commissions: 'Regional Commissions', exchange: 'Exchange',
+      exchangeDone: 'Commission completed', exchangeFail: 'Not enough materials or upgrade cap reached',
+      commission: { potions: 'Frontier Potion Supply', gold: 'Guild Material Order', gear: 'Relic Gear Coffer', perm: 'Survey Mastery' },
+      strategy: { safe: 'Safe', balanced: 'Balanced', loot: 'Plunder' },
+      strategyAria: 'Auto-expedition strategy: {strategy}. Activate to cycle.',
+      aiIntent: 'AI intent',
+      intent: {
+        idle: 'Surveying', survival: 'Returning safely', combat: 'In combat',
+        'player-order': 'Following order', loot: 'Recovering loot', frontier: 'Exploring frontier',
+        discovery: 'Investigating', gather: 'Gathering', guardian: 'Hunting guardian',
+        boss: 'Heading to lair', circuit: 'Gathering circuit', camp: 'Returning to camp'
+      },
+      searchClues: 'Search Clues', viewReadiness: 'View Readiness', goLair: 'Go to Lair', challengeBoss: 'Challenge Boss',
+      curioTitle: 'Expedition Curio Found', curioUnknown: 'Nameless Curio',
+      curioPrompt: 'Choose one effect for this expedition. The other is forfeited.',
+      curio: {
+        scout: 'Insight', scoutHint: 'Wider vision without direct loot gains',
+        fortune: 'Fortune', fortuneHint: 'Better drops with the same route risk',
+        ward: 'Ward', wardHint: 'Lower danger without faster exploration',
+        haste: 'Haste', hasteHint: 'Move faster without weakening enemies'
+      },
+      threat: { patrol: 'Patrol Territory', nest: 'Monster Nest', ambush: 'Ambush Ground' },
+      guardian: {
+        grassland: 'Riverfang', forest: 'Moss-Crown Warden', mine: 'Deep-Shaft Foreman', graveyard: 'Gravegate Headsman',
+        snowpass: 'Frostridge Sentry', lavacave: 'Forge Keeper', skyruins: 'Sky Arbiter', darkcastle: 'Blackgate Guard'
+      },
+      content: {
+        grassland: {
+          river_watch: 'Riverbend Watch', old_waystone: 'Old Kingroad Stone', windmill_ruin: 'Ruined Windmill', slime_nest: 'Great Slime Nest',
+          sun_dial: 'Mossy Sundial', wanderer_pack: 'Lost Wanderer Pack', silver_bell: 'Silver Wind Bell',
+          golden_hare: 'Golden Hare', brook_sprite: 'Brook Sprite'
+        },
+        forest: {
+          whisper_grove: 'Whisper Grove', moss_shrine: 'Moss-Stone Shrine', sunken_bridge: 'Sunken Bridge', elder_hollow: 'Elder Hollow',
+          root_crown: 'Root Crown', green_lantern: 'Evergreen Lantern', hunter_totem: 'Hunter Totem',
+          moon_moth: 'Moon Moth', antler_owl: 'Antler Owl'
+        },
+        mine: {
+          lift_ruin: 'Ruined Lift', echo_gallery: 'Echo Gallery', foreman_post: 'Foreman Post', golem_foundry: 'Golem Foundry',
+          miners_dice: 'Miner Bone Dice', blue_lamp: 'Deep-Blue Lamp', sealed_charge: 'Sealed Charge',
+          crystal_beetle: 'Crystal Beetle', blind_newt: 'Blind Cave Newt'
+        },
+        graveyard: {
+          mourning_gate: 'Mourning Gate', bell_crypt: 'Bell Crypt', saint_court: 'Nameless Saint Court', black_mausoleum: 'Black Mausoleum',
+          votive_chain: 'Votive Chain', empty_mask: 'Empty Mask', last_letter: 'Unsent Letter',
+          candle_crow: 'Candle Crow', pale_fox: 'Pale Spirit Fox'
+        },
+        snowpass: {
+          ice_bridge: 'Broken Ice Bridge', pilgrim_shelter: 'Pilgrim Shelter', signal_peak: 'Signal Peak', giant_crater: 'Giantfall Crater',
+          warm_stone: 'Warm Stone', storm_compass: 'Storm Compass', white_banner: 'Blank White Banner',
+          aurora_stag: 'Aurora Stag', snow_wisp: 'Snow Wisp'
+        },
+        lavacave: {
+          basalt_gate: 'Basalt Gate', forge_ruin: 'Lost Forge', ember_lake: 'Ember Lake', demon_caldera: 'Demon Caldera',
+          smiths_tongs: 'Undying Tongs', ash_hourglass: 'Ash Hourglass', cinder_idol: 'Cinder Idol',
+          glass_salamander: 'Glass Salamander', ember_moth: 'Ember Moth'
+        },
+        skyruins: {
+          broken_aqueduct: 'Broken Sky Aqueduct', star_archive: 'Star Archive', wind_bridge: 'Wind Bridge', guardian_core: 'Guardian Core',
+          sky_chart: 'Floating Star Chart', singing_key: 'Singing Key', cloud_prism: 'Cloud Prism',
+          ribbon_ray: 'Ribbon Ray', clockwork_swallow: 'Clockwork Swallow'
+        },
+        darkcastle: {
+          fallen_bastion: 'Fallen Bastion', silent_throne: 'Silent Throne', miasma_well: 'Miasma Well', demon_keep: 'Demon Keep',
+          oath_blade: 'Broken Oathblade', cracked_crown: 'Cracked Crown', dawn_reliquary: 'Dawn Reliquary',
+          void_raven: 'Void Raven', red_moon_bat: 'Red-Moon Bat'
+        }
+      }
+    },
+    offline: {
+      knownRoute: 'Known resource routes', routeLoops: 'Route circuits', materials: 'Gathered materials',
+      noDiscoveries: 'Offline expeditions use known intelligence only and discover no new places.'
+    }
+  });
 })();

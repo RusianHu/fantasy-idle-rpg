@@ -107,6 +107,7 @@
           y < Game.world.BOUND_TOP + 12 || y > layout.world.h - 20) return false;
       if (U.dist(x, y, layout.camp.x, layout.camp.y) < layout.campSafeRadius + 12) return false;
       if (U.dist(x, y, layout.bossPoint.x, layout.bossPoint.y) < layout.bossSafeRadius + 12) return false;
+      if (layout.version >= 3) return Game.terrain.isWalkable(x, y, 10);
       if (Game.terrain.costAt(x, y) > 1.6) return false;
       return Game.terrain.distanceToPath(x, y, layout.corridor.points) >=
         layout.corridor.width / 2 + 12;
@@ -179,6 +180,8 @@
       var tier = Game.State.regionTier(Game.state.world.region);
       var y = F.gatherYield(tier);
       var count = U.randInt(y.min, y.max);
+      var expeditionMult = Game.expedition ? Game.expedition.currentModifier().gather : 1;
+      count = Math.max(1, Math.round(count * expeditionMult));
       Game.state.world.nodeCooldowns[node.id] = node.cooldown;
       Game.inv.addMaterial(node.material, count);
       if (y.gold > 0) Game.player.addGold(y.gold);
@@ -188,6 +191,17 @@
         Game.player.addCrystal(1);
       }
       Game.state.meta.stats.gathers++;
+      if (Game.collection && Game.world.layout && Game.world.layout.version >= 3) {
+        Game.collection.record('resources', node.defId, {
+          rid: Game.state.world.region, entity: node
+        });
+        var repeatExp = Math.max(1, Math.round(Game.F.expNeed(Game.state.player.level) * 0.018));
+        Game.player.addExp(repeatExp);
+      }
+      var explorationState = Game.exploration && Game.exploration.regionState(Game.state.world.region);
+      if (explorationState) {
+        explorationState.resourceCounts[node.defId] = (explorationState.resourceCounts[node.defId] || 0) + count;
+      }
       var result = {
         id: node.id, material: node.material, count: count,
         gold: y.gold, crystal: crystal, cooldown: node.cooldown
@@ -217,7 +231,9 @@
       var tier = Game.State.regionTier(Game.state.world.region);
       var reward = F.chestYield(tier, chest.rare);
       Game.player.addGold(reward.gold);
-      var gatherDefs = Game.world.region.gather && Game.world.region.gather.nodes || [];
+      var gatherDefs = Game.world.layout && Game.world.layout.version >= 3
+        ? Game.world.region.exploration.resources
+        : Game.world.region.gather && Game.world.region.gather.nodes || [];
       var mat = gatherDefs.length ? U.choice(gatherDefs).material : null;
       var materialCount = U.randInt(reward.materialMin, reward.materialMax);
       if (mat) Game.inv.addMaterial(mat, materialCount);

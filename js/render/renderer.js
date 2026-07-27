@@ -368,21 +368,30 @@
       var viewL = cam.x - cw / z / 2 - 8, viewR = cam.x + cw / z / 2 + 8;
       var viewT = cam.y - ch / z / 2 - 8, viewB = cam.y + ch / z / 2 + 8;
 
-      Game.terrain.drawGround(ctx);
+      Game.terrain.drawGround(ctx, viewL, viewT, viewR, viewB);
       Game.terrain.drawLiquid(ctx, viewL, viewT, viewR, viewB);
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
+      if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB);
 
       // 5) y 排序绘制（装饰 + 实体）
       var drawables = [];
       var j, e;
-      for (j = 0; j < W.props.length; j++) {
-        var p = W.props[j];
+      var visibleProps = Game.terrain.spatialQuery && W.layout.version >= 3
+        ? Game.terrain.spatialQuery(viewL - 20, viewT - 40, viewR + 20, viewB + 20, false)
+        : W.props;
+      visibleProps = visibleProps || W.props;
+      for (j = 0; j < visibleProps.length; j++) {
+        var p = visibleProps[j];
+        if (p.kind === 'ecology' && Game.expedition && !Game.expedition.isEcologyActive(p.defId)) continue;
         if (p.x < viewL - 20 || p.x > viewR + 20 || p.y < viewT - 40 || p.y > viewB + 20) continue;
         drawables.push(p);
       }
-      for (j = 0; j < W.entities.length; j++) drawables.push(W.entities[j]);
-      for (j = 0; j < W.groundLoot.length; j++) drawables.push(W.groundLoot[j]);
+      var visibleDynamic = Game.terrain.spatialQuery && W.layout.version >= 3
+        ? Game.terrain.spatialQuery(viewL - 30, viewT - 60, viewR + 30, viewB + 30, true)
+        : W.entities.concat(W.groundLoot);
+      visibleDynamic = visibleDynamic || W.entities.concat(W.groundLoot);
+      for (j = 0; j < visibleDynamic.length; j++) drawables.push(visibleDynamic[j]);
       if (Game.environment) {
         var sceneChests = Game.environment.chests();
         for (j = 0; j < sceneChests.length; j++) drawables.push(sceneChests[j]);
@@ -475,6 +484,7 @@
       // 7) 触发粒子 + 氛围粒子 + 形状特效
       Game.particles.draw(ctx);
       Game.fx.drawShapes(ctx);
+      if (Game.exploration) Game.exploration.drawFog(ctx, viewL, viewT, viewR, viewB);
 
       // 8) 屏幕空间：林间光柱 → 日夜色调 → 暗角
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

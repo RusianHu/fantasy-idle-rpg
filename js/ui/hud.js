@@ -34,6 +34,14 @@
         autoBossLabel: $('#auto-boss-label'),
         bossBar: $('#boss-bar'), bossName: $('#boss-name'), bossFill: $('#boss-hp-fill'),
         buffChips: $('#buff-chips'),
+        expeditionHud: $('#expedition-hud'),
+        expeditionStrategy: $('#expedition-strategy'),
+        expeditionStrategyIcon: $('#expedition-strategy-icon'),
+        expeditionStrategyLabel: $('#expedition-strategy-label'),
+        expeditionIntentLabel: $('#expedition-intent-label'),
+        expeditionIntentTarget: $('#expedition-intent-target'),
+        expeditionReadinessLabel: $('#expedition-readiness-label'),
+        expeditionReadinessValue: $('#expedition-readiness-value'),
         controlSwitch: $('#control-switch'),
         controlIcon: $('#control-mode-icon'),
         controlTitle: $('#control-title'),
@@ -55,7 +63,22 @@
       Game.assets.drawToDom($('#icon-crystal'), 'icon_crystal', 'icon');
       Game.assets.drawToDom(els.bossHuntIcon, 'icon_boss_hunt', 'icon');
 
+      els.expeditionStrategy.addEventListener('click', function () {
+        var order = ['safe', 'balanced', 'loot'];
+        var at = order.indexOf(Game.expeditionAI.strategy());
+        Game.expeditionAI.setStrategy(order[(at + 1) % order.length]);
+        Hud.hud.update(true);
+      });
+
       els.btnBossHunt.addEventListener('click', function () {
+        var layout = Game.world.layout;
+        if (layout && layout.version >= 3 && Game.exploration) {
+          var readiness = Game.exploration.readiness(Game.state.world.region);
+          if (!readiness.lair || readiness.total < 70) {
+            Game.ui.tabs.open('map');
+            return;
+          }
+        }
         if (!Game.world.trySpawnBoss({ manual: true }) && Game.ui.modals) {
           var gi = Game.world.gaugeInfo();
           Game.ui.modals.toast(Game.i18n.t(
@@ -121,6 +144,9 @@
         if (Game.ui.modals) Game.ui.modals.toast(Game.i18n.t('ui.autoCampReturning'));
         Hud.hud.update(true);
       });
+      bus.on('readiness:changed', function () { Hud.hud.update(true); });
+      bus.on('ai:intentChanged', function () { Hud.hud.update(true); });
+      bus.on('ai:strategyChanged', function () { Hud.hud.update(true); });
 
       Hud.hud.update(true);
     },
@@ -188,21 +214,48 @@
 
       var gi = W.gaugeInfo();
       var boss = W.bossEnt;
+      var v3 = W.layout && W.layout.version >= 3 && Game.exploration;
+
+      els.expeditionHud.classList.toggle('hidden', !v3 || mode === 'rest');
+      if (v3) {
+        var strategy = Game.expeditionAI.strategy();
+        var intent = Game.expeditionAI.intent();
+        var readiness = gi.readiness;
+        Game.assets.drawToDom(els.expeditionStrategyIcon, 'icon_strategy_' + strategy, 'icon');
+        els.expeditionStrategyLabel.textContent = t('explore.strategy.' + strategy);
+        els.expeditionStrategy.setAttribute('aria-label', t('explore.strategyAria', {
+          strategy: t('explore.strategy.' + strategy)
+        }));
+        els.expeditionIntentLabel.textContent = t('explore.aiIntent');
+        els.expeditionIntentTarget.textContent = t('explore.intent.' + (intent.id || 'idle')) +
+          (intent.distance > 1 ? ' · ' + Math.round(intent.distance) + 'm' : '');
+        els.expeditionReadinessLabel.textContent = t('explore.readiness');
+        els.expeditionReadinessValue.textContent = readiness.total + '/100';
+        els.expeditionReadinessValue.classList.toggle('ready', readiness.total >= 70 && readiness.lair);
+      }
 
       // 讨伐条下方的紧凑 Boss 操作组：自动讨伐默认开启，关闭后满进度待命。
       var autoBoss = s.settings.autoBoss !== false;
-      var bossReady = mode === 'battle' && !boss && gi.kills >= gi.target &&
+      var bossReady = mode === 'battle' && !boss && (v3
+        ? gi.readiness.total >= 70 && gi.readiness.lair
+        : gi.kills >= gi.target) &&
         W.hero && W.hero.state !== 'dead' && W.hero.state !== 'recover' &&
         (!Game.transitions || !Game.transitions.isActive());
       els.huntActions.classList.toggle('hidden', !!boss || mode === 'rest');
-      els.bossHuntLabel.textContent = t('ui.bossHunt');
-      els.btnBossHunt.disabled = !bossReady;
+      var bossActionKey = !v3 ? 'ui.bossHunt'
+        : (!gi.readiness.lair ? 'explore.searchClues'
+          : (gi.readiness.total < 70 ? 'explore.viewReadiness'
+            : (U.dist(W.hero.x, W.hero.y, W.layout.bossPoint.x, W.layout.bossPoint.y) > 74
+              ? 'explore.goLair' : 'explore.challengeBoss')));
+      els.bossHuntLabel.textContent = t(bossActionKey);
+      els.btnBossHunt.disabled = v3 ? false : !bossReady;
       els.btnBossHunt.classList.toggle('ready', bossReady);
-      els.btnBossHunt.setAttribute('aria-label', t('ui.bossHunt'));
+      els.btnBossHunt.setAttribute('aria-label', t(bossActionKey));
       els.btnBossHunt.title = bossReady
         ? t('ui.bossHuntReady')
-        : t(gi.kills < gi.target ? 'ui.bossHuntLocked' : 'ui.bossHuntBusy', {
-          n: Math.max(0, gi.target - gi.kills)
+        : t(v3 ? 'explore.readinessHint' : (gi.kills < gi.target ? 'ui.bossHuntLocked' : 'ui.bossHuntBusy'), {
+          n: Math.max(0, (gi.required || gi.target) - gi.kills),
+          value: gi.readiness ? gi.readiness.total : gi.kills
         });
       els.autoBossLabel.textContent = t('ui.autoBossShort');
       els.autoBossSwitch.classList.toggle('on', autoBoss);
@@ -226,9 +279,10 @@
         els.gaugeFill.style.width = gaugePct + '%';
         els.gaugeText.textContent = mode === 'rest'
           ? t('ui.restGauge', { p: Math.floor(restPct) })
-          : t('ui.huntGauge') + ' ' + gi.kills + '/' + gi.target;
+          : (v3 ? t('explore.readiness') : t('ui.huntGauge')) + ' ' + gi.kills + '/' + gi.target;
         els.gauge.classList.toggle('resting', mode === 'rest');
-        els.gauge.classList.toggle('full', mode === 'rest' ? restPct >= 100 : gi.kills >= gi.target);
+        els.gauge.classList.toggle('full', mode === 'rest' ? restPct >= 100 :
+          (v3 ? gi.kills >= 70 && gi.lair : gi.kills >= gi.target));
       }
 
       // 返回营地按钮：距离、传送阶段与 Boss 撤离均有独立表达。

@@ -546,6 +546,9 @@
 
   Game.i18n.setLocale('zh-CN');
   Game.state = Game.State.newGame();
+  // 该实验室专门保留 v1/v2 的 900×520 地表与旧探索交互回归；
+  // 开放地图 v3 使用相邻的 exploration-v3 实验室。
+  Game.state.world.layoutVersion = 2;
   var params = queryParams();
   var querySeed = parseSeed(params.get('seed'));
   if (querySeed !== null) Game.state.world.worldSeed = querySeed;
@@ -553,7 +556,7 @@
   Game.state.settings.autoAdvance = false;
   Game.state.settings.autoEquip = false;
   Game.state.settings.controlMode = 'auto';
-  Game.player.setClass('warrior');
+  Game.player.setClass('fighter');
   Game.render.init(document.getElementById('stage'));
   bindControls();
   bindExplorationEvents();

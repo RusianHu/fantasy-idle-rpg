@@ -7,6 +7,7 @@
   var U = Game.util, bus = Game.bus, reg = Game.reg;
 
   var UI = Game.ui;
+  var mapSub = 'region-map';
 
   /* ================= 技能面板（按职业过滤） ================= */
   UI.panels.skills = function (root) {
@@ -102,6 +103,156 @@
     });
     root.appendChild(seedRow);
 
+    var subtabs = U.el('div', 'subtabs');
+    [
+      ['region-map', 'explore.mapTab'],
+      ['codex', 'explore.codexTab']
+    ].forEach(function (def) {
+      var btn = U.el('button', 'subtab' + (mapSub === def[0] ? ' active' : ''), t(def[1]));
+      btn.type = 'button';
+      btn.addEventListener('click', function () { mapSub = def[0]; UI.tabs.rerender(); });
+      subtabs.appendChild(btn);
+    });
+    root.appendChild(subtabs);
+
+    var rid = s.world.region;
+    var summary = Game.collection && Game.collection.regionSummary(rid);
+    if (Game.world.layout && Game.world.layout.version >= 3 && summary) {
+      if (mapSub === 'region-map') {
+        var mapCard = U.el('section', 'card exploration-map-card');
+        var ready = summary.readiness;
+        mapCard.innerHTML =
+          '<div class="exploration-map-head"><div><div class="name">' +
+          U.esc(t('region.' + rid + '.name')) + '</div><div class="desc">' +
+          t('explore.coverageLine', { p: Math.floor(summary.coverage * 100) }) +
+          '</div></div><strong class="readiness-total">' + ready.total + '/100</strong></div>' +
+          '<div class="readiness-grid">' +
+          '<span>' + t('explore.readyExplore') + '<b>' + ready.exploration + '/30</b></span>' +
+          '<span>' + t('explore.readyLandmarks') + '<b>' + ready.landmarks + '/25</b></span>' +
+          '<span>' + t('explore.readyResources') + '<b>' + ready.resources + '/18</b></span>' +
+          '<span>' + t('explore.readyCurios') + '<b>' + ready.curios + '/12</b></span>' +
+          '<span>' + t('explore.readyGuardian') + '<b>' + ready.guardian + '/15</b></span>' +
+          '<span>' + t('explore.readyLair') + '<b>' + (ready.lair ? t('explore.yes') : t('explore.no')) + '</b></span>' +
+          '</div>';
+        var viewport = U.el('div', 'region-map-viewport');
+        var canvas = document.createElement('canvas');
+        canvas.width = 660; canvas.height = 396;
+        canvas.setAttribute('aria-label', t('explore.mapAria'));
+        viewport.appendChild(canvas);
+        mapCard.appendChild(viewport);
+        var controls = U.el('div', 'map-zoom-controls',
+          '<button class="btn small" type="button" data-zoom="-1" aria-label="' + U.esc(t('explore.zoomOut')) + '">−</button>' +
+          '<button class="btn small" type="button" data-center="1">' + U.esc(t('explore.centerHero')) + '</button>' +
+          '<button class="btn small" type="button" data-zoom="1" aria-label="' + U.esc(t('explore.zoomIn')) + '">+</button>');
+        mapCard.appendChild(controls);
+        root.appendChild(mapCard);
+
+        var base = document.createElement('canvas');
+        base.width = 660; base.height = 396;
+        Game.exploration.drawMap(base.getContext('2d'), rid, base.width, base.height);
+        var view = { zoom: 1, x: 0, y: 0, drag: false, px: 0, py: 0 };
+        function draw() {
+          var g = canvas.getContext('2d');
+          g.imageSmoothingEnabled = false;
+          g.clearRect(0, 0, canvas.width, canvas.height);
+          var sw = base.width / view.zoom, sh = base.height / view.zoom;
+          view.x = U.clamp(view.x, 0, base.width - sw);
+          view.y = U.clamp(view.y, 0, base.height - sh);
+          g.drawImage(base, view.x, view.y, sw, sh, 0, 0, canvas.width, canvas.height);
+        }
+        function zoom(delta, cx, cy) {
+          var old = view.zoom;
+          view.zoom = U.clamp(view.zoom * (delta > 0 ? 1.35 : 1 / 1.35), 1, 3);
+          var ox = view.x + (cx || canvas.width / 2) / canvas.width * base.width / old;
+          var oy = view.y + (cy || canvas.height / 2) / canvas.height * base.height / old;
+          view.x = ox - (cx || canvas.width / 2) / canvas.width * base.width / view.zoom;
+          view.y = oy - (cy || canvas.height / 2) / canvas.height * base.height / view.zoom;
+          draw();
+        }
+        controls.querySelector('[data-zoom="-1"]').addEventListener('click', function () { zoom(-1); });
+        controls.querySelector('[data-zoom="1"]').addEventListener('click', function () { zoom(1); });
+        controls.querySelector('[data-center]').addEventListener('click', function () {
+          var hero = Game.world.hero;
+          view.zoom = Math.max(1.5, view.zoom);
+          view.x = hero.x / Game.world.layout.world.w * base.width - base.width / view.zoom / 2;
+          view.y = hero.y / Game.world.layout.world.h * base.height - base.height / view.zoom / 2;
+          draw();
+        });
+        canvas.addEventListener('wheel', function (e) {
+          e.preventDefault();
+          var rect = canvas.getBoundingClientRect();
+          zoom(e.deltaY < 0 ? 1 : -1, (e.clientX - rect.left) / rect.width * canvas.width,
+            (e.clientY - rect.top) / rect.height * canvas.height);
+        }, { passive: false });
+        canvas.addEventListener('pointerdown', function (e) {
+          view.drag = true; view.px = e.clientX; view.py = e.clientY;
+          canvas.setPointerCapture(e.pointerId);
+        });
+        canvas.addEventListener('pointermove', function (e) {
+          if (!view.drag) return;
+          view.x -= (e.clientX - view.px) / canvas.clientWidth * base.width / view.zoom;
+          view.y -= (e.clientY - view.py) / canvas.clientHeight * base.height / view.zoom;
+          view.px = e.clientX; view.py = e.clientY; draw();
+        });
+        canvas.addEventListener('pointerup', function () { view.drag = false; });
+        draw();
+      } else {
+        var codex = U.el('section', 'exploration-codex');
+        [
+          ['landmarks', summary.landmarks],
+          ['resources', summary.resources],
+          ['curios', summary.curios],
+          ['ecology', summary.ecology]
+        ].forEach(function (line) {
+          codex.appendChild(U.el('div', 'card codex-progress',
+            '<div class="row"><div class="grow"><div class="name">' + t('explore.' + line[0]) +
+            '</div><div class="desc">' + t('explore.registeredHint') + '</div></div>' +
+            '<strong>' + line[1].found + '/' + line[1].total + '</strong></div>'));
+        });
+        var state = Game.exploration.regionState(rid);
+        var content = Game.world.layout;
+        var regionContent = reg.get('region', rid).exploration;
+        [
+          ['landmarks', content.landmarks],
+          ['resources', regionContent.resources],
+          ['curios', content.curios],
+          ['ecology', content.ecology]
+        ].forEach(function (group) {
+          var list = U.el('div', 'card codex-list');
+          list.appendChild(U.el('div', 'name', t('explore.' + group[0])));
+          group[1].forEach(function (entry) {
+            var known = !!state.discovered[group[0]][entry.defId || entry.id];
+            list.appendChild(U.el('div', 'codex-entry' + (known ? ' known' : ''),
+              '<span class="codex-mark"></span><span>' +
+              U.esc(known ? t(entry.nameKey || 'material.' + entry.material) : t('explore.unknownEntry')) +
+              '</span>'));
+          });
+          codex.appendChild(list);
+        });
+
+        var commissions = U.el('div', 'card commission-card');
+        commissions.appendChild(U.el('div', 'name', t('explore.commissions')));
+        Game.expedition.commissionDefs(rid).forEach(function (def) {
+          var costs = Object.keys(def.costs).map(function (mat) {
+            return t('material.' + mat) + ' ' + (s.inv.materials[mat] || 0) + '/' + def.costs[mat];
+          }).join(' · ');
+          var row = U.el('div', 'commission-row',
+            '<div class="grow"><div class="name">' + t('explore.commission.' + def.reward) +
+            '</div><div class="desc">' + U.esc(costs) + '</div></div>' +
+            '<button class="btn small" type="button">' + t('explore.exchange') + '</button>');
+          row.querySelector('button').addEventListener('click', function () {
+            var result = Game.expedition.commission(def.id, rid);
+            Game.ui.modals.toast(t(result.ok ? 'explore.exchangeDone' : 'explore.exchangeFail'),
+              result.ok ? 'gold' : 'warn');
+            UI.tabs.rerender();
+          });
+          commissions.appendChild(row);
+        });
+        codex.appendChild(commissions);
+        root.appendChild(codex);
+      }
+    }
+
     // 自动推进开关
     var autoRow = U.el('div', 'card', '<div class="row"><div class="grow">' +
       '<div class="name">' + t('settings.autoAdvance') + '</div>' +
@@ -138,7 +289,9 @@
         '<div class="name">' + t('region.' + r.id + '.name') + status + '</div>' +
         '<div class="desc">' + t('region.' + r.id + '.desc') + '</div>' +
         '<div class="desc">' + t('ui.recommendLv', { lv: lvMin }) + '　·　' +
-        t('ui.huntGauge') + ' ' + Math.min(prog.kills, r.killTarget) + '/' + r.killTarget + '</div>' +
+        (Game.collection && Game.collection.regionSummary(r.id)
+          ? t('explore.coverageLine', { p: Math.floor(Game.collection.regionSummary(r.id).coverage * 100) })
+          : t('ui.huntGauge') + ' ' + Math.min(prog.kills, r.killTarget) + '/' + r.killTarget) + '</div>' +
         '</div>' +
         '<button class="btn small go-btn">' + t('ui.goRegion') + '</button>' +
         '</div>');
