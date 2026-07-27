@@ -2811,19 +2811,22 @@ async function run() {
       Game.BUILD_ID = 'browser-stale-build';
       Game.updateChecker.check();
     })()`);
-    await delay(420);
-    const updateNotice = await cdp.evaluate(`(() => {
-      const notice = document.getElementById('app-update-notice');
-      if (!notice) return { visible: false };
-      const rect = notice.getBoundingClientRect();
-      return {
-        visible: getComputedStyle(notice).visibility === 'visible',
-        height: rect.height,
-        withinViewport: rect.left >= 0 && rect.right <= innerWidth,
-        build: Game.updateChecker.availableBuild(),
-        copy: notice.textContent.trim()
-      };
-    })()`);
+    let updateNotice = { visible: false };
+    for (let attempt = 0; attempt < 20 && !updateNotice.visible; attempt++) {
+      await delay(200);
+      updateNotice = await cdp.evaluate(`(() => {
+        const notice = document.getElementById('app-update-notice');
+        if (!notice) return { visible: false };
+        const rect = notice.getBoundingClientRect();
+        return {
+          visible: getComputedStyle(notice).visibility === 'visible',
+          height: rect.height,
+          withinViewport: rect.left >= 0 && rect.right <= innerWidth,
+          build: Game.updateChecker.availableBuild(),
+          copy: notice.textContent.trim()
+        };
+      })()`);
+    }
     assert.equal(updateNotice.visible, true, 'a stale long-running tab receives an update action');
     assert.ok(updateNotice.height >= 44, 'the update action keeps a touch target');
     assert.equal(updateNotice.withinViewport, true, 'the update action fits the mobile viewport');
