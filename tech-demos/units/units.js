@@ -28,6 +28,22 @@
   var timeMode = 'cycle';
   var lastFrame = performance.now();
   var battleMessage = '等待战斗指令';
+  var bubbleAnchor = 'hero';
+  var bubbleAuto = true;
+  var bubbleAutoT = 0.35;
+  var bubbleSequence = 0;
+  var bubbleDemoSeq = 0;
+  var BUBBLE_LABELS = {
+    resource: '资源', gather: '采集', enemy: '接敌',
+    alert: '警戒', chest: '宝箱', loot: '掉落'
+  };
+  var AUTO_BUBBLES = [
+    { hero: 'resource' },
+    { hero: 'gather' },
+    { hero: 'enemy', monster: 'alert' },
+    { hero: 'chest' },
+    { hero: 'loot' }
+  ];
 
   function esc(value) { return U.esc(String(value)); }
 
@@ -269,11 +285,131 @@
     return ent;
   }
 
+  function bubbleMonster() {
+    var monster = Game.world.entities.find(function (entity) {
+      return entity.kind === 'monster' && !entity.dead && entity.hp > 0;
+    });
+    if (!monster) {
+      var unit = currentUnit();
+      var def = unit.type === 'hero' ? normalMonsters[0] : Game.reg.get('monster', unit.id);
+      monster = spawnSparring(def.id, !!def.boss);
+    }
+    var hero = Game.world.hero;
+    if (hero && U.dist(hero.x, hero.y, monster.x, monster.y) > 120) {
+      monster.x = hero.x + 88;
+      monster.y = hero.y + 6;
+      monster.spawnX = monster.x;
+      monster.spawnY = monster.y;
+    }
+    return monster;
+  }
+
+  function setBubbleAnchor(anchor) {
+    bubbleAnchor = /^(hero|monster|both)$/.test(anchor) ? anchor : 'hero';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-anchor]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-anchor') === bubbleAnchor);
+    });
+    updateBubbleQa();
+    return bubbleAnchor;
+  }
+
+  function setBubbleAuto(enabled) {
+    bubbleAuto = !!enabled;
+    bubbleAutoT = bubbleAuto ? 0.2 : 0;
+    var button = document.getElementById('toggle-bubble-auto');
+    if (button) {
+      button.classList.toggle('active', bubbleAuto);
+      button.setAttribute('aria-checked', bubbleAuto ? 'true' : 'false');
+    }
+    updateBubbleQa();
+    return bubbleAuto;
+  }
+
+  function showBubble(type, anchor, replace) {
+    if (!Game.actionBubbles.type(type)) return false;
+    anchor = anchor || bubbleAnchor;
+    var hero = Game.world.hero;
+    var monster = (anchor === 'monster' || anchor === 'both') ? bubbleMonster() : null;
+    // 生成陪练可能触发正式世界的清理事件；所有锚点就绪后再提交本次气泡。
+    if (replace !== false) Game.actionBubbles.clear();
+    var shown = [];
+    var targetId = 'units-demo:' + (++bubbleDemoSeq);
+    if (anchor === 'hero' || anchor === 'both') {
+      shown.push(Game.actionBubbles.show(hero, type, {
+        targetId: targetId + ':hero',
+        duration: 3
+      }));
+    }
+    if (anchor === 'monster' || anchor === 'both') {
+      shown.push(Game.actionBubbles.show(monster, type, {
+        targetId: targetId + ':monster',
+        duration: 3
+      }));
+    }
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-type]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-type') === type);
+    });
+    updateBubbleQa();
+    return shown.some(Boolean);
+  }
+
+  function showAutomaticBubble() {
+    var scene = AUTO_BUBBLES[bubbleSequence % AUTO_BUBBLES.length];
+    bubbleSequence++;
+    Game.actionBubbles.clear();
+    var hero = Game.world.hero;
+    var monster = scene.monster ? bubbleMonster() : null;
+    var targetId = 'units-auto:' + bubbleSequence;
+    if (scene.hero) {
+      Game.actionBubbles.show(hero, scene.hero, {
+        targetId: targetId + ':hero',
+        duration: 2.25
+      });
+    }
+    if (scene.monster && monster) {
+      Game.actionBubbles.show(monster, scene.monster, {
+        targetId: targetId + ':monster',
+        duration: 2.25
+      });
+    }
+    var activeType = scene.hero || scene.monster;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-type]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-type') === activeType);
+    });
+    updateBubbleQa();
+  }
+
+  function paintBubbleControls() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-type]'), function (button) {
+      Game.render.drawActionBubbleIcon(
+        button.querySelector('canvas'),
+        button.getAttribute('data-bubble-type')
+      );
+    });
+  }
+
+  function updateBubbleQa() {
+    var output = document.getElementById('bubble-status');
+    if (!output || !Game.actionBubbles) return;
+    var active = Game.actionBubbles.active().filter(function (bubble) {
+      return bubble.state === 'visible';
+    });
+    if (!active.length) {
+      output.textContent = bubbleAuto ? '自动轮播 · 等待气泡' : '手动检查 · 当前无气泡';
+      return;
+    }
+    output.textContent = active.map(function (bubble) {
+      var anchorName = bubble.entityKind === 'monster' ? '怪物' : '主角';
+      return anchorName + ' · ' + (BUBBLE_LABELS[bubble.type] || bubble.type);
+    }).join(' / ');
+  }
+
   function activateUnit(index) {
     currentIndex = (index + ALL_UNITS.length) % ALL_UNITS.length;
     var unit = currentUnit();
     currentGroup = unit.type === 'hero' ? 'hero' : (unit.type === 'boss' ? 'boss' : 'monster');
     setupStageForUnit(unit);
+    bubbleAutoT = 0.2;
     updateHeader();
     renderInspector();
     setBattleEvent(unit.type === 'hero' ? className(unit.id) + '已入场' : monsterName(unit.id) + '已入场');
@@ -331,6 +467,24 @@
     document.getElementById('motion-toggle').addEventListener('change', function () {
       if (!Game.state || !Game.state.settings) return;
       Game.state.settings.effects = this.checked;
+    });
+    document.querySelector('.bubble-anchor-controls').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-bubble-anchor]');
+      if (button) setBubbleAnchor(button.getAttribute('data-bubble-anchor'));
+    });
+    document.querySelector('.bubble-type-controls').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-bubble-type]');
+      if (!button) return;
+      setBubbleAuto(false);
+      showBubble(button.getAttribute('data-bubble-type'));
+    });
+    document.getElementById('toggle-bubble-auto').addEventListener('click', function () {
+      setBubbleAuto(this.getAttribute('aria-checked') !== 'true');
+    });
+    document.getElementById('clear-bubbles').addEventListener('click', function () {
+      setBubbleAuto(false);
+      Game.actionBubbles.clear();
+      updateBubbleQa();
     });
     document.getElementById('spawn-sparring').addEventListener('click', function () {
       var unit = currentUnit();
@@ -406,6 +560,7 @@
     if (cr) cr.textContent = Game.world.controlMode() === 'manual' ? '手动' : '自动';
     var ev = document.getElementById('battle-event');
     if (ev) ev.textContent = battleMessage;
+    updateBubbleQa();
   }
 
   function frame(now) {
@@ -419,6 +574,14 @@
       Game.particles.update(dt);
       Game.fx.update(dt);
       Game.world.update(dt);
+      Game.actionBubbles.update(dt);
+      if (bubbleAuto) {
+        bubbleAutoT -= dt;
+        if (bubbleAutoT <= 0) {
+          showAutomaticBubble();
+          bubbleAutoT = 2.55;
+        }
+      }
     }
     Game.render.frame(paused ? 0 : dt);
     updateBattleQa();
@@ -434,8 +597,22 @@
   Game.state.settings.groundLoot = false;
   Game.state.settings.effects = true;
   Game.render.init(document.getElementById('stage'));
+  Game.unitsBubbleDemo = {
+    show: function (type, anchor) {
+      setBubbleAuto(false);
+      return showBubble(type, anchor);
+    },
+    setAnchor: setBubbleAnchor,
+    setAuto: setBubbleAuto,
+    clear: function () {
+      Game.actionBubbles.clear();
+      updateBubbleQa();
+    },
+    snapshot: function () { return Game.actionBubbles.active(); }
+  };
   bindControls();
   bindBattleEvents();
+  paintBubbleControls();
   activateUnit(0);
   requestAnimationFrame(frame);
 })();

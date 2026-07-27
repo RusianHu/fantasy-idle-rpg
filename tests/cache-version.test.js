@@ -12,6 +12,9 @@ const demo = read('tech-demos/map-effects/map-effects.html');
 const demoStyle = read('tech-demos/map-effects/map-effects.css');
 const explorationDemo = read('tech-demos/exploration-v3/exploration-v3.html');
 const explorationDemoStyle = read('tech-demos/exploration-v3/exploration-v3.css');
+const unitsDemo = read('tech-demos/units/units.html');
+const unitsDemoStyle = read('tech-demos/units/units.css');
+const unitsDemoScript = read('tech-demos/units/units.js');
 const style = read('css/style.css');
 const utils = read('js/core/utils.js');
 const main = read('js/main.js');
@@ -42,10 +45,17 @@ function assertVersionedHtml(source, name) {
 assertVersionedHtml(index, 'index.html');
 assertVersionedHtml(demo, 'map-effects.html');
 assertVersionedHtml(explorationDemo, 'exploration-v3.html');
+assertVersionedHtml(unitsDemo, 'units.html');
 assert.ok(style.includes(`fusion-pixel.woff2?v=${buildId}`), 'CSS font URL must be versioned');
 assert.ok(demoStyle.includes(`fusion-pixel.woff2?v=${buildId}`), 'QA CSS font URL must be versioned');
 assert.ok(explorationDemoStyle.includes(`fusion-pixel.woff2?v=${buildId}`),
   'v3 QA CSS font URL must be versioned');
+assert.ok(unitsDemoStyle.includes(`fusion-pixel.woff2?v=${buildId}`),
+  'units QA CSS font URL must be versioned');
+assert.match(unitsDemo, /systems\/action_bubbles\.js\?v=/,
+  'units QA must load the production action bubble manager');
+assert.match(unitsDemoScript, /Game\.actionBubbles\.show/,
+  'units QA must exercise the production action bubble API');
 assert.match(main, /fusion-pixel\.woff2\?v=' \+ encodeURIComponent\(Game\.BUILD_ID\)/,
   'FontFace preload must use Game.BUILD_ID');
 assert.match(updater, /cache: 'no-store'/, 'release checks must bypass browser caches');

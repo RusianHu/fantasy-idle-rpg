@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#151614">
-<meta name="build-id" content="20260727.7">
+<meta name="build-id" content="20260727.15">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M4 12V6h2l2-2 2 2h2v6H4z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='3' fill='%23151614'/%3E%3C/svg%3E">
 <title>角色与怪物技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="units.css?v=20260727.7">
+<link rel="stylesheet" href="units.css?v=20260727.15">
 </head>
 <body>
 <div class="app-shell">
@@ -66,6 +66,36 @@
         </label>
       </div>
 
+      <section class="bubble-lab" aria-labelledby="bubble-lab-title">
+        <div class="bubble-lab-heading">
+          <div>
+            <p class="lab-kicker">ENTITY REACTIONS / LIVE QA</p>
+            <h3 id="bubble-lab-title">实体图形气泡</h3>
+          </div>
+          <div class="bubble-lab-status">
+            <output id="bubble-status" aria-live="polite">自动轮播 · 等待气泡</output>
+            <button id="toggle-bubble-auto" class="switch-button active" type="button"
+              role="switch" aria-checked="true">自动轮播</button>
+          </div>
+        </div>
+        <div class="bubble-controls">
+          <div class="bubble-anchor-controls" aria-label="气泡锚点">
+            <button type="button" data-bubble-anchor="hero" class="active">主角</button>
+            <button type="button" data-bubble-anchor="monster">怪物</button>
+            <button type="button" data-bubble-anchor="both">双锚点</button>
+          </div>
+          <div class="bubble-type-controls" aria-label="图形气泡类型">
+            <button type="button" data-bubble-type="resource"><canvas width="24" height="24" aria-hidden="true"></canvas><span>资源</span></button>
+            <button type="button" data-bubble-type="gather"><canvas width="24" height="24" aria-hidden="true"></canvas><span>采集</span></button>
+            <button type="button" data-bubble-type="enemy"><canvas width="24" height="24" aria-hidden="true"></canvas><span>接敌</span></button>
+            <button type="button" data-bubble-type="alert"><canvas width="24" height="24" aria-hidden="true"></canvas><span>警戒</span></button>
+            <button type="button" data-bubble-type="chest"><canvas width="24" height="24" aria-hidden="true"></canvas><span>宝箱</span></button>
+            <button type="button" data-bubble-type="loot"><canvas width="24" height="24" aria-hidden="true"></canvas><span>掉落</span></button>
+          </div>
+          <button id="clear-bubbles" class="clear-bubbles" type="button" title="清空气泡" aria-label="清空气泡">&times;</button>
+        </div>
+      </section>
+
       <div class="battle-lab" aria-labelledby="battle-lab-title">
         <div class="lab-heading">
           <div>
@@ -97,7 +127,7 @@
 
       <div class="source-line">
         <span>验证链路</span>
-        <code>classes.js</code><b>&#8594;</b><code>monsters.js</code><b>&#8594;</b><code>combat.js</code><b>&#8594;</b><code>world.js</code><b>&#8594;</b><code>renderer.js</code>
+        <code>classes.js</code><b>&#8594;</b><code>monsters.js</code><b>&#8594;</b><code>action_bubbles.js</code><b>&#8594;</b><code>world.js</code><b>&#8594;</b><code>renderer.js</code>
       </div>
     </section>
 
@@ -105,51 +135,52 @@
   </main>
 </div>
 
-<script src="../../js/core/utils.js?v=20260727.7"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260727.7"></script>
-<script src="../../js/core/eventbus.js?v=20260727.7"></script>
-<script src="../../js/core/registry.js?v=20260727.7"></script>
-<script src="../../js/i18n/i18n.js?v=20260727.7"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260727.7"></script>
-<script src="../../js/i18n/en.js?v=20260727.7"></script>
-<script src="../../js/core/assets.js?v=20260727.7"></script>
-<script src="../../js/data/formulas.js?v=20260727.7"></script>
-<script src="../../js/sprites/palettes.js?v=20260727.7"></script>
-<script src="../../js/sprites/hero.js?v=20260727.7"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260727.7"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260727.7"></script>
-<script src="../../js/sprites/props.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260727.7"></script>
-<script src="../../js/sprites/flora.js?v=20260727.7"></script>
-<script src="../../js/data/affixes.js?v=20260727.7"></script>
-<script src="../../js/data/items.js?v=20260727.7"></script>
-<script src="../../js/data/classes.js?v=20260727.7"></script>
-<script src="../../js/data/skills.js?v=20260727.7"></script>
-<script src="../../js/data/monsters.js?v=20260727.7"></script>
-<script src="../../js/data/regions.js?v=20260727.7"></script>
-<script src="../../js/systems/state.js?v=20260727.7"></script>
-<script src="../../js/systems/terrain.js?v=20260727.7"></script>
-<script src="../../js/systems/nav.js?v=20260727.7"></script>
-<script src="../../js/systems/inventory.js?v=20260727.7"></script>
-<script src="../../js/systems/items.js?v=20260727.7"></script>
-<script src="../../js/systems/combat.js?v=20260727.7"></script>
-<script src="../../js/systems/trade.js?v=20260727.7"></script>
-<script src="../../js/systems/environment.js?v=20260727.7"></script>
-<script src="../../js/render/terrain.js?v=20260727.7"></script>
-<script src="../../js/render/particles.js?v=20260727.7"></script>
-<script src="../../js/render/daynight.js?v=20260727.7"></script>
-<script src="../../js/render/effects.js?v=20260727.7"></script>
-<script src="../../js/render/renderer.js?v=20260727.7"></script>
-<script src="../../js/systems/world.js?v=20260727.7"></script>
-<script src="units.js?v=20260727.7"></script>
+<script src="../../js/core/utils.js?v=20260727.15"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260727.15"></script>
+<script src="../../js/core/eventbus.js?v=20260727.15"></script>
+<script src="../../js/core/registry.js?v=20260727.15"></script>
+<script src="../../js/i18n/i18n.js?v=20260727.15"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260727.15"></script>
+<script src="../../js/i18n/en.js?v=20260727.15"></script>
+<script src="../../js/core/assets.js?v=20260727.15"></script>
+<script src="../../js/data/formulas.js?v=20260727.15"></script>
+<script src="../../js/sprites/palettes.js?v=20260727.15"></script>
+<script src="../../js/sprites/hero.js?v=20260727.15"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260727.15"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260727.15"></script>
+<script src="../../js/sprites/props.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260727.15"></script>
+<script src="../../js/sprites/flora.js?v=20260727.15"></script>
+<script src="../../js/data/affixes.js?v=20260727.15"></script>
+<script src="../../js/data/items.js?v=20260727.15"></script>
+<script src="../../js/data/classes.js?v=20260727.15"></script>
+<script src="../../js/data/skills.js?v=20260727.15"></script>
+<script src="../../js/data/monsters.js?v=20260727.15"></script>
+<script src="../../js/data/regions.js?v=20260727.15"></script>
+<script src="../../js/systems/state.js?v=20260727.15"></script>
+<script src="../../js/systems/terrain.js?v=20260727.15"></script>
+<script src="../../js/systems/nav.js?v=20260727.15"></script>
+<script src="../../js/systems/inventory.js?v=20260727.15"></script>
+<script src="../../js/systems/items.js?v=20260727.15"></script>
+<script src="../../js/systems/combat.js?v=20260727.15"></script>
+<script src="../../js/systems/trade.js?v=20260727.15"></script>
+<script src="../../js/systems/environment.js?v=20260727.15"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260727.15"></script>
+<script src="../../js/render/terrain.js?v=20260727.15"></script>
+<script src="../../js/render/particles.js?v=20260727.15"></script>
+<script src="../../js/render/daynight.js?v=20260727.15"></script>
+<script src="../../js/render/effects.js?v=20260727.15"></script>
+<script src="../../js/render/renderer.js?v=20260727.15"></script>
+<script src="../../js/systems/world.js?v=20260727.15"></script>
+<script src="units.js?v=20260727.15"></script>
 </body>
 </html>

@@ -9,6 +9,13 @@
 - 日夜阶段控件：循环 / 昼间 / 黄昏 / 夜晚。
 - 「环境效果」开关控制氛围粒子；「动态效果」开关控制 Canvas 动效降级。
 
+## 实体图形气泡
+
+- 页面直接调用生产 `Game.actionBubbles` 与 `Game.render.drawActionBubbleIcon()`，不复制气泡状态机或像素图形。
+- 自动轮播依次覆盖资源、采集、主角接敌与怪物警戒、宝箱、掉落；舞台气泡只显示图形。
+- 手动检查可选择主角、怪物或双锚点，并触发六种默认图形；`Game.unitsBubbleDemo.snapshot()` 输出当前公开诊断快照。
+- 每个实体拥有独立队列、优先级和去重状态；切换单位、操控模式或区域时复用生产清理事件。
+
 ## 战斗循环演示
 
 - 舞台使用原版 `Game.world`、`Game.combat`、`Game.render`，在第一个区域（新手草原）生成主角与陪练目标。
@@ -25,8 +32,8 @@
 
 ## 复用链路
 
-`classes.js` / `monsters.js` → `state.js` → `combat.js` → `world.js` → `renderer.js` / `effects.js` / `particles.js` / `daynight.js`
+`classes.js` / `monsters.js` → `state.js` → `action_bubbles.js` / `combat.js` → `world.js` → `renderer.js` / `effects.js` / `particles.js` / `daynight.js`
 
 ## 自动验证
 
-`node tests/cache-version.test.js` 校验 `units.html` 与 `units.css` 的 `BUILD_ID` 同步。
+`node tests/cache-version.test.js` 校验 `units.html` 的全部 CSS/JS 查询版本与字体 `BUILD_ID` 同步；`node tests/browser-smoke.js` 验证移动端控件、主角/怪物双锚点和 Canvas 像素输出。

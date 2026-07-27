@@ -20,6 +20,7 @@
   var charSub = 'attr';
   var invSub = 'bag';
   var refreshTimer = null;
+  var panelCleanup = null;
 
   var UI = Game.ui = Game.ui || {};
   UI.panels = {};
@@ -48,6 +49,13 @@
       Game.assets.drawToDom(list[i], list[i].getAttribute('data-icon'), 'icon');
     }
   };
+
+  function cleanupPanel() {
+    if (!panelCleanup) return;
+    var cleanup = panelCleanup;
+    panelCleanup = null;
+    cleanup();
+  }
 
   UI.affixLine = function (af) {
     var def = reg.get('affix', af.id);
@@ -80,9 +88,12 @@
         'region:changed', 'boss:defeated', 'potion:used', 'potion:dropped',
         'skills:autoAllocated', 'equipment:autoChanged', 'slot:lockChanged',
         'trade:contextChanged', 'region:unlocked', 'region:relocked'];
+      var mapRerenderOn = ['region:changed', 'boss:defeated', 'region:unlocked', 'region:relocked'];
       rerenderOn.forEach(function (evt) {
         bus.on(evt, function () {
-          if (current !== 'battle' && current !== 'settings') UI.tabs.queueRerender();
+          if (current === 'battle' || current === 'settings') return;
+          if (current === 'map' && mapRerenderOn.indexOf(evt) < 0) return;
+          UI.tabs.queueRerender();
         });
       });
     },
@@ -102,6 +113,7 @@
       });
       var pc = $('#panel-container');
       if (tab === 'battle') {
+        cleanupPanel();
         pc.classList.add('hidden');
         return true;
       }
@@ -123,8 +135,9 @@
       var inner = $('#panel-inner');
       var fn = UI.panels[current];
       if (fn) {
+        cleanupPanel();
         inner.innerHTML = '';
-        fn(inner);
+        panelCleanup = fn(inner) || null;
         UI.renderIcons(inner);
       }
     },

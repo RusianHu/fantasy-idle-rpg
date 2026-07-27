@@ -534,6 +534,103 @@ async function run() {
     assert.equal(main.toast, true);
     assert.ok(main.canvasColors > 20, 'main stage canvas is nonblank');
     assert.equal(main.noHorizontalOverflow, true, 'main mobile viewport has no horizontal overflow');
+
+    const mapLiveStart = await cdp.evaluate(`(() => {
+      Game.world.setControlMode('manual');
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      if (!canvas) throw new Error('live region map canvas missing');
+      const layout = Game.world.layout;
+      const rid = Game.state.world.region;
+      const targets = [];
+      for (let gy = 2; gy < layout.nav.h - 2 && targets.length < 5; gy += 7) {
+        for (let gx = 2; gx < layout.nav.w - 2 && targets.length < 5; gx += 9) {
+          if (!layout.nav.grid[gy][gx]) continue;
+          const point = { x: gx * layout.nav.cell + layout.nav.cell / 2,
+            y: gy * layout.nav.cell + layout.nav.cell / 2 };
+          if (Game.exploration.isRevealed(point.x, point.y, rid)) continue;
+          if (targets.some((other) => Game.util.dist(other.x, other.y, point.x, point.y) < 240)) continue;
+          targets.push(point);
+        }
+      }
+      if (!targets.length) throw new Error('no unrevealed live-map fixture found');
+      window.__firpgMapLive = {
+        canvas,
+        pixels: Uint8ClampedArray.from(canvas.getContext('2d')
+          .getImageData(0, 0, canvas.width, canvas.height).data)
+      };
+      const beforeCoverage = document.querySelector('[data-map-coverage]').textContent;
+      targets.forEach((point) => Game.exploration.revealAt(point.x, point.y, { force: true, rid }));
+      Game.exploration.update(0.2);
+      return {
+        beforeCoverage,
+        targets: targets.length,
+        listeners: (Game.bus._map['readiness:changed'] || []).length
+      };
+    })()`);
+    await delay(320);
+    const mapLiveFog = await cdp.evaluate(`(() => {
+      const fixture = window.__firpgMapLive;
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixelDiff = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] !== fixture.pixels[i] || pixels[i + 1] !== fixture.pixels[i + 1] ||
+            pixels[i + 2] !== fixture.pixels[i + 2] || pixels[i + 3] !== fixture.pixels[i + 3]) pixelDiff++;
+      }
+      const summary = Game.collection.regionSummary(Game.state.world.region);
+      const expectedCoverage = Game.i18n.t('explore.coverageLine', {
+        p: Math.floor(summary.coverage * 100)
+      });
+      fixture.heroPixels = Uint8ClampedArray.from(pixels);
+      const hero = Game.world.hero;
+      const layout = Game.world.layout;
+      let destination = null;
+      for (let gy = layout.nav.h - 3; gy > 1 && !destination; gy -= 3) {
+        for (let gx = layout.nav.w - 3; gx > 1; gx -= 3) {
+          if (!layout.nav.grid[gy][gx]) continue;
+          const x = gx * layout.nav.cell + layout.nav.cell / 2;
+          const y = gy * layout.nav.cell + layout.nav.cell / 2;
+          if (Game.util.dist(hero.x, hero.y, x, y) > 500) { destination = { x, y }; break; }
+        }
+      }
+      if (!destination) throw new Error('no live hero marker destination found');
+      hero.x = destination.x;
+      hero.y = destination.y;
+      return {
+        sameCanvas: canvas === fixture.canvas,
+        pixelDiff,
+        coverage: document.querySelector('[data-map-coverage]').textContent,
+        expectedCoverage
+      };
+    })()`);
+    assert.equal(mapLiveStart.targets, 5);
+    assert.equal(mapLiveFog.sameCanvas, true, 'live map updates without rebuilding the panel canvas');
+    assert.ok(mapLiveFog.pixelDiff > 100, 'live map repaints newly revealed fog cells');
+    assert.notEqual(mapLiveFog.coverage, mapLiveStart.beforeCoverage, 'live coverage text advances in place');
+    assert.equal(mapLiveFog.coverage, mapLiveFog.expectedCoverage);
+
+    await delay(140);
+    const mapLiveHero = await cdp.evaluate(`(() => {
+      const fixture = window.__firpgMapLive;
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixelDiff = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        if (pixels[i] !== fixture.heroPixels[i] || pixels[i + 1] !== fixture.heroPixels[i + 1] ||
+            pixels[i + 2] !== fixture.heroPixels[i + 2] || pixels[i + 3] !== fixture.heroPixels[i + 3]) pixelDiff++;
+      }
+      const before = (Game.bus._map['readiness:changed'] || []).length;
+      Game.ui.tabs.open('battle');
+      const afterClose = (Game.bus._map['readiness:changed'] || []).length;
+      Game.ui.tabs.open('map');
+      const afterReopen = (Game.bus._map['readiness:changed'] || []).length;
+      delete window.__firpgMapLive;
+      return { pixelDiff, before, afterClose, afterReopen };
+    })()`);
+    assert.ok(mapLiveHero.pixelDiff > 30, 'hero marker follows world coordinates at the live refresh rate');
+    assert.equal(mapLiveHero.afterClose, mapLiveHero.before - 1, 'closing the map removes its live listener');
+    assert.equal(mapLiveHero.afterReopen, mapLiveHero.before, 'reopening the map installs one live listener');
+
     await delay(850);
     const mainCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const mainScreenshot = path.join(os.tmpdir(), 'firpg-main-map-mobile-cdp.png');
@@ -2842,6 +2939,76 @@ async function run() {
     const screenshot = path.join(os.tmpdir(), 'firpg-demo-mobile-cdp.png');
     fs.writeFileSync(screenshot, Buffer.from(capture.data, 'base64'));
 
+    await cdp.navigate(BASE + 'tech-demos/units/units.html');
+    await delay(250);
+    const unitsBubbleDemo = await cdp.evaluate(`(() => {
+      const stage = document.getElementById('stage');
+      const context = stage.getContext('2d');
+      Game.unitsBubbleDemo.setAuto(false);
+      Game.unitsBubbleDemo.clear();
+      Game.render.frame(0);
+      const before = context.getImageData(0, 0, stage.width, stage.height).data;
+      document.querySelector('[data-bubble-anchor="both"]').click();
+      document.querySelector('[data-bubble-type="enemy"]').click();
+      Game.render.frame(0);
+      const after = context.getImageData(0, 0, stage.width, stage.height).data;
+      let stagePixelDiff = 0;
+      for (let i = 0; i < before.length; i += 4) {
+        if (before[i] !== after[i] || before[i + 1] !== after[i + 1] ||
+            before[i + 2] !== after[i + 2] || before[i + 3] !== after[i + 3]) {
+          stagePixelDiff++;
+        }
+      }
+      const typeButtons = Array.from(document.querySelectorAll('[data-bubble-type]'));
+      const anchorButtons = Array.from(document.querySelectorAll('[data-bubble-anchor]'));
+      const iconPixels = typeButtons.map((button) => {
+        const canvas = button.querySelector('canvas');
+        const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        let visible = 0;
+        for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
+        return visible;
+      });
+      return {
+        snapshot: Game.unitsBubbleDemo.snapshot(),
+        stagePixelDiff,
+        iconPixels,
+        typeCount: typeButtons.length,
+        allControlsTouchable: typeButtons.concat(anchorButtons, [
+          document.getElementById('toggle-bubble-auto'),
+          document.getElementById('clear-bubbles')
+        ]).every((button) => button.getBoundingClientRect().height >= 44),
+        allControlsWithinViewport: typeButtons.concat(anchorButtons).every((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= 0 && rect.right <= innerWidth;
+        }),
+        autoSwitch: document.getElementById('toggle-bubble-auto').getAttribute('role') === 'switch',
+        sourceLoaded: !!document.querySelector('script[src*="systems/action_bubbles.js"]'),
+        status: document.getElementById('bubble-status').textContent,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
+    assert.equal(unitsBubbleDemo.typeCount, 6);
+    assert.ok(unitsBubbleDemo.iconPixels.every((count) => count >= 20),
+      'units QA uses nonblank production bubble icons: ' + JSON.stringify(unitsBubbleDemo));
+    assert.equal(unitsBubbleDemo.snapshot.length, 2,
+      'units QA must expose both anchors: ' + JSON.stringify(unitsBubbleDemo));
+    assert.equal(new Set(unitsBubbleDemo.snapshot.map((bubble) => bubble.anchorId)).size, 2,
+      'units QA keeps hero and monster bubble anchors independent');
+    assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'hero'));
+    assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'monster'));
+    assert.ok(unitsBubbleDemo.stagePixelDiff >= 120,
+      'units QA bubble controls paint the production canvas: ' + JSON.stringify(unitsBubbleDemo));
+    assert.equal(unitsBubbleDemo.allControlsTouchable, true);
+    assert.equal(unitsBubbleDemo.allControlsWithinViewport, true);
+    assert.equal(unitsBubbleDemo.autoSwitch, true);
+    assert.equal(unitsBubbleDemo.sourceLoaded, true);
+    assert.equal(unitsBubbleDemo.noHorizontalOverflow, true);
+    assert.deepEqual(cdp.errors, [], 'units bubble QA has no browser errors');
+    const unitsBubbleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const unitsBubbleScreenshot = path.join(os.tmpdir(), 'firpg-units-bubbles-mobile-cdp.png');
+    fs.writeFileSync(unitsBubbleScreenshot, Buffer.from(unitsBubbleCapture.data, 'base64'));
+
     // 真正走完“通关摘要 → 重开确认 → 页面重载 → 序章 → 新角色”。
     // 这能捕获删档后又被 pagehide/beforeunload 自动存档写回的竞态。
     await cdp.navigate(BASE);
@@ -3203,8 +3370,10 @@ async function run() {
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
-      desktopEnding, demo, demoDynamicTrade, mainScreenshot, densityScreenshots, desktopScreenshot,
+      desktopEnding, demo, demoDynamicTrade, unitsBubbleDemo,
+      mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
+      unitsBubbleScreenshot,
       restartCompleted, restartTitleScreenshot, restartClassScreenshot, existingTitle,
       existingTitleScreenshot, entryStarted, entryMid, entryScreenshot, resumedFromArchive,
       replacedWithFresh, deletedToEmpty, updateNotice

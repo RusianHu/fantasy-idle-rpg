@@ -80,6 +80,7 @@
   UI.panels.map = function (root) {
     var t = Game.i18n.t;
     var s = Game.state;
+    var mapCleanup = null;
 
     root.appendChild(U.el('div', 'panel-title', t('ui.tab.map')));
 
@@ -124,19 +125,20 @@
         mapCard.innerHTML =
           '<div class="exploration-map-head"><div><div class="name">' +
           U.esc(t('region.' + rid + '.name')) + '</div><div class="desc">' +
-          t('explore.coverageLine', { p: Math.floor(summary.coverage * 100) }) +
-          '</div></div><strong class="readiness-total">' + ready.total + '/100</strong></div>' +
+          '<span data-map-coverage>' + t('explore.coverageLine', { p: Math.floor(summary.coverage * 100) }) +
+          '</span></div></div><strong class="readiness-total" data-map-ready="total">' + ready.total + '/100</strong></div>' +
           '<div class="readiness-grid">' +
-          '<span>' + t('explore.readyExplore') + '<b>' + ready.exploration + '/30</b></span>' +
-          '<span>' + t('explore.readyLandmarks') + '<b>' + ready.landmarks + '/25</b></span>' +
-          '<span>' + t('explore.readyResources') + '<b>' + ready.resources + '/18</b></span>' +
-          '<span>' + t('explore.readyCurios') + '<b>' + ready.curios + '/12</b></span>' +
-          '<span>' + t('explore.readyGuardian') + '<b>' + ready.guardian + '/15</b></span>' +
-          '<span>' + t('explore.readyLair') + '<b>' + (ready.lair ? t('explore.yes') : t('explore.no')) + '</b></span>' +
+          '<span>' + t('explore.readyExplore') + '<b data-map-ready="exploration">' + ready.exploration + '/30</b></span>' +
+          '<span>' + t('explore.readyLandmarks') + '<b data-map-ready="landmarks">' + ready.landmarks + '/25</b></span>' +
+          '<span>' + t('explore.readyResources') + '<b data-map-ready="resources">' + ready.resources + '/18</b></span>' +
+          '<span>' + t('explore.readyCurios') + '<b data-map-ready="curios">' + ready.curios + '/12</b></span>' +
+          '<span>' + t('explore.readyGuardian') + '<b data-map-ready="guardian">' + ready.guardian + '/15</b></span>' +
+          '<span>' + t('explore.readyLair') + '<b data-map-ready="lair">' + (ready.lair ? t('explore.yes') : t('explore.no')) + '</b></span>' +
           '</div>';
         var viewport = U.el('div', 'region-map-viewport');
         var canvas = document.createElement('canvas');
         canvas.width = 660; canvas.height = 396;
+        canvas.setAttribute('data-live-region-map', rid);
         canvas.setAttribute('aria-label', t('explore.mapAria'));
         viewport.appendChild(canvas);
         mapCard.appendChild(viewport);
@@ -149,8 +151,38 @@
 
         var base = document.createElement('canvas');
         base.width = 660; base.height = 396;
-        Game.exploration.drawMap(base.getContext('2d'), rid, base.width, base.height);
         var view = { zoom: 1, x: 0, y: 0, drag: false, px: 0, py: 0 };
+        var baseDirty = false;
+        var summaryDirty = false;
+        var stopped = false;
+        var liveFrame = 0;
+        var lastBasePaint = 0;
+        var lastHeroPaint = 0;
+        var BASE_REFRESH_MS = 200;
+        var HERO_REFRESH_MS = 100;
+        var subscribed = false;
+
+        function paintBase() {
+          Game.exploration.drawMap(base.getContext('2d'), rid, base.width, base.height, { hero: false });
+          baseDirty = false;
+        }
+
+        function drawHero(g, sw, sh) {
+          var world = Game.world;
+          var hero = world && world.hero;
+          var layout = world && world.layout;
+          if (!hero || !layout || !world.region || world.region.id !== rid) return;
+          var hx = hero.x / layout.world.w * base.width;
+          var hy = hero.y / layout.world.h * base.height;
+          var x = (hx - view.x) / sw * canvas.width;
+          var y = (hy - view.y) / sh * canvas.height;
+          if (x < -7 || y < -7 || x > canvas.width + 7 || y > canvas.height + 7) return;
+          g.fillStyle = 'rgba(7,9,18,.88)';
+          g.beginPath(); g.arc(x, y, 6, 0, Math.PI * 2); g.fill();
+          g.fillStyle = '#ffffff';
+          g.beginPath(); g.arc(x, y, 3.5, 0, Math.PI * 2); g.fill();
+        }
+
         function draw() {
           var g = canvas.getContext('2d');
           g.imageSmoothingEnabled = false;
@@ -159,6 +191,90 @@
           view.x = U.clamp(view.x, 0, base.width - sw);
           view.y = U.clamp(view.y, 0, base.height - sh);
           g.drawImage(base, view.x, view.y, sw, sh, 0, 0, canvas.width, canvas.height);
+          drawHero(g, sw, sh);
+        }
+
+        function updateSummary() {
+          var next = Game.collection && Game.collection.regionSummary(rid);
+          if (!next) {
+            summaryDirty = false;
+            return;
+          }
+          var nextReady = next.readiness;
+          mapCard.querySelector('[data-map-coverage]').textContent =
+            t('explore.coverageLine', { p: Math.floor(next.coverage * 100) });
+          mapCard.querySelector('[data-map-ready="total"]').textContent = nextReady.total + '/100';
+          mapCard.querySelector('[data-map-ready="exploration"]').textContent = nextReady.exploration + '/30';
+          mapCard.querySelector('[data-map-ready="landmarks"]').textContent = nextReady.landmarks + '/25';
+          mapCard.querySelector('[data-map-ready="resources"]').textContent = nextReady.resources + '/18';
+          mapCard.querySelector('[data-map-ready="curios"]').textContent = nextReady.curios + '/12';
+          mapCard.querySelector('[data-map-ready="guardian"]').textContent = nextReady.guardian + '/15';
+          mapCard.querySelector('[data-map-ready="lair"]').textContent =
+            nextReady.lair ? t('explore.yes') : t('explore.no');
+          var regionCoverage = root.querySelector('[data-region-coverage="' + rid + '"]');
+          if (regionCoverage) {
+            regionCoverage.textContent = t('explore.coverageLine', {
+              p: Math.floor(next.coverage * 100)
+            });
+          }
+          summaryDirty = false;
+        }
+
+        function onMapStateChanged(payload) {
+          if (payload && payload.rid && payload.rid !== rid) return;
+          baseDirty = true;
+          summaryDirty = true;
+        }
+
+        function subscribe() {
+          if (subscribed) return;
+          subscribed = true;
+          Game.bus.on('readiness:changed', onMapStateChanged);
+        }
+
+        function pause() {
+          if (liveFrame) cancelAnimationFrame(liveFrame);
+          liveFrame = 0;
+          if (subscribed) Game.bus.off('readiness:changed', onMapStateChanged);
+          subscribed = false;
+        }
+
+        function resume() {
+          if (stopped || document.hidden || liveFrame) return;
+          baseDirty = true;
+          summaryDirty = true;
+          subscribe();
+          liveFrame = requestAnimationFrame(liveTick);
+        }
+
+        function onVisibilityChange() {
+          if (document.hidden) pause();
+          else resume();
+        }
+
+        function cleanup() {
+          if (stopped) return;
+          stopped = true;
+          pause();
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+        }
+
+        function liveTick(ts) {
+          if (stopped) return;
+          if (!canvas.isConnected || UI.tabs.current() !== 'map' || mapSub !== 'region-map') {
+            cleanup();
+            return;
+          }
+          if (summaryDirty) updateSummary();
+          if (baseDirty && ts - lastBasePaint >= BASE_REFRESH_MS) {
+            paintBase();
+            lastBasePaint = ts;
+          }
+          if (ts - lastHeroPaint >= HERO_REFRESH_MS) {
+            draw();
+            lastHeroPaint = ts;
+          }
+          liveFrame = requestAnimationFrame(liveTick);
         }
         function zoom(delta, cx, cy) {
           var old = view.zoom;
@@ -195,7 +311,17 @@
           view.px = e.clientX; view.py = e.clientY; draw();
         });
         canvas.addEventListener('pointerup', function () { view.drag = false; });
+        canvas.addEventListener('pointercancel', function () { view.drag = false; });
+        paintBase();
         draw();
+        lastBasePaint = performance.now();
+        lastHeroPaint = lastBasePaint;
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        if (!document.hidden) {
+          subscribe();
+          liveFrame = requestAnimationFrame(liveTick);
+        }
+        mapCleanup = cleanup;
       } else {
         var codex = U.el('section', 'exploration-codex');
         [
@@ -250,6 +376,15 @@
         });
         codex.appendChild(commissions);
         root.appendChild(codex);
+        var codexEvents = ['landmark:discovered', 'resource:registered', 'curio:found',
+          'ecology:recorded', 'guardian:defeated'];
+        var onCodexChanged = function (payload) {
+          if (!payload || !payload.rid || payload.rid === rid) UI.tabs.queueRerender();
+        };
+        codexEvents.forEach(function (eventName) { Game.bus.on(eventName, onCodexChanged); });
+        mapCleanup = function () {
+          codexEvents.forEach(function (eventName) { Game.bus.off(eventName, onCodexChanged); });
+        };
       }
     }
 
@@ -288,10 +423,11 @@
         '<div class="grow">' +
         '<div class="name">' + t('region.' + r.id + '.name') + status + '</div>' +
         '<div class="desc">' + t('region.' + r.id + '.desc') + '</div>' +
-        '<div class="desc">' + t('ui.recommendLv', { lv: lvMin }) + '　·　' +
+        '<div class="desc">' + t('ui.recommendLv', { lv: lvMin }) + '　·　<span data-region-coverage="' +
+        U.esc(r.id) + '">' +
         (Game.collection && Game.collection.regionSummary(r.id)
           ? t('explore.coverageLine', { p: Math.floor(Game.collection.regionSummary(r.id).coverage * 100) })
-          : t('ui.huntGauge') + ' ' + Math.min(prog.kills, r.killTarget) + '/' + r.killTarget) + '</div>' +
+          : t('ui.huntGauge') + ' ' + Math.min(prog.kills, r.killTarget) + '/' + r.killTarget) + '</span></div>' +
         '</div>' +
         '<button class="btn small go-btn">' + t('ui.goRegion') + '</button>' +
         '</div>');
@@ -319,6 +455,7 @@
       });
       root.appendChild(card);
     });
+    return mapCleanup;
   };
 
   /* ================= 设置面板 ================= */

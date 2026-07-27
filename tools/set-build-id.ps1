@@ -11,6 +11,8 @@ $demoPath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.html'
 $demoStylePath = Join-Path $projectRoot 'tech-demos\map-effects\map-effects.css'
 $explorationDemoPath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.html'
 $explorationDemoStylePath = Join-Path $projectRoot 'tech-demos\exploration-v3\exploration-v3.css'
+$unitsDemoPath = Join-Path $projectRoot 'tech-demos\units\units.html'
+$unitsDemoStylePath = Join-Path $projectRoot 'tech-demos\units\units.css'
 $stylePath = Join-Path $projectRoot 'css\style.css'
 $utilsPath = Join-Path $projectRoot 'js\core\utils.js'
 $versionPath = Join-Path $projectRoot 'version.json'
@@ -28,6 +30,8 @@ $files = @(
     $demoStylePath,
     $explorationDemoPath,
     $explorationDemoStylePath,
+    $unitsDemoPath,
+    $unitsDemoStylePath,
     $stylePath,
     $utilsPath,
     $versionPath
@@ -42,6 +46,9 @@ if ($contents[$demoPath] -notmatch [regex]::Escape("content=`"$currentBuild`""))
 }
 if ($contents[$explorationDemoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
     throw '开放探索演示页 build-id 与 index.html 不一致。'
+}
+if ($contents[$unitsDemoPath] -notmatch [regex]::Escape("content=`"$currentBuild`"")) {
+    throw '角色与怪物演示页 build-id 与 index.html 不一致。'
 }
 if ($contents[$utilsPath] -notmatch [regex]::Escape("Game.BUILD_ID = '$currentBuild'")) {
     throw 'Game.BUILD_ID 与 index.html 不一致。'

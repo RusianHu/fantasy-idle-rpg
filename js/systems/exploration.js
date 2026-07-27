@@ -515,7 +515,8 @@
       ctx.restore();
     },
 
-    drawMap: function (ctx, rid, width, height) {
+    drawMap: function (ctx, rid, width, height, opts) {
+      opts = opts || {};
       var layout = Game.world && Game.world.region && Game.world.region.id === rid ? Game.world.layout : null;
       if (!layout || layout.version < 3) return false;
       var rs = regionState(rid), sx = width / layout.world.w, sy = height / layout.world.h;
@@ -547,7 +548,7 @@
       mark(layout.nodes, rsd.resources, '#75d18b', 2);
       mark(layout.curios, rsd.curios, '#c48cf0', 2.5);
       mark(layout.ecology, rsd.ecology, '#7ddce0', 2);
-      if (Game.world && Game.world.hero) {
+      if (opts.hero !== false && Game.world && Game.world.hero) {
         ctx.fillStyle = '#ffffff';
         ctx.beginPath(); ctx.arc(Game.world.hero.x * sx, Game.world.hero.y * sy, 3.5, 0, Math.PI * 2); ctx.fill();
       }
