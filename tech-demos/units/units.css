@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260728.3") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260728.7") format("woff2");
   font-display: swap;
 }
 
@@ -355,6 +355,46 @@ h1 {
 
 .clear-bubbles:hover { color: #f2a48d; border-color: var(--brick); }
 
+.bubble-scene-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.bubble-scene-row > span {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.bubble-scene-controls,
+.bubble-walk-controls {
+  display: inline-grid;
+  grid-template-columns: repeat(3, minmax(82px, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.bubble-scene-controls button,
+.bubble-walk-controls button {
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.bubble-scene-controls button:last-child,
+.bubble-walk-controls button:last-child { border-right: 0; }
+.bubble-scene-controls button:hover,
+.bubble-scene-controls button.active,
+.bubble-walk-controls button:hover,
+.bubble-walk-controls button.active { color: #171711; background: var(--gold); }
+
 .battle-lab {
   margin-top: 14px;
   border: 1px solid var(--line);
@@ -638,6 +678,11 @@ h1 {
   .bubble-anchor-controls { grid-column: 1 / -1; width: 100%; }
   .bubble-type-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .bubble-type-controls button { min-height: 48px; }
+  .bubble-scene-row { align-items: stretch; flex-direction: column; gap: 6px; }
+  .bubble-scene-controls,
+  .bubble-walk-controls { width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bubble-scene-controls button,
+  .bubble-walk-controls button { min-width: 0; padding-inline: 4px; }
   .lab-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
   .lab-event { max-width: none; width: 100%; }
   .lab-runtime { grid-template-columns: 1fr; }

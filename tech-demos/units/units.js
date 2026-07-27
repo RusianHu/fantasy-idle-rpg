@@ -34,6 +34,8 @@
   var bubbleAutoT = 0.35;
   var bubbleSequence = 0;
   var bubbleDemoSeq = 0;
+  var bubbleScene = null;
+  var bubbleWalkScene = null;
   var AUTO_BUBBLES = [
     { hero: 'resource' },
     { hero: 'gather' },
@@ -55,7 +57,8 @@
       entered: '已入场', spawned: '已刷新', spawnNormal: '已刷新普通陪练', summoned: '已召唤 Boss',
       reset: '主角已重置', hit: '命中', critical: '暴击', basic: '普攻', dodge: '闪避', defeated: '击败',
       death: '主角阵亡，正在重整', bossEntered: 'Boss 登场', noBubble: '手动检查 · 当前无气泡',
-      autoWaiting: '自动轮播 · 等待气泡', hero: '主角', monster: '怪物', manual: '手动', auto: '自动', noneTarget: '无'
+      autoWaiting: '自动轮播 · 等待气泡', hero: '主角', monster: '怪物', manual: '手动', auto: '自动', noneTarget: '无',
+      leftSide: '左侧', rightSide: '右侧'
     },
     en: {
       maxHp: 'Max HP', atk: 'Attack', def: 'Defense', speed: 'Speed', crit: 'Critical chance', critDmg: 'Critical damage',
@@ -69,7 +72,8 @@
       entered: 'entered the stage', spawned: 'Respawned', spawnNormal: 'Spawned sparring enemy', summoned: 'Summoned boss',
       reset: 'Hero reset', hit: 'Hit', critical: 'critical', basic: 'basic attack', dodge: 'Dodged', defeated: 'Defeated',
       death: 'Hero down; regrouping', bossEntered: 'Boss entered', noBubble: 'Manual check · no active bubble',
-      autoWaiting: 'Auto sequence · waiting', hero: 'Hero', monster: 'Enemy', manual: 'Manual', auto: 'Auto', noneTarget: 'None'
+      autoWaiting: 'Auto sequence · waiting', hero: 'Hero', monster: 'Enemy', manual: 'Manual', auto: 'Auto', noneTarget: 'None',
+      leftSide: 'left', rightSide: 'right'
     }
   };
 
@@ -368,6 +372,110 @@
     return bubbleAuto;
   }
 
+  function setPaused(enabled) {
+    paused = !!enabled;
+    var button = document.getElementById('toggle-play');
+    button.textContent = paused ? '▶' : 'Ⅱ';
+    button.title = paused ? D.t('common.resume') : D.t('common.pause');
+    button.setAttribute('aria-label', button.title);
+    document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('units.runtime');
+    return paused;
+  }
+
+  function setBubbleScene(scene) {
+    scene = /^(center|left|right)$/.test(scene) ? scene : 'center';
+    bubbleScene = scene;
+    bubbleWalkScene = null;
+    setBubbleAuto(false);
+    setPaused(true);
+    setBubbleAnchor('both');
+
+    var hero = Game.world.hero;
+    var monster = bubbleMonster();
+    Game.world.cinematic = null;
+    Game.world.bossEnt = null;
+    hero.target = monster;
+    hero.manualTarget = true;
+    hero.moveOrder = null;
+    hero.state = 'fight';
+    hero.hp = Math.max(1, Math.round(hero.maxHp * 0.62));
+    monster.state = 'fight';
+    monster.engaged = true;
+    monster.hp = Math.max(1, Math.round(monster.maxHp * 0.62));
+    monster.y = hero.y + (scene === 'center' ? -30 : 34);
+    Game.nav.clear(hero);
+    Game.nav.clear(monster);
+    Game.render.snapCamera(hero.x, hero.y);
+    Game.render.frame(0);
+
+    var stage = document.getElementById('stage');
+    var viewY = stage.parentElement.clientHeight / 2;
+    var viewLeft = Game.render.screenToWorld(0, viewY).x;
+    var viewRight = Game.render.screenToWorld(stage.parentElement.clientWidth, viewY).x;
+    if (scene === 'center') monster.x = hero.x;
+    if (scene === 'left') monster.x = viewLeft + 10;
+    if (scene === 'right') monster.x = viewRight - 10;
+    monster.spawnX = monster.x;
+    monster.spawnY = monster.y;
+    hero.dir = monster.x >= hero.x ? 'r' : 'l';
+    monster.dir = monster.x >= hero.x ? 'l' : 'r';
+    Game.exploration.revealAt(monster.x, monster.y, { force: true, rid: Game.world.region.id });
+
+    Game.actionBubbles.clear();
+    var targetId = 'units-layout:' + scene + ':' + (++bubbleDemoSeq);
+    Game.actionBubbles.show(hero, 'enemy', { targetId: targetId + ':hero', duration: 30 });
+    Game.actionBubbles.show(monster, 'alert', { targetId: targetId + ':monster', duration: 30 });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-type]'), function (button) {
+      button.classList.toggle('active', /^(enemy|alert)$/.test(button.getAttribute('data-bubble-type')));
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-scene]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-scene') === scene);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-walk]'), function (button) {
+      button.classList.remove('active');
+    });
+    Game.render.frame(0);
+    updateBubbleQa();
+    return Game.render.actionBubbleLayouts();
+  }
+
+  function setWalkBubbleScene(scene) {
+    scene = /^(l|r|vertical)$/.test(scene) ? scene : 'vertical';
+    bubbleScene = null;
+    bubbleWalkScene = scene;
+    setBubbleAuto(false);
+    setPaused(true);
+    setBubbleAnchor('hero');
+    clearSparring();
+
+    var hero = Game.world.hero;
+    hero.target = null;
+    hero.manualTarget = false;
+    hero.moveOrder = null;
+    hero.state = 'idle';
+    hero.moving = true;
+    hero.dir = scene === 'vertical' ? 'u' : scene;
+    hero.hp = hero.maxHp;
+    Game.nav.clear(hero);
+    Game.render.snapCamera(hero.x, hero.y);
+    Game.actionBubbles.show(hero, 'resource', {
+      targetId: 'units-walk:' + scene + ':' + (++bubbleDemoSeq),
+      duration: 30
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-type]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-type') === 'resource');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-scene]'), function (button) {
+      button.classList.remove('active');
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bubble-walk]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-bubble-walk') === scene);
+    });
+    Game.render.frame(0);
+    updateBubbleQa();
+    return Game.render.actionBubbleLayouts();
+  }
+
   function showBubble(type, anchor, replace) {
     if (!Game.actionBubbles.type(type)) return false;
     anchor = anchor || bubbleAnchor;
@@ -443,7 +551,9 @@
     }
     output.textContent = active.map(function (bubble) {
       var anchorName = bubble.entityKind === 'monster' ? tr('monster') : tr('hero');
-      return anchorName + ' · ' + bubbleLabel(bubble.type);
+      var layout = Game.render.actionBubbleLayouts().find(function (item) { return item.id === bubble.id; });
+      var side = layout && layout.side ? ' · ' + tr(layout.side === 'left' ? 'leftSide' : 'rightSide') : '';
+      return anchorName + ' · ' + bubbleLabel(bubble.type) + side;
     }).join(' / ');
   }
 
@@ -487,11 +597,7 @@
       activateUnit(unitGlobalIndex(currentGroup, local + 1));
     });
     document.getElementById('toggle-play').addEventListener('click', function () {
-      paused = !paused;
-      this.textContent = paused ? '▶' : 'Ⅱ';
-      this.title = paused ? D.t('common.resume') : D.t('common.pause');
-      this.setAttribute('aria-label', this.title);
-      document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('units.runtime');
+      setPaused(!paused);
     });
     document.querySelector('.mode-controls').addEventListener('click', function (event) {
       var button = event.target.closest('[data-kind]');
@@ -520,6 +626,14 @@
       if (!button) return;
       setBubbleAuto(false);
       showBubble(button.getAttribute('data-bubble-type'));
+    });
+    document.querySelector('.bubble-scene-controls').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-bubble-scene]');
+      if (button) setBubbleScene(button.getAttribute('data-bubble-scene'));
+    });
+    document.querySelector('.bubble-walk-controls').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-bubble-walk]');
+      if (button) setWalkBubbleScene(button.getAttribute('data-bubble-walk'));
     });
     document.getElementById('toggle-bubble-auto').addEventListener('click', function () {
       setBubbleAuto(this.getAttribute('aria-checked') !== 'true');
@@ -655,7 +769,12 @@
       Game.actionBubbles.clear();
       updateBubbleQa();
     },
-    snapshot: function () { return Game.actionBubbles.active(); }
+    snapshot: function () { return Game.actionBubbles.active(); },
+    setScene: setBubbleScene,
+    setWalkScene: setWalkBubbleScene,
+    scene: function () { return bubbleScene; },
+    walkScene: function () { return bubbleWalkScene; },
+    layouts: function () { return Game.render.actionBubbleLayouts(); }
   };
   bindControls();
   bindBattleEvents();

@@ -14,6 +14,7 @@
   var parallaxRegion = null;
   var SW = 480;              // 视差条带宽（可平铺）
   var vignetteC = null;      // 暗角缓存
+  var lastBubbleLayouts = [];
 
   function buildVignette() {
     vignetteC = document.createElement('canvas');
@@ -291,34 +292,180 @@
     }
   }
 
-  function drawPixelBubble(bubble, anchor, left, top, right, bottom) {
-    if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
-    if (anchor.x < left - 48 || anchor.x > right + 48 ||
-        anchor.y < top - 48 || anchor.y > bottom + 48) return;
+  function rectsOverlap(a, b) {
+    return !!(a && b && a.x < b.x + b.w && a.x + a.w > b.x &&
+      a.y < b.y + b.h && a.y + a.h > b.y);
+  }
 
-    ctx.save();
+  function healthBarRect(anchor) {
+    if (!anchor || (anchor.kind !== 'hero' && anchor.kind !== 'monster')) return null;
+    var visible = anchor.kind === 'monster'
+      ? (!anchor.dead && (anchor.hp < anchor.maxHp || anchor.engaged || anchor.boss))
+      : anchor.hp < anchor.maxHp;
+    if (!visible) return null;
+    var sprite = anchor.sprite ? Game.assets.sprite(anchor.sprite) : null;
+    var spriteH = sprite ? sprite.h : (anchor.spriteH || 18);
+    var width = anchor.boss ? 26 : 14;
+    return {
+      x: anchor.x - width / 2 - 1,
+      y: anchor.y - spriteH - 5,
+      w: width + 2,
+      h: 4
+    };
+  }
+
+  function preferredBubbleSide(bubble, anchor, left, right) {
+    if (bubble.side === 'left' || bubble.side === 'right') return bubble.side;
+    if (bubble.placement === 'directional') {
+      return anchor.dir === 'r' ? 'left' : 'right';
+    }
+    var opponent = null;
+    if (anchor.kind === 'hero' && anchor.target && Number.isFinite(anchor.target.x)) {
+      opponent = anchor.target;
+    } else if (anchor.kind === 'monster' && Game.world && Game.world.hero &&
+        (anchor.engaged || bubble.type === 'alert')) {
+      opponent = Game.world.hero;
+    }
+    if (opponent) {
+      if (Math.abs(opponent.x - anchor.x) >= 1) {
+        return opponent.x > anchor.x ? 'left' : 'right';
+      }
+      return anchor.kind === 'monster' ? 'right' : 'left';
+    }
+    if (anchor.dir === 'r') return 'left';
+    if (anchor.dir === 'l') return 'right';
+    return anchor.x < (left + right) / 2 ? 'right' : 'left';
+  }
+
+  function sideBubbleLayout(bubble, anchor, left, top, right, bottom) {
+    var w = 15;
+    var h = 14;
+    var tailReach = 6;
+    var margin = 2;
+    var sprite = anchor.sprite ? Game.assets.sprite(anchor.sprite) : null;
+    var entityH = anchor.bubbleOffsetY || anchor.spriteH || (sprite && sprite.h) || 18;
+    var healthBar = healthBarRect(anchor);
+    var spriteHalfW = ((sprite && sprite.w) || 14) / 2;
+    var clearHalfW = Math.max(spriteHalfW, healthBar ? healthBar.w / 2 : 0) + 1;
+    var positions = {
+      left: Math.round(anchor.x - clearHalfW - tailReach - w),
+      right: Math.round(anchor.x + clearHalfW + tailReach)
+    };
+    function fits(side) {
+      var x = positions[side];
+      var minX = side === 'right' ? x - tailReach : x;
+      var maxX = side === 'left' ? x + w + tailReach : x + w;
+      return minX >= left + margin && maxX <= right - margin;
+    }
+
+    var preferred = preferredBubbleSide(bubble, anchor, left, right);
+    var opposite = preferred === 'left' ? 'right' : 'left';
+    var side = fits(preferred) ? preferred : (fits(opposite) ? opposite :
+      (anchor.x < (left + right) / 2 ? 'right' : 'left'));
+    var x = positions[side];
+    if (side === 'left') {
+      x = U.clamp(x, left + margin, right - margin - w - tailReach);
+    } else {
+      x = U.clamp(x, left + margin + tailReach, right - margin - w);
+    }
+    var y = Math.round(U.clamp(
+      Math.round(anchor.y - entityH - h + 3),
+      Math.ceil(top + margin),
+      Math.floor(bottom - margin - h - 2)
+    ));
+    var body = { x: x, y: y, w: w, h: h };
+    var tail = side === 'left'
+      ? { x: x + w - 2, y: y + h - 6, w: tailReach + 2, h: 8 }
+      : { x: x - tailReach, y: y + h - 6, w: tailReach + 2, h: 8 };
+    var bounds = {
+      x: Math.min(body.x, tail.x),
+      y: Math.min(body.y, tail.y),
+      w: Math.max(body.x + body.w, tail.x + tail.w) - Math.min(body.x, tail.x),
+      h: Math.max(body.y + body.h, tail.y + tail.h) - Math.min(body.y, tail.y)
+    };
+    return {
+      mode: 'side', side: side, preferredSide: preferred, flipped: side !== preferred,
+      x: x, y: y, w: w, h: h,
+      body: body, tail: tail, bounds: bounds, healthBar: healthBar,
+      overlapsHealthBar: rectsOverlap(body, healthBar) || rectsOverlap(tail, healthBar),
+      withinViewport: bounds.x >= left && bounds.x + bounds.w <= right &&
+        bounds.y >= top && bounds.y + bounds.h <= bottom
+    };
+  }
+
+  function aboveBubbleLayout(anchor, left, top, right) {
     var w = 15;
     var h = 14;
     var centerX = U.clamp(anchor.x, left + w / 2 + 2, right - w / 2 - 2);
     var entityH = anchor.bubbleOffsetY || anchor.spriteH || 18;
-    var y = Math.round(anchor.y - entityH - h - 14);
-    y = Math.max(Math.round(top + 2), y);
+    var y = Math.max(Math.round(top + 2), Math.round(anchor.y - entityH - h - 14));
     var x = Math.round(centerX - w / 2);
     var tailX = U.clamp(Math.round(anchor.x), x + 6, x + w - 6);
-    var motion = U.motionEnabled();
-    var fadeIn = motion ? U.clamp((bubble.age + 0.06) / 0.14, 0, 1) : 1;
-    var fadeOut = bubble.duration - bubble.age < 0.32
-      ? U.clamp((bubble.duration - bubble.age) / 0.32, 0, 1)
-      : 1;
-    ctx.globalAlpha = fadeIn * fadeOut;
-    if (motion) y += Math.round(Math.sin((bubble.age + bubble.priority) * 4) * 0.45);
+    var body = { x: x, y: y, w: w, h: h };
+    var tail = { x: tailX - 3, y: y + h - 1, w: 6, h: 6 };
+    var healthBar = healthBarRect(anchor);
+    return {
+      mode: 'above', side: null, preferredSide: null, flipped: false,
+      x: x, y: y, w: w, h: h, tailX: tailX,
+      body: body, tail: tail,
+      bounds: { x: x, y: y, w: w, h: h + 5 },
+      healthBar: healthBar,
+      overlapsHealthBar: rectsOverlap(body, healthBar) || rectsOverlap(tail, healthBar),
+      withinViewport: true
+    };
+  }
 
+  function drawSidePixelBubble(bubble, layout) {
+    var x = layout.x;
+    var y = layout.y;
+    var w = layout.w;
+    var h = layout.h;
     var border = '#392c27';
+
+    ctx.fillStyle = 'rgba(20,16,20,0.38)';
+    ctx.fillRect(x + 2, y + 3, w, h - 2);
+
+    ctx.fillStyle = border;
+    ctx.fillRect(x + 2, y, w - 4, h);
+    ctx.fillRect(x, y + 2, w, h - 4);
+    if (layout.side === 'left') {
+      ctx.fillRect(x + w - 2, y + h - 6, 3, 4);
+      ctx.fillRect(x + w, y + h - 4, 3, 4);
+      ctx.fillRect(x + w + 2, y + h - 2, 3, 3);
+      ctx.fillRect(x + w + 4, y + h, 2, 2);
+    } else {
+      ctx.fillRect(x - 1, y + h - 6, 3, 4);
+      ctx.fillRect(x - 3, y + h - 4, 3, 4);
+      ctx.fillRect(x - 5, y + h - 2, 3, 3);
+      ctx.fillRect(x - 6, y + h, 2, 2);
+    }
+
+    ctx.fillStyle = bubble.style.paper;
+    ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+    if (layout.side === 'left') {
+      ctx.fillRect(x + w - 1, y + h - 4, 2, 2);
+      ctx.fillRect(x + w + 1, y + h - 2, 2, 2);
+    } else {
+      ctx.fillRect(x - 1, y + h - 4, 2, 2);
+      ctx.fillRect(x - 3, y + h - 2, 2, 2);
+    }
+    ctx.fillStyle = 'rgba(255,255,255,0.34)';
+    ctx.fillRect(x + 4, y + 2, Math.max(4, w - 9), 1);
+    drawBubbleIcon(ctx, bubble.icon, x + 4, y + 3, bubble.style.accent, bubble.style.ink);
+  }
+
+  function drawAbovePixelBubble(bubble, layout) {
+    var x = layout.x;
+    var y = layout.y;
+    var w = layout.w;
+    var h = layout.h;
+    var tailX = layout.tailX;
+    var border = '#392c27';
+
     ctx.fillStyle = 'rgba(20,16,20,0.38)';
     ctx.fillRect(x + 2, y + 3, w, h - 2);
     ctx.fillRect(tailX, y + h + 1, 3, 3);
 
-    // 阶梯角与方形尾巴保持像素轮廓，不引入圆角或平滑矢量边。
     ctx.fillStyle = border;
     ctx.fillRect(x + 2, y, w - 4, h);
     ctx.fillRect(x, y + 2, w, h - 4);
@@ -331,8 +478,45 @@
     ctx.fillRect(tailX - 1, y + h - 1, 2, 3);
     ctx.fillStyle = 'rgba(255,255,255,0.34)';
     ctx.fillRect(x + 4, y + 2, Math.max(4, w - 9), 1);
-
     drawBubbleIcon(ctx, bubble.icon, x + 4, y + 3, bubble.style.accent, bubble.style.ink);
+  }
+
+  function drawPixelBubble(bubble, anchor, left, top, right, bottom) {
+    if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
+    if (anchor.x < left - 48 || anchor.x > right + 48 ||
+        anchor.y < top - 48 || anchor.y > bottom + 48) return;
+
+    ctx.save();
+    var usesDiagonalSide = bubble.placement === 'side' ||
+      (bubble.placement === 'directional' && (anchor.dir === 'l' || anchor.dir === 'r'));
+    var layout = usesDiagonalSide
+      ? sideBubbleLayout(bubble, anchor, left, top, right, bottom)
+      : aboveBubbleLayout(anchor, left, top, right);
+    var motion = U.motionEnabled();
+    var fadeIn = motion ? U.clamp((bubble.age + 0.06) / 0.14, 0, 1) : 1;
+    var fadeOut = bubble.duration - bubble.age < 0.32
+      ? U.clamp((bubble.duration - bubble.age) / 0.32, 0, 1)
+      : 1;
+    ctx.globalAlpha = fadeIn * fadeOut;
+    // 阶梯角与像素尾巴保持硬边；接敌气泡的尾巴向单位斜下方收束。
+    if (layout.mode === 'side') drawSidePixelBubble(bubble, layout);
+    else drawAbovePixelBubble(bubble, layout);
+    lastBubbleLayouts.push({
+      id: bubble.id,
+      type: bubble.type,
+      entityKind: anchor.kind || 'entity',
+      placement: bubble.placement,
+      mode: layout.mode,
+      side: layout.side,
+      preferredSide: layout.preferredSide,
+      flipped: layout.flipped,
+      body: layout.body,
+      tail: layout.tail,
+      bounds: layout.bounds,
+      healthBar: layout.healthBar,
+      overlapsHealthBar: layout.overlapsHealthBar,
+      withinViewport: layout.withinViewport
+    });
     ctx.restore();
   }
 
@@ -642,6 +826,7 @@
     },
 
     drawActionBubbles: function () {
+      lastBubbleLayouts = [];
       if (!Game.actionBubbles) return;
       var left = cam.x - cw / cam.zoom / 2;
       var right = cam.x + cw / cam.zoom / 2;
@@ -650,6 +835,10 @@
       Game.actionBubbles.visit(function (bubble, anchor) {
         drawPixelBubble(bubble, anchor, left, top, right, bottom);
       });
+    },
+
+    actionBubbleLayouts: function () {
+      return JSON.parse(JSON.stringify(lastBubbleLayouts));
     },
 
     drawActionBubbleIcon: function (target, type) {

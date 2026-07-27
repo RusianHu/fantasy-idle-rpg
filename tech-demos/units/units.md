@@ -14,6 +14,9 @@
 - 页面直接调用生产 `Game.actionBubbles` 与 `Game.render.drawActionBubbleIcon()`，不复制气泡状态机或像素图形。
 - 自动轮播依次覆盖资源、采集、主角接敌与怪物警戒、宝箱、掉落；舞台气泡只显示图形。
 - 手动检查可选择主角、怪物或双锚点，并触发六种默认图形；`Game.unitsBubbleDemo.snapshot()` 输出当前公开诊断快照。
+- 非战斗实体气泡统一读取朝向：向左/右行走时落在后脑斜上方，向上/下行走或无方向锚点时保持原有正上方；演示页提供三种冻结行走场景。
+- 接敌与警戒改用目标感知的斜向左右对话框：默认落在交战双方头部外侧上方，尾巴斜向单位；纵向接敌固定主角左/怪物右，临近视口边缘时向内翻转。纵向、左沿、右沿场景会冻结单位并强制显示双方血条。
+- `Game.unitsBubbleDemo.layouts()` 暴露气泡主体、尾巴、血条、翻转及视口约束诊断，便于自动验证零重叠。
 - 每个实体拥有独立队列、优先级和去重状态；切换单位、操控模式或区域时复用生产清理事件。
 
 ## 战斗循环演示
@@ -37,4 +40,4 @@
 
 ## 自动验证
 
-`node tests/cache-version.test.js` 校验 `units.html` 的全部 CSS/JS 查询版本与字体 `BUILD_ID` 同步；`node tests/browser-smoke.js` 验证移动端控件、主角/怪物双锚点和 Canvas 像素输出。
+`node tests/cache-version.test.js` 校验 `units.html` 的全部 CSS/JS 查询版本与字体 `BUILD_ID` 同步；`node tests/action-bubble-demo.test.js` 聚焦验证三种行走朝向、纵向接敌、双边缘翻转、血条零重叠、视口约束和中英文控件；`node tests/browser-smoke.js` 保留整站集成覆盖。

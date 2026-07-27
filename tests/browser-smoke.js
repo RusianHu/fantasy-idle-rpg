@@ -3216,6 +3216,8 @@ async function run() {
       }
       const typeButtons = Array.from(document.querySelectorAll('[data-bubble-type]'));
       const anchorButtons = Array.from(document.querySelectorAll('[data-bubble-anchor]'));
+      const sceneButtons = Array.from(document.querySelectorAll('[data-bubble-scene]'));
+      const walkButtons = Array.from(document.querySelectorAll('[data-bubble-walk]'));
       const iconPixels = typeButtons.map((button) => {
         const canvas = button.querySelector('canvas');
         const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
@@ -3223,16 +3225,30 @@ async function run() {
         for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
         return visible;
       });
+      const walks = ['l', 'r', 'vertical'].map((scene) => ({
+        scene,
+        layouts: Game.unitsBubbleDemo.setWalkScene(scene)
+      }));
+      const scenes = ['center', 'left', 'right'].map((scene) => {
+        const layouts = Game.unitsBubbleDemo.setScene(scene);
+        return {
+          scene,
+          layouts,
+          monster: layouts.find((layout) => layout.entityKind === 'monster')
+        };
+      });
       return {
         snapshot: Game.unitsBubbleDemo.snapshot(),
+        walks,
+        scenes,
         stagePixelDiff,
         iconPixels,
         typeCount: typeButtons.length,
-        allControlsTouchable: typeButtons.concat(anchorButtons, [
+        allControlsTouchable: typeButtons.concat(anchorButtons, sceneButtons, walkButtons, [
           document.getElementById('toggle-bubble-auto'),
           document.getElementById('clear-bubbles')
         ]).every((button) => button.getBoundingClientRect().height >= 44),
-        allControlsWithinViewport: typeButtons.concat(anchorButtons).every((button) => {
+        allControlsWithinViewport: typeButtons.concat(anchorButtons, sceneButtons, walkButtons).every((button) => {
           const rect = button.getBoundingClientRect();
           return rect.left >= 0 && rect.right <= innerWidth;
         }),
@@ -3252,6 +3268,23 @@ async function run() {
       'units QA keeps hero and monster bubble anchors independent');
     assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'hero'));
     assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'monster'));
+    assert.deepEqual(unitsBubbleDemo.walks.map((walk) => [
+      walk.scene, walk.layouts[0].placement, walk.layouts[0].mode, walk.layouts[0].side
+    ]), [
+      ['l', 'directional', 'side', 'right'],
+      ['r', 'directional', 'side', 'left'],
+      ['vertical', 'directional', 'above', null]
+    ], 'movement bubbles stay behind horizontal facing and above vertical facing');
+    assert.ok(unitsBubbleDemo.scenes.every((scene) => scene.layouts.length === 2));
+    assert.ok(unitsBubbleDemo.scenes.every((scene) => scene.layouts.every((layout) =>
+      layout.mode === 'side' && layout.healthBar && !layout.overlapsHealthBar && layout.withinViewport &&
+      layout.tail.y + layout.tail.h > layout.body.y + layout.body.h)),
+    'diagonal engagement bubbles avoid visible health bars and viewport edges: ' + JSON.stringify(unitsBubbleDemo.scenes));
+    assert.deepEqual(
+      unitsBubbleDemo.scenes.map((scene) => [scene.scene, scene.monster.side, scene.monster.flipped]),
+      [['center', 'right', false], ['left', 'right', true], ['right', 'left', true]],
+      'monster alert bubble uses the opposite side in a vertical encounter and flips inward at either viewport edge'
+    );
     assert.ok(unitsBubbleDemo.stagePixelDiff >= 120,
       'units QA bubble controls paint the production canvas: ' + JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.allControlsTouchable, true);

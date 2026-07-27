@@ -25,6 +25,9 @@
     next.priority = Number(next.priority) || 0;
     next.cooldown = Math.max(0, Number(next.cooldown) || 0.7);
     next.icon = next.icon || id;
+    next.placement = /^(above|side|directional)$/.test(next.placement)
+      ? next.placement
+      : 'directional';
     next.accent = next.accent || '#d7b866';
     next.paper = next.paper || '#eee1bd';
     next.ink = next.ink || '#28231d';
@@ -76,6 +79,10 @@
       key: options.dedupeKey || type + ':' + targetId,
       targetId: targetId || null,
       meta: options.meta || null,
+      placement: /^(above|side|directional)$/.test(options.placement)
+        ? options.placement
+        : def.placement,
+      side: options.side === 'left' || options.side === 'right' ? options.side : 'auto',
       style: {
         accent: options.accent || def.accent,
         paper: options.paper || def.paper,
@@ -95,6 +102,8 @@
       duration: bubble.duration,
       age: bubble.age,
       targetId: bubble.targetId,
+      placement: bubble.placement,
+      side: bubble.side,
       state: state,
       x: lane.anchor.x,
       y: lane.anchor.y
@@ -219,12 +228,12 @@
   registerType('enemy', {
     icon: 'enemy',
     accent: '#bd554c', paper: '#efd7bc', ink: '#3b201d',
-    priority: 90, duration: 2.2
+    placement: 'side', priority: 90, duration: 2.2
   });
   registerType('alert', {
     icon: 'alert',
     accent: '#bd554c', paper: '#efd7bc', ink: '#3b201d',
-    priority: 95, duration: 1.35, cooldown: 1.2
+    placement: 'side', priority: 95, duration: 1.35, cooldown: 1.2
   });
   registerType('chest', {
     icon: 'chest',
