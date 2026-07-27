@@ -97,6 +97,8 @@ for (const region of regions) {
       edgeLength(first.macro, 2, 3) + edgeLength(first.macro, 3, 1);
     assert.ok(alternateCost <= macroMainCost(first.macro) * 1.6);
     assert.ok(first.nodes.length >= 16 && first.nodes.length <= 22);
+    assert.ok(first.nodes.every((node) => Number.isFinite(node.phase)),
+      `${region.id}:${seed} every gather node needs a finite render phase`);
     assert.ok(first.threats.length >= 6 && first.threats.length <= 9);
     assert.equal(first.landmarks.length, 4);
     assert.equal(first.curios.length, 3);
@@ -403,6 +405,10 @@ assert.match(read('js/systems/exploration.js'), /ctx\.fillStyle = '#080912'/,
   'unknown fog must fully hide terrain tiles and undiscovered entities');
 assert.match(read('js/render/renderer.js'), /sp\.w <= 13 && sp\.h <= 13 \? 2 : 1/,
   'small v3 resource sprites must use an integer 2x world scale');
+assert.match(read('js/render/renderer.js'), /Number\.isFinite\(node\.phase\)/,
+  'resource rendering must tolerate v3 layouts created before phase was added');
+assert.doesNotMatch(read('js/render/renderer.js'), /Math\.sin\([^;\n]*node\.phase/,
+  'resource animation must never feed an optional phase directly into coordinates');
 assert.match(read('js/systems/environment.js'),
   /!Game\.exploration\.isRevealed\(node\.x, node\.y\)/,
   'ambient auto-gather must reject unrevealed resources');

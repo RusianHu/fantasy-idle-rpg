@@ -463,6 +463,7 @@
           color: rd.color, accent: rd.accent,
           rarity: rd.rarity || 'common',
           x: rp.x, y: rp.y,
+          phase: (U.strSeed(region.id + ':resource:' + rd.id + ':' + rn) % 628) / 100,
           cooldown: rd.rarity === 'rare'
             ? Math.round(900 + resourceRng() * 600)
             : Math.round(480 + resourceRng() * 240)

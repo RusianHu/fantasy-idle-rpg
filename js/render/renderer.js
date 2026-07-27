@@ -684,7 +684,13 @@
       var spriteId = node.sprite || ('gather_' + node.nodeType);
       var sp = Game.assets.sprite(spriteId);
       var scale = sp.w <= 13 && sp.h <= 13 ? 2 : 1;
-      var bob = ready && motion ? Math.sin(t * 1.8 + node.phase) * 0.65 : 0;
+      // v3 首发存档中的节点可能没有 phase。动画输入一旦是 undefined，
+      // Math.sin 会返回 NaN，继而令整张资源精灵的 y 坐标失效、完全不落到 Canvas。
+      // 生成器会为新布局写入 phase；这里仍保留稳定回退，兼容已生成的旧布局。
+      var phase = Number.isFinite(node.phase)
+        ? node.phase
+        : (U.strSeed(String(node.id || spriteId)) % 628) / 100;
+      var bob = ready && motion ? Math.sin(t * 1.8 + phase) * 0.65 : 0;
       var x = Math.round(node.x), y = Math.round(node.y + bob);
       ctx.save();
       ctx.globalAlpha = ready ? 0.34 : 0.14;
@@ -712,7 +718,7 @@
       }
       if (motion) {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.30 + 0.12 * Math.sin(t * 2 + node.phase);
+        ctx.globalAlpha = 0.30 + 0.12 * Math.sin(t * 2 + phase);
         ctx.drawImage(Game.assets.glowTex(node.accent, 16), x - 20, y - 24, 40, 40);
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
@@ -725,9 +731,9 @@
       ctx.stroke();
       ctx.globalAlpha = 1;
       var frame = Game.assets.hasFrame(spriteId, 'idle1') &&
-        (((t / 0.55) + node.phase) | 0) % 2 === 1 ? 'idle1' : 'idle0';
+        (((t / 0.55) + phase) | 0) % 2 === 1 ? 'idle1' : 'idle0';
       Game.assets.draw(ctx, spriteId, frame, x, y, { scale: scale });
-      var sparkle = ((t * 3 + (node.phase || 0)) | 0) % 7;
+      var sparkle = ((t * 3 + phase) | 0) % 7;
       if (sparkle < 2) {
         ctx.fillStyle = node.rarity === 'rare' ? '#fff2ad' : (node.accent || '#d8f09a');
         ctx.fillRect(x + Math.max(6, sp.w * scale * 0.35), y - sp.h * scale + 1, 1, 3);

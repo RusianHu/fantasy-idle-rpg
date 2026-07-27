@@ -633,9 +633,35 @@ async function run() {
       Game.world.setControlMode('manual');
       Game.render.snapCamera(node.x, node.y);
       for (let i = 0; i < 8; i++) Game.render.frame(1 / 60);
+      const canvas = document.getElementById('stage');
+      const context = canvas.getContext('2d');
+      const generatedPhase = node.phase;
+      // Exercise the compatibility branch too: v3 layouts produced by the
+      // broken build did not contain phase and used to turn the sprite y into NaN.
+      delete node.phase;
+      Game.render.frame(0);
+      const withResource = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const drawGatherNode = Game.render.drawGatherNode;
+      Game.render.drawGatherNode = function (entry, time) {
+        if (entry !== node) drawGatherNode.call(Game.render, entry, time);
+      };
+      Game.render.frame(0);
+      const withoutResource = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      Game.render.drawGatherNode = drawGatherNode;
+      node.phase = generatedPhase;
+      Game.render.frame(0);
+      let resourcePixelDiff = 0;
+      for (let i = 0; i < withResource.length; i += 4) {
+        if (withResource[i] !== withoutResource[i] ||
+            withResource[i + 1] !== withoutResource[i + 1] ||
+            withResource[i + 2] !== withoutResource[i + 2] ||
+            withResource[i + 3] !== withoutResource[i + 3]) resourcePixelDiff++;
+      }
       return {
         id: node.id,
         sprite: node.sprite,
+        phaseFinite: Number.isFinite(generatedPhase),
+        resourcePixelDiff,
         hiddenRejected,
         revealed,
         recorded,
@@ -648,6 +674,10 @@ async function run() {
     assert.equal(v3ResourceVisual.recorded, true);
     assert.equal(v3ResourceVisual.immediateRejected, true);
     assert.equal(v3ResourceVisual.afterGraceAccepted, true);
+    assert.equal(v3ResourceVisual.phaseFinite, true);
+    assert.ok(v3ResourceVisual.resourcePixelDiff >= 80,
+      'a mature v3 gatherable must paint real pixels before gathering: ' +
+      JSON.stringify(v3ResourceVisual));
     await delay(120);
     const v3ResourceCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const v3ResourceScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-resource-mobile-cdp.png');
@@ -665,6 +695,70 @@ async function run() {
     const v3DepletedCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const v3DepletedScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-resource-depleted-mobile-cdp.png');
     fs.writeFileSync(v3DepletedScreenshot, Buffer.from(v3DepletedCapture.data, 'base64'));
+
+    // Reproduce the reported dark mine node specifically. It must contribute
+    // visible pixels while idle, before any gather order or progress ring exists.
+    const v3MineResourceVisual = await cdp.evaluate(`(() => {
+      Game.state.world.worldSeed = 0x397D5DF1;
+      Game.state.world.layoutVersion = 3;
+      Game.state.world.region = 'mine';
+      Game.state.world.mode = 'battle';
+      Game.world.init('mine');
+      Game.world.setControlMode('manual');
+      const layout = Game.world.layout;
+      const node = layout.nodes.find((entry) => entry.defId === 'coal_shard');
+      if (!node) throw new Error('v3 coal shard probe missing');
+      const hero = Game.world.hero;
+      const projected = Game.terrain.projectPoint(node.x - 48, node.y + 8, 2) ||
+        Game.terrain.projectPoint(node.x + 48, node.y + 8, 2);
+      hero.x = projected.x;
+      hero.y = projected.y;
+      hero.state = 'idle';
+      hero.target = null;
+      hero.moveOrder = null;
+      hero.interactOrder = null;
+      Game.state.world.nodeCooldowns[node.id] = 0;
+      Game.exploration.revealAt(node.x, node.y, { force: true });
+      Game.render.snapCamera(node.x, node.y);
+      const canvas = document.getElementById('stage');
+      const context = canvas.getContext('2d');
+      delete node.phase;
+      Game.render.frame(0);
+      const withResource = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      const drawGatherNode = Game.render.drawGatherNode;
+      Game.render.drawGatherNode = function (entry, time) {
+        if (entry !== node) drawGatherNode.call(Game.render, entry, time);
+      };
+      Game.render.frame(0);
+      const withoutResource = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      Game.render.drawGatherNode = drawGatherNode;
+      Game.render.frame(0);
+      let resourcePixelDiff = 0;
+      for (let i = 0; i < withResource.length; i += 4) {
+        if (withResource[i] !== withoutResource[i] ||
+            withResource[i + 1] !== withoutResource[i + 1] ||
+            withResource[i + 2] !== withoutResource[i + 2] ||
+            withResource[i + 3] !== withoutResource[i + 3]) resourcePixelDiff++;
+      }
+      return {
+        id: node.id,
+        sprite: node.sprite,
+        resourcePixelDiff,
+        ready: Game.environment.nodeReady(node),
+        revealed: Game.exploration.isRevealed(node.x, node.y),
+        idleBeforeGather: !hero.interactOrder && hero.state === 'idle'
+      };
+    })()`);
+    assert.equal(v3MineResourceVisual.sprite, 'gather_coal_shard');
+    assert.equal(v3MineResourceVisual.ready, true);
+    assert.equal(v3MineResourceVisual.revealed, true);
+    assert.equal(v3MineResourceVisual.idleBeforeGather, true);
+    assert.ok(v3MineResourceVisual.resourcePixelDiff >= 80,
+      'the dark mine resource must be visible before gathering: ' +
+      JSON.stringify(v3MineResourceVisual));
+    const v3MineResourceCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v3MineResourceScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-mine-resource-before-gather-mobile-cdp.png');
+    fs.writeFileSync(v3MineResourceScreenshot, Buffer.from(v3MineResourceCapture.data, 'base64'));
 
     const v3Navigation = await cdp.evaluate(`(() => {
       const cases = [
@@ -2837,8 +2931,10 @@ async function run() {
     console.log('Browser smoke passed: ' + JSON.stringify({
       titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
       titleScreenshot, titleTallScreenshot, titleShortScreenshot, main,
-      v3CampVisual, v3ResourceVisual, v3DepletedVisual, v3Navigation, v3ForestVisual,
+      v3CampVisual, v3ResourceVisual, v3DepletedVisual, v3MineResourceVisual,
+      v3Navigation, v3ForestVisual,
       v3CampScreenshot, v3ResourceScreenshot, v3DepletedScreenshot,
+      v3MineResourceScreenshot,
       v3ForestScreenshot, worldChecks,
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
