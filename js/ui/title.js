@@ -49,9 +49,12 @@
       titleOptions = opts;
       titleSlots = Array.isArray(opts.slots) && opts.slots.length ?
         opts.slots : T.makeSlots({ occupied: false });
+      var emptyLobby = titleSlots.every(function (slot) { return slot.kind === 'empty'; });
       var t = Game.i18n.t;
       titleRoot = U.el('div', '');
       titleRoot.id = 'title-root';
+      titleRoot.classList.toggle('is-empty-lobby', emptyLobby);
+      titleRoot.setAttribute('data-lobby-state', emptyLobby ? 'new-game' : 'archive');
       titleRoot.innerHTML =
         '<canvas id="title-canvas"></canvas>' +
         '<div class="title-ui">' +
@@ -61,9 +64,11 @@
         '<button class="title-lang" type="button"><span aria-hidden="true">文</span><strong></strong></button>' +
         '<div class="title-logo"><span class="title-logo-main">' + t('ui.titleLogo') + '</span>' +
         '<span class="title-sub">FANTASY IDLE RPG</span></div>' +
-        '<section class="title-archive" aria-labelledby="title-archive-heading" aria-hidden="true" inert>' +
+        '<section class="title-archive' + (emptyLobby ? ' is-empty-state' : '') +
+        '" aria-labelledby="title-archive-heading" aria-hidden="true" inert>' +
         '<div class="archive-heading">' +
-        '<button class="archive-view" type="button"><span aria-hidden="true"><i></i></span></button>' +
+        '<button class="archive-view" type="button"><span aria-hidden="true"><i></i></span>' +
+        '<em class="archive-view-label"></em></button>' +
         '<span class="archive-heading-copy"><small class="archive-kicker"></small>' +
         '<strong id="title-archive-heading" class="archive-title"></strong></span>' +
         '<span class="archive-capacity"></span>' +
@@ -98,13 +103,23 @@
         button.type = 'button';
         button.setAttribute('data-slot-id', slot.id);
         button.setAttribute('data-slot-kind', slot.kind);
-        button.innerHTML =
-          '<span class="slot-number"><small>SLOT</small><b>' +
-          ('0' + slot.index).slice(-2) + '</b></span>' +
-          '<span class="slot-portrait"><canvas width="56" height="56"></canvas><i aria-hidden="true"></i></span>' +
-          '<span class="slot-copy"><strong class="slot-name"></strong>' +
-          '<span class="slot-location"></span><span class="slot-meta"></span></span>' +
-          '<span class="slot-action"><span></span><i aria-hidden="true"></i></span>';
+        if (slot.kind === 'empty' && emptyLobby) {
+          button.innerHTML =
+            '<span class="start-new-crest" aria-hidden="true">' +
+            '<span class="slot-portrait"><canvas width="56" height="56"></canvas><i></i></span></span>' +
+            '<span class="slot-copy"><span class="slot-location"></span>' +
+            '<strong class="slot-name"></strong><span class="slot-meta"></span></span>' +
+            '<span class="slot-action"><span></span><i aria-hidden="true"></i></span>' +
+            '<span class="start-new-glint" aria-hidden="true"></span>';
+        } else {
+          button.innerHTML =
+            '<span class="slot-number"><small>SLOT</small><b>' +
+            ('0' + slot.index).slice(-2) + '</b></span>' +
+            '<span class="slot-portrait"><canvas width="56" height="56"></canvas><i aria-hidden="true"></i></span>' +
+            '<span class="slot-copy"><strong class="slot-name"></strong>' +
+            '<span class="slot-location"></span><span class="slot-meta"></span></span>' +
+            '<span class="slot-action"><span></span><i aria-hidden="true"></i></span>';
+        }
         button.addEventListener('click', function () {
           if (titleRoot.classList.contains('is-entering')) return;
           titleRoot.setAttribute('data-selected-slot', slot.id);
@@ -207,6 +222,37 @@
         }
         return;
       }
+      if (slot.kind === 'empty') {
+        // 新旅程使用对称的羽翼长剑印记：大轮廓优先，确保 1× 移动端
+        // 也能一眼识别为公会启程纹章，而不是普通空槽占位符。
+        g.fillStyle = '#5f4218';
+        [
+          [8, 18, 16, 4], [10, 23, 14, 4], [13, 28, 11, 4], [17, 33, 8, 4],
+          [32, 18, 16, 4], [32, 23, 14, 4], [32, 28, 11, 4], [31, 33, 8, 4]
+        ].forEach(function (r) { g.fillRect(r[0], r[1], r[2], r[3]); });
+        g.fillStyle = '#c89c3d';
+        [
+          [10, 18, 13, 2], [12, 23, 11, 2], [15, 28, 8, 2], [19, 33, 5, 2],
+          [33, 18, 13, 2], [33, 23, 11, 2], [33, 28, 8, 2], [32, 33, 5, 2]
+        ].forEach(function (r) { g.fillRect(r[0], r[1], r[2], r[3]); });
+        g.fillStyle = '#4b3013';
+        g.fillRect(25, 7, 7, 30);
+        g.fillRect(19, 31, 19, 6);
+        g.fillRect(25, 36, 7, 11);
+        g.fillRect(22, 45, 13, 5);
+        g.fillStyle = '#f6dc79';
+        g.fillRect(28, 6, 3, 28);
+        g.fillRect(22, 33, 13, 2);
+        g.fillRect(28, 36, 3, 10);
+        g.fillRect(25, 47, 7, 2);
+        g.fillStyle = '#fff3b2';
+        g.fillRect(28, 9, 1, 21);
+        g.fillStyle = '#d5a642';
+        g.fillRect(27, 4, 5, 3);
+        g.fillRect(26, 6, 7, 2);
+        canvas.setAttribute('data-portrait-mode', 'new-journey');
+        return;
+      }
       // 空档/草稿使用字符网格绘制的公会羽剑纹章，不依赖 Emoji 或外部图标。
       var ink = slot.kind === 'draft' ? '#d8b45a' : '#6d7398';
       var hi = slot.kind === 'draft' ? '#f0d47b' : '#9da2bd';
@@ -288,6 +334,7 @@
       var view = titleRoot.querySelector('.archive-view');
       view.setAttribute('aria-label', t('ui.titleViewCamp'));
       view.title = t('ui.titleViewCamp');
+      view.querySelector('.archive-view-label').textContent = t('ui.titleViewCamp');
       titleRoot.querySelector('.archive-kicker').textContent = t('ui.titleArchiveKicker');
       titleRoot.querySelector('.archive-title').textContent = t('ui.titleArchive');
       titleRoot.querySelector('.archive-capacity').textContent =
@@ -300,6 +347,14 @@
       lang.querySelector('strong').textContent = locale === 'zh-CN' ? '中' : 'EN';
       lang.setAttribute('aria-label', t('ui.titleLanguage'));
       lang.title = t('ui.titleLanguage');
+      var archive = titleRoot.querySelector('.title-archive');
+      if (archive.classList.contains('is-empty-state')) {
+        archive.removeAttribute('aria-labelledby');
+        archive.setAttribute('aria-label', t('ui.titleBeginTitle'));
+      } else {
+        archive.removeAttribute('aria-label');
+        archive.setAttribute('aria-labelledby', 'title-archive-heading');
+      }
 
       titleSlots.forEach(function (slot) {
         var root = titleRoot.querySelector('[data-slot-id="' + slot.id + '"]');
@@ -325,10 +380,10 @@
           meta = t('ui.titleSlotSeed', { seed: U.hex32(slot.worldSeed) });
           action = t('ui.titleResumeDraft');
         } else {
-          name = t('ui.titleSlotEmpty');
-          location = t('ui.titleSlotEmptyDesc');
-          meta = t('ui.titleSlotNewWorld');
-          action = t('ui.titleCreate');
+          name = t('ui.titleBeginTitle');
+          location = t('ui.titleBeginKicker');
+          meta = t('ui.titleBeginDesc');
+          action = t('ui.titleBeginAction');
         }
         root.querySelector('.slot-name').textContent = name;
         root.querySelector('.slot-location').textContent = location;

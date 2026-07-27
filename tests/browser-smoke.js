@@ -313,6 +313,7 @@ async function run() {
       const view = root.querySelector('.archive-view');
       return {
         open: root.classList.contains('is-archive-open'),
+        emptyState: archive.classList.contains('is-empty-state'),
         archiveVisible: getComputedStyle(archive).visibility === 'visible' &&
           Number(getComputedStyle(archive).opacity) > 0.9,
         archiveHiddenFromAT: archive.getAttribute('aria-hidden'),
@@ -323,6 +324,7 @@ async function run() {
       };
     })()`);
     assert.equal(titleArchiveReveal.open, true);
+    assert.equal(titleArchiveReveal.emptyState, true, 'an empty lobby uses the dedicated new-game presentation');
     assert.equal(titleArchiveReveal.archiveVisible, true);
     assert.equal(titleArchiveReveal.archiveHiddenFromAT, 'false');
     assert.equal(titleArchiveReveal.archiveInert, false);
@@ -337,8 +339,10 @@ async function run() {
       const action = slot.querySelector('.slot-action span');
       const name = slot.querySelector('.slot-name');
       const result = {
-        archiveTitle: root.querySelector('.archive-title').textContent,
+        emptyState: root.querySelector('.title-archive').classList.contains('is-empty-state'),
+        archiveHeadingHidden: getComputedStyle(root.querySelector('.archive-heading-copy')).display === 'none',
         action: action.textContent,
+        name: name.textContent,
         actionFits: action.scrollWidth <= action.clientWidth,
         nameFits: name.scrollWidth <= name.clientWidth || getComputedStyle(name).textOverflow === 'ellipsis',
         slotFits: slot.scrollWidth <= slot.clientWidth,
@@ -347,8 +351,10 @@ async function run() {
       root.querySelector('.title-lang').click();
       return result;
     })()`);
-    assert.equal(englishTitleFit.archiveTitle, 'EXPEDITION RECORD');
-    assert.equal(englishTitleFit.action, 'NEW GAME');
+    assert.equal(englishTitleFit.emptyState, true);
+    assert.equal(englishTitleFit.archiveHeadingHidden, true, 'empty saves do not present an expedition archive heading');
+    assert.equal(englishTitleFit.name, 'NEW GAME');
+    assert.equal(englishTitleFit.action, 'BEGIN');
     assert.equal(englishTitleFit.actionFits, true);
     assert.equal(englishTitleFit.nameFits, true);
     assert.equal(englishTitleFit.slotFits, true);
