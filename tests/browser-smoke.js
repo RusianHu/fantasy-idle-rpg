@@ -535,6 +535,177 @@ async function run() {
     assert.ok(main.canvasColors > 20, 'main stage canvas is nonblank');
     assert.equal(main.noHorizontalOverflow, true, 'main mobile viewport has no horizontal overflow');
 
+    const mapWheelMobile = await cdp.evaluate(`(() => {
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const rect = canvas.getBoundingClientRect();
+      const beforePixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const boundaryOut = new WheelEvent('wheel', {
+        deltaY: 120, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left, clientY: rect.top, bubbles: true, cancelable: true
+      });
+      const boundaryAllowed = canvas.dispatchEvent(boundaryOut);
+      const beforeAnchor = {
+        x: Number(canvas.dataset.mapViewX),
+        y: Number(canvas.dataset.mapViewY)
+      };
+      const zoomIn = new WheelEvent('wheel', {
+        deltaY: -120, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left, clientY: rect.top, bubbles: true, cancelable: true
+      });
+      const zoomInAllowed = canvas.dispatchEvent(zoomIn);
+      const afterPixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixelDiff = 0;
+      for (let i = 0; i < afterPixels.length; i += 4) {
+        if (afterPixels[i] !== beforePixels[i] || afterPixels[i + 1] !== beforePixels[i + 1] ||
+            afterPixels[i + 2] !== beforePixels[i + 2] || afterPixels[i + 3] !== beforePixels[i + 3]) pixelDiff++;
+      }
+      const afterAnchor = {
+        x: Number(canvas.dataset.mapViewX),
+        y: Number(canvas.dataset.mapViewY)
+      };
+      const zoomAfterIn = Number(canvas.dataset.mapZoom);
+      const zoomOut = new WheelEvent('wheel', {
+        deltaY: 120, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left, clientY: rect.top, bubbles: true, cancelable: true
+      });
+      const zoomOutAllowed = canvas.dispatchEvent(zoomOut);
+      window.__firpgMapGesture = {
+        canvas,
+        heroOrder: Game.world.hero.moveOrder,
+        anchor: {
+          x: Number(canvas.dataset.mapViewX) + canvas.width * 0.5 / Number(canvas.dataset.mapZoom),
+          y: Number(canvas.dataset.mapViewY) + canvas.height * 0.5 / Number(canvas.dataset.mapZoom)
+        }
+      };
+      return {
+        boundaryAllowed,
+        zoomInAllowed,
+        zoomOutAllowed,
+        zoomAfterIn,
+        zoomAfterOut: Number(canvas.dataset.mapZoom),
+        zoomOutDisabled: document.querySelector('[data-zoom="-1"]').disabled,
+        anchorDelta: Math.hypot(afterAnchor.x - beforeAnchor.x, afterAnchor.y - beforeAnchor.y),
+        pixelDiff,
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      };
+    })()`);
+    assert.equal(mapWheelMobile.boundaryAllowed, true, 'wheel leaves the panel scrollable at minimum zoom');
+    assert.equal(mapWheelMobile.zoomInAllowed, false, 'wheel zoom consumes the event while the scale changes');
+    assert.equal(mapWheelMobile.zoomOutAllowed, false, 'wheel zoom-out consumes the event while the scale changes');
+    assert.ok(mapWheelMobile.zoomAfterIn > 1.1 && mapWheelMobile.zoomAfterIn < 1.3,
+      'wheel uses a continuous scale instead of the 1.35 button step');
+    assert.ok(Math.abs(mapWheelMobile.zoomAfterOut - 1) < 0.001, 'inverse wheel deltas return to overview');
+    assert.equal(mapWheelMobile.zoomOutDisabled, true, 'zoom-out button reflects the minimum boundary');
+    assert.ok(mapWheelMobile.anchorDelta < 0.001, 'a zero-coordinate wheel anchor stays fixed');
+    assert.ok(mapWheelMobile.pixelDiff > 20, 'wheel zoom visibly recomposites the map');
+
+    const mapRect = mapWheelMobile.rect;
+    const touchStart = [
+      { x: mapRect.left + mapRect.width * 0.35, y: mapRect.top + mapRect.height * 0.5,
+        radiusX: 4, radiusY: 4, force: 1, id: 1 },
+      { x: mapRect.left + mapRect.width * 0.65, y: mapRect.top + mapRect.height * 0.5,
+        radiusX: 4, radiusY: 4, force: 1, id: 2 }
+    ];
+    const touchEnd = [
+      { x: mapRect.left + mapRect.width * 0.25, y: mapRect.top + mapRect.height * 0.5,
+        radiusX: 4, radiusY: 4, force: 1, id: 1 },
+      { x: mapRect.left + mapRect.width * 0.85, y: mapRect.top + mapRect.height * 0.5,
+        radiusX: 4, radiusY: 4, force: 1, id: 2 }
+    ];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: touchStart });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: touchEnd });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const mapPinch = await cdp.evaluate(`(() => {
+      const fixture = window.__firpgMapGesture;
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const zoom = Number(canvas.dataset.mapZoom);
+      const anchorAfter = {
+        x: Number(canvas.dataset.mapViewX) + canvas.width * 0.55 / zoom,
+        y: Number(canvas.dataset.mapViewY) + canvas.height * 0.5 / zoom
+      };
+      return {
+        sameCanvas: canvas === fixture.canvas,
+        zoom,
+        anchorDelta: Math.hypot(anchorAfter.x - fixture.anchor.x, anchorAfter.y - fixture.anchor.y),
+        heroOrderUntouched: Game.world.hero.moveOrder === fixture.heroOrder,
+        x: Number(canvas.dataset.mapViewX),
+        y: Number(canvas.dataset.mapViewY)
+      };
+    })()`);
+    assert.equal(mapPinch.sameCanvas, true, 'pinch keeps the live map canvas instance');
+    assert.ok(Math.abs(mapPinch.zoom - 2) < 0.02, 'pinch distance controls map scale continuously');
+    assert.ok(mapPinch.anchorDelta < 0.2, 'pinch keeps the map point under its moving midpoint');
+    assert.equal(mapPinch.heroOrderUntouched, true, 'map gestures do not issue world movement orders');
+
+    const dragStart = {
+      x: mapRect.left + mapRect.width * 0.55,
+      y: mapRect.top + mapRect.height * 0.5,
+      radiusX: 4, radiusY: 4, force: 1, id: 3
+    };
+    const dragEnd = {
+      x: mapRect.left + mapRect.width * 0.45,
+      y: mapRect.top + mapRect.height * 0.42,
+      radiusX: 4, radiusY: 4, force: 1, id: 3
+    };
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [dragStart] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [dragEnd] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const mapGestureCleanup = await cdp.evaluate(`(() => {
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const rect = canvas.getBoundingClientRect();
+      const dragged = {
+        x: Number(canvas.dataset.mapViewX),
+        y: Number(canvas.dataset.mapViewY)
+      };
+      function pointer(type, id, x, y) {
+        canvas.dispatchEvent(new PointerEvent(type, {
+          pointerId: id, pointerType: 'touch', isPrimary: true,
+          clientX: x, clientY: y, bubbles: true, cancelable: true
+        }));
+      }
+      pointer('pointerdown', 91, rect.left + 80, rect.top + 80);
+      pointer('pointercancel', 91, rect.left + 80, rect.top + 80);
+      const cancelX = Number(canvas.dataset.mapViewX);
+      const cancelY = Number(canvas.dataset.mapViewY);
+      pointer('pointermove', 91, rect.left + 130, rect.top + 120);
+      const cancelStable = cancelX === Number(canvas.dataset.mapViewX) &&
+        cancelY === Number(canvas.dataset.mapViewY);
+
+      pointer('pointerdown', 92, rect.left + 90, rect.top + 90);
+      pointer('lostpointercapture', 92, rect.left + 90, rect.top + 90);
+      const lostX = Number(canvas.dataset.mapViewX);
+      const lostY = Number(canvas.dataset.mapViewY);
+      pointer('pointermove', 92, rect.left + 140, rect.top + 130);
+      const lostStable = lostX === Number(canvas.dataset.mapViewX) &&
+        lostY === Number(canvas.dataset.mapViewY);
+
+      for (let i = 0; i < 8; i++) document.querySelector('[data-zoom="1"]').click();
+      const maxZoom = Number(canvas.dataset.mapZoom);
+      const maxDisabled = document.querySelector('[data-zoom="1"]').disabled;
+      const maxWheelAllowed = canvas.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -240, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+        bubbles: true, cancelable: true
+      }));
+      for (let i = 0; i < 12; i++) document.querySelector('[data-zoom="-1"]').click();
+      const minZoom = Number(canvas.dataset.mapZoom);
+      const minDisabled = document.querySelector('[data-zoom="-1"]').disabled;
+      delete window.__firpgMapGesture;
+      return {
+        dragged: dragged.x > ${mapPinch.x} && dragged.y > ${mapPinch.y},
+        cancelStable, lostStable, maxZoom, maxDisabled, maxWheelAllowed, minZoom, minDisabled,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(mapGestureCleanup.dragged, true, 'one-finger drag resumes after pinch');
+    assert.equal(mapGestureCleanup.cancelStable, true, 'pointercancel clears drag state');
+    assert.equal(mapGestureCleanup.lostStable, true, 'lost pointer capture clears drag state');
+    assert.equal(mapGestureCleanup.maxZoom, 3, 'button zoom clamps to the maximum');
+    assert.equal(mapGestureCleanup.maxDisabled, true, 'zoom-in button reflects the maximum boundary');
+    assert.equal(mapGestureCleanup.maxWheelAllowed, true, 'wheel is released at maximum zoom');
+    assert.equal(mapGestureCleanup.minZoom, 1, 'button zoom clamps to the minimum');
+    assert.equal(mapGestureCleanup.minDisabled, true, 'zoom-out button reflects the minimum boundary');
+    assert.equal(mapGestureCleanup.noHorizontalOverflow, true);
+
     const mapLiveStart = await cdp.evaluate(`(() => {
       Game.world.setControlMode('manual');
       const canvas = document.querySelector('canvas[data-live-region-map]');
@@ -2775,6 +2946,32 @@ async function run() {
     const desktopCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const desktopScreenshot = path.join(os.tmpdir(), 'firpg-density-forest-desktop-cdp.png');
     fs.writeFileSync(desktopScreenshot, Buffer.from(desktopCapture.data, 'base64'));
+
+    const desktopMapWheel = await cdp.evaluate(`(() => {
+      const previousLayoutVersion = Game.state.world.layoutVersion;
+      Game.state.world.layoutVersion = 3;
+      Game.world.init('forest');
+      Game.ui.tabs.open('map');
+      const canvas = document.querySelector('canvas[data-live-region-map]');
+      const rect = canvas.getBoundingClientRect();
+      const consumed = !canvas.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -96, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left + rect.width * 0.72,
+        clientY: rect.top + rect.height * 0.38,
+        bubbles: true, cancelable: true
+      }));
+      const zoom = Number(canvas.dataset.mapZoom);
+      const sameCanvas = canvas === document.querySelector('canvas[data-live-region-map]');
+      const noHorizontalOverflow = document.documentElement.scrollWidth <= innerWidth;
+      Game.ui.tabs.open('battle');
+      Game.state.world.layoutVersion = previousLayoutVersion;
+      Game.world.init('forest');
+      return { consumed, zoom, sameCanvas, noHorizontalOverflow };
+    })()`);
+    assert.equal(desktopMapWheel.consumed, true, 'desktop wheel is captured while map zoom changes');
+    assert.ok(desktopMapWheel.zoom > 1 && desktopMapWheel.zoom < 1.35);
+    assert.equal(desktopMapWheel.sameCanvas, true);
+    assert.equal(desktopMapWheel.noHorizontalOverflow, true);
 
     const desktopTransition = await cdp.evaluate(`(() => {
       if (Game.transitions.isActive()) Game.transitions.settleBeforeSave();

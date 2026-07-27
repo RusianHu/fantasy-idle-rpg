@@ -151,7 +151,12 @@
 
         var base = document.createElement('canvas');
         base.width = 660; base.height = 396;
-        var view = { zoom: 1, x: 0, y: 0, drag: false, px: 0, py: 0 };
+        var view = { zoom: 1, x: 0, y: 0 };
+        var pointers = Object.create(null);
+        var pointerOrder = [];
+        var pinch = null;
+        var zoomOutButton = controls.querySelector('[data-zoom="-1"]');
+        var zoomInButton = controls.querySelector('[data-zoom="1"]');
         var baseDirty = false;
         var summaryDirty = false;
         var stopped = false;
@@ -192,6 +197,11 @@
           view.y = U.clamp(view.y, 0, base.height - sh);
           g.drawImage(base, view.x, view.y, sw, sh, 0, 0, canvas.width, canvas.height);
           drawHero(g, sw, sh);
+          zoomOutButton.disabled = view.zoom <= 1.0001;
+          zoomInButton.disabled = view.zoom >= 2.9999;
+          canvas.setAttribute('data-map-zoom', view.zoom.toFixed(4));
+          canvas.setAttribute('data-map-view-x', view.x.toFixed(4));
+          canvas.setAttribute('data-map-view-y', view.y.toFixed(4));
         }
 
         function updateSummary() {
@@ -276,17 +286,66 @@
           }
           liveFrame = requestAnimationFrame(liveTick);
         }
-        function zoom(delta, cx, cy) {
-          var old = view.zoom;
-          view.zoom = U.clamp(view.zoom * (delta > 0 ? 1.35 : 1 / 1.35), 1, 3);
-          var ox = view.x + (cx || canvas.width / 2) / canvas.width * base.width / old;
-          var oy = view.y + (cy || canvas.height / 2) / canvas.height * base.height / old;
-          view.x = ox - (cx || canvas.width / 2) / canvas.width * base.width / view.zoom;
-          view.y = oy - (cy || canvas.height / 2) / canvas.height * base.height / view.zoom;
-          draw();
+        function canvasPoint(clientX, clientY) {
+          var rect = canvas.getBoundingClientRect();
+          return {
+            x: (clientX - rect.left) / (rect.width || 1) * canvas.width,
+            y: (clientY - rect.top) / (rect.height || 1) * canvas.height
+          };
         }
-        controls.querySelector('[data-zoom="-1"]').addEventListener('click', function () { zoom(-1); });
-        controls.querySelector('[data-zoom="1"]').addEventListener('click', function () { zoom(1); });
+
+        function mapPointAt(cx, cy) {
+          return {
+            x: view.x + cx / canvas.width * base.width / view.zoom,
+            y: view.y + cy / canvas.height * base.height / view.zoom
+          };
+        }
+
+        function setZoom(nextZoom, cx, cy, anchor) {
+          nextZoom = U.clamp(nextZoom, 1, 3);
+          if (!Number.isFinite(nextZoom)) return false;
+          var zoomChanged = Math.abs(nextZoom - view.zoom) >= 0.0001;
+          if (!zoomChanged && !anchor) return false;
+          cx = cx === undefined || cx === null ? canvas.width / 2 : cx;
+          cy = cy === undefined || cy === null ? canvas.height / 2 : cy;
+          anchor = anchor || mapPointAt(cx, cy);
+          view.zoom = nextZoom;
+          view.x = anchor.x - cx / canvas.width * base.width / view.zoom;
+          view.y = anchor.y - cy / canvas.height * base.height / view.zoom;
+          draw();
+          return zoomChanged;
+        }
+
+        function stepZoom(direction) {
+          setZoom(view.zoom * (direction > 0 ? 1.35 : 1 / 1.35));
+        }
+
+        function pointerPair() {
+          return [pointers[pointerOrder[0]], pointers[pointerOrder[1]]];
+        }
+
+        function beginPinch() {
+          var pair = pointerPair();
+          var dx = pair[1].x - pair[0].x, dy = pair[1].y - pair[0].y;
+          var midpoint = canvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+          pinch = {
+            distance: Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+            zoom: view.zoom,
+            anchor: mapPointAt(midpoint.x, midpoint.y)
+          };
+        }
+
+        function removePointer(pointerId) {
+          if (!pointers[pointerId]) return;
+          delete pointers[pointerId];
+          var index = pointerOrder.indexOf(pointerId);
+          if (index >= 0) pointerOrder.splice(index, 1);
+          pinch = null;
+          if (pointerOrder.length === 2) beginPinch();
+        }
+
+        zoomOutButton.addEventListener('click', function () { stepZoom(-1); });
+        zoomInButton.addEventListener('click', function () { stepZoom(1); });
         controls.querySelector('[data-center]').addEventListener('click', function () {
           var hero = Game.world.hero;
           view.zoom = Math.max(1.5, view.zoom);
@@ -295,23 +354,44 @@
           draw();
         });
         canvas.addEventListener('wheel', function (e) {
-          e.preventDefault();
-          var rect = canvas.getBoundingClientRect();
-          zoom(e.deltaY < 0 ? 1 : -1, (e.clientX - rect.left) / rect.width * canvas.width,
-            (e.clientY - rect.top) / rect.height * canvas.height);
+          var delta = e.deltaY;
+          if (e.deltaMode === 1) delta *= 16;
+          else if (e.deltaMode === 2) delta *= canvas.clientHeight || canvas.height;
+          delta = U.clamp(delta, -240, 240);
+          if (!delta) return;
+          var point = canvasPoint(e.clientX, e.clientY);
+          if (setZoom(view.zoom * Math.exp(-delta * 0.0015), point.x, point.y)) {
+            e.preventDefault();
+          }
         }, { passive: false });
         canvas.addEventListener('pointerdown', function (e) {
-          view.drag = true; view.px = e.clientX; view.py = e.clientY;
-          canvas.setPointerCapture(e.pointerId);
+          if ((e.pointerType === 'mouse' && e.button !== 0) || pointerOrder.length >= 2) return;
+          pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+          pointerOrder.push(e.pointerId);
+          try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+          if (pointerOrder.length === 2) beginPinch();
         });
         canvas.addEventListener('pointermove', function (e) {
-          if (!view.drag) return;
-          view.x -= (e.clientX - view.px) / canvas.clientWidth * base.width / view.zoom;
-          view.y -= (e.clientY - view.py) / canvas.clientHeight * base.height / view.zoom;
-          view.px = e.clientX; view.py = e.clientY; draw();
+          var pointer = pointers[e.pointerId];
+          if (!pointer) return;
+          var dx = e.clientX - pointer.x, dy = e.clientY - pointer.y;
+          pointer.x = e.clientX; pointer.y = e.clientY;
+          if (pointerOrder.length === 1) {
+            view.x -= dx / (canvas.clientWidth || 1) * base.width / view.zoom;
+            view.y -= dy / (canvas.clientHeight || 1) * base.height / view.zoom;
+            draw();
+            return;
+          }
+          if (!pinch) beginPinch();
+          var pair = pointerPair();
+          var pdx = pair[1].x - pair[0].x, pdy = pair[1].y - pair[0].y;
+          var midpoint = canvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+          setZoom(pinch.zoom * Math.sqrt(pdx * pdx + pdy * pdy) / pinch.distance,
+            midpoint.x, midpoint.y, pinch.anchor);
         });
-        canvas.addEventListener('pointerup', function () { view.drag = false; });
-        canvas.addEventListener('pointercancel', function () { view.drag = false; });
+        canvas.addEventListener('pointerup', function (e) { removePointer(e.pointerId); });
+        canvas.addEventListener('pointercancel', function (e) { removePointer(e.pointerId); });
+        canvas.addEventListener('lostpointercapture', function (e) { removePointer(e.pointerId); });
         paintBase();
         draw();
         lastBasePaint = performance.now();
