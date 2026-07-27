@@ -8,6 +8,7 @@
   var FOG_CELL = 32;
   var FOG_VERSION = 1;
   var FOV_RADIUS = 80;
+  var FRONTIER_HORIZON = 520;
   var cache = {};
   var pendingFog = null;
   var pendingFogT = 0;
@@ -382,6 +383,7 @@
   var E = Game.exploration = {
     FOG_CELL: FOG_CELL,
     FOV_RADIUS: FOV_RADIUS,
+    FRONTIER_HORIZON: FRONTIER_HORIZON,
     regionState: regionState,
     flush: flushFog,
 
@@ -447,6 +449,7 @@
       var rs = regionState(rid), layout = Game.world && Game.world.layout;
       if (!layout || layout.version < 3) return null;
       var best = null, bestScore = -Infinity;
+      var localBest = null, localBestScore = -Infinity;
       for (var gy = 1; gy < rs.fog.h - 1; gy++) {
         for (var gx = 1; gx < rs.fog.w - 1; gx++) {
           if (visibleCell(rid, gx, gy)) continue;
@@ -472,11 +475,23 @@
           var score = unknownAround * 8 - travel * 0.045 - danger * 90;
           if (score > bestScore) {
             bestScore = score;
-            best = { kind: 'frontier', id: frontierId, x: p.x, y: p.y, gx: gx, gy: gy, score: score };
+            best = {
+              kind: 'frontier', id: frontierId, x: p.x, y: p.y,
+              gx: gx, gy: gy, score: score, travel: travel
+            };
+          }
+          if (travel <= FRONTIER_HORIZON && score > localBestScore) {
+            localBestScore = score;
+            localBest = {
+              kind: 'frontier', id: frontierId, x: p.x, y: p.y,
+              gx: gx, gy: gy, score: score, travel: travel
+            };
           }
         }
       }
-      return best;
+      // 完成一个局部航段后再评估下一段；附近没有合法前沿时才回退
+      // 到全局候选，避免单个远目标掩盖沿途的新发现。
+      return localBest || best;
     },
 
     drawFog: function (ctx, viewL, viewT, viewR, viewB) {

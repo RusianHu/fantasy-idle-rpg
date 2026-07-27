@@ -792,11 +792,17 @@ async function run() {
         hero.target = null;
         hero.moveOrder = null;
         hero.interactOrder = null;
+        for (const node of Game.world.layout.nodes) {
+          Game.state.world.nodeCooldowns[node.id] = 9999;
+        }
         let previousX = hero.x;
         let previousY = hero.y;
         let travelled = 0;
         let still = 0;
         let maxStill = 0;
+        let activeOrder = null;
+        let prematureSwitches = 0;
+        let firstGoalDistance = null;
         const targets = new Set();
         const startCoverage = Game.exploration.coverage(rid);
         for (let step = 0; step < 900; step++) {
@@ -809,6 +815,19 @@ async function run() {
           previousY = hero.y;
           const intent = Game.expeditionAI.intent();
           if (intent.target && intent.target.id) targets.add(intent.target.id);
+          const order = hero.moveOrder;
+          if (order && order.ai) {
+            if (firstGoalDistance === null) {
+              firstGoalDistance = Game.util.dist(hero.x, hero.y, order.x, order.y);
+            }
+            if (activeOrder && activeOrder.id !== order.id &&
+                Game.util.dist(hero.x, hero.y, activeOrder.x, activeOrder.y) > 7) {
+              prematureSwitches++;
+            }
+            activeOrder = { id: order.id, x: order.x, y: order.y };
+          } else {
+            activeOrder = null;
+          }
           const expectsMove = (hero.moveOrder && hero.moveOrder.ai) ||
             ['frontier', 'discovery', 'boss'].includes(intent.id);
           if (expectsMove && moved < 0.15) still++;
@@ -820,6 +839,9 @@ async function run() {
           travelled,
           maxStillSeconds: maxStill / 10,
           targets: targets.size,
+          prematureSwitches,
+          firstGoalDistance,
+          frontierHorizon: Game.exploration.FRONTIER_HORIZON,
           startCoverage,
           endCoverage: Game.exploration.coverage(rid),
           finalIntent: Game.expeditionAI.intent().id
@@ -835,9 +857,172 @@ async function run() {
         run.rid + ' auto-expedition does not remain stuck: ' + JSON.stringify(run));
       assert.ok(run.targets >= 2,
         run.rid + ' auto-expedition advances between objectives: ' + JSON.stringify(run));
+      assert.equal(run.prematureSwitches, 0,
+        run.rid + ' keeps each AI travel target until arrival: ' + JSON.stringify(run));
+      assert.ok(run.firstGoalDistance > 0 &&
+        run.firstGoalDistance <= run.frontierHorizon + 2,
+        run.rid + ' starts with a local frontier goal: ' + JSON.stringify(run));
       assert.ok(run.endCoverage > run.startCoverage,
         run.rid + ' auto-expedition reveals new fog: ' + JSON.stringify(run));
     }
+
+    const v3AutoActions = await cdp.evaluate(`(() => {
+      const W = Game.world;
+      Game.state.world.worldSeed = 0xA170AC71;
+      Game.state.world.layoutVersion = 3;
+      Game.state.world.region = 'mine';
+      Game.state.world.mode = 'battle';
+      Game.state.settings.controlMode = 'auto';
+      Game.state.settings.expeditionStrategy = 'balanced';
+      Game.state.settings.autoBoss = false;
+      W.init('mine');
+      let hero = W.hero;
+      W.entities = [hero];
+      W.pendingRespawn = [];
+      W.bossEnt = null;
+      Game.expeditionAI.reset();
+
+      const node = W.layout.nodes.find((entry) =>
+        !Game.exploration.isRevealed(entry.x, entry.y));
+      if (!node) throw new Error('auto-action resource probe missing');
+      let stand = null;
+      for (const radius of [48, 36, 24, 0]) {
+        for (let i = 0; i < 8 && !stand; i++) {
+          const angle = i * Math.PI / 4;
+          const point = Game.terrain.projectPoint(
+            node.x + Math.cos(angle) * radius,
+            node.y + Math.sin(angle) * radius,
+            2
+          );
+          if (point && Game.util.dist(point.x, point.y, node.x, node.y) <= 68) stand = point;
+        }
+      }
+      if (!stand) throw new Error('auto-action resource stand point missing');
+      hero.x = stand.x;
+      hero.y = stand.y;
+      hero.state = 'idle';
+      hero.target = null;
+      hero.interactOrder = null;
+      hero.navRoute = null;
+      delete node.seenAt;
+      for (const entry of W.layout.nodes) {
+        Game.state.world.nodeCooldowns[entry.id] = entry === node ? 0 : 9999;
+      }
+      Game.state.world.worldTime = 1000;
+      Game.exploration.revealAt(hero.x, hero.y, { force: true });
+      const materialBefore = Game.state.inv.materials[node.material] || 0;
+      const far = W.layout.bossPoint;
+      hero.moveOrder = {
+        x: far.x, y: far.y, id: 'ai-frontier:test-long-route',
+        ai: true, targetRef: { id: 'test-long-route', x: far.x, y: far.y }
+      };
+      let maxNodeDistance = 0;
+      for (let step = 0; step < 60 && !Game.state.world.nodeCooldowns[node.id]; step++) {
+        Game.state.world.worldTime += 0.1;
+        Game.terrain.update(0.1);
+        W.update(0.1);
+        maxNodeDistance = Math.max(
+          maxNodeDistance,
+          Game.util.dist(hero.x, hero.y, node.x, node.y)
+        );
+      }
+      const gathered = Game.state.world.nodeCooldowns[node.id] > 0;
+      const materialAfter = Game.state.inv.materials[node.material] || 0;
+      const gatherTrace = Game.expeditionAI.trace();
+
+      W.init('mine');
+      hero = W.hero;
+      W.pendingRespawn = [];
+      W.bossEnt = null;
+      for (const entry of W.layout.nodes) Game.state.world.nodeCooldowns[entry.id] = 9999;
+      let encounterPoint = null;
+      for (const radius of [60, 56, 52]) {
+        for (let i = 0; i < 12 && !encounterPoint; i++) {
+          const angle = i * Math.PI / 6;
+          const point = Game.terrain.projectPoint(
+            hero.x + Math.cos(angle) * radius,
+            hero.y + Math.sin(angle) * radius,
+            2
+          );
+          const distance = point && Game.util.dist(hero.x, hero.y, point.x, point.y);
+          if (distance >= 48 && distance <= 68) encounterPoint = point;
+        }
+      }
+      if (!encounterPoint) throw new Error('auto-action encounter point missing');
+      const monster = W.makeMonster(W.region.monsters[0], false);
+      monster.id = 'test-route-monster';
+      monster.x = encounterPoint.x;
+      monster.y = encounterPoint.y;
+      monster.spawnX = monster.x;
+      monster.spawnY = monster.y;
+      W.entities = [hero, monster];
+      Game.exploration.revealAt(monster.x, monster.y, { force: true });
+      const routePoint = W.layout.bossPoint;
+      hero.target = null;
+      hero.interactOrder = null;
+      hero.moveOrder = {
+        x: routePoint.x, y: routePoint.y, id: 'ai-frontier:test-encounter',
+        ai: true, targetRef: { id: 'test-encounter', x: routePoint.x, y: routePoint.y }
+      };
+      Game.expeditionAI.reset();
+      Game.expeditionAI.update(hero, 0.4);
+      const routeEncounter = {
+        acquired: hero.target === monster,
+        moveCleared: hero.moveOrder === null,
+        intent: Game.expeditionAI.intent().id,
+        reason: Game.expeditionAI.intent().reason,
+        trace: Game.expeditionAI.trace()
+      };
+
+      hero.target = null;
+      monster.engaged = false;
+      hero.moveOrder = {
+        x: routePoint.x, y: routePoint.y, id: 'player:test-order', ai: false
+      };
+      Game.expeditionAI.reset();
+      Game.expeditionAI.update(hero, 0.4);
+      const playerPriority = {
+        targetUntouched: hero.target === null,
+        orderPreserved: !!hero.moveOrder && hero.moveOrder.id === 'player:test-order',
+        intent: Game.expeditionAI.intent().id
+      };
+      Game.state.settings.autoBoss = true;
+      return {
+        resource: {
+          gathered,
+          materialGain: materialAfter - materialBefore,
+          maxNodeDistance,
+          trace: gatherTrace
+        },
+        routeEncounter,
+        playerPriority
+      };
+    })()`);
+    console.log('v3 auto-action diagnostics:', JSON.stringify(v3AutoActions));
+    assert.equal(v3AutoActions.resource.gathered, true);
+    assert.ok(v3AutoActions.resource.materialGain > 0);
+    assert.ok(v3AutoActions.resource.maxNodeDistance <= 70,
+      'new resource remains nearby through reveal grace: ' + JSON.stringify(v3AutoActions));
+    assert.ok(v3AutoActions.resource.trace.some((entry) =>
+      entry.to === 'gather' && entry.reason === 'reveal-grace'),
+    'resource trace records reveal-grace preemption: ' + JSON.stringify(v3AutoActions));
+    assert.deepEqual(
+      [
+        v3AutoActions.routeEncounter.acquired,
+        v3AutoActions.routeEncounter.moveCleared,
+        v3AutoActions.routeEncounter.intent,
+        v3AutoActions.routeEncounter.reason
+      ],
+      [true, true, 'combat', 'route-encounter']
+    );
+    assert.deepEqual(
+      [
+        v3AutoActions.playerPriority.targetUntouched,
+        v3AutoActions.playerPriority.orderPreserved,
+        v3AutoActions.playerPriority.intent
+      ],
+      [true, true, 'player-order']
+    );
 
     const v3ForestVisual = await cdp.evaluate(`(() => {
       Game.state.world.worldSeed = 0x1098DC78;

@@ -412,7 +412,7 @@
       }
       drawables.sort(function (a, b) { return a.y - b.y; });
 
-      // 手动锁定目标：金色选中圈；移动指令：绿色标记
+      // 手动锁定目标：金色选中圈；玩家移动与 AI 航段使用不同标记。
       var hero0 = W.hero;
       if (hero0 && hero0.manualTarget && hero0.target && !hero0.target.dead) {
         var mt = hero0.target;
@@ -424,13 +424,25 @@
       }
       if (hero0 && hero0.moveOrder) {
         var mo = hero0.moveOrder;
-        ctx.strokeStyle = 'rgba(120,230,130,' + (0.5 + 0.3 * Math.sin(t * 7)).toFixed(2) + ')';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(mo.x, mo.y, 6, 3, 0, 0, 6.29);
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(120,230,130,0.7)';
-        ctx.fillRect(mo.x - 1, mo.y - 1, 2, 2);
+        if (mo.ai) {
+          ctx.strokeStyle = 'rgba(105,190,225,' + (0.34 + 0.18 * Math.sin(t * 4)).toFixed(2) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(mo.x, mo.y - 5);
+          ctx.lineTo(mo.x + 5, mo.y);
+          ctx.lineTo(mo.x, mo.y + 5);
+          ctx.lineTo(mo.x - 5, mo.y);
+          ctx.closePath();
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = 'rgba(120,230,130,' + (0.5 + 0.3 * Math.sin(t * 7)).toFixed(2) + ')';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.ellipse(mo.x, mo.y, 6, 3, 0, 0, 6.29);
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(120,230,130,0.7)';
+          ctx.fillRect(mo.x - 1, mo.y - 1, 2, 2);
+        }
       }
 
       for (j = 0; j < drawables.length; j++) {

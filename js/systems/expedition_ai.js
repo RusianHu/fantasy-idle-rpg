@@ -9,11 +9,14 @@
   var thinkT = 0;
   var current = { id: 'idle', target: null, distance: 0, danger: 0, reason: null };
   var progress = { x: 0, y: 0, still: 0, blocked: {} };
+  var trace = [];
+  var TRACE_LIMIT = 80;
+  var NODE_NOTICE_RADIUS = 92;
 
   var STRATEGIES = {
-    safe: { hp: 0.58, danger: 1.55, resource: 0.8, route: 1.35 },
-    balanced: { hp: 0.36, danger: 1.0, resource: 1.0, route: 1.6 },
-    loot: { hp: 0.24, danger: 0.62, resource: 1.45, route: 1.9 }
+    safe: { hp: 0.58, danger: 1.55, resource: 0.8, route: 1.35, engage: 42 },
+    balanced: { hp: 0.36, danger: 1.0, resource: 1.0, route: 1.6, engage: 72 },
+    loot: { hp: 0.24, danger: 0.62, resource: 1.45, route: 1.9, engage: 96 }
   };
 
   function strategy() {
@@ -22,8 +25,21 @@
   }
 
   function emitIntent(next) {
-    var oldKey = current.id + ':' + (current.target && current.target.id || '');
-    var newKey = next.id + ':' + (next.target && next.target.id || '');
+    function targetKey(target) {
+      return target && (target.id || target.threatId || target.mid) || '';
+    }
+    var oldKey = current.id + ':' + targetKey(current.target);
+    var newKey = next.id + ':' + targetKey(next.target);
+    if (oldKey !== newKey) {
+      trace.push({
+        at: Game.state && Game.state.world ? +(Game.state.world.worldTime || 0).toFixed(2) : 0,
+        from: current.id,
+        to: next.id,
+        target: targetKey(next.target) || null,
+        reason: next.reason || null
+      });
+      if (trace.length > TRACE_LIMIT) trace.splice(0, trace.length - TRACE_LIMIT);
+    }
     current = next;
     if (oldKey !== newKey) bus.emit('ai:intentChanged', { intent: current, strategy: strategy() });
     return current;
@@ -56,9 +72,15 @@
     if (!target) return false;
     var projected = Game.terrain.projectPoint(target.x, target.y, 2);
     if (!projected) return false;
+    var orderId = prefix + ':' + (target.id || Math.round(projected.x) + ':' + Math.round(projected.y));
+    if (hero.moveOrder && hero.moveOrder.ai && hero.moveOrder.id === orderId &&
+        U.dist(hero.moveOrder.x, hero.moveOrder.y, projected.x, projected.y) < 4) {
+      hero.moveOrder.targetRef = target;
+      return true;
+    }
     hero.moveOrder = {
       x: projected.x, y: projected.y,
-      id: prefix + ':' + (target.id || Math.round(projected.x) + ':' + Math.round(projected.y)),
+      id: orderId,
       ai: true, targetRef: target
     };
     hero.target = null;
@@ -84,6 +106,81 @@
     var drops = Game.world.groundLoot || [];
     var urgent = drops.filter(function (d) { return d.ttl - d.age < 18; });
     return nearest(urgent, hero);
+  }
+
+  function interactionIntent(order) {
+    var target = order && order.target;
+    var id = order && order.type === 'chest' ? 'chest' :
+      (order && order.type === 'gather' ? 'gather' : 'loot');
+    return {
+      id: id,
+      target: target || null,
+      distance: target ? U.dist(Game.world.hero.x, Game.world.hero.y, target.x, target.y) : 0,
+      danger: target ? Game.terrain.dangerAt(target.x, target.y) : 0,
+      reason: order && order.explicit ? 'player' : 'ambient'
+    };
+  }
+
+  function nearbyThreat(hero) {
+    var radius = STRATEGIES[strategy()].engage;
+    return nearest(Game.world.entities || [], hero, function (e) {
+      if (!e || e.kind !== 'monster' || e.dead || e.hp <= 0 || e.boss) return false;
+      if (!visible(e)) return false;
+      return U.dist(hero.x, hero.y, e.x, e.y) <= radius;
+    });
+  }
+
+  function pendingNode(hero) {
+    if (!Game.environment || !Game.exploration) return null;
+    var now = Game.state.world.worldTime || 0;
+    var grace = Game.environment.AUTO_GATHER_REVEAL_GRACE || 0;
+    var rs = Game.exploration.regionState(Game.state.world.region);
+    return nearest(Game.world.layout.nodes || [], hero, function (node) {
+      if (!visible(node) || !rs.discovered.resources[node.defId]) return false;
+      if (!Game.environment.nodeReady(node) || node.seenAt === undefined) return false;
+      var age = now - node.seenAt;
+      return age >= 0 && age < grace &&
+        U.dist(hero.x, hero.y, node.x, node.y) <= NODE_NOTICE_RADIUS;
+    });
+  }
+
+  function nearbyMatureNode(hero) {
+    if (!Game.environment) return null;
+    return Game.environment.nearestNode(hero.x, hero.y, 120);
+  }
+
+  function holdForNode(hero, found) {
+    if (hero.moveOrder && hero.moveOrder.ai) {
+      hero.moveOrder = null;
+      if (Game.nav) Game.nav.clear(hero);
+    }
+    return emitIntent({
+      id: 'gather',
+      target: found.target,
+      distance: found.distance,
+      danger: Game.terrain.dangerAt(found.target.x, found.target.y),
+      reason: 'reveal-grace'
+    });
+  }
+
+  function preservedTravel(hero) {
+    var order = hero.moveOrder;
+    if (!order || !order.ai) return null;
+    var target = order.targetRef || order;
+    if (target.id && blocked(target.id)) return null;
+    var id = current.id;
+    if (!id || id === 'idle') {
+      id = order.id.indexOf('ai-frontier:') === 0 ? 'frontier' :
+        (order.id.indexOf('ai-discovery:') === 0 ? 'discovery' :
+          (order.id.indexOf('ai-boss:') === 0 ? 'boss' : 'camp'));
+    }
+    return {
+      id: id,
+      target: target,
+      distance: U.dist(hero.x, hero.y, order.x, order.y),
+      danger: Game.terrain.dangerAt(order.x, order.y),
+      reason: current.reason || 'travel'
+    };
   }
 
   function visibleMissing(kind, list, hero) {
@@ -122,7 +219,7 @@
     return { target: lair, distance: U.dist(hero.x, hero.y, lair.x, lair.y), ready: ready };
   }
 
-  function replan(hero, reason) {
+  function replan(hero, reason, force) {
     var layout = Game.world.layout;
     if (!layout || layout.version < 3 || Game.world.controlMode() !== 'auto') {
       return emitIntent({ id: 'idle', target: null, distance: 0, danger: 0, reason: reason || null });
@@ -138,11 +235,44 @@
     if (hero.interactOrder && hero.interactOrder.explicit) {
       return emitIntent({ id: 'player-order', target: hero.interactOrder.target, distance: 0, danger: 0, reason: null });
     }
+    if (hero.interactOrder) return emitIntent(interactionIntent(hero.interactOrder));
 
     var loot = expiringLoot(hero);
     if (loot) {
-      Game.world.startInteraction({ type: 'loot', target: loot.target }, false);
-      return emitIntent({ id: 'loot', target: loot.target, distance: loot.distance, danger: Game.terrain.dangerAt(loot.target.x, loot.target.y), reason: 'expiring' });
+      if (Game.world.startInteraction({ type: 'loot', target: loot.target }, false)) {
+        return emitIntent({ id: 'loot', target: loot.target, distance: loot.distance, danger: Game.terrain.dangerAt(loot.target.x, loot.target.y), reason: 'expiring' });
+      }
+    }
+
+    var threat = nearbyThreat(hero);
+    if (threat) {
+      hero.target = threat.target;
+      hero.moveOrder = null;
+      if (Game.nav) Game.nav.clear(hero);
+      return emitIntent({
+        id: 'combat', target: threat.target, distance: threat.distance,
+        danger: Game.terrain.dangerAt(threat.target.x, threat.target.y),
+        reason: 'route-encounter'
+      });
+    }
+
+    var waitingNode = pendingNode(hero);
+    if (waitingNode) return holdForNode(hero, waitingNode);
+
+    var closeNode = nearbyMatureNode(hero);
+    if (closeNode && Game.world.startInteraction({ type: 'gather', target: closeNode.target }, false)) {
+      return emitIntent({
+        id: 'gather', target: closeNode.target, distance: closeNode.distance,
+        danger: Game.terrain.dangerAt(closeNode.target.x, closeNode.target.y),
+        reason: 'along-route'
+      });
+    }
+
+    // 已开始的航段保持到抵达；沿途紧急掉落、接敌和新资源仍可在
+    // 上方抢占，避免已进入视野的前沿每 0.35 秒跳到别处。
+    var travel = !force && preservedTravel(hero);
+    if (travel) {
+      return emitIntent(travel);
     }
 
     // 未知前沿优先；只能读取迷雾边界，不读取未发现奖励坐标。
@@ -168,8 +298,9 @@
     var prog = Game.State.regionProg(Game.state.world.region);
     var node = matureNode(hero, !!prog.firstKill);
     if (node) {
-      Game.world.startInteraction({ type: 'gather', target: node.target }, false);
-      return emitIntent({ id: 'gather', target: node.target, distance: node.distance, danger: Game.terrain.dangerAt(node.target.x, node.target.y), reason: null });
+      if (Game.world.startInteraction({ type: 'gather', target: node.target }, false)) {
+        return emitIntent({ id: 'gather', target: node.target, distance: node.distance, danger: Game.terrain.dangerAt(node.target.x, node.target.y), reason: null });
+      }
     }
 
     var guardian = guardianTarget(hero);
@@ -191,8 +322,9 @@
     if (prog.firstKill) {
       node = matureNode(hero, true);
       if (node) {
-        Game.world.startInteraction({ type: 'gather', target: node.target }, false);
-        return emitIntent({ id: 'circuit', target: node.target, distance: node.distance, danger: Game.terrain.dangerAt(node.target.x, node.target.y), reason: null });
+        if (Game.world.startInteraction({ type: 'gather', target: node.target }, false)) {
+          return emitIntent({ id: 'circuit', target: node.target, distance: node.distance, danger: Game.terrain.dangerAt(node.target.x, node.target.y), reason: null });
+        }
       }
     }
     setMove(hero, layout.camp, 'ai-camp');
@@ -208,14 +340,15 @@
       thinkT = 0;
       bus.emit('settings:changed', { key: 'expeditionStrategy', value: id });
       bus.emit('ai:strategyChanged', { strategy: id });
-      if (Game.world && Game.world.hero) replan(Game.world.hero, 'strategy');
+      if (Game.world && Game.world.hero) replan(Game.world.hero, 'strategy', true);
       return id;
     },
 
     strategy: strategy,
     intent: function () { return current; },
+    trace: function () { return trace.slice(); },
     replan: function (reason) {
-      return Game.world && Game.world.hero ? replan(Game.world.hero, reason) : current;
+      return Game.world && Game.world.hero ? replan(Game.world.hero, reason, true) : current;
     },
 
     update: function (hero, dt) {
@@ -232,6 +365,29 @@
           emitIntent({ id: 'combat', target: contact, distance: U.dist(hero.x, hero.y, contact.x, contact.y), danger: 1, reason: 'contact' });
         }
       }
+      if (hero.interactOrder && !hero.target) {
+        if (hero.interactOrder.explicit) {
+          emitIntent({
+            id: 'player-order',
+            target: hero.interactOrder.target,
+            distance: hero.interactOrder.target
+              ? U.dist(hero.x, hero.y, hero.interactOrder.target.x, hero.interactOrder.target.y)
+              : 0,
+            danger: 0,
+            reason: 'player'
+          });
+        } else {
+          emitIntent(interactionIntent(hero.interactOrder));
+        }
+      } else if (hero.moveOrder && !hero.moveOrder.ai && !hero.target) {
+        emitIntent({
+          id: 'player-order',
+          target: hero.moveOrder,
+          distance: U.dist(hero.x, hero.y, hero.moveOrder.x, hero.moveOrder.y),
+          danger: Game.terrain.dangerAt(hero.moveOrder.x, hero.moveOrder.y),
+          reason: 'player'
+        });
+      }
 
       var moved = U.dist(hero.x, hero.y, progress.x, progress.y);
       var expectsMove = (hero.moveOrder && hero.moveOrder.ai) ||
@@ -244,11 +400,10 @@
         var tid = current.target && current.target.id;
         if (tid) progress.blocked[tid] = (Game.state.world.worldTime || 0) + 30;
         hero.moveOrder = null;
-        var camp = Game.terrain.projectPoint(Game.world.layout.camp.x, Game.world.layout.camp.y, 2);
-        if (camp) setMove(hero, camp, 'ai-stuck-camp');
+        if (Game.nav) Game.nav.clear(hero);
         progress.still = 0;
         thinkT = 0;
-        replan(hero, 'stuck-fallback');
+        replan(hero, 'stuck-fallback', true);
         return true;
       }
       if (progress.still >= 2) {
@@ -267,7 +422,7 @@
       if (thinkT <= 0 && !hero.target && !hero.interactOrder &&
           (!hero.moveOrder || hero.moveOrder.ai)) {
         thinkT = 0.35;
-        replan(hero, null);
+        replan(hero, null, false);
       }
       if (current.target && Number.isFinite(current.target.x)) {
         current.distance = U.dist(hero.x, hero.y, current.target.x, current.target.y);
@@ -280,6 +435,7 @@
       thinkT = 0;
       current = { id: 'idle', target: null, distance: 0, danger: 0, reason: null };
       progress = { x: 0, y: 0, still: 0, blocked: {} };
+      trace = [];
     }
   };
 })();

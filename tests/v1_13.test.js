@@ -397,6 +397,18 @@ assert.match(aiSource, /autoNodeReady\(n\)/,
   'newly seen resources remain visible before automatic gathering');
 assert.doesNotMatch(aiSource, /layout\.(landmarks|nodes|curios|ecology)\[[^\]]+\].*frontier/);
 assert.match(aiSource, /boss && boss\.ready\.coverage >= 0\.60/);
+assert.match(aiSource, /balanced:.*engage: 72/,
+  'balanced auto expeditions must notice monsters that are visibly along the route');
+assert.match(aiSource, /function preservedTravel\(hero\)/,
+  'active AI travel keeps a stable target until arrival or a valid preemption');
+assert.match(aiSource, /reason: 'reveal-grace'/,
+  'newly revealed resources hold the route until the visibility grace elapses');
+assert.match(aiSource, /trace: function \(\) \{ return trace\.slice\(\); \}/,
+  'AI exposes a bounded read-only decision trace for deterministic diagnostics');
+assert.match(read('js/systems/exploration.js'), /FRONTIER_HORIZON = 520/,
+  'frontier selection prefers a local exploration horizon');
+assert.match(read('js/render/renderer.js'), /if \(mo\.ai\)/,
+  'AI travel and player click markers must remain visually distinct');
 assert.ok(aiSource.indexOf('var guardian = guardianTarget(hero);') <
   aiSource.indexOf("setMove(hero, boss.target, 'ai-boss')"),
   'guardian decision remains ahead of Boss execution');
