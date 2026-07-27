@@ -405,10 +405,14 @@ assert.match(aiSource, /reason: 'reveal-grace'/,
   'newly revealed resources hold the route until the visibility grace elapses');
 assert.match(aiSource, /trace: function \(\) \{ return trace\.slice\(\); \}/,
   'AI exposes a bounded read-only decision trace for deterministic diagnostics');
+assert.match(aiSource, /Game\.actionBubbles\.show\(hero, 'gather'/,
+  'automatic gathering reports its action through the shared bubble manager');
 assert.match(read('js/systems/exploration.js'), /FRONTIER_HORIZON = 520/,
   'frontier selection prefers a local exploration horizon');
 assert.match(read('js/render/renderer.js'), /if \(mo\.ai\)/,
   'AI travel and player click markers must remain visually distinct');
+assert.match(read('js/render/renderer.js'), /Game\.actionBubbles\.visit/,
+  'the renderer consumes generic entity anchors instead of hero-only bubble state');
 assert.ok(aiSource.indexOf('var guardian = guardianTarget(hero);') <
   aiSource.indexOf("setMove(hero, boss.target, 'ai-boss')"),
   'guardian decision remains ahead of Boss execution');
@@ -434,6 +438,40 @@ assert.match(read('js/systems/world.js'), /autoNodeReady\(gatherTarget\)/,
 assert.doesNotMatch(read('js/render/renderer.js'),
   /Game\.assets\.draw\(ctx, spriteId, 'idle0', x, y, \{ alpha: 0\.22/,
   'depleted resources must not render as a misleading translucent live node');
+
+const bubbleBox = makeSandbox([
+  'js/core/utils.js',
+  'js/core/eventbus.js',
+  'js/systems/action_bubbles.js'
+]);
+const Bubble = bubbleBox.Game.actionBubbles;
+const bubbleHero = { kind: 'hero', x: 80, y: 90 };
+const bubbleMonster = { kind: 'monster', x: 120, y: 90 };
+const resourceBubble = Bubble.show(bubbleHero, 'resource', { targetId: 'node-a' });
+assert.equal(resourceBubble.type, 'resource');
+assert.equal(resourceBubble.icon, 'resource');
+assert.equal(Object.prototype.hasOwnProperty.call(resourceBubble, 'textKey'), false,
+  'RPG reaction bubble snapshots remain icon-only');
+assert.equal(Bubble.show(bubbleHero, 'resource', { targetId: 'node-a' }), false,
+  'same entity and target bubble is deduplicated');
+assert.equal(Bubble.show(bubbleMonster, 'alert', { targetId: 'monster-a' }).type, 'alert');
+assert.equal(Bubble.show(bubbleHero, 'enemy', { targetId: 'monster-a' }).type, 'enemy');
+assert.equal(Bubble.show(bubbleHero, 'loot', { targetId: 'loot-a' }).state, 'queued');
+let bubbleSnapshot = Bubble.active();
+assert.equal(bubbleSnapshot.filter((entry) => entry.state === 'visible').length, 2);
+assert.ok(bubbleSnapshot.some((entry) =>
+  entry.entityKind === 'hero' && entry.type === 'enemy' && entry.state === 'visible'));
+assert.ok(bubbleSnapshot.some((entry) =>
+  entry.entityKind === 'monster' && entry.type === 'alert' && entry.state === 'visible'));
+assert.ok(bubbleSnapshot.every((entry) => !Object.prototype.hasOwnProperty.call(entry, 'anchor')),
+  'diagnostics expose coordinates and stable IDs without leaking mutable anchors');
+for (let tick = 0; tick < 10; tick++) Bubble.update(0.25);
+bubbleSnapshot = Bubble.active();
+assert.ok(bubbleSnapshot.some((entry) =>
+  entry.entityKind === 'hero' && entry.type === 'loot' && entry.state === 'visible'),
+'a queued lower-priority bubble advances after the encounter bubble expires');
+Bubble.clear();
+assert.deepEqual(Array.from(Bubble.active()), []);
 
 const offlineBox = makeSandbox([
   'js/core/utils.js',
@@ -501,6 +539,7 @@ for (const id of newResourceSprites) assert.ok(manifest.assets.includes(id));
 const index = read('index.html');
 assert.ok(index.indexOf('systems/terrain_v3.js') > index.indexOf('systems/terrain.js'));
 assert.ok(index.indexOf('systems/exploration.js') < index.indexOf('systems/world.js'));
+assert.ok(index.indexOf('systems/action_bubbles.js') < index.indexOf('systems/expedition_ai.js'));
 assert.ok(index.indexOf('render/exploration.js') > index.indexOf('render/terrain.js'));
 assert.ok(fs.existsSync(path.join(ROOT, 'tech-demos/exploration-v3/exploration-v3.html')));
 

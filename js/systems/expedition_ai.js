@@ -24,6 +24,44 @@
     return STRATEGIES[id] ? id : 'balanced';
   }
 
+  function showIntentBubble(next) {
+    var bubbles = Game.actionBubbles;
+    var hero = Game.world && Game.world.hero;
+    if (!bubbles || !hero || !Game.state ||
+        Game.world.controlMode() !== 'auto' || Game.state.world.mode !== 'battle') return;
+    var target = next.target;
+    var targetId = target && (target.id || target.threatId || target.mid) || next.id;
+
+    if (next.id === 'combat' || next.id === 'guardian') {
+      bubbles.show(hero, 'enemy', {
+        targetId: targetId,
+        dedupeKey: 'enemy:' + targetId
+      });
+      if (target && target.kind === 'monster') {
+        bubbles.show(target, 'alert', {
+          targetId: targetId,
+          dedupeKey: 'alert:' + targetId
+        });
+      }
+    } else if (next.id === 'gather' || next.id === 'circuit' ||
+        (next.id === 'discovery' && target && target.kind === 'gatherNode')) {
+      bubbles.show(hero, 'resource', {
+        targetId: targetId,
+        dedupeKey: 'resource:' + targetId
+      });
+    } else if (next.id === 'chest') {
+      bubbles.show(hero, 'chest', {
+        targetId: targetId,
+        dedupeKey: 'chest:' + targetId
+      });
+    } else if (next.id === 'loot') {
+      bubbles.show(hero, 'loot', {
+        targetId: targetId,
+        dedupeKey: 'loot:' + targetId
+      });
+    }
+  }
+
   function emitIntent(next) {
     function targetKey(target) {
       return target && (target.id || target.threatId || target.mid) || '';
@@ -41,7 +79,10 @@
       if (trace.length > TRACE_LIMIT) trace.splice(0, trace.length - TRACE_LIMIT);
     }
     current = next;
-    if (oldKey !== newKey) bus.emit('ai:intentChanged', { intent: current, strategy: strategy() });
+    if (oldKey !== newKey) {
+      bus.emit('ai:intentChanged', { intent: current, strategy: strategy() });
+      showIntentBubble(current);
+    }
     return current;
   }
 
@@ -438,4 +479,28 @@
       trace = [];
     }
   };
+
+  bus.on('gather:start', function (payload) {
+    var hero = Game.world && Game.world.hero;
+    if (!hero || !Game.actionBubbles || Game.world.controlMode() !== 'auto' ||
+        Game.state.world.mode !== 'battle' ||
+        (hero.interactOrder && hero.interactOrder.explicit)) return;
+    var id = payload && payload.id || 'node';
+    Game.actionBubbles.show(hero, 'gather', {
+      targetId: id,
+      dedupeKey: 'gather:' + id
+    });
+  });
+
+  bus.on('item:pickedUp', function (payload) {
+    var hero = Game.world && Game.world.hero;
+    if (!hero || !Game.actionBubbles || Game.world.controlMode() !== 'auto' ||
+        Game.state.world.mode !== 'battle' ||
+        (payload && payload.reason === 'click')) return;
+    var id = payload && payload.id || 'loot';
+    Game.actionBubbles.show(hero, 'loot', {
+      targetId: id,
+      dedupeKey: 'loot:' + id
+    });
+  });
 })();

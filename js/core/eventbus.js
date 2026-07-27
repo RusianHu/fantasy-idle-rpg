@@ -35,6 +35,7 @@
  *   readiness:changed / region:completed100
  *   expedition:started / expedition:finished / commission:completed
  *   ai:intentChanged / ai:strategyChanged
+ *   actionBubble:shown
  * ============================================================ */
 (function () {
   'use strict';

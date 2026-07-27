@@ -64,6 +64,7 @@
     if (dt > 0.25) dt = 0.25;
 
     step(dt);
+    if (Game.actionBubbles) Game.actionBubbles.update(dt);
     Game.render.frame(dt);
     Game.ui.hud.tick(dt);
 

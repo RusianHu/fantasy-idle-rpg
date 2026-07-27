@@ -234,6 +234,110 @@
     return ((m.animT / 0.36) | 0) % 2 === 0 ? 'idle0' : 'idle1';
   }
 
+  function drawBubbleIcon(graphics, icon, x, y, accent, ink) {
+    var px;
+    graphics.fillStyle = ink;
+    if (icon === 'resource') {
+      graphics.fillRect(x + 3, y + 1, 1, 7);
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 1, y + 1, 3, 2);
+      graphics.fillRect(x, y + 2, 4, 2);
+      graphics.fillRect(x + 4, y + 3, 3, 2);
+      graphics.fillRect(x + 4, y + 5, 2, 1);
+    } else if (icon === 'gather') {
+      graphics.fillStyle = '#75502d';
+      for (px = 0; px < 5; px++) graphics.fillRect(x + 5 - px, y + 3 + px, 1, 1);
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 1, y + 1, 6, 1);
+      graphics.fillRect(x, y + 2, 3, 1);
+      graphics.fillStyle = ink;
+      graphics.fillRect(x + 5, y + 2, 2, 1);
+    } else if (icon === 'enemy') {
+      for (px = 0; px < 5; px++) {
+        graphics.fillRect(x + 1 + px, y + 1 + px, 1, 1);
+        graphics.fillRect(x + 5 - px, y + 1 + px, 1, 1);
+      }
+      graphics.fillStyle = accent;
+      graphics.fillRect(x, y + 6, 3, 1);
+      graphics.fillRect(x + 5, y + 6, 3, 1);
+      graphics.fillStyle = '#f5e9c7';
+      graphics.fillRect(x + 1, y + 1, 1, 1);
+      graphics.fillRect(x + 6, y + 1, 1, 1);
+    } else if (icon === 'alert') {
+      graphics.fillRect(x + 3, y, 2, 5);
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 3, y + 6, 2, 2);
+      graphics.fillStyle = '#f7e7c7';
+      graphics.fillRect(x + 3, y, 1, 3);
+    } else if (icon === 'chest') {
+      graphics.fillRect(x, y + 2, 8, 6);
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 1, y + 1, 6, 2);
+      graphics.fillRect(x + 1, y + 4, 6, 3);
+      graphics.fillStyle = '#f2cd65';
+      graphics.fillRect(x + 3, y + 3, 2, 3);
+      graphics.fillStyle = '#fff1a8';
+      graphics.fillRect(x + 4, y + 4, 1, 1);
+    } else if (icon === 'loot') {
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 2, y + 2, 5, 5);
+      graphics.fillRect(x + 3, y + 1, 3, 1);
+      graphics.fillStyle = ink;
+      graphics.fillRect(x + 3, y, 3, 1);
+      graphics.fillRect(x + 1, y + 7, 7, 1);
+      graphics.fillStyle = '#f4d56c';
+      graphics.fillRect(x, y + 1, 1, 3);
+      graphics.fillRect(x - 1, y + 2, 3, 1);
+    }
+  }
+
+  function drawPixelBubble(bubble, anchor, left, top, right, bottom) {
+    if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return;
+    if (anchor.x < left - 48 || anchor.x > right + 48 ||
+        anchor.y < top - 48 || anchor.y > bottom + 48) return;
+
+    ctx.save();
+    var w = 15;
+    var h = 14;
+    var centerX = U.clamp(anchor.x, left + w / 2 + 2, right - w / 2 - 2);
+    var entityH = anchor.bubbleOffsetY || anchor.spriteH || 18;
+    var y = Math.round(anchor.y - entityH - h - 14);
+    y = Math.max(Math.round(top + 2), y);
+    var x = Math.round(centerX - w / 2);
+    var tailX = U.clamp(Math.round(anchor.x), x + 6, x + w - 6);
+    var motion = U.motionEnabled();
+    var fadeIn = motion ? U.clamp((bubble.age + 0.06) / 0.14, 0, 1) : 1;
+    var fadeOut = bubble.duration - bubble.age < 0.32
+      ? U.clamp((bubble.duration - bubble.age) / 0.32, 0, 1)
+      : 1;
+    ctx.globalAlpha = fadeIn * fadeOut;
+    if (motion) y += Math.round(Math.sin((bubble.age + bubble.priority) * 4) * 0.45);
+
+    var border = '#392c27';
+    ctx.fillStyle = 'rgba(20,16,20,0.38)';
+    ctx.fillRect(x + 2, y + 3, w, h - 2);
+    ctx.fillRect(tailX, y + h + 1, 3, 3);
+
+    // 阶梯角与方形尾巴保持像素轮廓，不引入圆角或平滑矢量边。
+    ctx.fillStyle = border;
+    ctx.fillRect(x + 2, y, w - 4, h);
+    ctx.fillRect(x, y + 2, w, h - 4);
+    ctx.fillRect(tailX - 3, y + h - 1, 6, 2);
+    ctx.fillRect(tailX - 2, y + h + 1, 4, 2);
+    ctx.fillRect(tailX - 1, y + h + 3, 2, 2);
+
+    ctx.fillStyle = bubble.style.paper;
+    ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+    ctx.fillRect(tailX - 1, y + h - 1, 2, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.34)';
+    ctx.fillRect(x + 4, y + 2, Math.max(4, w - 9), 1);
+    ctx.fillStyle = bubble.style.accent;
+    ctx.fillRect(x + 2, y + 3, 2, h - 6);
+
+    drawBubbleIcon(ctx, bubble.icon, x + 4, y + 3, bubble.style.accent, bubble.style.ink);
+    ctx.restore();
+  }
+
   /* ================= 渲染器 ================= */
   var R = Game.render = {
     cam: cam,
@@ -535,7 +639,37 @@
       // 9) 飘字置于色调之上（保证可读）
       ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (cw / 2 - cam.x * z + sh.x), dpr * (ch / 2 - cam.y * z + sh.y));
       Game.fx.drawFloats(ctx, z);
+      R.drawActionBubbles();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    },
+
+    drawActionBubbles: function () {
+      if (!Game.actionBubbles) return;
+      var left = cam.x - cw / cam.zoom / 2;
+      var right = cam.x + cw / cam.zoom / 2;
+      var top = cam.y - ch / cam.zoom / 2;
+      var bottom = cam.y + ch / cam.zoom / 2;
+      Game.actionBubbles.visit(function (bubble, anchor) {
+        drawPixelBubble(bubble, anchor, left, top, right, bottom);
+      });
+    },
+
+    drawActionBubbleIcon: function (target, type) {
+      if (!target || !Game.actionBubbles) return false;
+      var def = Game.actionBubbles.type(type);
+      if (!def) return false;
+      var graphics = target.getContext && target.getContext('2d');
+      if (!graphics) return false;
+      graphics.clearRect(0, 0, target.width, target.height);
+      graphics.imageSmoothingEnabled = false;
+      var scale = Math.max(1, Math.floor(Math.min(target.width, target.height) / 12));
+      graphics.save();
+      graphics.scale(scale, scale);
+      var x = Math.floor(target.width / scale / 2) - 4;
+      var y = Math.floor(target.height / scale / 2) - 4;
+      drawBubbleIcon(graphics, def.icon, x, y, def.accent, def.ink);
+      graphics.restore();
+      return true;
     },
 
     /* ---------- 实体绘制 ---------- */

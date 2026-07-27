@@ -881,6 +881,7 @@ async function run() {
       W.pendingRespawn = [];
       W.bossEnt = null;
       Game.expeditionAI.reset();
+      Game.actionBubbles.clear();
 
       const node = W.layout.nodes.find((entry) =>
         !Game.exploration.isRevealed(entry.x, entry.y));
@@ -917,10 +918,14 @@ async function run() {
         ai: true, targetRef: { id: 'test-long-route', x: far.x, y: far.y }
       };
       let maxNodeDistance = 0;
+      const resourceBubbleTypes = new Set();
       for (let step = 0; step < 60 && !Game.state.world.nodeCooldowns[node.id]; step++) {
         Game.state.world.worldTime += 0.1;
         Game.terrain.update(0.1);
         W.update(0.1);
+        for (const bubble of Game.actionBubbles.active()) {
+          if (bubble.entityKind === 'hero') resourceBubbleTypes.add(bubble.type);
+        }
         maxNodeDistance = Math.max(
           maxNodeDistance,
           Game.util.dist(hero.x, hero.y, node.x, node.y)
@@ -971,11 +976,13 @@ async function run() {
         moveCleared: hero.moveOrder === null,
         intent: Game.expeditionAI.intent().id,
         reason: Game.expeditionAI.intent().reason,
+        bubbles: Game.actionBubbles.active(),
         trace: Game.expeditionAI.trace()
       };
 
       hero.target = null;
       monster.engaged = false;
+      Game.actionBubbles.clear();
       hero.moveOrder = {
         x: routePoint.x, y: routePoint.y, id: 'player:test-order', ai: false
       };
@@ -992,6 +999,7 @@ async function run() {
           gathered,
           materialGain: materialAfter - materialBefore,
           maxNodeDistance,
+          bubbleTypes: Array.from(resourceBubbleTypes),
           trace: gatherTrace
         },
         routeEncounter,
@@ -1006,6 +1014,9 @@ async function run() {
     assert.ok(v3AutoActions.resource.trace.some((entry) =>
       entry.to === 'gather' && entry.reason === 'reveal-grace'),
     'resource trace records reveal-grace preemption: ' + JSON.stringify(v3AutoActions));
+    assert.ok(v3AutoActions.resource.bubbleTypes.includes('resource') &&
+      v3AutoActions.resource.bubbleTypes.includes('gather'),
+    'resource discovery and gather action use distinct bubbles: ' + JSON.stringify(v3AutoActions));
     assert.deepEqual(
       [
         v3AutoActions.routeEncounter.acquired,
@@ -1015,6 +1026,12 @@ async function run() {
       ],
       [true, true, 'combat', 'route-encounter']
     );
+    assert.ok(v3AutoActions.routeEncounter.bubbles.some((bubble) =>
+      bubble.entityKind === 'hero' && bubble.type === 'enemy' && bubble.state === 'visible'));
+    assert.ok(v3AutoActions.routeEncounter.bubbles.some((bubble) =>
+      bubble.entityKind === 'monster' && bubble.type === 'alert' && bubble.state === 'visible'));
+    assert.equal(new Set(v3AutoActions.routeEncounter.bubbles.map((bubble) =>
+      bubble.anchorId)).size, 2, 'hero and monster bubbles retain independent anchor lanes');
     assert.deepEqual(
       [
         v3AutoActions.playerPriority.targetUntouched,
@@ -1023,6 +1040,68 @@ async function run() {
       ],
       [true, true, 'player-order']
     );
+
+    const actionBubbleVisual = await cdp.evaluate(`(() => {
+      const canvas = document.getElementById('stage');
+      const context = canvas.getContext('2d');
+      const hero = Game.world.hero;
+      Game.state.settings.effects = false;
+      Game.actionBubbles.clear();
+      Game.render.frame(0);
+      const before = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      Game.actionBubbles.show(hero, 'resource', {
+        targetId: 'visual-resource',
+        duration: 5
+      });
+      Game.render.frame(0);
+      const after = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      let pixelDiff = 0;
+      for (let i = 0; i < before.length; i += 4) {
+        if (before[i] !== after[i] || before[i + 1] !== after[i + 1] ||
+            before[i + 2] !== after[i + 2] || before[i + 3] !== after[i + 3]) {
+          pixelDiff++;
+        }
+      }
+      return {
+        pixelDiff,
+        active: Game.actionBubbles.active(),
+        locale: Game.i18n.locale()
+      };
+    })()`);
+    assert.ok(actionBubbleVisual.pixelDiff >= 120,
+      'action bubble must paint a visible canvas surface: ' + JSON.stringify(actionBubbleVisual));
+    assert.equal(actionBubbleVisual.active[0].type, 'resource');
+    const actionBubbleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const actionBubbleScreenshot = path.join(os.tmpdir(), 'firpg-action-bubble-mobile-cdp.png');
+    fs.writeFileSync(actionBubbleScreenshot, Buffer.from(actionBubbleCapture.data, 'base64'));
+
+    const enemyBubbleVisual = await cdp.evaluate(`(() => {
+      const hero = Game.world.hero;
+      const monster = Game.world.entities.find((entity) =>
+        entity.kind === 'monster' && !entity.dead);
+      if (!monster) throw new Error('enemy bubble visual monster missing');
+      monster.x = hero.x + 58;
+      monster.y = hero.y + 4;
+      Game.exploration.revealAt(monster.x, monster.y, { force: true });
+      Game.actionBubbles.clear();
+      Game.actionBubbles.show(hero, 'enemy', {
+        targetId: 'visual-enemy',
+        duration: 5
+      });
+      Game.actionBubbles.show(monster, 'alert', {
+        targetId: 'visual-enemy',
+        duration: 5
+      });
+      Game.render.frame(0);
+      return Game.actionBubbles.active();
+    })()`);
+    assert.ok(enemyBubbleVisual.some((bubble) =>
+      bubble.entityKind === 'hero' && bubble.type === 'enemy'));
+    assert.ok(enemyBubbleVisual.some((bubble) =>
+      bubble.entityKind === 'monster' && bubble.type === 'alert'));
+    const enemyBubbleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const enemyBubbleScreenshot = path.join(os.tmpdir(), 'firpg-action-bubble-enemy-mobile-cdp.png');
+    fs.writeFileSync(enemyBubbleScreenshot, Buffer.from(enemyBubbleCapture.data, 'base64'));
 
     const v3ForestVisual = await cdp.evaluate(`(() => {
       Game.state.world.worldSeed = 0x1098DC78;
@@ -3117,9 +3196,9 @@ async function run() {
       titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
       titleScreenshot, titleTallScreenshot, titleShortScreenshot, main,
       v3CampVisual, v3ResourceVisual, v3DepletedVisual, v3MineResourceVisual,
-      v3Navigation, v3ForestVisual,
+      v3Navigation, v3AutoActions, actionBubbleVisual, enemyBubbleVisual, v3ForestVisual,
       v3CampScreenshot, v3ResourceScreenshot, v3DepletedScreenshot,
-      v3MineResourceScreenshot,
+      v3MineResourceScreenshot, actionBubbleScreenshot, enemyBubbleScreenshot,
       v3ForestScreenshot, worldChecks,
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
