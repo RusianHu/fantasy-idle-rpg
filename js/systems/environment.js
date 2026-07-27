@@ -14,6 +14,7 @@
   var moveTarget = 0;
   var sinceChest = F.BAL.chestMinGap;
   var chestSeq = 1;
+  var AUTO_GATHER_REVEAL_GRACE = 2.4;
 
   function nextMoveTarget() {
     moveTarget = U.rand(F.BAL.chestMoveMin, F.BAL.chestMoveMax);
@@ -33,6 +34,7 @@
   }
 
   var Env = Game.environment = {
+    AUTO_GATHER_REVEAL_GRACE: AUTO_GATHER_REVEAL_GRACE,
     chests: function () { return chests; },
 
     resetRegion: function () {
@@ -49,6 +51,15 @@
 
     nodeCooldown: function (node) {
       return Math.max(0, Game.state.world.nodeCooldowns[node.id] || 0);
+    },
+
+    autoNodeReady: function (node) {
+      if (!Env.nodeReady(node)) return false;
+      var layout = Game.world && Game.world.layout;
+      if (!layout || layout.version < 3) return true;
+      if (!Game.exploration || !Game.exploration.isRevealed(node.x, node.y)) return false;
+      var now = Game.state && Game.state.world && Game.state.world.worldTime || 0;
+      return node.seenAt !== undefined && now - node.seenAt >= AUTO_GATHER_REVEAL_GRACE;
     },
 
     update: function (dt) {
@@ -168,7 +179,8 @@
       var nodes = Game.world && Game.world.layout && Game.world.layout.nodes || [];
       var best = null, dist = Infinity;
       for (var i = 0; i < nodes.length; i++) {
-        if (!Env.nodeReady(nodes[i])) continue;
+        // v3 自动互动只能使用玩家已经亲眼发现且充分展示过的节点。
+        if (!Env.autoNodeReady(nodes[i])) continue;
         var d = U.dist(x, y, nodes[i].x, nodes[i].y);
         if (d <= maxDistance && d < dist) { dist = d; best = nodes[i]; }
       }

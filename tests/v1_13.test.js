@@ -102,6 +102,30 @@ for (const region of regions) {
     assert.equal(first.curios.length, 3);
     assert.equal(first.ecology.length, 2);
     assert.ok(first.guardian && first.bossLair);
+    const surfaceMaterial = (x, y) => first.grid[
+      Math.floor(y / first.cell) * first.gw + Math.floor(x / first.cell)
+    ];
+    for (const [dx, dy] of [[0, 0], [30, 26], [22, 22], [-62, 25], [48, 4]]) {
+      assert.ok(
+        !['water', 'lava', 'blocked', 'void'].includes(surfaceMaterial(first.camp.x + dx, first.camp.y + dy)),
+        `${region.id}:${seed} camp surface must be dry and visible`
+      );
+    }
+    assert.ok(first.props.length >= 550, `${region.id}:${seed} v3 environment is too sparse`);
+    const blockerProps = first.props.filter((prop) => prop.blockerProp);
+    assert.ok(blockerProps.length >= 350,
+      `${region.id}:${seed} hard blockers need visible environment silhouettes`);
+    assert.ok(blockerProps.every((prop) =>
+      /(tree|oak|birch|pine|rocks_big|crystal_big|beam|tombstone|grave_cross|obsidian|lava_rock|pillar|spikes|banner)/.test(prop.sprite)),
+    `${region.id}:${seed} hard blocker uses a misleading small prop`);
+    if (region.terrain.tufts > 0) {
+      assert.ok(first.tufts.length >= region.terrain.tufts * 5,
+        `${region.id}:${seed} tuft density regressed`);
+    }
+    if (region.terrain.flowers) {
+      assert.ok(first.flowers.length >= region.terrain.flowers.count * 4,
+        `${region.id}:${seed} flower density regressed`);
+    }
     if (first.generation.fallback) fallbacks++;
 
     // Golden seeds and a regular sample guard determinism without doubling
@@ -299,6 +323,21 @@ const savedFog = G.exploration.serializeFog('grassland');
 assert.match(savedFog.data, /^[A-Za-z0-9+/]*={0,2}$/);
 assert.ok(savedFog.data.length < 700, 'fog bitset stays compact');
 assert.equal(G.exploration.validateFog('grassland', savedFog), true);
+const firstFrontier = G.exploration.nextObjective(
+  'grassland', G.world.hero.x, G.world.hero.y
+);
+assert.ok(firstFrontier && /^frontier:\d+:\d+$/.test(firstFrontier.id));
+assert.equal(G.exploration.isRevealed(firstFrontier.x, firstFrontier.y, 'grassland'), false);
+const frontierNavX = Math.floor(firstFrontier.x / explorationLayout.nav.cell);
+const frontierNavY = Math.floor(firstFrontier.y / explorationLayout.nav.cell);
+assert.ok(explorationLayout.nav.grid[frontierNavY][frontierNavX] &&
+  explorationLayout.nav.distance[frontierNavY][frontierNavX] >= 2,
+  'frontier targets are unknown walkable cells, not projected blocker faces');
+const alternateFrontier = G.exploration.nextObjective(
+  'grassland', G.world.hero.x, G.world.hero.y, (id) => id === firstFrontier.id
+);
+assert.ok(!alternateFrontier || alternateFrontier.id !== firstFrontier.id,
+  'temporarily blocked frontiers are not selected again');
 
 const firstLandmark = grass.exploration.landmarks[0].id;
 const expBefore = expAwarded;
@@ -350,12 +389,33 @@ assert.match(aiSource, /safe:\s*\{ hp: 0\.58/);
 assert.match(aiSource, /balanced:\s*\{ hp: 0\.36/);
 assert.match(aiSource, /loot:\s*\{ hp: 0\.24/);
 assert.match(aiSource, /nextObjective/);
+assert.match(aiSource, /!visible\(n\)/,
+  'resource circuits must never target exact coordinates in unexplored fog');
+assert.match(aiSource, /autoNodeReady\(n\)/,
+  'newly seen resources remain visible before automatic gathering');
 assert.doesNotMatch(aiSource, /layout\.(landmarks|nodes|curios|ecology)\[[^\]]+\].*frontier/);
 assert.match(aiSource, /boss && boss\.ready\.coverage >= 0\.60/);
 assert.ok(aiSource.indexOf('var guardian = guardianTarget(hero);') <
   aiSource.indexOf("setMove(hero, boss.target, 'ai-boss')"),
   'guardian decision remains ahead of Boss execution');
 assert.doesNotMatch(read('js/systems/offline.js'), /exploration\.reveal/);
+assert.match(read('js/systems/exploration.js'), /ctx\.fillStyle = '#080912'/,
+  'unknown fog must fully hide terrain tiles and undiscovered entities');
+assert.match(read('js/render/renderer.js'), /sp\.w <= 13 && sp\.h <= 13 \? 2 : 1/,
+  'small v3 resource sprites must use an integer 2x world scale');
+assert.match(read('js/systems/environment.js'),
+  /!Game\.exploration\.isRevealed\(node\.x, node\.y\)/,
+  'ambient auto-gather must reject unrevealed resources');
+assert.match(read('js/systems/environment.js'), /AUTO_GATHER_REVEAL_GRACE = 2\.4/,
+  'ambient auto-gather must leave newly revealed resources on screen');
+assert.match(read('js/systems/world.js'),
+  /!Game\.exploration\.isRevealed\(gatherTarget\.x, gatherTarget\.y\)/,
+  'the interaction boundary must reject hidden v3 resources');
+assert.match(read('js/systems/world.js'), /autoNodeReady\(gatherTarget\)/,
+  'the interaction boundary must enforce the visibility grace period');
+assert.doesNotMatch(read('js/render/renderer.js'),
+  /Game\.assets\.draw\(ctx, spriteId, 'idle0', x, y, \{ alpha: 0\.22/,
+  'depleted resources must not render as a misleading translucent live node');
 
 const offlineBox = makeSandbox([
   'js/core/utils.js',

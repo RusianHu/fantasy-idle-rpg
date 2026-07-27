@@ -683,34 +683,56 @@
       var motion = U.motionEnabled();
       var spriteId = node.sprite || ('gather_' + node.nodeType);
       var sp = Game.assets.sprite(spriteId);
+      var scale = sp.w <= 13 && sp.h <= 13 ? 2 : 1;
       var bob = ready && motion ? Math.sin(t * 1.8 + node.phase) * 0.65 : 0;
       var x = Math.round(node.x), y = Math.round(node.y + bob);
       ctx.save();
-      ctx.globalAlpha = ready ? 0.22 : 0.14;
+      ctx.globalAlpha = ready ? 0.34 : 0.14;
       ctx.fillStyle = '#202236';
       ctx.beginPath();
-      ctx.ellipse(x, y + 1, Math.max(7, sp.w * 0.34), 3, 0, 0, Math.PI * 2);
+      ctx.ellipse(x, y + 1, Math.max(8, sp.w * scale * 0.38), 3.5, 0, 0, Math.PI * 2);
       ctx.fill();
       if (!ready) {
-        Game.assets.draw(ctx, spriteId, 'idle0', x, y, { alpha: 0.22 });
-        ctx.globalAlpha = 0.66;
-        ctx.fillStyle = '#584b43';
-        ctx.fillRect(x - 5, y - 2, 10, 2);
-        ctx.fillStyle = '#817266';
-        ctx.fillRect(x - 2, y - 3, 4, 1);
+        // 枯竭节点只保留明确的地面痕迹，不再用半透明原精灵造成“采完才出现”的错觉。
+        ctx.globalAlpha = 0.78;
+        ctx.fillStyle = '#332b29';
+        ctx.fillRect(x - 6, y - 2, 12, 3);
+        ctx.fillStyle = '#6f5d48';
+        ctx.fillRect(x - 4, y - 3, 8, 2);
+        ctx.fillStyle = '#9a7d59';
+        ctx.fillRect(x - 1, y - 5, 3, 2);
+        ctx.globalAlpha = 0.44;
+        ctx.strokeStyle = '#8d7558';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(x, y + 1, 8, 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
         return;
       }
       if (motion) {
         ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = 0.24 + 0.1 * Math.sin(t * 2 + node.phase);
-        ctx.drawImage(Game.assets.glowTex(node.accent, 16), x - 15, y - 18, 30, 30);
+        ctx.globalAlpha = 0.30 + 0.12 * Math.sin(t * 2 + node.phase);
+        ctx.drawImage(Game.assets.glowTex(node.accent, 16), x - 20, y - 24, 40, 40);
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
       }
+      ctx.strokeStyle = node.rarity === 'rare' ? 'rgba(255,218,110,0.86)' : (node.accent || '#9de5a0');
+      ctx.globalAlpha = 0.70;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(x, y + 1, Math.max(8, sp.w * scale * 0.40), 4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
       var frame = Game.assets.hasFrame(spriteId, 'idle1') &&
         (((t / 0.55) + node.phase) | 0) % 2 === 1 ? 'idle1' : 'idle0';
-      Game.assets.draw(ctx, spriteId, frame, x, y, {});
+      Game.assets.draw(ctx, spriteId, frame, x, y, { scale: scale });
+      var sparkle = ((t * 3 + (node.phase || 0)) | 0) % 7;
+      if (sparkle < 2) {
+        ctx.fillStyle = node.rarity === 'rare' ? '#fff2ad' : (node.accent || '#d8f09a');
+        ctx.fillRect(x + Math.max(6, sp.w * scale * 0.35), y - sp.h * scale + 1, 1, 3);
+        ctx.fillRect(x + Math.max(5, sp.w * scale * 0.35) - 1, y - sp.h * scale + 2, 3, 1);
+      }
       ctx.restore();
     },
 

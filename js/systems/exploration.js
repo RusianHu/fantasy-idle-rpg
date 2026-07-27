@@ -198,6 +198,9 @@
         var radius = kind === 'threats' ? Math.max(90, ent.radius * 0.7) : (kind === 'ecology' ? 56 : 70);
         if (U.dist(x, y, ent.x, ent.y) > radius) continue;
         if (kind === 'ecology' && Game.expedition && !Game.expedition.isEcologyActive(ent.defId)) continue;
+        if (kind === 'resources' && ent.seenAt === undefined) {
+          ent.seenAt = Game.state.world.worldTime || 0;
+        }
         Collection.record(kind, ent.defId, {
           rid: rid, entity: ent, x: ent.x, y: ent.y
         });
@@ -439,7 +442,7 @@
       return visibleCell(rid, Math.floor(x / FOG_CELL), Math.floor(y / FOG_CELL));
     },
 
-    nextObjective: function (rid, fromX, fromY) {
+    nextObjective: function (rid, fromX, fromY, isBlocked) {
       rid = rid || Game.state.world.region;
       var rs = regionState(rid), layout = Game.world && Game.world.layout;
       if (!layout || layout.version < 3) return null;
@@ -451,8 +454,15 @@
             visibleCell(rid, gx, gy - 1) || visibleCell(rid, gx, gy + 1);
           if (!knownNeighbor) continue;
           var x = gx * FOG_CELL + FOG_CELL / 2, y = gy * FOG_CELL + FOG_CELL / 2;
+          var nx = U.clamp(Math.floor(x / layout.nav.cell), 0, layout.nav.w - 1);
+          var ny = U.clamp(Math.floor(y / layout.nav.cell), 0, layout.nav.h - 1);
+          if (!layout.nav.grid[ny][nx] || layout.nav.distance[ny][nx] < 2) continue;
           var p = Game.terrain.projectPoint(x, y, 2);
           if (!p) continue;
+          var pgx = Math.floor(p.x / FOG_CELL), pgy = Math.floor(p.y / FOG_CELL);
+          if (visibleCell(rid, pgx, pgy)) continue;
+          var frontierId = 'frontier:' + gx + ':' + gy;
+          if (isBlocked && isBlocked(frontierId)) continue;
           var travel = U.dist(fromX, fromY, p.x, p.y);
           var danger = Game.terrain.dangerAt(p.x, p.y);
           var unknownAround = 0;
@@ -462,7 +472,7 @@
           var score = unknownAround * 8 - travel * 0.045 - danger * 90;
           if (score > bestScore) {
             bestScore = score;
-            best = { kind: 'frontier', x: p.x, y: p.y, gx: gx, gy: gy, score: score };
+            best = { kind: 'frontier', id: frontierId, x: p.x, y: p.y, gx: gx, gy: gy, score: score };
           }
         }
       }
@@ -478,7 +488,8 @@
       var minY = Math.max(0, Math.floor(viewT / FOG_CELL));
       var maxY = Math.min(rs.fog.h - 1, Math.ceil(viewB / FOG_CELL));
       ctx.save();
-      ctx.fillStyle = 'rgba(8,9,18,0.84)';
+      // 未探索区完全遮蔽底层材质与实体，避免泄露资源、阻挡轮廓和粗网格。
+      ctx.fillStyle = '#080912';
       for (var gy = minY; gy <= maxY; gy++) {
         for (var gx = minX; gx <= maxX; gx++) {
           if (!visibleCell(rid, gx, gy)) {

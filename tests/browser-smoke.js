@@ -538,6 +538,274 @@ async function run() {
     const mainCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const mainScreenshot = path.join(os.tmpdir(), 'firpg-main-map-mobile-cdp.png');
     fs.writeFileSync(mainScreenshot, Buffer.from(mainCapture.data, 'base64'));
+
+    // v3 visual and interaction regression: the camp is always dry, the richer
+    // material bake remains visible, and automatic gathering cannot beat fog.
+    const v3CampVisual = await cdp.evaluate(`(() => {
+      Game.ui.tabs.open('battle');
+      Game.state.world.worldSeed = 0x1098DC78;
+      Game.state.world.layoutVersion = 3;
+      Game.state.world.region = 'grassland';
+      Game.state.world.mode = 'battle';
+      Game.State.regionProg('grassland').kills = 0;
+      Game.world.init('grassland');
+      Game.world.setControlMode('manual');
+      const layout = Game.world.layout;
+      const hero = Game.world.hero;
+      hero.x = layout.camp.x + 44;
+      hero.y = layout.camp.y + 32;
+      hero.state = 'idle';
+      hero.target = null;
+      hero.moveOrder = null;
+      Game.exploration.revealAt(hero.x, hero.y, { force: true });
+      Game.render.snapCamera(layout.camp.x, layout.camp.y);
+      for (let i = 0; i < 8; i++) Game.render.frame(1 / 60);
+      const cell = layout.cell;
+      const materialAt = (x, y) => layout.grid[
+        Math.floor(y / cell) * layout.gw + Math.floor(x / cell)
+      ];
+      const nearbyProps = layout.props.filter((prop) =>
+        Math.abs(prop.x - layout.camp.x) <= 250 &&
+        Math.abs(prop.y - layout.camp.y) <= 300);
+      const nearbyGround = layout.tufts.filter((prop) =>
+        Math.abs(prop.x - layout.camp.x) <= 250 &&
+        Math.abs(prop.y - layout.camp.y) <= 300).length +
+        layout.flowers.filter((prop) =>
+          Math.abs(prop.x - layout.camp.x) <= 250 &&
+          Math.abs(prop.y - layout.camp.y) <= 300).length;
+      const canvas = document.getElementById('stage');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const colors = new Set();
+      for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 2200 / 4) * 4)) {
+        colors.add(pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2]);
+      }
+      return {
+        version: layout.version,
+        props: layout.props.length,
+        tufts: layout.tufts.length,
+        flowers: layout.flowers.length,
+        nearbyProps: nearbyProps.length,
+        nearbyGround,
+        canvasColors: colors.size,
+        campMaterials: [[0, 0], [30, 26], [22, 22], [-62, 25], [48, 4]]
+          .map(([dx, dy]) => materialAt(layout.camp.x + dx, layout.camp.y + dy))
+      };
+    })()`);
+    assert.equal(v3CampVisual.version, 3);
+    assert.ok(v3CampVisual.props >= 550, 'v3 environment is not sparse: ' + JSON.stringify(v3CampVisual));
+    assert.ok(v3CampVisual.nearbyProps >= 8, 'camp viewport contains environmental silhouettes');
+    assert.ok(v3CampVisual.nearbyGround >= 20, 'camp viewport contains ground detail');
+    assert.ok(v3CampVisual.canvasColors >= 180, 'v3 material bake preserves rich color variation');
+    assert.ok(v3CampVisual.campMaterials.every((material) =>
+      !['water', 'lava', 'blocked', 'void'].includes(material)),
+    'camp and camp props are placed on dry terrain: ' + JSON.stringify(v3CampVisual));
+    await delay(120);
+    const v3CampCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v3CampScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-camp-mobile-cdp.png');
+    fs.writeFileSync(v3CampScreenshot, Buffer.from(v3CampCapture.data, 'base64'));
+
+    const v3ResourceVisual = await cdp.evaluate(`(() => {
+      const layout = Game.world.layout;
+      const hero = Game.world.hero;
+      const hidden = layout.nodes.find((node) => !Game.exploration.isRevealed(node.x, node.y));
+      if (!hidden) throw new Error('v3 hidden resource probe missing');
+      const hiddenRejected = Game.world.startInteraction({ type: 'gather', target: hidden }, false) === false;
+      const node = hidden;
+      const projected = Game.terrain.projectPoint(node.x - 42, node.y, 2) ||
+        Game.terrain.projectPoint(node.x + 42, node.y, 2);
+      hero.x = projected.x;
+      hero.y = projected.y;
+      hero.state = 'idle';
+      hero.target = null;
+      hero.moveOrder = null;
+      hero.interactOrder = null;
+      Game.exploration.revealAt(node.x, node.y, { force: true });
+      const revealed = Game.exploration.isRevealed(node.x, node.y);
+      const recorded = node.seenAt !== undefined;
+      const immediateRejected =
+        Game.world.startInteraction({ type: 'gather', target: node }, false) === false;
+      const before = Game.state.world.worldTime;
+      Game.state.world.worldTime = Math.max(before, node.seenAt) +
+        Game.environment.AUTO_GATHER_REVEAL_GRACE + 0.01;
+      const afterGraceAccepted =
+        Game.world.startInteraction({ type: 'gather', target: node }, false) === true;
+      Game.world.cancelInteraction('browser-probe');
+      Game.world.setControlMode('manual');
+      Game.render.snapCamera(node.x, node.y);
+      for (let i = 0; i < 8; i++) Game.render.frame(1 / 60);
+      return {
+        id: node.id,
+        sprite: node.sprite,
+        hiddenRejected,
+        revealed,
+        recorded,
+        immediateRejected,
+        afterGraceAccepted
+      };
+    })()`);
+    assert.equal(v3ResourceVisual.hiddenRejected, true);
+    assert.equal(v3ResourceVisual.revealed, true);
+    assert.equal(v3ResourceVisual.recorded, true);
+    assert.equal(v3ResourceVisual.immediateRejected, true);
+    assert.equal(v3ResourceVisual.afterGraceAccepted, true);
+    await delay(120);
+    const v3ResourceCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v3ResourceScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-resource-mobile-cdp.png');
+    fs.writeFileSync(v3ResourceScreenshot, Buffer.from(v3ResourceCapture.data, 'base64'));
+    const v3DepletedVisual = await cdp.evaluate(`(() => {
+      const node = Game.world.layout.nodes.find((entry) =>
+        entry.id === ${JSON.stringify(v3ResourceVisual.id)});
+      if (!node) throw new Error('v3 depleted resource probe missing');
+      Game.state.world.nodeCooldowns[node.id] = 60;
+      for (let i = 0; i < 8; i++) Game.render.frame(1 / 60);
+      return { id: node.id, ready: Game.environment.nodeReady(node) };
+    })()`);
+    assert.equal(v3DepletedVisual.ready, false);
+    await delay(80);
+    const v3DepletedCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v3DepletedScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-resource-depleted-mobile-cdp.png');
+    fs.writeFileSync(v3DepletedScreenshot, Buffer.from(v3DepletedCapture.data, 'base64'));
+
+    const v3Navigation = await cdp.evaluate(`(() => {
+      const cases = [
+        ['forest', 0x51A7E001],
+        ['mine', 0x51A7E002],
+        ['graveyard', 0x51A7E003],
+        ['snowpass', 0x51A7E004],
+        ['lavacave', 0x51A7E005],
+        ['skyruins', 0x51A7E006],
+        ['darkcastle', 0x51A7E007]
+      ];
+      const runs = [];
+      Game.state.settings.autoBoss = false;
+      for (const [rid, seed] of cases) {
+        Game.state.world.worldSeed = seed;
+        Game.state.world.layoutVersion = 3;
+        Game.state.world.region = rid;
+        Game.state.world.mode = 'battle';
+        const progress = Game.State.regionProg(rid);
+        progress.kills = 0;
+        progress.firstKill = false;
+        Game.world.init(rid);
+        const hero = Game.world.hero;
+        Game.state.player.hp = hero.maxHp;
+        Game.world.entities = [hero];
+        Game.world.pendingRespawn = [];
+        Game.world.bossEnt = null;
+        Game.terrain.rebuildDynamicSpatial([hero]);
+        Game.world.setControlMode('auto');
+        hero.state = 'idle';
+        hero.target = null;
+        hero.moveOrder = null;
+        hero.interactOrder = null;
+        let previousX = hero.x;
+        let previousY = hero.y;
+        let travelled = 0;
+        let still = 0;
+        let maxStill = 0;
+        const targets = new Set();
+        const startCoverage = Game.exploration.coverage(rid);
+        for (let step = 0; step < 900; step++) {
+          Game.state.world.worldTime += 0.1;
+          Game.terrain.update(0.1);
+          Game.world.update(0.1);
+          const moved = Game.util.dist(previousX, previousY, hero.x, hero.y);
+          travelled += moved;
+          previousX = hero.x;
+          previousY = hero.y;
+          const intent = Game.expeditionAI.intent();
+          if (intent.target && intent.target.id) targets.add(intent.target.id);
+          const expectsMove = (hero.moveOrder && hero.moveOrder.ai) ||
+            ['frontier', 'discovery', 'boss'].includes(intent.id);
+          if (expectsMove && moved < 0.15) still++;
+          else still = 0;
+          if (still > maxStill) maxStill = still;
+        }
+        runs.push({
+          rid,
+          travelled,
+          maxStillSeconds: maxStill / 10,
+          targets: targets.size,
+          startCoverage,
+          endCoverage: Game.exploration.coverage(rid),
+          finalIntent: Game.expeditionAI.intent().id
+        });
+      }
+      Game.state.settings.autoBoss = true;
+      return runs;
+    })()`);
+    for (const run of v3Navigation) {
+      assert.ok(run.travelled >= 350,
+        run.rid + ' auto-expedition travels through the map: ' + JSON.stringify(run));
+      assert.ok(run.maxStillSeconds < 6.8,
+        run.rid + ' auto-expedition does not remain stuck: ' + JSON.stringify(run));
+      assert.ok(run.targets >= 2,
+        run.rid + ' auto-expedition advances between objectives: ' + JSON.stringify(run));
+      assert.ok(run.endCoverage > run.startCoverage,
+        run.rid + ' auto-expedition reveals new fog: ' + JSON.stringify(run));
+    }
+
+    const v3ForestVisual = await cdp.evaluate(`(() => {
+      Game.state.world.worldSeed = 0x1098DC78;
+      Game.state.world.layoutVersion = 3;
+      Game.state.world.region = 'forest';
+      Game.state.world.mode = 'battle';
+      Game.world.init('forest');
+      Game.world.setControlMode('manual');
+      const layout = Game.world.layout;
+      const hero = Game.world.hero;
+      let focus = layout.camp;
+      let best = -1;
+      for (const center of layout.macro.centers) {
+        const projected = Game.terrain.projectPoint(center.x, center.y, 3);
+        if (!projected) continue;
+        const count = layout.props.filter((prop) =>
+          Math.abs(prop.x - projected.x) <= 210 &&
+          Math.abs(prop.y - projected.y) <= 230).length;
+        if (count > best) {
+          best = count;
+          focus = projected;
+        }
+      }
+      hero.x = focus.x;
+      hero.y = focus.y;
+      hero.state = 'idle';
+      hero.target = null;
+      hero.moveOrder = null;
+      for (let oy = -128; oy <= 128; oy += 64) {
+        for (let ox = -128; ox <= 128; ox += 64) {
+          Game.exploration.revealAt(focus.x + ox, focus.y + oy, { force: true });
+        }
+      }
+      Game.render.snapCamera(focus.x, focus.y);
+      const started = performance.now();
+      for (let i = 0; i < 18; i++) Game.render.frame(1 / 60);
+      const frameMs = (performance.now() - started) / 18;
+      const visible = layout.props.filter((prop) =>
+        Math.abs(prop.x - focus.x) <= 210 &&
+        Math.abs(prop.y - focus.y) <= 230);
+      document.querySelectorAll('#modal-root .modal-mask').forEach((modal) => modal.remove());
+      return {
+        props: layout.props.length,
+        visibleProps: visible.length,
+        visibleLarge: visible.filter((prop) => prop.large).length,
+        blockerProps: visible.filter((prop) => prop.blockerProp).length,
+        frameMs
+      };
+    })()`);
+    assert.ok(v3ForestVisual.visibleProps >= 18,
+      'v3 forest viewport is densely populated: ' + JSON.stringify(v3ForestVisual));
+    assert.ok(v3ForestVisual.visibleLarge >= 6,
+      'v3 forest viewport contains several large silhouettes: ' + JSON.stringify(v3ForestVisual));
+    assert.ok(v3ForestVisual.blockerProps >= 6,
+      'v3 forest blockers have matching visible props: ' + JSON.stringify(v3ForestVisual));
+    assert.ok(v3ForestVisual.frameMs < 25,
+      'v3 dense forest rendering stays inside frame budget: ' + JSON.stringify(v3ForestVisual));
+    await delay(120);
+    const v3ForestCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const v3ForestScreenshot = path.join(os.tmpdir(), 'firpg-v1-13-forest-mobile-cdp.png');
+    fs.writeFileSync(v3ForestScreenshot, Buffer.from(v3ForestCapture.data, 'base64'));
+
     await cdp.evaluate(`(() => {
       Game.ui.tabs.open('battle');
       Game.world.setControlMode('manual');
@@ -2565,7 +2833,10 @@ async function run() {
 
     console.log('Browser smoke passed: ' + JSON.stringify({
       titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
-      titleScreenshot, titleTallScreenshot, titleShortScreenshot, main, worldChecks,
+      titleScreenshot, titleTallScreenshot, titleShortScreenshot, main,
+      v3CampVisual, v3ResourceVisual, v3DepletedVisual, v3Navigation, v3ForestVisual,
+      v3CampScreenshot, v3ResourceScreenshot, v3DepletedScreenshot,
+      v3ForestScreenshot, worldChecks,
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,

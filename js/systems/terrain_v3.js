@@ -30,6 +30,17 @@
     return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
   }
 
+  function smoothNoise(x, y, scale, seed) {
+    var fx = x / scale, fy = y / scale;
+    var x0 = Math.floor(fx), y0 = Math.floor(fy);
+    var tx = fx - x0, ty = fy - y0;
+    tx = tx * tx * (3 - 2 * tx);
+    ty = ty * ty * (3 - 2 * ty);
+    var a = hash2(x0, y0, seed), b = hash2(x0 + 1, y0, seed);
+    var c = hash2(x0, y0 + 1, seed), d = hash2(x0 + 1, y0 + 1, seed);
+    return (a + (b - a) * tx) + ((c + (d - c) * tx) - (a + (b - a) * tx)) * ty;
+  }
+
   function edgeKey(a, b) {
     return a < b ? a + ':' + b : b + ':' + a;
   }
@@ -540,13 +551,23 @@
           colors[idx] = blockedPalette;
           continue;
         }
-        var choose = hash2(gx >> 3, gy >> 3, worldSeed ^ 0xa913);
-        var pd = patchMats.length && choose > 0.70
-          ? patchMats[Math.floor(hash2(gx >> 4, gy >> 4, worldSeed) * patchMats.length)]
+        var wx = gx * CELL + CELL / 2, wy = gy * CELL + CELL / 2;
+        var campGround = region.layout && region.layout.road && region.layout.road.mat || base.mat;
+        if (campGround === 'water' || campGround === 'lava' || campGround === 'void') campGround = base.mat;
+        var inCamp = U.dist(wx, wy, content.camp.x, content.camp.y) <= 92;
+        var inLair = U.dist(wx, wy, content.bossPoint.x, content.bossPoint.y) <= 116;
+        var broad = smoothNoise(gx, gy, 15, worldSeed ^ 0xa913);
+        var fine = smoothNoise(gx + 37, gy - 19, 5.5, worldSeed ^ 0x4b71);
+        var choose = broad * 0.72 + fine * 0.28;
+        var typeNoise = smoothNoise(gx - 23, gy + 41, 18, worldSeed ^ 0x91d3);
+        var pd = patchMats.length && choose > 0.67
+          ? patchMats[Math.min(patchMats.length - 1, Math.floor(typeNoise * patchMats.length))]
           : null;
-        var mat = pd ? pd.mat : base.mat;
+        var mat = inCamp ? campGround : (inLair ? base.mat : (pd ? pd.mat : base.mat));
         grid[idx] = mat;
-        colors[idx] = pd ? pd.colors : base.colors;
+        colors[idx] = inCamp
+          ? (region.layout && region.layout.road && region.layout.road.colors || base.colors)
+          : (inLair ? base.colors : (pd ? pd.colors : base.colors));
         if (mat === 'water') water.push(idx);
         if (mat === 'lava') lava.push(idx);
       }
@@ -555,42 +576,133 @@
     var rng = U.seededRng(seedFor(worldSeed, region.id, 'details', attempt));
     var props = [], glows = [], tufts = [], flowers = [];
     var deco = region.terrain.deco || [];
-    for (var pi = 0; pi < 220; pi++) {
-      var px = 30 + rng() * (WORLD_W - 60), py = BOUND_TOP + 20 + rng() * (WORLD_H - BOUND_TOP - 42);
-      var gx0 = Math.floor(px / NAV), gy0 = Math.floor(py / NAV);
-      if (gx0 < 0 || gy0 < 0 || gx0 >= nav.w || gy0 >= nav.h) continue;
-      var nearBlocker = nav.distance[gy0][gx0] <= 2;
-      if (!nearBlocker && rng() < 0.62) continue;
-      var dd = deco[pi % Math.max(1, deco.length)] || { sprite: 'deco_rock' };
-      if (!nav.grid[gy0][gx0] && nav.distance[gy0][gx0] === 0) {
-        // 阻挡内部装饰只负责视觉，不改变导航数据。
-        var prop = {
-          sprite: dd.sprite || 'deco_rock', x: px, y: py,
-          phase: rng() * 6.28, flipX: rng() < 0.5, sway: false,
-          animSpd: 1, bob: !!dd.bob, shadow: true, glow: dd.glow || null,
-          flicker: !!dd.flicker, large: true, h: 18, blockerProp: true
-        };
-        props.push(prop);
-        if (prop.glow) glows.push(prop);
+    var solidDeco = deco.filter(function (d) { return !d.water; });
+    var blockerDeco = solidDeco.filter(function (d) {
+      return /(tree|oak|birch|pine|rocks_big|crystal_big|beam|tombstone|grave_cross|obsidian|lava_rock|pillar|spikes|banner)/.test(d.sprite || '');
+    });
+    var groundDeco = deco.filter(function (d) {
+      return !d.water && /(fern|bush|flowers|pebbles|stump|shroom|candle|skulls|mound|bone|shard|lantern)/.test(d.sprite || '');
+    });
+    var waterDeco = deco.filter(function (d) { return !!d.water; });
+    if (!solidDeco.length) solidDeco = [{ sprite: 'deco_rock', count: 1 }];
+    if (!blockerDeco.length) blockerDeco = solidDeco;
+    function weighted(pool) {
+      if (!pool.length) return null;
+      var total = 0;
+      for (var wi = 0; wi < pool.length; wi++) total += Math.max(1, pool[wi].count || 1);
+      var roll = rng() * total;
+      for (wi = 0; wi < pool.length; wi++) {
+        roll -= Math.max(1, pool[wi].count || 1);
+        if (roll <= 0) return pool[wi];
+      }
+      return pool[pool.length - 1];
+    }
+    var propBuckets = {};
+    function propSpace(x, y, spacing) {
+      var bx = Math.floor(x / 32), by = Math.floor(y / 32);
+      for (var yy = by - 1; yy <= by + 1; yy++) {
+        for (var xx = bx - 1; xx <= bx + 1; xx++) {
+          var bucket = propBuckets[xx + ':' + yy] || [];
+          for (var si = 0; si < bucket.length; si++) {
+            if (U.dist(x, y, bucket[si].x, bucket[si].y) < spacing) return false;
+          }
+        }
+      }
+      return true;
+    }
+    function clearOfContent(x, y, radius) {
+      if (U.dist(x, y, content.camp.x, content.camp.y) < 155 ||
+          U.dist(x, y, content.bossPoint.x, content.bossPoint.y) < 120) return false;
+      var important = content.landmarks.concat(content.nodes, content.curios, content.ecology, [content.guardian]);
+      for (var ci = 0; ci < important.length; ci++) {
+        if (U.dist(x, y, important[ci].x, important[ci].y) < radius) return false;
+      }
+      return true;
+    }
+    function addDecor(def, x, y, blockerProp) {
+      if (!def) return false;
+      var spacing = blockerProp ? 22 : 15;
+      if (!propSpace(x, y, spacing) || !clearOfContent(x, y, blockerProp ? 28 : 20)) return false;
+      var sprite = def.sprite || 'deco_rock';
+      var large = blockerProp || /(tree|oak|pine|rocks_big|pillar_big|beam|spikes)/.test(sprite);
+      var prop = {
+        sprite: sprite, x: x, y: y,
+        phase: rng() * 6.28, flipX: rng() < 0.5,
+        sway: /(tree|oak|pine|fern)/.test(sprite),
+        animSpd: def.flicker ? 0.24 : (0.9 + rng() * 0.7),
+        bob: !!def.bob, shadow: def.shadow !== false,
+        glow: def.glow || null, flicker: !!def.flicker,
+        large: large, h: large ? 22 : 12, blockerProp: !!blockerProp
+      };
+      props.push(prop);
+      var key = Math.floor(x / 32) + ':' + Math.floor(y / 32);
+      (propBuckets[key] = propBuckets[key] || []).push(prop);
+      if (prop.glow) glows.push(prop);
+      return true;
+    }
+
+    // 让硬阻挡在视觉上对应密林、岩群、墓碑或遗迹，而不是大片空色块。
+    for (var by = Math.ceil(BOUND_TOP / NAV) + 1; by < nav.h - 2; by += 2) {
+      for (var bx = 2; bx < nav.w - 2; bx += 2) {
+        if (nav.grid[by][bx] || rng() > 0.58) continue;
+        addDecor(
+          weighted(blockerDeco),
+          bx * NAV + NAV / 2 + (rng() - 0.5) * 20,
+          by * NAV + NAV / 2 + (rng() - 0.5) * 20,
+          true
+        );
       }
     }
-    for (var ti = 0; ti < 420; ti++) {
+    // 小型地表物只放在宽阔可行走区，不与导航碰撞语义冲突。
+    if (groundDeco.length) {
+      for (by = Math.ceil(BOUND_TOP / NAV) + 2; by < nav.h - 2; by += 3) {
+        for (bx = 3; bx < nav.w - 3; bx += 3) {
+          if (!nav.grid[by][bx] || nav.distance[by][bx] < 3 || rng() > 0.52) continue;
+          addDecor(
+            weighted(groundDeco),
+            bx * NAV + NAV / 2 + (rng() - 0.5) * 24,
+            by * NAV + NAV / 2 + (rng() - 0.5) * 24,
+            false
+          );
+        }
+      }
+    }
+    if (waterDeco.length) {
+      for (var wpi = 0; wpi < 150; wpi++) {
+        var wpx = 24 + rng() * (WORLD_W - 48), wpy = BOUND_TOP + 18 + rng() * (WORLD_H - BOUND_TOP - 36);
+        var wgx = U.clamp(Math.floor(wpx / CELL), 0, gw - 1);
+        var wgy = U.clamp(Math.floor(wpy / CELL), 0, gh - 1);
+        if (grid[wgy * gw + wgx] === 'water') addDecor(weighted(waterDeco), wpx, wpy, false);
+      }
+    }
+
+    var tuftTarget = Math.round((region.terrain.tufts || 0) * 6);
+    for (var ti = 0, tuftGuard = 0; ti < tuftTarget && tuftGuard < tuftTarget * 8; tuftGuard++) {
       var tx = 20 + rng() * (WORLD_W - 40), ty = BOUND_TOP + rng() * (WORLD_H - BOUND_TOP - 20);
       var tgx = Math.floor(tx / NAV), tgy = Math.floor(ty / NAV);
-      if (nav.grid[tgy] && nav.grid[tgy][tgx] && nav.distance[tgy][tgx] > 1) {
+      var smx = U.clamp(Math.floor(tx / CELL), 0, gw - 1);
+      var smy = U.clamp(Math.floor(ty / CELL), 0, gh - 1);
+      var smat = grid[smy * gw + smx];
+      if (nav.grid[tgy] && nav.grid[tgy][tgx] && nav.distance[tgy][tgx] > 1 &&
+          (smat === base.mat || smat === 'grass')) {
         tufts.push({ x: tx, y: ty, phase: rng() * 6.28, disturb: 0, h: 3 + (rng() * 3 | 0) });
+        ti++;
       }
     }
     if (region.terrain.flowers) {
-      for (var fi = 0; fi < 80; fi++) {
+      var flowerTarget = Math.round((region.terrain.flowers.count || 0) * 5);
+      for (var fi = 0, flowerGuard = 0; fi < flowerTarget && flowerGuard < flowerTarget * 8; flowerGuard++) {
         var fx = 20 + rng() * (WORLD_W - 40), fy = BOUND_TOP + rng() * (WORLD_H - BOUND_TOP - 20);
         var fgx = Math.floor(fx / NAV), fgy = Math.floor(fy / NAV);
-        if (nav.grid[fgy] && nav.grid[fgy][fgx]) {
+        var fsx = U.clamp(Math.floor(fx / CELL), 0, gw - 1);
+        var fsy = U.clamp(Math.floor(fy / CELL), 0, gh - 1);
+        if (nav.grid[fgy] && nav.grid[fgy][fgx] && grid[fsy * gw + fsx] === base.mat) {
           flowers.push({
             x: fx, y: fy,
             color: region.terrain.flowers.colors[fi % region.terrain.flowers.colors.length],
             dots: 1 + (fi % 3)
           });
+          fi++;
         }
       }
     }

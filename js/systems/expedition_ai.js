@@ -95,7 +95,7 @@
   function matureNode(hero, fullCircuit) {
     var rs = Game.exploration.regionState(Game.state.world.region);
     return nearest(Game.world.layout.nodes || [], hero, function (n) {
-      if (!rs.discovered.resources[n.defId] || !Game.environment.nodeReady(n)) return false;
+      if (!visible(n) || !rs.discovered.resources[n.defId] || !Game.environment.autoNodeReady(n)) return false;
       if (fullCircuit) return true;
       var direct = U.dist(hero.x, hero.y, n.x, n.y);
       var frontier = Game.exploration.nextObjective(Game.state.world.region, hero.x, hero.y);
@@ -150,7 +150,7 @@
     var boss = bossObjective(hero);
     var frontier = boss && boss.ready.coverage >= 0.60
       ? null
-      : Game.exploration.nextObjective(Game.state.world.region, hero.x, hero.y);
+      : Game.exploration.nextObjective(Game.state.world.region, hero.x, hero.y, blocked);
     if (frontier) {
       setMove(hero, frontier, 'ai-frontier');
       return emitIntent({ id: 'frontier', target: frontier, distance: U.dist(hero.x, hero.y, frontier.x, frontier.y), danger: Game.terrain.dangerAt(frontier.x, frontier.y), reason: reason || null });

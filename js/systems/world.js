@@ -432,6 +432,11 @@
       if (W.bossEnt || hero.state === 'dead' || hero.state === 'recover' ||
           hero.state === 'entrance' || hero.state === 'warpOut' || hero.state === 'warpIn') return false;
       if (hero.target && !hero.target.dead && hero.target.hp > 0) return false;
+      if (order.type === 'gather' && W.layout && W.layout.version >= 3 && Game.exploration) {
+        var gatherTarget = order.target;
+        if (!gatherTarget || !Game.exploration.isRevealed(gatherTarget.x, gatherTarget.y)) return false;
+        if (!explicit && (!Game.environment || !Game.environment.autoNodeReady(gatherTarget))) return false;
+      }
       hero.interactOrder = order;
       hero.moveOrder = null;
       hero.manualTarget = false;
@@ -699,6 +704,8 @@
         var nodes = W.layout.nodes || [];
         for (var ni = 0; ni < nodes.length; ni++) {
           if (U.dist(wx, wy, nodes[ni].x, nodes[ni].y) <= 18) {
+            if (W.layout.version >= 3 && Game.exploration &&
+                !Game.exploration.isRevealed(nodes[ni].x, nodes[ni].y)) return;
             if (Game.environment.nodeReady(nodes[ni])) {
               W.startInteraction({ type: 'gather', target: nodes[ni] }, true);
             }

@@ -18,6 +18,76 @@
     return ((h ^ (h >>> 13)) >>> 0) / 4294967296;
   }
 
+  function cellNoise(gx, gy, sx, sy, seed) {
+    return noise(gx * 11 + sx * 3, gy * 13 + sy * 5, seed);
+  }
+
+  function drawCampSurface(ctx, layout, chunk) {
+    var camp = layout.camp;
+    if (!camp) return;
+    ctx.save();
+    ctx.translate(-chunk.x, -chunk.y);
+    ctx.globalAlpha = 0.27;
+    ctx.fillStyle = '#4a321f';
+    ctx.beginPath();
+    ctx.ellipse(camp.x, camp.y + 12, 62, 42, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.clip();
+    for (var cy = camp.y - 31; cy <= camp.y + 55; cy += 4) {
+      for (var cx = camp.x - 62; cx <= camp.x + 62; cx += 4) {
+        var pattern = ((cx * 13 + cy * 7 + layout.regionSeed) >>> 0) % 11;
+        if (pattern < 3) {
+          ctx.globalAlpha = pattern === 0 ? 0.16 : 0.09;
+          ctx.fillStyle = pattern === 0 ? '#f1d293' : '#1d1713';
+          ctx.fillRect(cx + (pattern & 1), cy, 2, 2);
+        }
+      }
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(-chunk.x, -chunk.y);
+    ctx.globalAlpha = 0.32;
+    ctx.strokeStyle = '#d3ad61';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(camp.x, camp.y + 9, 15, 8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (var rune = 0; rune < 8; rune++) {
+      var ra = rune / 8 * Math.PI * 2;
+      var rx = Math.round(camp.x + Math.cos(ra) * 18);
+      var ry = Math.round(camp.y + 9 + Math.sin(ra) * 10);
+      ctx.fillRect(rx - 1, ry - 1, rune % 2 ? 2 : 3, 2);
+    }
+    for (var stone = 0; stone < 12; stone++) {
+      var sa = stone / 12 * Math.PI * 2 + 0.18;
+      var sx = Math.round(camp.x + Math.cos(sa) * 58);
+      var sy = Math.round(camp.y + 12 + Math.sin(sa) * 40);
+      ctx.fillStyle = stone % 3 === 0 ? 'rgba(232,210,166,0.32)' : 'rgba(32,26,28,0.34)';
+      ctx.fillRect(sx - 2, sy - 1, 4, 2);
+    }
+    ctx.restore();
+  }
+
+  function drawBroadMotifs(ctx, layout, chunk) {
+    ctx.save();
+    ctx.translate(-chunk.x, -chunk.y);
+    for (var i = 0; i < 20; i++) {
+      var x = noise(i, 1, layout.seeds.details ^ 0x97a1) * layout.world.w;
+      var y = 90 + noise(i, 2, layout.seeds.details ^ 0x5c31) * (layout.world.h - 120);
+      var r = 38 + noise(i, 3, layout.seeds.details ^ 0xb817) * 82;
+      var dark = noise(i, 4, layout.seeds.details) < 0.72;
+      ctx.globalAlpha = dark
+        ? (0.045 + noise(i, 5, layout.seeds.details) * 0.045)
+        : (0.025 + noise(i, 6, layout.seeds.details) * 0.025);
+      ctx.fillStyle = dark ? '#000018' : '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(x, y, r, r * 0.58, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   function bakeChunk(layout, chunk) {
     var c = document.createElement('canvas');
     c.width = chunk.w; c.height = chunk.h;
@@ -31,18 +101,89 @@
       for (var gx = gx0; gx < gx1; gx++) {
         var idx = gy * layout.gw + gx;
         var cols = layout.colorGrid[idx] || ['#242534', '#171824'];
+        var mat = layout.grid[idx];
         var lx = gx * cell - chunk.x, ly = gy * cell - chunk.y;
         ctx.fillStyle = cols[0]; ctx.fillRect(lx, ly, cell, cell);
-        var rv = noise(gx, gy, layout.seeds.details);
-        if (rv < 0.55) {
-          ctx.fillStyle = cols[1 % cols.length];
-          ctx.fillRect(lx + ((rv * 17) | 0) % 6, ly + ((rv * 29) | 0) % 6, 2, 2);
+        for (var sy = 0; sy < cell; sy += 2) {
+          for (var sx = 0; sx < cell; sx += 2) {
+            var rv = cellNoise(gx, gy, sx, sy, layout.seeds.details);
+            if (rv < 0.24) {
+              ctx.fillStyle = cols[1 % cols.length];
+              ctx.fillRect(lx + sx, ly + sy, 2, 2);
+            } else if (rv < 0.32 && cols[2]) {
+              ctx.fillStyle = cols[2];
+              ctx.fillRect(lx + sx, ly + sy, 2, 2);
+            }
+          }
         }
-        if (layout.grid[idx] === 'blocked') {
-          ctx.fillStyle = 'rgba(4,5,12,0.18)';
-          if (noise(gx, gy, layout.seeds.blockers) > 0.6) ctx.fillRect(lx, ly, cell, 2);
+
+        var detail = noise(gx, gy, layout.seeds.details ^ 0x3d71);
+        if (mat === 'grass' && detail < 0.34) {
+          var grassX = Math.floor(noise(gx, gy, layout.seeds.details ^ 0x72c1) * 6);
+          var grassY = Math.floor(noise(gx, gy, layout.seeds.details ^ 0x184f) * 5);
+          ctx.fillStyle = 'rgba(0,30,0,0.24)';
+          ctx.fillRect(lx + grassX, ly + grassY, 1, 2);
+          if (detail < 0.13) {
+            ctx.fillStyle = 'rgba(205,255,165,0.30)';
+            ctx.fillRect(lx + ((grassX + 3) % 7), ly + ((grassY + 2) % 6), 1, 1);
+          }
+        } else if (mat === 'snow' && detail < 0.18) {
+          ctx.fillStyle = 'rgba(255,255,255,0.92)';
+          ctx.fillRect(lx + ((detail * 37) | 0) % 7, ly + ((detail * 53) | 0) % 7, 1, 1);
+        } else if ((mat === 'stone' || mat === 'dirt') && detail < 0.14) {
+          var crackX = lx + ((detail * 43) | 0) % 5;
+          var crackY = ly + ((detail * 67) | 0) % 5;
+          ctx.fillStyle = 'rgba(0,0,10,0.30)';
+          ctx.fillRect(crackX, crackY, 3, 1);
+          ctx.fillRect(crackX + 2, crackY + 1, 1, 2);
+        } else if (mat === 'lava' && detail < 0.52) {
+          ctx.fillStyle = 'rgba(40,10,0,0.52)';
+          ctx.fillRect(lx + ((detail * 31) | 0) % 5, ly + ((detail * 47) | 0) % 6, 2 + ((detail * 5) | 0), 1);
+        } else if (mat === 'blocked') {
+          ctx.fillStyle = 'rgba(4,5,12,0.22)';
+          if (noise(gx, gy, layout.seeds.blockers) > 0.46) ctx.fillRect(lx, ly, cell, 2);
         }
       }
+    }
+    drawBroadMotifs(ctx, layout, chunk);
+    drawCampSurface(ctx, layout, chunk);
+
+    for (gy = gy0; gy < gy1; gy++) {
+      for (gx = gx0; gx < gx1; gx++) {
+        var edgeIdx = gy * layout.gw + gx;
+        var here = layout.grid[edgeIdx];
+        var edge = (gx > 0 && layout.grid[edgeIdx - 1] !== here) ||
+          (gy > 0 && layout.grid[edgeIdx - layout.gw] !== here) ||
+          (gx < layout.gw - 1 && layout.grid[edgeIdx + 1] !== here) ||
+          (gy < layout.gh - 1 && layout.grid[edgeIdx + layout.gw] !== here);
+        if (!edge) continue;
+        var ex = gx * cell - chunk.x, ey = gy * cell - chunk.y;
+        if (here === 'water') {
+          ctx.fillStyle = 'rgba(255,255,255,0.28)';
+          ctx.fillRect(ex, ey, cell, 2);
+          ctx.fillStyle = 'rgba(255,255,255,0.52)';
+          ctx.fillRect(ex + ((noise(gx, gy, layout.seeds.details) * 6) | 0), ey + 1, 2, 1);
+        } else if (here === 'lava') {
+          ctx.fillStyle = 'rgba(255,220,120,0.52)';
+          ctx.fillRect(ex, ey, cell, 2);
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.14)';
+          ctx.fillRect(ex, ey, cell, 1);
+        }
+      }
+    }
+    var flowers = layout.flowers || [];
+    for (var fi = 0; fi < flowers.length; fi++) {
+      var flower = flowers[fi];
+      if (flower.x < chunk.x || flower.x >= chunk.x + chunk.w ||
+          flower.y < chunk.y || flower.y >= chunk.y + chunk.h) continue;
+      var fx = Math.floor(flower.x - chunk.x), fy = Math.floor(flower.y - chunk.y);
+      ctx.fillStyle = flower.color;
+      ctx.fillRect(fx, fy, 1, 1);
+      if (flower.dots >= 2) ctx.fillRect(fx + 2, fy + 1, 1, 1);
+      if (flower.dots >= 3) ctx.fillRect(fx - 1, fy + 2, 1, 1);
+      ctx.fillStyle = 'rgba(20,45,24,0.58)';
+      ctx.fillRect(fx, fy + 1, 1, 1);
     }
     var grad = ctx.createLinearGradient(0, 0, 0, chunk.h);
     grad.addColorStop(0, 'rgba(255,255,255,0.05)');
