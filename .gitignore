@@ -1,3 +1,4 @@
 # VPS 部署同步脚本（仅服务器端使用，不入版本库）
 git-sync.sh
 AGENTS.md
+/.playwright-mcp

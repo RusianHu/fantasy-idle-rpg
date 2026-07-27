@@ -16,3 +16,4 @@
 | 验证项 | 入口 | 验证记录 | 范围 |
 | --- | --- | --- | --- |
 | 地图级特效与布局 | `map-effects/map-effects.html?seed=1234ABCD&region=forest` | `map-effects/map-effects.md` | 八区 v1/v2 布局、采集节点/冷却/产出、普通与稀有宝箱、动态交易域 TTL 桩、主题元素、导航、粒子、日夜、视差、实体演出与性能 |
+| 角色与怪物 | `units/units.html` | `units/units.md` | 五职业与十六普通怪/八 Boss 的精灵、属性面板、原版战斗循环、自动/手动操控、技能释放、伤害/治疗/暴击飘字、受击闪白、弹道、死亡消散 |

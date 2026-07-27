@@ -5,111 +5,103 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#151614">
 <meta name="build-id" content="20260727.7">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23151614'/%3E%3C/svg%3E">
-<title>地图级特效技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="map-effects.css?v=20260727.7">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M4 12V6h2l2-2 2 2h2v6H4z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='3' fill='%23151614'/%3E%3C/svg%3E">
+<title>角色与怪物技术验证 · 幻境远征</title>
+<link rel="stylesheet" href="units.css?v=20260727.7">
 </head>
 <body>
 <div class="app-shell">
   <header class="topbar">
     <div>
-      <p class="eyebrow">FANTASY IDLE RPG / EFFECTS LAB / MAP-FX-01</p>
-      <h1>地图级特效技术验证</h1>
+      <p class="eyebrow">FANTASY IDLE RPG / UNITS LAB / UNITS-01</p>
+      <h1>角色与怪物技术验证</h1>
     </div>
     <a class="back-link" href="../../index.html">返回原游戏</a>
   </header>
 
-  <nav id="region-tabs" class="region-tabs" aria-label="特效验证区域"></nav>
-
   <main class="workspace">
-    <section class="preview-column" aria-labelledby="stage-region-name">
+    <section class="preview-column" aria-labelledby="stage-title">
       <div class="preview-toolbar">
-        <div class="region-heading">
-          <span id="stage-index" class="region-index">01</span>
+        <div class="stage-heading">
+          <span id="stage-index" class="stage-index">01</span>
           <div>
-            <h2 id="stage-region-name">新手草原</h2>
-            <p id="stage-region-id">region / grassland</p>
+            <h2 id="stage-title">战士</h2>
+            <p id="stage-subtitle">class / fighter · hero_fighter</p>
           </div>
         </div>
         <div class="icon-actions">
-          <button id="prev-region" class="icon-button" type="button" title="上一个区域" aria-label="上一个区域">&#8592;</button>
+          <button id="prev-unit" class="icon-button" type="button" title="上一个" aria-label="上一个">&#8592;</button>
           <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示">&#8545;</button>
-          <button id="next-region" class="icon-button" type="button" title="下一个区域" aria-label="下一个区域">&#8594;</button>
+          <button id="next-unit" class="icon-button" type="button" title="下一个" aria-label="下一个">&#8594;</button>
         </div>
       </div>
 
       <div id="stage-wrap" class="stage-wrap">
-        <canvas id="stage" aria-label="原版地图级特效实时画布"></canvas>
+        <canvas id="stage" aria-label="原版角色与怪物实时画布"></canvas>
         <div class="stage-badges" aria-hidden="true">
-          <span id="runtime-status">原版特效运行中</span>
-          <span id="runtime-count">0 个实体</span>
+          <span id="runtime-status">原版战斗循环运行中</span>
+          <span id="runtime-count">战斗演示</span>
         </div>
       </div>
 
       <div class="control-strip">
-        <form id="seed-form" class="seed-control">
-          <label for="seed-input">世界种子</label>
-          <input id="seed-input" type="text" inputmode="text" maxlength="8" spellcheck="false" autocomplete="off" aria-describedby="seed-format">
-          <button type="submit">应用</button>
-          <span id="seed-format">8 位十六进制</span>
-        </form>
+        <div class="mode-controls" aria-label="分类切换">
+          <button type="button" data-kind="hero" class="active">职业</button>
+          <button type="button" data-kind="monster">普通怪</button>
+          <button type="button" data-kind="boss">Boss</button>
+        </div>
         <div class="segmented" aria-label="日夜阶段">
           <button type="button" data-time="cycle" class="active">循环</button>
           <button type="button" data-time="day">昼间</button>
           <button type="button" data-time="dusk">黄昏</button>
           <button type="button" data-time="night">夜晚</button>
         </div>
-        <div class="focus-actions" aria-label="镜头视点">
-          <button type="button" data-focus="camp">营地</button>
-          <button type="button" data-focus="center">中部</button>
-          <button type="button" data-focus="boss">Boss 点</button>
-        </div>
         <label class="check-control">
           <input id="effects-toggle" type="checkbox" checked>
           <span>环境效果</span>
         </label>
-        <div class="dynamic-trade-qa" aria-label="动态交易域接口验证">
-          <button id="spawn-dynamic-trade" type="button">注入临时游商</button>
-          <output id="dynamic-trade-status">未注册</output>
-        </div>
+        <label class="check-control">
+          <input id="motion-toggle" type="checkbox" checked>
+          <span>动态效果</span>
+        </label>
       </div>
 
-      <section class="exploration-lab" aria-labelledby="exploration-lab-title">
+      <div class="battle-lab" aria-labelledby="battle-lab-title">
         <div class="lab-heading">
           <div>
-            <p class="lab-kicker">WORLD INTERACTION / LIVE QA</p>
-            <h3 id="exploration-lab-title">可采集物 / 宝箱</h3>
-            <p>直接验证生产环境中的节点冷却、点击交互、合法移动发现与宝箱过期。</p>
+            <p class="lab-kicker">COMBAT LOOP / LIVE QA</p>
+            <h3 id="battle-lab-title">战斗循环演示</h3>
+            <p>直接调用原版 <code>Game.world</code>、<code>Game.combat</code> 与 <code>Game.render</code>。</p>
           </div>
-          <output id="exploration-event" class="lab-event" aria-live="polite">等待交互</output>
+          <output id="battle-event" class="lab-event" aria-live="polite">等待战斗指令</output>
         </div>
-        <div class="lab-runtime" aria-label="探索交互运行状态">
-          <div><span>采集节点</span><strong id="gather-runtime">0 / 0 成熟</strong></div>
-          <div><span>发现进度</span><strong id="discovery-runtime">0 / 0 秒</strong></div>
-          <div><span>场上宝箱</span><strong id="chest-runtime">无</strong></div>
+        <div class="lab-runtime" aria-label="战斗运行状态">
+          <div><span>目标</span><strong id="target-runtime">无</strong></div>
+          <div><span>主角状态</span><strong id="hero-runtime">idle</strong></div>
+          <div><span>操控</span><strong id="control-runtime">自动</strong></div>
         </div>
         <div class="lab-actions">
           <div class="lab-action-group">
-            <span>采集节点</span>
-            <button id="focus-gather" type="button">定位成熟节点</button>
-            <button id="reset-gather" type="button">恢复全部节点</button>
+            <span>演示</span>
+            <button id="spawn-sparring" type="button">刷新陪练</button>
+            <button id="spawn-boss" type="button">召唤 Boss</button>
           </div>
           <div class="lab-action-group">
-            <span>宝箱变体</span>
-            <button id="spawn-common-chest" type="button">生成普通宝箱</button>
-            <button id="spawn-rare-chest" type="button">生成稀有宝箱</button>
+            <span>操控</span>
+            <button id="toggle-control" type="button">切换自动/手动</button>
+            <button id="reset-hero" type="button">重置主角</button>
           </div>
         </div>
-        <p class="lab-hint">定位或生成后，点击画布中的节点/宝箱即可观察角色走近、1.2 秒采集或 0.8 秒开箱；接敌会中断当前交互。</p>
-      </section>
+        <p class="lab-hint">点击画布怪物锁定接敌；点击空白处移动。手动模式下 WASD / 方向键移动，接敌后自动按攻速与技能冷却结算。</p>
+      </div>
 
       <div class="source-line">
         <span>验证链路</span>
-        <code>regions.js</code><b>&#8594;</b><code>terrain.build(seed)</code><b>&#8594;</b><code>environment.js</code><b>&#8594;</b><code>world.update()</code><b>&#8594;</b><code>renderer.frame()</code>
+        <code>classes.js</code><b>&#8594;</b><code>monsters.js</code><b>&#8594;</b><code>combat.js</code><b>&#8594;</b><code>world.js</code><b>&#8594;</b><code>renderer.js</code>
       </div>
     </section>
 
-    <aside id="inspector" class="inspector" aria-label="地图级特效配置明细"></aside>
+    <aside id="inspector" class="inspector" aria-label="角色与怪物属性明细"></aside>
   </main>
 </div>
 
@@ -148,6 +140,7 @@
 <script src="../../js/systems/terrain.js?v=20260727.7"></script>
 <script src="../../js/systems/nav.js?v=20260727.7"></script>
 <script src="../../js/systems/inventory.js?v=20260727.7"></script>
+<script src="../../js/systems/items.js?v=20260727.7"></script>
 <script src="../../js/systems/combat.js?v=20260727.7"></script>
 <script src="../../js/systems/trade.js?v=20260727.7"></script>
 <script src="../../js/systems/environment.js?v=20260727.7"></script>
@@ -157,6 +150,6 @@
 <script src="../../js/render/effects.js?v=20260727.7"></script>
 <script src="../../js/render/renderer.js?v=20260727.7"></script>
 <script src="../../js/systems/world.js?v=20260727.7"></script>
-<script src="map-effects.js?v=20260727.7"></script>
+<script src="units.js?v=20260727.7"></script>
 </body>
 </html>
