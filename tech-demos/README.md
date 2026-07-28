@@ -4,7 +4,7 @@
 
 | 工作台 | URL 参数 | 生产链路与范围 |
 | --- | --- | --- |
-| 角色与怪物 | `units/units.html?lang=en` | 五职业、十六普通怪、八 Boss、开放探索 v3 世界、战斗/技能/弹道、朝向感知与双锚点斜向动作气泡 |
+| 角色与怪物 | `units/units.html?region=forest&unit=treant_sapling&lang=en` | 注册表自动枚举的八区怪物目录与职业选项、随选区切换的 v3 世界、战斗/技能/弹道、朝向感知与双锚点斜向动作气泡 |
 | 开放世界现场 | `map-effects/map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN` | 2400×1440 v3 地图、迷雾/准备度、远征 AI、资源/宝箱、动态交易域、日夜与环境渲染 |
 | 生成器审计 | `exploration-v3/exploration-v3.html?seed=20260727&region=grassland&lang=en` | 宏观拓扑、硬阻挡、距离场、内容分布、5×3 区块、结构报告与 32 种子批量验证 |
 

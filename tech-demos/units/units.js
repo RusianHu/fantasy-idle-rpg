@@ -8,23 +8,60 @@
   var regions = Game.reg.all('region');
   var classes = Game.reg.all('class');
   var monsters = Game.reg.all('monster');
-  var normalMonsters = monsters.filter(function (m) { return !m.boss; });
-  var bossMonsters = monsters.filter(function (m) { return m.boss; });
+  var monsterById = {};
+  monsters.forEach(function (monster) { monsterById[monster.id] = monster; });
 
-  var HERO_KINDS = [
-    { type: 'hero', id: 'fighter', sprite: 'hero_fighter', face: 'face_fighter', index: 0 },
-    { type: 'hero', id: 'rogue',   sprite: 'hero_rogue',   face: 'face_rogue',   index: 1 },
-    { type: 'hero', id: 'mage',    sprite: 'hero_mage',    face: 'face_mage',    index: 2 },
-    { type: 'hero', id: 'cleric',  sprite: 'hero_cleric',  face: 'face_cleric',  index: 3 },
-    { type: 'hero', id: 'ranger',  sprite: 'hero_ranger',  face: 'face_ranger',  index: 4 }
-  ];
+  var HERO_KINDS = classes.map(function (cls, index) {
+    return {
+      type: 'hero',
+      id: cls.id,
+      sprite: cls.sprite || ('hero_' + cls.id),
+      face: cls.face || ('face_' + cls.id),
+      index: index,
+      optionIndex: index
+    };
+  });
+  var REGION_CATALOG = regions.map(function (region, regionIndex) {
+    var normal = (region.monsters || []).map(function (mid, optionIndex) {
+      var def = monsterById[mid];
+      return def ? {
+        type: def.boss ? 'boss' : 'monster',
+        id: mid,
+        sprite: def.sprite || mid,
+        index: optionIndex,
+        optionIndex: optionIndex,
+        regionId: region.id,
+        regionIndex: regionIndex
+      } : null;
+    }).filter(Boolean);
+    var bossDef = monsterById[region.boss];
+    var boss = bossDef ? [{
+      type: 'boss',
+      id: bossDef.id,
+      sprite: bossDef.sprite || bossDef.id,
+      index: 0,
+      optionIndex: 0,
+      regionId: region.id,
+      regionIndex: regionIndex
+    }] : [];
+    return {
+      id: region.id,
+      region: region,
+      index: regionIndex,
+      normal: normal,
+      boss: boss,
+      units: normal.concat(boss)
+    };
+  });
   var ALL_UNITS = [];
   HERO_KINDS.forEach(function (h) { ALL_UNITS.push(h); });
-  normalMonsters.forEach(function (m, i) { ALL_UNITS.push({ type: 'monster', id: m.id, sprite: m.sprite || m.id, index: i }); });
-  bossMonsters.forEach(function (m, i) { ALL_UNITS.push({ type: 'boss', id: m.id, sprite: m.sprite || m.id, index: i }); });
+  REGION_CATALOG.forEach(function (entry) {
+    entry.units.forEach(function (unit) { ALL_UNITS.push(unit); });
+  });
 
   var currentIndex = 0;
   var currentGroup = 'hero';
+  var currentRegionId = regions[0] ? regions[0].id : '';
   var paused = false;
   var timeMode = 'cycle';
   var lastFrame = performance.now();
@@ -58,7 +95,9 @@
       reset: '主角已重置', hit: '命中', critical: '暴击', basic: '普攻', dodge: '闪避', defeated: '击败',
       death: '主角阵亡，正在重整', bossEntered: 'Boss 登场', noBubble: '手动检查 · 当前无气泡',
       autoWaiting: '自动轮播 · 等待气泡', hero: '主角', monster: '怪物', manual: '手动', auto: '自动', noneTarget: '无',
-      leftSide: '左侧', rightSide: '右侧'
+      leftSide: '左侧', rightSide: '右侧', registryOptions: '注册表选项', registryId: '注册 ID',
+      spriteId: '精灵 ID', faceId: '头像 ID', role: '出场类型', modifiers: '变体系数',
+      classTraits: '职业特征', weapon: '武器', optionSlot: '区域选项', defaultMods: '默认公式'
     },
     en: {
       maxHp: 'Max HP', atk: 'Attack', def: 'Defense', speed: 'Speed', crit: 'Critical chance', critDmg: 'Critical damage',
@@ -73,7 +112,9 @@
       reset: 'Hero reset', hit: 'Hit', critical: 'critical', basic: 'basic attack', dodge: 'Dodged', defeated: 'Defeated',
       death: 'Hero down; regrouping', bossEntered: 'Boss entered', noBubble: 'Manual check · no active bubble',
       autoWaiting: 'Auto sequence · waiting', hero: 'Hero', monster: 'Enemy', manual: 'Manual', auto: 'Auto', noneTarget: 'None',
-      leftSide: 'left', rightSide: 'right'
+      leftSide: 'left', rightSide: 'right', registryOptions: 'Registry options', registryId: 'Registry ID',
+      spriteId: 'Sprite ID', faceId: 'Portrait ID', role: 'Encounter role', modifiers: 'Variant modifiers',
+      classTraits: 'Class traits', weapon: 'Weapon', optionSlot: 'Region option', defaultMods: 'Formula defaults'
     }
   };
 
@@ -96,6 +137,18 @@
     return Game.i18n.t('monster.' + id + '.name');
   }
 
+  function monsterDescription(id, regionId) {
+    var key = 'monster.' + id + '.desc';
+    var translated = Game.i18n.t(key);
+    return translated === key
+      ? D.t('units.monsterFallback', { name: monsterName(id), region: regionName(regionId) })
+      : translated;
+  }
+
+  function regionName(id) {
+    return Game.i18n.t('region.' + id + '.name');
+  }
+
   function trait(label, cls) {
     return '<span class="trait' + (cls ? ' ' + cls : '') + '"' + '>' + esc(label) + '</span>';
   }
@@ -114,16 +167,20 @@
 
   function currentUnit() { return ALL_UNITS[currentIndex]; }
 
+  function currentCatalog() {
+    return REGION_CATALOG.find(function (entry) { return entry.id === currentRegionId; }) || REGION_CATALOG[0];
+  }
+
   function groupUnits(group) {
-    return ALL_UNITS.filter(function (u) {
-      if (group === 'hero') return u.type === 'hero';
-      if (group === 'monster') return u.type === 'monster';
-      return u.type === 'boss';
-    });
+    if (group === 'hero') return HERO_KINDS;
+    var catalog = currentCatalog();
+    if (!catalog) return [];
+    return group === 'monster' ? catalog.normal : catalog.boss;
   }
 
   function unitFor(group, index) {
     var list = groupUnits(group);
+    if (!list.length) return HERO_KINDS[0];
     return list[(index + list.length) % list.length];
   }
 
@@ -139,6 +196,15 @@
     activateUnit(ALL_UNITS.indexOf(unit));
   }
 
+  function setRegion(regionId, preserveUnit) {
+    var next = REGION_CATALOG.find(function (entry) { return entry.id === regionId; });
+    if (!next) return false;
+    currentRegionId = next.id;
+    var unit = preserveUnit && currentGroup === 'hero' ? currentUnit() : unitFor(currentGroup, 0);
+    activateUnit(ALL_UNITS.indexOf(unit));
+    return true;
+  }
+
   function statRow(label, value, note) {
     return '<div class="config-row"><span>' + esc(label) + '</span><div>' + esc(value) +
       (note ? ' <span class="raw-id">' + esc(note) + '</span>' : '') + '</div></div>';
@@ -146,20 +212,70 @@
 
   function fmtPct(v) { return (Math.round(v * 1000) / 10) + '%'; }
 
-  function renderTabs() {
+  function optionLabel(unit) {
+    if (unit.type === 'hero') return D.t('units.classOption', { slot: unit.optionIndex + 1 });
+    if (unit.type === 'boss') return D.t('units.bossOption');
+    return D.t('units.normalOption', { slot: unit.optionIndex + 1 });
+  }
+
+  function renderUnitOption(unit) {
+    var active = unit === currentUnit() ? ' active' : '';
+    var title = unit.type === 'hero' ? className(unit.id) : monsterName(unit.id);
+    return '<button class="registry-unit' + active + '" type="button" data-global="' + ALL_UNITS.indexOf(unit) + '"' +
+      (active ? ' aria-current="true"' : '') + '>' +
+      '<canvas width="32" height="32" data-sprite="' + esc(unit.sprite) + '" aria-hidden="true"></canvas>' +
+      '<span><small>' + esc(optionLabel(unit)) + '</small><strong>' + esc(title) + '</strong>' +
+      '<code>' + esc(unit.id) + '</code></span></button>';
+  }
+
+  function renderCatalog() {
     var root = document.getElementById('inspector');
-    var list = groupUnits(currentGroup);
-    var tabs = document.createElement('div');
-    tabs.className = 'unit-tabs';
-    tabs.innerHTML = list.map(function (u) {
-      var active = u === currentUnit() ? ' active' : '';
-      var title = u.type === 'hero' ? className(u.id) : monsterName(u.id);
-      var subtitle = u.type === 'hero' ? 'Lv.60' : ('T' + (Game.reg.get('monster', u.id).tier || '-' ));
-      return '<button class="unit-tab' + active + '" type="button" data-global="' + ALL_UNITS.indexOf(u) + '"' +
-        (active ? ' aria-current="page"' : '') + '>' +
-        '<small>' + esc(subtitle) + '</small>' + esc(title) + '</button>';
+    var catalog = currentCatalog();
+    if (!catalog) return;
+    var totalOptions = REGION_CATALOG.reduce(function (sum, entry) { return sum + entry.units.length; }, 0);
+    var audit = catalogSnapshot();
+    var regionButtons = REGION_CATALOG.map(function (entry) {
+      var selected = entry.id === catalog.id;
+      return '<button class="registry-region' + (selected ? ' active' : '') + '" type="button" role="tab"' +
+        ' aria-selected="' + (selected ? 'true' : 'false') + '" data-region="' + esc(entry.id) + '">' +
+        '<small>' + String(entry.index + 1).padStart(2, '0') + ' · T' + esc(entry.region.tier) + '</small>' +
+        '<strong>' + esc(regionName(entry.id)) + '</strong>' +
+        '<span>' + esc(D.t('units.regionCounts', {
+          normal: entry.normal.length,
+          boss: entry.boss.length
+        })) + '</span></button>';
     }).join('');
-    root.insertBefore(tabs, root.firstChild);
+    var classOptions = HERO_KINDS.map(renderUnitOption).join('');
+    var regionOptions = catalog.units.map(renderUnitOption).join('');
+    var block = document.createElement('section');
+    block.className = 'registry-catalog';
+    block.setAttribute('aria-label', D.t('units.catalogAria'));
+    block.innerHTML =
+      '<div class="registry-heading"><div><p>REGISTRY / AUTO DISCOVERY</p><h2>' +
+        esc(D.t('units.catalogTitle')) + '</h2></div><output>' +
+        '<span>' + esc(D.t('units.catalogSummary', {
+          regions: REGION_CATALOG.length,
+          monsters: totalOptions,
+          classes: HERO_KINDS.length
+        })) + '</span><strong class="' + (audit.complete ? 'complete' : 'issues') + '">' +
+        esc(audit.complete ? D.t('units.catalogComplete') : D.t('units.catalogIssues', {
+          count: audit.issues.length + audit.missing.length + audit.unmapped.length
+        })) + '</strong></output></div>' +
+      '<div class="registry-section-head"><strong>' + esc(D.t('units.themeMaps')) +
+        '</strong><span>' + esc(D.t('units.themeMapsHint')) + '</span></div>' +
+      '<div class="registry-regions" role="tablist" aria-label="' + esc(D.t('units.themeMapsAria')) + '">' +
+        regionButtons + '</div>' +
+      '<div class="registry-section-head current"><strong>' +
+        esc(D.t('units.regionRoster', { region: regionName(catalog.id) })) + '</strong><span>' +
+        esc(D.t('units.regionCounts', {
+          normal: catalog.normal.length,
+          boss: catalog.boss.length
+        })) + '</span></div>' +
+      '<div class="registry-units">' + regionOptions + '</div>' +
+      '<div class="registry-section-head"><strong>' + esc(D.t('units.classOptions')) +
+        '</strong><span>' + HERO_KINDS.length + '</span></div>' +
+      '<div class="registry-units classes">' + classOptions + '</div>';
+    root.insertBefore(block, root.firstChild);
   }
 
   function renderHeroInspector(unit) {
@@ -167,6 +283,7 @@
     var d = F.playerBase(cls, 60);
     var preview = Game.player.previewDerived({ classId: unit.id, level: 60 });
     var skills = Game.reg.all('skill').filter(function (s) { return s.cls === unit.id; });
+    var classTraits = (cls.traits || []).map(function (value) { return trait(value); }).join('');
     var statRows =
       statRow(tr('maxHp'), preview.maxHp) +
       statRow(tr('atk'), preview.atk) +
@@ -198,6 +315,16 @@
         '<div class="metric"><strong>' + d.hp + '</strong><span>' + esc(tr('baseHp')) + '</span></div>' +
         '<div class="metric"><strong>' + d.def + '</strong><span>' + esc(tr('baseDef')) + '</span></div>' +
       '</div>' +
+      '<section class="inspect-section"><h3>' + esc(tr('registryOptions')) + '</h3>' +
+        spriteRow(unit.sprite, className(unit.id), classTraits) +
+        '<div class="row-list registry-raw">' +
+          statRow(tr('registryId'), cls.id) +
+          statRow(tr('spriteId'), unit.sprite) +
+          statRow(tr('faceId'), unit.face) +
+          statRow(tr('weapon'), cls.weapon || tr('none')) +
+          statRow(tr('classTraits'), (cls.traits || []).join(' · ') || tr('none')) +
+        '</div>' +
+      '</section>' +
       '<section class="inspect-section"><h3>' + esc(tr('derived')) + '</h3>' +
         '<div class="row-list">' + statRows + '</div>' +
       '</section>' +
@@ -210,7 +337,10 @@
     var tier = def.tier || Game.State.regionTier(unit.id);
     var st = F.monsterStats(tier, def.mods, def.boss);
     var traits = def.boss ? trait('Boss', 'boss') + trait(tr('target'), 'accent') : trait(tr('normal'));
-    var region = regions.find(function (r) { return (def.boss ? r.boss : r.monsters.indexOf(unit.id)) >= 0; });
+    var region = regions.find(function (r) { return r.id === unit.regionId; });
+    var modifiers = def.mods && Object.keys(def.mods).length
+      ? Object.keys(def.mods).map(function (key) { return key + ': ' + def.mods[key]; }).join(' · ')
+      : tr('defaultMods');
 
     var statRows =
       statRow(tr('hp'), st.hp) +
@@ -226,7 +356,7 @@
     document.getElementById('inspector').innerHTML =
       '<div class="inspector-header">' +
         '<h2>' + esc(monsterName(unit.id)) + '</h2>' +
-        '<p>' + esc(Game.i18n.t('monster.' + unit.id + '.desc')) + '</p>' +
+        '<p>' + esc(monsterDescription(unit.id, unit.regionId)) + '</p>' +
       '</div>' +
       '<div class="metric-grid">' +
         '<div class="metric"><strong>' + st.hp + '</strong><span>HP</span></div>' +
@@ -235,7 +365,14 @@
       '</div>' +
       '<section class="inspect-section"><h3>' + (def.boss ? 'Boss' : esc(tr('normal'))) + ' ' + esc(tr('panel')) + '</h3>' +
         spriteRow(unit.sprite, monsterName(unit.id), traits) +
-        '<div class="row-list">' + statRows + '</div>' +
+        '<div class="row-list registry-raw">' +
+          statRow(tr('registryId'), def.id) +
+          statRow(tr('spriteId'), def.sprite) +
+          statRow(tr('role'), def.boss ? 'Boss' : tr('normal')) +
+          statRow(tr('optionSlot'), region ? (region.id + ' / ' + (unit.optionIndex + 1)) : '-') +
+          statRow(tr('modifiers'), modifiers + (def.scale ? ' · scale: ' + def.scale : '')) +
+        '</div>' +
+        '<div class="row-list stat-rows">' + statRows + '</div>' +
       '</section>' +
       '<p class="note">' + esc(tr('monsterNote')) + '</p>';
   }
@@ -244,8 +381,9 @@
     var unit = currentUnit();
     if (unit.type === 'hero') renderHeroInspector(unit);
     else renderMonsterInspector(unit);
+    renderCatalog();
 
-    Array.prototype.forEach.call(document.querySelectorAll('.sprite-preview, .skill-row canvas'), function (canvas) {
+    Array.prototype.forEach.call(document.querySelectorAll('#inspector [data-sprite]'), function (canvas) {
       Game.assets.drawToDom(canvas, canvas.getAttribute('data-sprite'), 'idle0');
     });
   }
@@ -255,10 +393,11 @@
     var title, subtitle;
     if (unit.type === 'hero') {
       title = className(unit.id);
-      subtitle = 'class / ' + unit.id + ' · ' + unit.sprite;
+      subtitle = 'class / ' + unit.id + ' · ' + unit.sprite + ' · ' + currentRegionId;
     } else {
-      title = monsterName(unit.id);
-      subtitle = (unit.type === 'boss' ? 'boss' : 'monster') + ' / ' + unit.id + ' · ' + unit.sprite;
+      title = monsterName(unit.id) + ' · ' + regionName(currentRegionId);
+      subtitle = (unit.type === 'boss' ? 'boss' : 'monster') + ' / ' + unit.id + ' · ' + unit.sprite +
+        ' · region/' + currentRegionId;
     }
     document.getElementById('stage-title').textContent = title;
     document.getElementById('stage-subtitle').textContent = subtitle;
@@ -266,7 +405,7 @@
   }
 
   function setupStageForUnit(unit) {
-    var region = regions[0];
+    var region = regions.find(function (entry) { return entry.id === currentRegionId; }) || regions[0];
     var classId = unit.type === 'hero' ? unit.id : 'fighter';
     var level = unit.type === 'hero' ? 60 : Math.max(1, (unit.type === 'boss' ? 70 : 55));
     Game.player.setClass(classId);
@@ -338,7 +477,8 @@
     });
     if (!monster) {
       var unit = currentUnit();
-      var def = unit.type === 'hero' ? normalMonsters[0] : Game.reg.get('monster', unit.id);
+      var fallback = currentCatalog() && currentCatalog().normal[0];
+      var def = unit.type === 'hero' && fallback ? Game.reg.get('monster', fallback.id) : Game.reg.get('monster', unit.id);
       monster = spawnSparring(def.id, !!def.boss);
     }
     var hero = Game.world.hero;
@@ -557,14 +697,29 @@
     }).join(' / ');
   }
 
+  function syncSelectionUi() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-kind]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-kind') === currentGroup);
+    });
+    if (location.protocol !== 'file:') {
+      var url = new URL(location.href);
+      url.searchParams.set('region', currentRegionId);
+      url.searchParams.set('unit', currentUnit().id);
+      history.replaceState(null, '', url.href);
+    }
+  }
+
   function activateUnit(index) {
+    if (index < 0 || !ALL_UNITS[index]) index = 0;
     currentIndex = (index + ALL_UNITS.length) % ALL_UNITS.length;
     var unit = currentUnit();
     currentGroup = unit.type === 'hero' ? 'hero' : (unit.type === 'boss' ? 'boss' : 'monster');
+    if (unit.regionId) currentRegionId = unit.regionId;
     setupStageForUnit(unit);
     bubbleAutoT = 0.2;
     updateHeader();
     renderInspector();
+    syncSelectionUi();
     setBattleEvent((unit.type === 'hero' ? className(unit.id) : monsterName(unit.id)) + ' · ' + tr('entered'));
   }
 
@@ -586,15 +741,16 @@
   }
 
   function bindControls() {
-    document.getElementById('prev-unit').addEventListener('click', function () {
+    function stepUnit(delta) {
       var list = groupUnits(currentGroup);
       var local = list.indexOf(currentUnit());
-      activateUnit(unitGlobalIndex(currentGroup, local - 1));
+      activateUnit(unitGlobalIndex(currentGroup, local + delta));
+    }
+    document.getElementById('prev-unit').addEventListener('click', function () {
+      stepUnit(-1);
     });
     document.getElementById('next-unit').addEventListener('click', function () {
-      var list = groupUnits(currentGroup);
-      var local = list.indexOf(currentUnit());
-      activateUnit(unitGlobalIndex(currentGroup, local + 1));
+      stepUnit(1);
     });
     document.getElementById('toggle-play').addEventListener('click', function () {
       setPaused(!paused);
@@ -646,7 +802,7 @@
     document.getElementById('spawn-sparring').addEventListener('click', function () {
       var unit = currentUnit();
       if (unit.type === 'hero') {
-        var list = normalMonsters;
+        var list = currentCatalog().normal;
         var pick = list[Math.floor(Math.random() * list.length)];
         spawnSparring(pick.id, false);
         setBattleEvent(tr('spawnNormal') + ' · ' + monsterName(pick.id));
@@ -656,7 +812,8 @@
       }
     });
     document.getElementById('spawn-boss').addEventListener('click', function () {
-      var pick = bossMonsters[Math.floor(Math.random() * bossMonsters.length)];
+      var list = currentCatalog().boss;
+      var pick = list[Math.floor(Math.random() * list.length)];
       spawnSparring(pick.id, true);
       setBattleEvent(tr('summoned') + ' · ' + monsterName(pick.id));
     });
@@ -681,14 +838,19 @@
       setBattleEvent(tr('reset'));
     });
     document.getElementById('inspector').addEventListener('click', function (event) {
+      var regionButton = event.target.closest('[data-region]');
+      if (regionButton) {
+        setRegion(regionButton.getAttribute('data-region'), currentGroup === 'hero');
+        return;
+      }
       var button = event.target.closest('[data-global]');
       if (!button) return;
       activateUnit(Number(button.getAttribute('data-global')));
     });
     window.addEventListener('keydown', function (event) {
       if (event.target && /input|textarea|select/i.test(event.target.tagName)) return;
-      if (event.key === '[') activateUnit(currentIndex - 1);
-      if (event.key === ']') activateUnit(currentIndex + 1);
+      if (event.key === '[') stepUnit(-1);
+      if (event.key === ']') stepUnit(1);
     });
   }
 
@@ -747,6 +909,89 @@
     requestAnimationFrame(frame);
   }
 
+  function unitOptionSnapshot(unit) {
+    var def = unit.type === 'hero' ? Game.reg.get('class', unit.id) : Game.reg.get('monster', unit.id);
+    return {
+      id: unit.id,
+      type: unit.type,
+      sprite: unit.sprite,
+      regionId: unit.regionId || null,
+      optionIndex: unit.optionIndex,
+      tier: def.tier || null,
+      boss: !!def.boss,
+      mods: def.mods || null,
+      scale: def.scale || null
+    };
+  }
+
+  function catalogSnapshot() {
+    var mapped = {};
+    var missing = [];
+    var issues = [];
+    REGION_CATALOG.forEach(function (entry) {
+      (entry.region.monsters || []).forEach(function (mid) {
+        var def = monsterById[mid];
+        if (!def) {
+          missing.push({ regionId: entry.id, monsterId: mid, role: 'normal' });
+          return;
+        }
+        mapped[mid] = true;
+        if (def.boss) issues.push({ regionId: entry.id, monsterId: mid, issue: 'normal-marked-boss' });
+        if (def.tier !== entry.region.tier) issues.push({ regionId: entry.id, monsterId: mid, issue: 'tier-mismatch' });
+      });
+      if (entry.region.boss) {
+        var bossDef = monsterById[entry.region.boss];
+        if (!bossDef) missing.push({ regionId: entry.id, monsterId: entry.region.boss, role: 'boss' });
+        else {
+          mapped[bossDef.id] = true;
+          if (!bossDef.boss) issues.push({ regionId: entry.id, monsterId: bossDef.id, issue: 'boss-not-marked' });
+          if (bossDef.tier !== entry.region.tier) issues.push({ regionId: entry.id, monsterId: bossDef.id, issue: 'tier-mismatch' });
+        }
+      }
+    });
+    var unmapped = monsters.filter(function (def) { return !mapped[def.id]; }).map(function (def) { return def.id; });
+    return {
+      complete: missing.length === 0 && issues.length === 0 && unmapped.length === 0,
+      regionCount: REGION_CATALOG.length,
+      classCount: HERO_KINDS.length,
+      monsterDefinitionCount: monsters.length,
+      monsterOptionCount: REGION_CATALOG.reduce(function (sum, entry) { return sum + entry.units.length; }, 0),
+      missing: missing,
+      issues: issues,
+      unmapped: unmapped,
+      classes: HERO_KINDS.map(unitOptionSnapshot),
+      regions: REGION_CATALOG.map(function (entry) {
+        return {
+          id: entry.id,
+          tier: entry.region.tier,
+          normal: entry.normal.map(unitOptionSnapshot),
+          boss: entry.boss.map(unitOptionSnapshot)
+        };
+      })
+    };
+  }
+
+  function selectionSnapshot() {
+    var unit = currentUnit();
+    return {
+      regionId: currentRegionId,
+      worldRegionId: Game.world.region && Game.world.region.id,
+      group: currentGroup,
+      unit: unitOptionSnapshot(unit)
+    };
+  }
+
+  function selectUnit(id, regionId) {
+    if (regionId && !REGION_CATALOG.some(function (entry) { return entry.id === regionId; })) return null;
+    if (regionId) currentRegionId = regionId;
+    var index = ALL_UNITS.findIndex(function (unit) {
+      return unit.id === id && (!unit.regionId || !regionId || unit.regionId === regionId);
+    });
+    if (index < 0) return null;
+    activateUnit(index);
+    return selectionSnapshot();
+  }
+
   D.init();
   Game.state = Game.State.newGame();
   Game.i18n.setLocale(D.locale());
@@ -774,12 +1019,29 @@
     setWalkScene: setWalkBubbleScene,
     scene: function () { return bubbleScene; },
     walkScene: function () { return bubbleWalkScene; },
-    layouts: function () { return Game.render.actionBubbleLayouts(); }
+    layouts: function () { return Game.render.actionBubbleLayouts(); },
+    catalog: catalogSnapshot,
+    selection: selectionSnapshot,
+    selectRegion: function (regionId) {
+      return setRegion(regionId, currentGroup === 'hero') ? selectionSnapshot() : null;
+    },
+    selectUnit: selectUnit
   };
   bindControls();
   bindBattleEvents();
   paintBubbleControls();
-  activateUnit(0);
+  var initialParams = new URLSearchParams(location.search);
+  var initialRegion = initialParams.get('region');
+  var hasInitialRegion = REGION_CATALOG.some(function (entry) { return entry.id === initialRegion; });
+  if (hasInitialRegion) currentRegionId = initialRegion;
+  var initialUnit = initialParams.get('unit');
+  var initialIndex = initialUnit ? ALL_UNITS.findIndex(function (unit) {
+    return unit.id === initialUnit && (!unit.regionId || unit.regionId === currentRegionId);
+  }) : 0;
+  if (initialIndex < 0 && initialUnit && !hasInitialRegion) {
+    initialIndex = ALL_UNITS.findIndex(function (unit) { return unit.id === initialUnit; });
+  }
+  activateUnit(initialIndex < 0 ? 0 : initialIndex);
   window.addEventListener('demo:locale', function () {
     activateUnit(currentIndex);
     paintBubbleControls();

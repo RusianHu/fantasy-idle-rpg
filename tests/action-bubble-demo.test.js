@@ -122,6 +122,23 @@ async function run() {
 
     const diagnostics = await cdp.evaluate(`(() => {
       DemoI18n.setLocale('en');
+      const catalog = Game.unitsBubbleDemo.catalog();
+      const regionSelection = Game.unitsBubbleDemo.selectRegion('forest');
+      const unitSelection = Game.unitsBubbleDemo.selectUnit('treant_sapling', 'forest');
+      const catalogButtons = Array.from(document.querySelectorAll('.registry-region, .registry-unit'));
+      const catalogDom = {
+        regions: document.querySelectorAll('.registry-region').length,
+        regionUnits: document.querySelectorAll('.registry-units:not(.classes) .registry-unit').length,
+        classes: document.querySelectorAll('.registry-units.classes .registry-unit').length,
+        activeRegion: document.querySelector('.registry-region.active')?.dataset.region,
+        activeUnit: document.querySelector('.registry-unit.active')?.textContent,
+        title: document.querySelector('.registry-heading h2')?.textContent,
+        touchable: catalogButtons.every((button) => button.getBoundingClientRect().height >= 44),
+        withinViewport: catalogButtons.every((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= 0 && rect.right <= innerWidth;
+        })
+      };
       const sceneButtons = Array.from(document.querySelectorAll('[data-bubble-scene]'));
       const walkButtons = Array.from(document.querySelectorAll('[data-bubble-walk]'));
       const walks = ['l', 'r', 'vertical'].map((scene) => {
@@ -145,6 +162,10 @@ async function run() {
         };
       });
       return {
+        catalog,
+        regionSelection,
+        unitSelection,
+        catalogDom,
         walks,
         scenes,
         locale: document.documentElement.lang,
@@ -161,6 +182,40 @@ async function run() {
       };
     })()`);
 
+    assert.equal(diagnostics.catalog.complete, true);
+    assert.equal(diagnostics.catalog.regionCount, 8);
+    assert.equal(diagnostics.catalog.classCount, 5);
+    assert.equal(diagnostics.catalog.monsterDefinitionCount, 24);
+    assert.equal(diagnostics.catalog.monsterOptionCount, 24);
+    assert.deepEqual(diagnostics.catalog.missing, []);
+    assert.deepEqual(diagnostics.catalog.issues, []);
+    assert.deepEqual(diagnostics.catalog.unmapped, []);
+    assert.deepEqual(diagnostics.catalog.regions.map((region) => [
+      region.id, region.tier, region.normal.length, region.boss.length
+    ]), [
+      ['grassland', 1, 2, 1],
+      ['forest', 2, 2, 1],
+      ['mine', 3, 2, 1],
+      ['graveyard', 4, 2, 1],
+      ['snowpass', 5, 2, 1],
+      ['lavacave', 6, 2, 1],
+      ['skyruins', 7, 2, 1],
+      ['darkcastle', 8, 2, 1]
+    ]);
+    assert.equal(diagnostics.regionSelection.regionId, 'forest');
+    assert.equal(diagnostics.regionSelection.worldRegionId, 'forest');
+    assert.equal(diagnostics.unitSelection.regionId, 'forest');
+    assert.equal(diagnostics.unitSelection.worldRegionId, 'forest');
+    assert.equal(diagnostics.unitSelection.group, 'monster');
+    assert.equal(diagnostics.unitSelection.unit.id, 'treant_sapling');
+    assert.equal(diagnostics.catalogDom.regions, 8);
+    assert.equal(diagnostics.catalogDom.regionUnits, 3);
+    assert.equal(diagnostics.catalogDom.classes, 5);
+    assert.equal(diagnostics.catalogDom.activeRegion, 'forest');
+    assert.equal(diagnostics.catalogDom.title, 'Auto-discovered Unit Catalog');
+    assert.equal(diagnostics.catalogDom.touchable, true);
+    assert.equal(diagnostics.catalogDom.withinViewport, true);
+    assert.match(diagnostics.catalogDom.activeUnit, /Treant Sapling/);
     for (const walk of diagnostics.walks) {
       assert.equal(walk.layouts.length, 1, walk.id + ' exposes the hero bubble');
       assert.equal(walk.activeButton, true, walk.id + ' movement control is selected');

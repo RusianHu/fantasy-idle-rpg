@@ -4,8 +4,10 @@
 
 ## QA 控制
 
-- 顶部「职业 / 普通怪 / Boss」分类切换，右侧检查器列出当前分类全部单位，点击即可切到对应单位。
-- 左右箭头或在分类内按 `[` / `]` 切换上一个/下一个单位。
+- 右侧「角色与怪物自动目录」直接遍历生产 `class`、`region`、`monster` 注册表：八张主题地图分别列出普通怪与 Boss 选项，职业不再由演示页手写。
+- 点击主题地图会重建该区域的正式 v3 舞台；选择怪物时自动切到其所属地图，避免在草原背景验证高阶区域怪物。
+- 顶部「职业 / 普通怪 / Boss」切换当前地图内的类别；左右箭头或 `[` / `]` 仅遍历当前类别与区域。
+- 支持 `?region=forest&unit=treant_sapling&lang=zh-CN` 深链；选择状态会同步回 URL，便于复现。
 - 日夜阶段控件：循环 / 昼间 / 黄昏 / 夜晚。
 - 「环境效果」开关控制氛围粒子；「动态效果」开关控制 Canvas 动效降级。
 
@@ -31,8 +33,9 @@
 
 ## 检查器内容
 
-- 职业：Lv.60 裸属性、派生属性（含被动加成）、五职业技能列表与图标。
-- 怪物/Boss：精灵预览、属性面板、所属区域、经典阶位、攻击间隔。
+- 职业：注册 ID、角色/头像精灵、武器、职业特征、Lv.60 裸属性与派生属性、技能列表与图标。
+- 怪物/Boss：注册 ID、精灵、区域选项位、变体系数、属性面板、所属区域、经典阶位、攻击间隔。
+- `Game.unitsBubbleDemo.catalog()` 输出注册表覆盖、缺失/未映射怪物与八区完整选项；`selectRegion()`、`selectUnit()`、`selection()` 用于自动化复现。
 
 ## 复用链路
 
@@ -40,4 +43,4 @@
 
 ## 自动验证
 
-`node tests/cache-version.test.js` 校验 `units.html` 的全部 CSS/JS 查询版本与字体 `BUILD_ID` 同步；`node tests/action-bubble-demo.test.js` 聚焦验证三种行走朝向、纵向接敌、双边缘翻转、血条零重叠、视口约束和中英文控件；`node tests/browser-smoke.js` 保留整站集成覆盖。
+`node tests/cache-version.test.js` 校验 `units.html` 的全部 CSS/JS 查询版本与字体 `BUILD_ID` 同步；`node tests/action-bubble-demo.test.js` 验证八区 24 个怪物选项的注册表覆盖、区域/单位选择同步，以及三种行走朝向、纵向接敌、双边缘翻转、血条零重叠、视口约束和中英文控件；`node tests/browser-smoke.js` 保留整站集成覆盖。

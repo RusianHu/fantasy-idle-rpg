@@ -66,7 +66,7 @@ css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 assets/sprite-source/ 采集物与探索宝箱的生成式母版及运行时预览
 assets/sprites/       可独立复用的透明运行时 PNG（exploration/ 按稳定 ID 拆分）
-tech-demos/           双语技术演示中心（生产代码直连；支持区域/种子/语言 URL 参数）
+tech-demos/           双语技术演示中心（生产代码直连；角色/怪物按区域注册表自动枚举，支持区域/单位/种子/语言 URL 参数）
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
   core/               utils / eventbus / registry / audio(占位) / assets(精灵工厂) / save / loop / update
