@@ -3269,6 +3269,7 @@ async function run() {
       let visible = 0;
       for (let i = 3; i < pixels.length; i += 64) if (pixels[i]) visible++;
       const report = JSON.parse(document.getElementById('report').textContent);
+      const iconCanvases = Array.from(document.querySelectorAll('[data-map-icon]'));
       return {
         region: report.region,
         seed: report.seed,
@@ -3278,6 +3279,12 @@ async function run() {
         valid: report.metrics.walkableRatio >= 0.6 && report.metrics.walkableRatio <= 0.7,
         metricCount: document.querySelectorAll('#metrics .metric').length,
         chunkToggle: !!document.getElementById('show-chunks'),
+        iconCount: iconCanvases.length,
+        iconsPainted: iconCanvases.every((icon) => {
+          const data = icon.getContext('2d').getImageData(0, 0, icon.width, icon.height).data;
+          for (let i = 3; i < data.length; i += 4) if (data[i]) return true;
+          return false;
+        }),
         visible,
         controlsTouchable: [document.getElementById('generate'), document.getElementById('audit')]
           .every((el) => el.getBoundingClientRect().height >= 44),
@@ -3292,6 +3299,8 @@ async function run() {
     assert.equal(generatorDemo.valid, true);
     assert.equal(generatorDemo.metricCount, 8);
     assert.equal(generatorDemo.chunkToggle, true);
+    assert.equal(generatorDemo.iconCount, 9);
+    assert.equal(generatorDemo.iconsPainted, true);
     assert.ok(generatorDemo.visible > 1000, 'v3 generator canvas is nonblank');
     assert.equal(generatorDemo.controlsTouchable, true);
     assert.equal(generatorDemo.noHorizontalOverflow, true);

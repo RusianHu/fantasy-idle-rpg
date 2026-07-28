@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.4") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.5") format("woff2");
   font-display: swap;
 }
 :root {
@@ -38,9 +38,9 @@ aside { padding: 12px; display: grid; align-content: start; gap: 9px; background
 aside label { min-height: 32px; display: flex; align-items: center; gap: 7px; color: #b6bbb3; font-size: 10px; }
 aside input { min-height: 0; accent-color: #c4a950; }
 .legend { display: grid; grid-template-columns: 1fr; gap: 6px; padding-top: 8px; border-top: 1px solid #3f4740; font-size: 9px; }
-.legend span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; background: currentColor; }
-.camp { color: #69d891; } .boss { color: #ef705e; } .landmark { color: #f0ce69; }
-.resource { color: #62bde0; } .curio { color: #be83e8; } .threat { color: #d6594f; }
+.legend span { min-width: 0; min-height: 24px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 6px; color: #c6cbc3; }
+.legend canvas { width: 18px; height: 18px; image-rendering: pixelated; }
+.legend b { min-width: 0; color: inherit; font-weight: normal; line-height: 1.3; overflow-wrap: anywhere; }
 pre { min-height: 92px; max-height: 240px; margin: 8px 0 0; padding: 10px; overflow: auto; color: #b7c0ba; background: #101511; border: 1px solid #343c35; font: 10px/1.55 Consolas, monospace; }
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }

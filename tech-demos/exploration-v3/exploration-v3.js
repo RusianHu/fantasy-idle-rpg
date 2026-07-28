@@ -32,13 +32,23 @@
   buildRegionOptions(query.get('region'));
   if (/^[0-9a-f]{1,8}$/i.test(query.get('seed') || '')) seedInput.value = query.get('seed').toUpperCase();
 
-  function marks(list, color, radius, sx, sy) {
-    ctx.fillStyle = color;
+  function markerSize() {
+    var cssWidth = Math.max(1, canvas.getBoundingClientRect().width);
+    return Math.max(17, Math.min(48, Math.round(15 * canvas.width / cssWidth)));
+  }
+
+  function marks(list, type, sx, sy) {
+    var size = markerSize();
     (list || []).forEach(function (point) {
       if (!point) return;
-      ctx.beginPath();
-      ctx.arc(point.x * sx, point.y * sy, radius, 0, Math.PI * 2);
-      ctx.fill();
+      Game.mapIcons.draw(ctx, typeof type === 'function' ? type(point) : type,
+        point.x * sx, point.y * sy, { size: size });
+    });
+  }
+
+  function drawLegend() {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-map-icon]'), function (icon) {
+      Game.mapIcons.drawToDom(icon, icon.getAttribute('data-map-icon'));
     });
   }
 
@@ -85,12 +95,14 @@
     }
 
     if (document.getElementById('show-content').checked) {
-      marks(layout.landmarks, '#f0ce69', 4, sx, sy);
-      marks(layout.nodes, '#62bde0', 2, sx, sy);
-      marks(layout.curios, '#be83e8', 3, sx, sy);
-      marks(layout.ecology, '#83e1d9', 2, sx, sy);
-      marks(layout.threats, '#d6594f', 4, sx, sy);
-      marks([layout.guardian], '#ffffff', 4, sx, sy);
+      marks([layout.camp], 'camp', sx, sy);
+      marks(layout.landmarks, function (point) { return point.bossLair ? 'lair' : 'landmark'; }, sx, sy);
+      marks(layout.nodes, 'resource', sx, sy);
+      marks(layout.curios, 'curio', sx, sy);
+      marks(layout.ecology, 'ecology', sx, sy);
+      marks(layout.threats, 'threat', sx, sy);
+      marks([layout.guardian], 'guardian', sx, sy);
+      marks([{ x: layout.camp.x + 54, y: layout.camp.y + 36 }], 'hero', sx, sy);
     }
 
     if (document.getElementById('show-chunks').checked) {
@@ -207,5 +219,6 @@
     buildRegionOptions(selected);
     generate();
   });
+  drawLegend();
   generate();
 })();

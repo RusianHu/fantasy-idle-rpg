@@ -532,22 +532,31 @@
         }
       }
       var rsd = rs.discovered;
-      function mark(list, bucket, color, radius) {
-        ctx.fillStyle = color;
+      var markerSize = Math.max(15, Math.min(19, Math.round(width / 29)));
+      function icon(type, point, alpha) {
+        if (!Game.mapIcons || !point) return;
+        var half = markerSize / 2 + 1;
+        Game.mapIcons.draw(ctx, type,
+          U.clamp(point.x * sx, half, width - half),
+          U.clamp(point.y * sy, half, height - half),
+          { size: markerSize, alpha: alpha });
+      }
+      function mark(list, bucket, type) {
         for (var i = 0; i < list.length; i++) {
           if (!bucket[list[i].defId]) continue;
-          ctx.beginPath();
-          ctx.arc(list[i].x * sx, list[i].y * sy, radius, 0, Math.PI * 2);
-          ctx.fill();
+          icon(typeof type === 'function' ? type(list[i]) : type, list[i]);
         }
       }
-      mark(layout.landmarks, rsd.landmarks, '#f4d379', 3);
-      mark(layout.nodes, rsd.resources, '#75d18b', 2);
-      mark(layout.curios, rsd.curios, '#c48cf0', 2.5);
-      mark(layout.ecology, rsd.ecology, '#7ddce0', 2);
+      icon('camp', layout.camp);
+      mark(layout.nodes, rsd.resources, 'resource');
+      mark(layout.ecology, rsd.ecology, 'ecology');
+      mark(layout.landmarks, rsd.landmarks, function (point) {
+        return point.bossLair ? 'lair' : 'landmark';
+      });
+      mark(layout.curios, rsd.curios, 'curio');
+      if (rsd.guardian) icon('guardian', layout.guardian);
       if (opts.hero !== false && Game.world && Game.world.hero) {
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath(); ctx.arc(Game.world.hero.x * sx, Game.world.hero.y * sy, 3.5, 0, Math.PI * 2); ctx.fill();
+        icon('hero', Game.world.hero);
       }
       return true;
     },
