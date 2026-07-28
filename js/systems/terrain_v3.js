@@ -577,16 +577,13 @@
     var rng = U.seededRng(seedFor(worldSeed, region.id, 'details', attempt));
     var props = [], glows = [], tufts = [], flowers = [];
     var deco = region.terrain.deco || [];
-    var solidDeco = deco.filter(function (d) { return !d.water; });
-    var blockerDeco = solidDeco.filter(function (d) {
-      return /(tree|oak|birch|pine|rocks_big|crystal_big|beam|tombstone|grave_cross|obsidian|lava_rock|pillar|spikes|banner)/.test(d.sprite || '');
-    });
-    var groundDeco = deco.filter(function (d) {
-      return !d.water && /(fern|bush|flowers|pebbles|stump|shroom|candle|skulls|mound|bone|shard|lantern)/.test(d.sprite || '');
-    });
-    var waterDeco = deco.filter(function (d) { return !!d.water; });
-    if (!solidDeco.length) solidDeco = [{ sprite: 'deco_rock', count: 1 }];
-    if (!blockerDeco.length) blockerDeco = solidDeco;
+    function placementOf(def) {
+      return def.placement || (def.water ? 'water' : 'ground');
+    }
+    var blockerDeco = deco.filter(function (d) { return placementOf(d) === 'blocker'; });
+    var groundDeco = deco.filter(function (d) { return placementOf(d) === 'ground'; });
+    var waterDeco = deco.filter(function (d) { return placementOf(d) === 'water'; });
+    if (!blockerDeco.length) blockerDeco = [{ sprite: 'deco_rock', count: 1, placement: 'blocker' }];
     function weighted(pool) {
       if (!pool.length) return null;
       var total = 0;
@@ -625,11 +622,11 @@
       var spacing = blockerProp ? 22 : 15;
       if (!propSpace(x, y, spacing) || !clearOfContent(x, y, blockerProp ? 28 : 20)) return false;
       var sprite = def.sprite || 'deco_rock';
-      var large = blockerProp || /(tree|oak|pine|rocks_big|pillar_big|beam|spikes)/.test(sprite);
+      var large = blockerProp || !!def.large;
       var prop = {
         sprite: sprite, x: x, y: y,
         phase: rng() * 6.28, flipX: rng() < 0.5,
-        sway: /(tree|oak|pine|fern)/.test(sprite),
+        sway: !!def.sway,
         animSpd: def.flicker ? 0.24 : (0.9 + rng() * 0.7),
         bob: !!def.bob, shadow: def.shadow !== false,
         glow: def.glow || null, flicker: !!def.flicker,

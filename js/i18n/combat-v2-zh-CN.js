@@ -29,7 +29,7 @@
     },
     monster: monster,
     actor: {
-      adventurer: { name: '独行冒险者', desc: '公会登记的前线冒险者。', lore: '沿着随机前线路线净化露西亚大陆的瘴气。' },
+      adventurer: { name: '独行冒险者', desc: '公会登记的前线冒险者。', lore: '沿着公会编定的远征路线净化露西亚大陆的瘴气。' },
       guild_scout: { name: '公会斥候', desc: '驻守营地的非战斗斥候。', lore: '负责记录道路、巢穴与远征队归期。' },
       shadow_wisp: { name: '影缚幽火', desc: '由能力临时召来的战斗 Actor。', lore: '只在当前遭遇内存在，不进入长期名册。' },
       arcane_crystal: { name: '奥术防卫晶体', desc: '具备关系与战斗组件的可破坏物件。', lore: '遗迹守卫以古代术式唤醒的防卫节点。' }

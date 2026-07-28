@@ -23,6 +23,8 @@ Game.assets = {
   }
 };
 load('js/data/regions.js');
+load('js/data/routes.js');
+load('js/systems/routes.js');
 load('js/systems/terrain.js');
 load('js/systems/terrain_v3.js');
 load('js/vendor/easystar-0.4.4.min.js');
@@ -244,14 +246,22 @@ runNavLifecycle();
 
 load('js/systems/state.js');
 
-const seededOrderA = Game.State.makeRegionOrder(0x10203040);
-const seededOrderB = Game.State.makeRegionOrder(0x10203040);
+const canonicalOrder = Game.reg.ids('region');
+const authoredOrderA = Game.State.makeRegionOrder(0x10203040);
+const authoredOrderB = Game.State.makeRegionOrder(0x55667788);
+assert.deepEqual(authoredOrderA, canonicalOrder, 'new-game route randomization defaults to off');
+assert.deepEqual(authoredOrderB, canonicalOrder, 'world seed does not reorder the authored route while disabled');
+const seededOrderA = Game.State.makeRegionOrder(0x10203040, { randomizeMainline: true });
+const seededOrderB = Game.State.makeRegionOrder(0x10203040, { randomizeMainline: true });
 assert.deepEqual(seededOrderA, seededOrderB, 'region shuffle is deterministic for a world seed');
-const orderVariants = new Set(Array.from({ length: 32 }, (_, seed) => Game.State.makeRegionOrder(seed).slice(0, 4).join(',')));
+const orderVariants = new Set(Array.from({ length: 32 }, (_, seed) =>
+  Game.State.makeRegionOrder(seed, { randomizeMainline: true }).slice(0, 4).join(',')));
 assert.ok(orderVariants.size > 12, 'world seeds produce varied early-region orders');
 const freshState = Game.State.newGame();
 assert.equal(freshState.world.worldSeed, freshState.world.worldSeed >>> 0);
 assert.equal(freshState.world.layoutVersion, 3);
+assert.deepEqual(freshState.world.regionOrder, canonicalOrder);
+assert.deepEqual(Game.routes.validate(freshState.world.routePlan), []);
 
 const storage = new Map();
 global.localStorage = {
@@ -302,11 +312,14 @@ function runSaveTests() {
   assert.equal(migrated.world.worldSeed, expectedSeed);
   assert.equal(migrated.world.layoutVersion, 3);
   assert.deepEqual(migrated.world.regionOrder, old.world.regionOrder, 'migration preserves route order');
+  assert.deepEqual(Game.routes.mainlineRegionOrder(migrated.world.routePlan), old.world.regionOrder,
+    'migration compiles the preserved route into RoutePlan');
 
   Game.save.applyLoaded(migrated);
   const serialized = Game.save.serialize();
   assert.equal(serialized.world.worldSeed, expectedSeed);
   assert.equal(serialized.world.layoutVersion, 3);
+  assert.deepEqual(Game.routes.validate(serialized.world.routePlan), []);
   const expectedLayout = JSON.stringify(Game.terrain.snapshotV3(
     Game.terrain.build(Game.reg.get('region', serialized.world.region), expectedSeed, 3)
   ));

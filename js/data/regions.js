@@ -30,15 +30,15 @@
           { mat: 'sand', colors: ['#c8b078', '#bca46c'], count: 1, rMin: 24, rMax: 36 }
         ],
         deco: [
-          { sprite: 'flora_oak_big', count: 5, cluster: true },
-          { sprite: 'flora_oak_small', count: 5, cluster: true },
-          { sprite: 'flora_blossom', count: 2 },
-          { sprite: 'flora_bush_berry', count: 6 },
-          { sprite: 'flora_flowers', count: 4 },
-          { sprite: 'flora_flowers_pink', count: 4 },
-          { sprite: 'flora_pebbles', count: 4 },
-          { sprite: 'flora_stump', count: 2 },
-          { sprite: 'flora_lily', count: 3, water: true }
+          { sprite: 'flora_oak_big', count: 5, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'flora_oak_small', count: 5, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'flora_blossom', count: 2, placement: 'ground', sway: true },
+          { sprite: 'flora_bush_berry', count: 6, placement: 'ground' },
+          { sprite: 'flora_flowers', count: 4, placement: 'ground' },
+          { sprite: 'flora_flowers_pink', count: 4, placement: 'ground' },
+          { sprite: 'flora_pebbles', count: 4, placement: 'ground' },
+          { sprite: 'flora_stump', count: 2, placement: 'ground' },
+          { sprite: 'flora_lily', count: 3, water: true, placement: 'water' }
         ],
         tufts: 150,
         tuftColors: ['#3d8232', '#8ad06a'],
@@ -64,12 +64,12 @@
           { mat: 'water', colors: ['#356a9a', '#30618c'], count: 2, rMin: 30, rMax: 44 }
         ],
         deco: [
-          { sprite: 'flora_tree_forest', count: 10, cluster: true },
-          { sprite: 'flora_birch', count: 5, cluster: true },
-          { sprite: 'flora_fern', count: 8 },
-          { sprite: 'flora_shroom_glow', count: 6, glow: { color: '#5ad8cc', r: 15 } },
-          { sprite: 'flora_bush_berry', count: 3 },
-          { sprite: 'flora_lily', count: 3, water: true }
+          { sprite: 'flora_tree_forest', count: 10, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'flora_birch', count: 5, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'flora_fern', count: 8, placement: 'ground', sway: true },
+          { sprite: 'flora_shroom_glow', count: 6, placement: 'ground', glow: { color: '#5ad8cc', r: 15 } },
+          { sprite: 'flora_bush_berry', count: 3, placement: 'ground' },
+          { sprite: 'flora_lily', count: 3, water: true, placement: 'water' }
         ],
         tufts: 120,
         tuftColors: ['#2f6b28', '#6fae5a'],
@@ -96,12 +96,12 @@
           { mat: 'sand', colors: ['#9a8058', '#8e7650'], count: 2, rMin: 24, rMax: 40 }
         ],
         deco: [
-          { sprite: 'flora_rocks_big', count: 6, cluster: true },
-          { sprite: 'deco_rock', count: 6 },
-          { sprite: 'flora_crystal_big', count: 5, glow: { color: '#78d0e8', r: 20 } },
-          { sprite: 'flora_beam', count: 3 },
-          { sprite: 'flora_pebbles', count: 6 },
-          { sprite: 'deco_bone', count: 3 }
+          { sprite: 'flora_rocks_big', count: 6, cluster: true, placement: 'blocker' },
+          { sprite: 'deco_rock', count: 6, placement: 'ground' },
+          { sprite: 'flora_crystal_big', count: 5, placement: 'blocker', glow: { color: '#78d0e8', r: 20 } },
+          { sprite: 'flora_beam', count: 3, placement: 'blocker' },
+          { sprite: 'flora_pebbles', count: 6, placement: 'ground' },
+          { sprite: 'deco_bone', count: 3, placement: 'ground' }
         ],
         tufts: 0
       },
@@ -124,12 +124,12 @@
           { mat: 'water', colors: ['#2c3c50', '#283648'], count: 1, rMin: 26, rMax: 38 }
         ],
         deco: [
-          { sprite: 'flora_deadtree_big', count: 4 },
-          { sprite: 'deco_dead_tree', count: 4 },
-          { sprite: 'deco_tombstone', count: 6, cluster: true },
-          { sprite: 'flora_grave_cross', count: 5, cluster: true },
-          { sprite: 'flora_candle', count: 6, glow: { color: '#f8c860', r: 13 }, flicker: true },
-          { sprite: 'flora_skulls', count: 4 }
+          { sprite: 'flora_deadtree_big', count: 4, placement: 'blocker', sway: true },
+          { sprite: 'deco_dead_tree', count: 4, placement: 'blocker', sway: true },
+          { sprite: 'deco_tombstone', count: 6, cluster: true, placement: 'blocker' },
+          { sprite: 'flora_grave_cross', count: 5, cluster: true, placement: 'blocker' },
+          { sprite: 'flora_candle', count: 6, placement: 'ground', glow: { color: '#f8c860', r: 13 }, flicker: true },
+          { sprite: 'flora_skulls', count: 4, placement: 'ground' }
         ],
         tufts: 46,
         tuftColors: ['#4c543e', '#7a8560'],
@@ -155,12 +155,12 @@
           { mat: 'stone', colors: ['#8a92a0', '#7e8694'], count: 3, rMin: 24, rMax: 40 }
         ],
         deco: [
-          { sprite: 'flora_pine_big', count: 7, cluster: true },
-          { sprite: 'flora_pine_mid', count: 6, cluster: true },
-          { sprite: 'deco_pine_snow', count: 3 },
-          { sprite: 'flora_ice_shard', count: 4, glow: { color: '#a8e0f0', r: 15 } },
-          { sprite: 'flora_snow_mound', count: 6 },
-          { sprite: 'deco_rock', count: 3 }
+          { sprite: 'flora_pine_big', count: 7, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'flora_pine_mid', count: 6, cluster: true, placement: 'blocker', sway: true },
+          { sprite: 'deco_pine_snow', count: 3, placement: 'blocker', sway: true },
+          { sprite: 'flora_ice_shard', count: 4, placement: 'ground', glow: { color: '#a8e0f0', r: 15 } },
+          { sprite: 'flora_snow_mound', count: 6, placement: 'ground' },
+          { sprite: 'deco_rock', count: 3, placement: 'ground' }
         ],
         tufts: 0
       },
@@ -183,10 +183,10 @@
           { mat: 'dirt', colors: ['#5c4638', '#523e32'], count: 3, rMin: 26, rMax: 40 }
         ],
         deco: [
-          { sprite: 'flora_obsidian', count: 5, cluster: true },
-          { sprite: 'deco_lava_rock', count: 8, glow: { color: '#f09030', r: 13 } },
-          { sprite: 'flora_char_stump', count: 5 },
-          { sprite: 'flora_rocks_big', count: 3 }
+          { sprite: 'flora_obsidian', count: 5, cluster: true, placement: 'blocker' },
+          { sprite: 'deco_lava_rock', count: 8, placement: 'blocker', glow: { color: '#f09030', r: 13 } },
+          { sprite: 'flora_char_stump', count: 5, placement: 'ground' },
+          { sprite: 'flora_rocks_big', count: 3, placement: 'blocker' }
         ],
         tufts: 0
       },
@@ -209,12 +209,12 @@
           { mat: 'water', colors: ['#78b8d8', '#6cacce'], count: 2, rMin: 22, rMax: 34 }
         ],
         deco: [
-          { sprite: 'flora_pillar_big', count: 5, cluster: true },
-          { sprite: 'flora_pillar_broken', count: 5 },
-          { sprite: 'deco_pillar', count: 3 },
-          { sprite: 'flora_float_crystal', count: 5, bob: true, glow: { color: '#8ae8dc', r: 15 } },
-          { sprite: 'flora_flowers_blue', count: 5 },
-          { sprite: 'deco_crystal', count: 3, glow: { color: '#68c8e8', r: 11 } }
+          { sprite: 'flora_pillar_big', count: 5, cluster: true, placement: 'blocker' },
+          { sprite: 'flora_pillar_broken', count: 5, placement: 'blocker' },
+          { sprite: 'deco_pillar', count: 3, placement: 'blocker' },
+          { sprite: 'flora_float_crystal', count: 5, placement: 'ground', bob: true, glow: { color: '#8ae8dc', r: 15 } },
+          { sprite: 'flora_flowers_blue', count: 5, placement: 'ground' },
+          { sprite: 'deco_crystal', count: 3, placement: 'ground', glow: { color: '#68c8e8', r: 11 } }
         ],
         tufts: 64,
         tuftColors: ['#5f8c5f', '#a0cca0'],
@@ -241,12 +241,12 @@
           { mat: 'dirt', colors: ['#463c4a', '#3e3442'], count: 2, rMin: 26, rMax: 38 }
         ],
         deco: [
-          { sprite: 'flora_dark_tree', count: 4 },
-          { sprite: 'deco_banner_evil', count: 6, cluster: true },
-          { sprite: 'flora_lantern', count: 6, glow: { color: '#b070e0', r: 15 }, flicker: true },
-          { sprite: 'flora_spikes', count: 4 },
-          { sprite: 'deco_pillar', count: 3 },
-          { sprite: 'deco_bone', count: 4 }
+          { sprite: 'flora_dark_tree', count: 4, placement: 'blocker', sway: true },
+          { sprite: 'deco_banner_evil', count: 6, cluster: true, placement: 'blocker' },
+          { sprite: 'flora_lantern', count: 6, placement: 'ground', glow: { color: '#b070e0', r: 15 }, flicker: true },
+          { sprite: 'flora_spikes', count: 4, placement: 'blocker' },
+          { sprite: 'deco_pillar', count: 3, placement: 'blocker' },
+          { sprite: 'deco_bone', count: 4, placement: 'ground' }
         ],
         tufts: 30,
         tuftColors: ['#43265f', '#8a56c0']

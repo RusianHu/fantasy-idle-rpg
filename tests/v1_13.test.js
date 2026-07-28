@@ -76,6 +76,11 @@ for (const region of regions) {
   assert.equal(region.exploration.curios.length, 3);
   assert.equal(region.exploration.ecology.length, 2);
   assert.equal(region.exploration.commissions.length, 4);
+  assert.ok(region.terrain.deco.length > 0);
+  assert.ok(region.terrain.deco.every((def) => ['blocker', 'ground', 'water'].includes(def.placement)),
+    `${region.id} theme decorations must declare placement semantics`);
+  assert.ok(region.terrain.deco.some((def) => def.placement === 'blocker'),
+    `${region.id} needs a data-declared hard-blocker visual pool`);
   for (let n = 1; n <= 200; n++) {
     const seed = Math.imul(n, 2654435761) >>> 0;
     const started = performance.now();
@@ -117,9 +122,17 @@ for (const region of regions) {
     const blockerProps = first.props.filter((prop) => prop.blockerProp);
     assert.ok(blockerProps.length >= 350,
       `${region.id}:${seed} hard blockers need visible environment silhouettes`);
-    assert.ok(blockerProps.every((prop) =>
-      /(tree|oak|birch|pine|rocks_big|crystal_big|beam|tombstone|grave_cross|obsidian|lava_rock|pillar|spikes|banner)/.test(prop.sprite)),
-    `${region.id}:${seed} hard blocker uses a misleading small prop`);
+    const blockerSprites = new Set(region.terrain.deco
+      .filter((def) => def.placement === 'blocker').map((def) => def.sprite));
+    assert.ok(blockerProps.every((prop) => blockerSprites.has(prop.sprite)),
+      `${region.id}:${seed} hard-blocker visuals must come from the declared placement pool`);
+    if (n === 1) {
+      const actualSprites = new Set(first.props.filter((prop) => !prop.campProp).map((prop) => prop.sprite));
+      for (const def of region.terrain.deco) {
+        assert.ok(actualSprites.has(def.sprite),
+          `${region.id}:${seed} configured theme decoration ${def.sprite} was not instantiated`);
+      }
+    }
     if (region.terrain.tufts > 0) {
       assert.ok(first.tufts.length >= region.terrain.tufts * 5,
         `${region.id}:${seed} tuft density regressed`);

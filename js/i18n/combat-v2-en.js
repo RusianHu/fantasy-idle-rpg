@@ -26,7 +26,7 @@
     },
     monster: monster,
     actor: {
-      adventurer: { name: 'Lone Adventurer', desc: 'A frontline adventurer registered with the guild.', lore: 'Follows a shuffled frontline route to cleanse Lucia of miasma.' },
+      adventurer: { name: 'Lone Adventurer', desc: 'A frontline adventurer registered with the guild.', lore: 'Follows the guild-authored expedition route to cleanse Lucia of miasma.' },
       guild_scout: { name: 'Guild Scout', desc: 'A non-combat scout stationed at camp.', lore: 'Records roads, lairs, and returning expeditions.' },
       shadow_wisp: { name: 'Bound Shadow Wisp', desc: 'A temporary combat Actor created by an ability.', lore: 'Exists only for its encounter and never enters the persistent roster.' },
       arcane_crystal: { name: 'Arcane Defense Crystal', desc: 'A destructible object with relations and combat components.', lore: 'An ancient ruin defense node awakened by its wardens.' }

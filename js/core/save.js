@@ -201,6 +201,21 @@
         delete inv.lockedSlots;
         data.v = 12;
       }
+    },
+    {
+      // v12 → v13：将区域数组提升为可扩展 RoutePlan。旧档的既有主线
+      // 顺序原样编译，绝不受当前“新档随机路线”功能开关影响。
+      from: 12,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.routePlan = Game.routes.fromLegacy(
+          data.world.regionOrder,
+          Number.isFinite(data.world.worldSeed) ? data.world.worldSeed : 0,
+          { creationMode: 'legacy-preserved' }
+        );
+        data.world.regionOrder = Game.routes.mainlineRegionOrder(data.world.routePlan);
+        data.v = 13;
+      }
     }
   ];
 
@@ -257,6 +272,7 @@
         world: {
           region: st.world.region,
           regionOrder: st.world.regionOrder,
+          routePlan: st.world.routePlan,
           worldSeed: st.world.worldSeed >>> 0,
           layoutVersion: st.world.layoutVersion,
           mode: st.world.mode,
@@ -370,8 +386,13 @@
       st.world.layoutVersion = 3;
       st.world.exploration = data.world && data.world.exploration &&
         typeof data.world.exploration === 'object' ? data.world.exploration : {};
+      st.world.routePlan = Game.routes.normalize(
+        data.world && data.world.routePlan,
+        data.world && data.world.regionOrder,
+        st.world.worldSeed
+      );
       st.world.regionOrder = Game.State.normalizeRegionOrder(
-        data.world && data.world.regionOrder
+        Game.routes.mainlineRegionOrder(st.world.routePlan)
       );
       st.world.finalRegionLocked = !!st.world.finalRegionLocked;
       U.merge(st.meta, data.meta || {});

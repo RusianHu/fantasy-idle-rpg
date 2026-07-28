@@ -600,7 +600,8 @@ for (const key of ['pickups', 'gathers', 'materials', 'chests']) delete v8.meta.
 localStorage.setItem('firpg_save', JSON.stringify(v8));
 localStorage.setItem('firpg_save_backup', JSON.stringify(v8));
 const migratedCurrent = Game.save.load();
-assert.equal(migratedCurrent.v, 12);
+assert.equal(migratedCurrent.v, 13);
+assert.equal(Game.routes.validate(migratedCurrent.world.routePlan).length, 0);
 assert.deepEqual(Object.keys(migratedCurrent.inv.materials), []);
 assert.deepEqual(Object.keys(migratedCurrent.world.nodeCooldowns), []);
 assert.deepEqual(Object.keys(migratedCurrent.world.exploration), []);

@@ -9,61 +9,46 @@
   var paused = false;
   var timeMode = 'cycle';
   var lastFrame = performance.now();
+  var lastRuntimeUpdate = 0;
   var qaRestoreAuto = false;
   var explorationMessage = '';
 
-  var COPY = {
-    'zh-CN': {
-      valid: '结构验证', pass: '通过', fail: '未通过', world: '世界尺寸', walkable: '可行走率',
-      connected: '主连通格', centers: '宏观中心', edges: '拓扑边', loops: '环路秩', alternate: '替代路线',
-      clearance: '最小净宽', chunks: '热区块', props: '环境实体', blockers: '大型阻挡',
-      resources: '资源节点', landmarks: '地标', curios: '奇物', ecology: '稀有生态', threats: '威胁领地',
-      guardian: '守门精英', attempts: '生成尝试', repairs: '确定性修复', fallback: '安全回退', none: '无',
-      generation: '开放地图生成报告', content: '探索内容角色', resourceCatalog: '区域资源目录',
-      combat: '战斗生态与环境', qa: '运行时 QA 状态', monster: '普通怪', boss: 'Boss',
-      seed: '世界种子', layout: '布局协议', strategy: '远征策略', intent: 'AI 意图', coverage: '迷雾揭示', gold: '金币',
-      ready: '成熟', rare: '稀有', common: '常见', count: '数量', cooldown: '冷却', particle: '环境粒子',
-      parallax: '视差层', generationNote: '所有指标来自本次 Game.terrain.generate/validate 结果，不是静态文档值。',
-      contentNote: '资源、地标、奇物、生态、威胁、守门精英和巢穴均使用稳定 ID 并写入 v12 世界状态。',
-      focused: '已定位并揭示资源', revealed: '已揭示全部资源并恢复节点', noReady: '没有成熟资源',
-      commonChest: '普通宝箱', rareChest: '稀有宝箱', spawned: '已生成', clickOpen: '点击箱体走近开启',
-      spawnFailed: '当前镜头附近没有合法宝箱落点', bossBlocks: 'Boss 登场期间不可生成宝箱',
-      gatherStart: '采集中', gatherDone: '采集完成', interrupted: '采集已中断', chestOpened: '宝箱已开启',
-      chestExpired: '宝箱已过期', merchantActive: '游商运行中', merchantExpired: '未注册 / 已过期',
-      regionReady: '已生成开放地图', entities: '个实体', seconds: '秒', manual: '手动', auto: '自动',
-      seedError: '请输入 1–8 位十六进制数字'
-    },
-    en: {
-      valid: 'Validation', pass: 'Pass', fail: 'Failed', world: 'World size', walkable: 'Walkable ratio',
-      connected: 'Connected cells', centers: 'Macro centers', edges: 'Graph edges', loops: 'Loop rank', alternate: 'Alternate routes',
-      clearance: 'Minimum clearance', chunks: 'World chunks', props: 'Environment entities', blockers: 'Large blockers',
-      resources: 'Resource nodes', landmarks: 'Landmarks', curios: 'Curios', ecology: 'Rare ecology', threats: 'Threat territories',
-      guardian: 'Gate guardian', attempts: 'Generation attempts', repairs: 'Deterministic repairs', fallback: 'Safe fallback', none: 'None',
-      generation: 'Open-map generation report', content: 'Exploration content roles', resourceCatalog: 'Region resource catalog',
-      combat: 'Combat ecology & environment', qa: 'Runtime QA state', monster: 'Enemy', boss: 'Boss',
-      seed: 'World seed', layout: 'Layout protocol', strategy: 'Expedition strategy', intent: 'AI intent', coverage: 'Fog revealed', gold: 'gold',
-      ready: 'Ready', rare: 'Rare', common: 'Common', count: 'Count', cooldown: 'Cooldown', particle: 'World particles',
-      parallax: 'Parallax layers', generationNote: 'Every metric comes from this Game.terrain.generate/validate result, not static documentation.',
-      contentNote: 'Resources, landmarks, curios, ecology, threats, guardian and lair use stable IDs in the v12 world state.',
-      focused: 'Focused and revealed resource', revealed: 'Revealed all resources and reset cooldowns', noReady: 'No ready resource',
-      commonChest: 'Common chest', rareChest: 'Rare chest', spawned: 'Spawned', clickOpen: 'click the chest to approach and open',
-      spawnFailed: 'No legal chest position near the current view', bossBlocks: 'Chests cannot spawn while a boss is active',
-      gatherStart: 'Gathering', gatherDone: 'Gather complete', interrupted: 'Gather interrupted', chestOpened: 'Chest opened',
-      chestExpired: 'Chest expired', merchantActive: 'Trader active', merchantExpired: 'Not registered / expired',
-      regionReady: 'Generated open map', entities: 'entities', seconds: 'seconds', manual: 'Manual', auto: 'Auto',
-      seedError: 'Enter 1–8 hexadecimal digits'
-    }
-  };
+  function tr(key, vars) { return D.t('map.inspector.' + key, vars); }
 
-  function tr(key) {
-    var locale = D.locale();
-    return (COPY[locale] && COPY[locale][key]) || COPY['zh-CN'][key] || key;
+  function idName(group, id) {
+    var key = 'map.inspector.' + group + '.' + id;
+    var value = D.t(key);
+    return value === key ? id : value;
   }
 
   function esc(value) { return U.esc(String(value)); }
   function regionName(region) { return Game.i18n.t('region.' + region.id + '.name'); }
-  function contentName(item) { return item && item.nameKey ? Game.i18n.t(item.nameKey) : (item.defId || item.id); }
-  function materialName(id) { return Game.i18n.t('material.' + id); }
+  function contentName(item) {
+    if (!item) return tr('none');
+    var fallback = item.defId || item.id || tr('none');
+    if (!item.nameKey) return fallback;
+    var value = Game.i18n.t(item.nameKey);
+    return value === item.nameKey ? fallback : value;
+  }
+  function materialName(id) {
+    var key = 'material.' + id;
+    var value = Game.i18n.t(key);
+    return value === key ? idName('material', id) : value;
+  }
+  function monsterName(id) {
+    var key = 'monster.' + id + '.name';
+    var value = Game.i18n.t(key);
+    return value === key ? id : value;
+  }
+  function unique(values) {
+    return values.filter(function (value, index) { return values.indexOf(value) === index; });
+  }
+  function range(values, digits) {
+    if (!values.length) return tr('none');
+    var min = Math.min.apply(Math, values), max = Math.max.apply(Math, values);
+    var format = function (value) { return digits === undefined ? String(value) : value.toFixed(digits); };
+    return format(min) + (min === max ? '' : '–' + format(max));
+  }
 
   function queryParams() {
     try { return new URLSearchParams(location.search); } catch (_) { return new URLSearchParams(); }
@@ -88,15 +73,21 @@
     return '<span class="trait' + (cls ? ' ' + cls : '') + '">' + esc(label) + '</span>';
   }
 
-  function spriteRow(sprite, name, traits) {
-    return '<div class="sprite-row">' +
+  function inspectorAttrs(kind, id) {
+    return (kind ? ' data-inspector-kind="' + esc(kind) + '"' : '') +
+      (id ? ' data-inspector-id="' + esc(id) + '"' : '');
+  }
+
+  function spriteRow(sprite, name, traits, kind, id) {
+    return '<div class="sprite-row"' + inspectorAttrs(kind, id) + '>' +
       '<canvas class="sprite-preview" width="40" height="40" data-sprite="' + esc(sprite) + '"></canvas>' +
       '<div class="sprite-copy"><strong>' + esc(name) + '</strong><small>' + esc(sprite) + '</small></div>' +
       '<div class="trait-list">' + traits + '</div></div>';
   }
 
-  function configRow(label, value, raw) {
-    return '<div class="config-row"><span>' + esc(label) + '</span><div>' + esc(value) +
+  function configRow(label, value, raw, kind, id, runtimeField) {
+    return '<div class="config-row"' + inspectorAttrs(kind, id) + '><span>' + esc(label) + '</span><div>' +
+      '<span class="config-value"' + (runtimeField ? ' data-inspector-runtime="' + esc(runtimeField) + '"' : '') + '>' + esc(value) + '</span>' +
       (raw ? '<div class="raw-id">' + esc(raw) + '</div>' : '') + '</div></div>';
   }
 
@@ -105,11 +96,21 @@
       '</strong><span>' + esc(label) + '</span></div>';
   }
 
+  function catalogGroup(title, rows, kind) {
+    return '<div class="catalog-group" data-inspector-group="' + esc(kind) + '"><h4>' + esc(title) +
+      '</h4><div class="sprite-list">' + rows + '</div></div>';
+  }
+
+  function translatedGameValue(key, fallback) {
+    var value = Game.i18n.t(key);
+    return value === key ? fallback : value;
+  }
+
   function renderTabs() {
     document.getElementById('region-tabs').innerHTML = regions.map(function (region, index) {
       return '<button class="region-tab' + (index === currentIndex ? ' active' : '') + '" type="button" data-region-index="' + index + '"' +
         (index === currentIndex ? ' aria-current="page"' : '') + '><small>' + String(index + 1).padStart(2, '0') +
-        ' / TIER ' + region.tier + '</small>' + esc(regionName(region)) + '</button>';
+        ' / ' + esc(tr('tier').toUpperCase()) + ' ' + region.tier + '</small>' + esc(regionName(region)) + '</button>';
     }).join('');
   }
 
@@ -119,20 +120,91 @@
     var metrics = report.metrics;
     var cfg = region.exploration;
     var props = layout.props || [];
-    var largeProps = props.filter(function (item) { return item.large; }).length;
+    var blockerProps = props.filter(function (item) { return item.blockerProp; }).length;
     var ai = Game.expeditionAI.intent();
+    var expedition = Game.expedition.current(region.id);
+    var modifiers = Game.expedition.currentModifier(region.id);
+    var summary = Game.collection.regionSummary(region.id);
+    var ready = summary.readiness;
+    var activeEcology = expedition.activeEcology || [];
     var resourceRows = cfg.resources.map(function (def) {
-      var count = layout.nodes.filter(function (node) { return node.defId === def.id; }).length;
+      var nodes = layout.nodes.filter(function (node) { return node.defId === def.id; });
+      var cooldowns = nodes.map(function (node) { return node.cooldown; });
       return spriteRow(def.sprite, materialName(def.material),
-        trait(tr('count') + ' ' + count) + trait(def.rarity === 'rare' ? tr('rare') : tr('common'), def.rarity === 'rare' ? 'accent' : ''));
+        trait(tr('count') + ' ' + nodes.length) +
+        trait(tr('cooldown') + ' ' + range(cooldowns) + ' ' + tr('seconds')) +
+        trait(def.rarity === 'rare' ? tr('rare') : tr('common'), def.rarity === 'rare' ? 'accent' : ''),
+        'resource', def.id);
     }).join('');
     var landmarkRows = layout.landmarks.map(function (item) {
-      return spriteRow(item.sprite, contentName(item), trait(item.bossLair ? tr('boss') : item.function, item.bossLair ? 'boss' : ''));
+      var role = item.bossLair ? 'boss' : item.function;
+      return spriteRow(item.sprite, contentName(item), trait(idName('function', role), item.bossLair ? 'boss' : ''),
+        'landmark', item.defId);
     }).join('');
+    var curioRows = layout.curios.map(function (item) {
+      var choices = (item.choices || []).map(function (id) {
+        return translatedGameValue('explore.curio.' + id, id);
+      }).join(' / ');
+      return spriteRow(item.sprite, contentName(item), trait(tr('choices') + ' ' + choices), 'curio', item.defId);
+    }).join('');
+    var ecologyRows = layout.ecology.map(function (item) {
+      var active = activeEcology.indexOf(item.defId) >= 0;
+      return spriteRow(item.sprite, contentName(item), trait(active ? tr('active') : tr('inactive'), active ? 'accent' : ''),
+        'ecology', item.defId);
+    }).join('');
+    var threatBuckets = {};
+    layout.threats.forEach(function (item) {
+      (threatBuckets[item.defId] = threatBuckets[item.defId] || []).push(item);
+    });
+    var threatRows = Object.keys(threatBuckets).map(function (id) {
+      var bucket = threatBuckets[id];
+      var affixes = unique(bucket.map(function (item) {
+        return expedition.threatAffixes[item.id] || item.affix;
+      }));
+      var monsterIds = unique(bucket.map(function (item) { return item.monster; }));
+      var details = tr('count') + ' ' + bucket.length + ' · ' + tr('danger') + ' ' +
+        range(bucket.map(function (item) { return item.danger; }), 2) + ' · ' + tr('radius') + ' ' +
+        range(bucket.map(function (item) { return item.radius; })) + ' px · ' + tr('affixes') + ' ' +
+        affixes.map(function (affix) { return idName('affix', affix); }).join(', ') + ' · ' +
+        tr('monsterSet') + ' ' + monsterIds.map(monsterName).join(', ');
+      return configRow(contentName(bucket[0]), details,
+        bucket.map(function (item) { return item.id; }).join(', '), 'threat', id);
+    }).join('');
+    var guardian = layout.guardian;
+    var guardianRows = spriteRow(guardian.sprite || 'exp_guardian_mark', contentName(guardian),
+      trait(tr('guardian'), 'accent') + trait(monsterName(guardian.monster)), 'guardian', guardian.id);
+
+    var materialIds = unique([region.terrain.base.mat].concat(region.terrain.patches.map(function (patch) { return patch.mat; })));
+    var decorRows = region.terrain.deco.map(function (def) {
+      var actual = props.filter(function (prop) { return prop.sprite === def.sprite && !prop.campProp; }).length;
+      return spriteRow(def.sprite, def.sprite,
+        trait(tr('actual') + ' ' + actual, actual ? 'accent' : 'boss') +
+        trait(tr('configured') + ' ' + def.count) + trait(idName('role', def.placement)),
+        'decoration', def.sprite);
+    }).join('');
+    var parallaxRows = region.parallax.map(function (layer, index) {
+      return configRow(idName('parallax', layer.type), '×' + layer.factor,
+        layer.type + (layer.y === undefined ? '' : ' / y ' + layer.y), 'parallax', String(index));
+    }).join('');
+
     var monsterRows = region.monsters.map(function (id) {
       var def = Game.reg.get('monster', id);
-      return spriteRow(def.sprite || id, Game.i18n.t('monster.' + id + '.name'), trait(tr('monster')));
-    }).join('') + spriteRow(region.boss, Game.i18n.t('monster.' + region.boss + '.name'), trait(tr('boss'), 'boss'));
+      return spriteRow(def && def.sprite || id, monsterName(id), trait(tr('monster')), 'monster', id);
+    }).join('') + spriteRow(region.boss, monsterName(region.boss), trait(tr('boss'), 'boss'), 'boss', region.boss);
+
+    var anomalyNames = expedition.anomalies.map(function (id) { return idName('anomaly', id); });
+    var activeEcologyNames = activeEcology.map(function (id) {
+      var item = layout.ecology.filter(function (entry) { return entry.defId === id; })[0];
+      return item ? contentName(item) : id;
+    });
+    var modifierText = Object.keys(modifiers).map(function (key) {
+      return key + ' ×' + Number(modifiers[key]).toFixed(2);
+    }).join(' · ');
+    var readinessText = tr('coverage') + ' ' + ready.exploration + ' · ' + tr('landmarks') + ' ' + ready.landmarks +
+      ' · ' + tr('resources') + ' ' + ready.resources + ' · ' + tr('curios') + ' ' + ready.curios +
+      ' · ' + tr('guardian') + ' ' + ready.guardian;
+    var strategyName = translatedGameValue('explore.strategy.' + Game.expeditionAI.strategy(), Game.expeditionAI.strategy());
+    var intentName = translatedGameValue('explore.intent.' + ai.id, ai.id) + (ai.reason ? ' / ' + ai.reason : '');
 
     document.getElementById('inspector').innerHTML =
       '<div class="inspector-header"><h2>' + esc(regionName(region)) + '</h2><p>' + esc(Game.i18n.t('region.' + region.id + '.desc')) + '</p></div>' +
@@ -158,20 +230,43 @@
       '<section class="inspect-section"><h3>' + esc(tr('content')) + '</h3><div class="metric-grid compact">' +
         metric(layout.landmarks.length, tr('landmarks')) + metric(layout.curios.length, tr('curios')) +
         metric(layout.ecology.length, tr('ecology')) + metric(layout.threats.length, tr('threats')) +
-        metric(layout.guardian ? 1 : 0, tr('guardian')) + metric(largeProps, tr('blockers')) +
-      '</div><div class="sprite-list">' + landmarkRows + '</div><p class="note">' + esc(tr('contentNote')) + '</p></section>' +
+        metric(layout.guardian ? 1 : 0, tr('guardian')) + metric(blockerProps, tr('blockers')) +
+      '</div>' + catalogGroup(tr('landmarks'), landmarkRows, 'landmarks') +
+        catalogGroup(tr('curios'), curioRows, 'curios') + catalogGroup(tr('ecology'), ecologyRows, 'ecology') +
+        catalogGroup(tr('threats'), threatRows, 'threats') + catalogGroup(tr('guardian'), guardianRows, 'guardian') +
+        '<p class="note">' + esc(tr('contentNote')) + '</p></section>' +
       '<section class="inspect-section"><h3>' + esc(tr('resourceCatalog')) + '</h3><div class="sprite-list">' + resourceRows + '</div></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('combat')) + '</h3><div class="sprite-list">' + monsterRows + '</div><div class="row-list">' +
-        configRow(tr('particle'), region.particles) + configRow(tr('parallax'), region.parallax.length) +
-        configRow(tr('props'), props.length) + configRow(tr('blockers'), largeProps) + '</div></section>' +
+      '<section class="inspect-section"><h3>' + esc(tr('theme')) + '</h3><div class="row-list">' +
+        configRow(tr('macroPreset'), idName('preset', layout.preset), layout.preset, 'theme-field', 'macro-preset') +
+        configRow(tr('blockerTheme'), idName('preset', cfg.blockerTheme), cfg.blockerTheme, 'theme-field', 'blocker-theme') +
+        configRow(tr('baseMaterial'), materialName(region.terrain.base.mat), region.terrain.base.mat, 'theme-field', 'base-material') +
+        configRow(tr('terrainMaterials'), materialIds.map(materialName).join(' / '), materialIds.join(', '), 'theme-field', 'materials') +
+        configRow(tr('particle'), idName('particle', region.particles), region.particles, 'theme-field', 'particle') +
+        configRow(tr('parallax'), region.parallax.length) + configRow(tr('tufts'), layout.tufts.length) +
+        configRow(tr('flowers'), layout.flowers.length) + '</div>' +
+        catalogGroup(tr('decorations'), decorRows, 'decorations') + catalogGroup(tr('parallax'), parallaxRows, 'parallax') + '</section>' +
+      '<section class="inspect-section"><h3>' + esc(tr('combat')) + '</h3><div class="sprite-list">' + monsterRows + '</div></section>' +
+      '<section class="inspect-section"><h3>' + esc(tr('expedition')) + '</h3><div class="row-list">' +
+        configRow(tr('expeditionIndex'), expedition.index) + configRow(tr('expeditionSeed'), U.hex32(expedition.seed), String(expedition.seed)) +
+        configRow(tr('anomalies'), anomalyNames.join(' / ') || tr('none'), expedition.anomalies.join(', '), 'anomaly', 'active') +
+        configRow(tr('ecology'), activeEcologyNames.join(' / ') || tr('none'), activeEcology.join(', '), 'active-ecology', 'active') +
+        configRow(tr('modifiers'), modifierText) + '</div></section>' +
       '<section class="inspect-section"><h3>' + esc(tr('qa')) + '</h3><div class="row-list">' +
         configRow(tr('seed'), U.hex32(layout.worldSeed)) + configRow(tr('layout'), 'v' + layout.version) +
-        configRow(tr('strategy'), Game.expeditionAI.strategy()) + configRow(tr('intent'), ai.id + (ai.reason ? ' / ' + ai.reason : '')) +
-        configRow(tr('coverage'), (Game.exploration.coverage(region.id) * 100).toFixed(1) + '%') + '</div></section>';
+        configRow(tr('strategy'), strategyName, Game.expeditionAI.strategy(), null, null, 'strategy') +
+        configRow(tr('intent'), intentName, ai.id, null, null, 'intent') +
+        configRow(tr('coverage'), (ready.coverage * 100).toFixed(1) + '%', null, null, null, 'coverage') +
+        configRow(tr('readiness'), ready.total.toFixed(0) + ' / 100', readinessText, null, null, 'readiness') +
+        configRow(tr('complete'), summary.complete ? tr('yes') : tr('no'), null, null, null, 'complete') + '</div></section>';
 
     Array.prototype.forEach.call(document.querySelectorAll('.sprite-preview'), function (canvas) {
       Game.assets.drawToDom(canvas, canvas.getAttribute('data-sprite'), 'idle0');
     });
+  }
+
+  function setInspectorRuntime(field, value) {
+    var node = document.querySelector('[data-inspector-runtime="' + field + '"]');
+    if (node) node.textContent = value;
   }
 
   function setExplorationEvent(message) {
@@ -264,12 +359,17 @@
     return chest;
   }
 
-  function updateRuntime() {
+  function updateRuntime(force) {
     if (!Game.world.layout) return;
+    var now = performance.now();
+    if (!force && now - lastRuntimeUpdate < 200) return;
+    lastRuntimeUpdate = now;
     var nodes = Game.world.layout.nodes;
     var ready = nodes.filter(function (node) { return Game.environment.nodeReady(node); }).length;
+    var readiness = Game.exploration.readiness(Game.world.region.id);
+    var intent = Game.expeditionAI.intent();
     document.getElementById('gather-runtime').textContent = D.t('map.ready', { ready: ready, total: nodes.length });
-    document.getElementById('discovery-runtime').textContent = Game.exploration.readiness(Game.world.region.id).total.toFixed(0) + ' / 100';
+    document.getElementById('discovery-runtime').textContent = readiness.total.toFixed(0) + ' / 100';
     var chest = Game.environment.chests()[0];
     document.getElementById('chest-runtime').textContent = chest
       ? (chest.rare ? tr('rareChest') : tr('commonChest')) + ' · ' + Math.max(0, Math.ceil(chest.ttl - chest.age)) + 's'
@@ -279,6 +379,13 @@
     document.getElementById('dynamic-trade-status').textContent = area
       ? tr('merchantActive') + ' · ' + Math.max(0, Math.ceil(area.expiresAt - Game.state.world.worldTime)) + 's'
       : tr('merchantExpired');
+    setInspectorRuntime('strategy', translatedGameValue(
+      'explore.strategy.' + Game.expeditionAI.strategy(), Game.expeditionAI.strategy()));
+    setInspectorRuntime('intent', translatedGameValue('explore.intent.' + intent.id, intent.id) +
+      (intent.reason ? ' / ' + intent.reason : ''));
+    setInspectorRuntime('coverage', (readiness.coverage * 100).toFixed(1) + '%');
+    setInspectorRuntime('readiness', readiness.total.toFixed(0) + ' / 100');
+    setInspectorRuntime('complete', Game.exploration.isComplete(Game.world.region.id) ? tr('yes') : tr('no'));
   }
 
   function bindEvents() {
@@ -304,7 +411,7 @@
     Game.state.world.layoutVersion = 3;
     Game.state.world.mode = 'battle';
     Game.state.world.deathsRow = 0;
-    Game.state.player.level = 1 + currentIndex * 9;
+    Game.state.player.level = 1 + Math.max(0, region.tier - 1) * 9;
     Game.state.player.exp = 0;
     Game.state.player.skills = {};
     Game.player.recalc();
@@ -314,11 +421,11 @@
     document.getElementById('seed-input').value = U.hex32(Game.state.world.worldSeed);
     document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
     document.getElementById('stage-region-name').textContent = regionName(region);
-    document.getElementById('stage-region-id').textContent = 'region / ' + region.id + ' · layout v3';
+    document.getElementById('stage-region-id').textContent = 'region / ' + region.id + ' · layout v' + Game.world.layout.version;
     setExplorationEvent(regionName(region) + ' · ' + tr('regionReady') + ' · ' + Game.world.layout.nodes.length + ' ' + tr('resources'));
     renderTabs();
     renderInspector(region);
-    updateRuntime();
+    updateRuntime(true);
   }
 
   function setTimeMode(mode) {
@@ -357,7 +464,7 @@
         radius: 62, catalogs: ['camp-general'], priority: 30,
         nameKey: 'tradeArea.generic', prop: { style: 'supply-cart' }
       }, { ttl: 20 });
-      updateRuntime();
+      updateRuntime(true);
     });
     document.getElementById('focus-gather').addEventListener('click', focusReadyNode);
     document.getElementById('reset-gather').addEventListener('click', revealAllResources);
@@ -451,7 +558,7 @@
     document.getElementById('stage-region-name').textContent = regionName(Game.world.region);
     renderInspector(Game.world.region);
     setExplorationEvent(Game.world.region.id + ' · ' + tr('regionReady'));
-    updateRuntime();
+    updateRuntime(true);
   });
   requestAnimationFrame(frame);
 })();

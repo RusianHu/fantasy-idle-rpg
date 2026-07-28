@@ -59,18 +59,14 @@
       return s;
     },
 
-    /** 新档只打乱前四区；后半程与最终区域保持固定。 */
-    makeRegionOrder: function (worldSeed) {
-      var list = reg.ids('region');
-      var count = Math.min(4, list.length);
-      var rng = U.seededRng(worldSeed >>> 0);
-      for (var i = count - 1; i > 0; i--) {
-        var j = Math.floor(rng() * (i + 1));
-        var tmp = list[i];
-        list[i] = list[j];
-        list[j] = tmp;
-      }
-      return list;
+    /** 编译新档路线；随机主线由全局 ROUTE_FEATURES 开关控制。 */
+    makeRoutePlan: function (worldSeed, opts) {
+      return Game.routes.create(worldSeed, opts);
+    },
+
+    /** 兼容旧调用方：返回 RoutePlan 的主线区域投影。 */
+    makeRegionOrder: function (worldSeed, opts) {
+      return Game.routes.mainlineRegionOrder(State.makeRoutePlan(worldSeed, opts));
     },
 
     /**
@@ -78,24 +74,16 @@
      * 未提供顺序时使用经典注册顺序（用于旧档兼容）。
      */
     normalizeRegionOrder: function (savedOrder) {
-      var canonical = reg.ids('region');
-      var source = Array.isArray(savedOrder) ? savedOrder : canonical;
-      var seen = {}, out = [];
-      for (var i = 0; i < source.length; i++) {
-        var rid = source[i];
-        if (!seen[rid] && reg.has('region', rid)) {
-          seen[rid] = true;
-          out.push(rid);
-        }
-      }
-      for (var j = 0; j < canonical.length; j++) {
-        if (!seen[canonical[j]]) out.push(canonical[j]);
-      }
-      return out;
+      return Game.routes.normalizeRegionIds(savedOrder);
     },
 
     regionOrder: function () {
       if (Game.state && Game.state.world) {
+        if (Game.state.world.routePlan) {
+          return State.normalizeRegionOrder(
+            Game.routes.mainlineRegionOrder(Game.state.world.routePlan)
+          );
+        }
         return State.normalizeRegionOrder(Game.state.world.regionOrder);
       }
       return reg.ids('region');
@@ -125,7 +113,8 @@
     /** 新档（职业在序章后选择） */
     newGame: function () {
       var worldSeed = U.randomSeed();
-      var regionOrder = State.makeRegionOrder(worldSeed);
+      var routePlan = State.makeRoutePlan(worldSeed);
+      var regionOrder = Game.routes.mainlineRegionOrder(routePlan);
       var s = {
         createdAt: U.now(),
         settings: {
@@ -165,6 +154,7 @@
         world: {
           region: regionOrder[0],
           regionOrder: regionOrder,
+          routePlan: routePlan,
           worldSeed: worldSeed,
           layoutVersion: 3,
           mode: 'battle',

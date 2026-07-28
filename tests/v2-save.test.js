@@ -44,12 +44,12 @@ function boot(saved) {
     'js/sprites/exploration_v3.js',
     'js/data/formulas.js', 'js/data/affixes.js', 'js/data/items.js',
     'js/data/classes.js', 'js/data/skills.js', 'js/data/monsters.js',
-    'js/data/regions.js', 'js/data/packs/manifest.js'
+    'js/data/regions.js', 'js/data/routes.js', 'js/data/packs/manifest.js'
   ].forEach(load);
   sandbox.Game.CONTENT_PACK_FILES.forEach(load);
   sandbox.Game.content.finalize({ strict: true });
   [
-    'js/systems/state.js', 'js/systems/inventory.js',
+    'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
     'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
     'js/systems/actors/roster.js', 'js/systems/actors/actors.js',
     'js/core/save.js'
@@ -84,7 +84,7 @@ function legacy(version) {
 
 const v11 = boot(legacy(11));
 const migrated = v11.Game.save.load();
-assert.equal(migrated.v, 12);
+assert.equal(migrated.v, 13);
 assert.equal(migrated.player, undefined);
 assert.equal(migrated.roster.actors['player-main'].talentRanks.ft_heavy, 3);
 v11.Game.save.applyLoaded(migrated);
@@ -93,9 +93,10 @@ assert.equal(v11.Game.state.player.skills.ft_tough, 2);
 assert.equal(v11.Game.state.inv.lockedSlots.weapon, true);
 assert.equal(Object.prototype.propertyIsEnumerable.call(v11.Game.state, 'player'), false);
 const serialized = v11.Game.save.serialize();
-assert.equal(serialized.v, 12);
+assert.equal(serialized.v, 13);
 assert.equal(serialized.player, undefined);
 assert.ok(serialized.roster && serialized.economy);
+assert.equal(v11.Game.routes.validate(serialized.world.routePlan).length, 0);
 assert.equal(serialized.roster.actors['player-main'].loadout.lockedSlots.weapon, true);
 assert.equal(JSON.stringify(serialized).includes('encounterId'), false);
 assert.equal(JSON.stringify(serialized).includes('cooldowns'), false);
@@ -111,9 +112,9 @@ assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);
 // Full migration chain remains executable for the oldest supported save.
 const v1 = boot(legacy(1));
 const oldest = v1.Game.save.load();
-assert.equal(oldest.v, 12);
+assert.equal(oldest.v, 13);
 v1.Game.save.applyLoaded(oldest);
 assert.equal(v1.Game.state.roster.primaryActorId, 'player-main');
 assert.ok(v1.Game.State.normalizeRegionOrder(v1.Game.state.world.regionOrder).length >= 8);
 
-console.log('V2 save tests passed: v1→v12 and v11→v12 migration, downgrade, transient boundary.');
+console.log('V2 save tests passed: v1→v13 and v11→v13 migration, downgrade, route plan, transient boundary.');

@@ -1,4 +1,4 @@
-/* Persistent ActorRecord facade over save v12 roster state. */
+/* Persistent ActorRecord facade over the v12+ roster state. */
 (function () {
   'use strict';
   var Game = window.Game;

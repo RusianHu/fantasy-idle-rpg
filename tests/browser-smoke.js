@@ -3314,6 +3314,9 @@ async function run() {
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
       const colors = new Set();
       const explorationIds = Object.keys(Game.EXPLORATION_SPRITES?.assets || {});
+      const region = Game.world.region;
+      const layout = Game.world.layout;
+      const inspectorCount = (kind) => document.querySelectorAll('[data-inspector-kind="' + kind + '"]').length;
       for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4)) {
         colors.add(pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2]);
       }
@@ -3338,7 +3341,22 @@ async function run() {
         canvasColors: colors.size,
         explorationAssetCount: explorationIds.length,
         explorationAssetsRegistered: explorationIds.every((id) => Game.assets.has(id)),
-        explorationScriptCount: document.querySelectorAll('script[src*="sprites/exploration/"]').length
+        explorationScriptCount: document.querySelectorAll('script[src*="sprites/exploration/"]').length,
+        registryDrivenInspector: {
+          regions: document.querySelectorAll('[data-region-index]').length === Game.reg.all('region').length,
+          resources: inspectorCount('resource') === region.exploration.resources.length,
+          landmarks: inspectorCount('landmark') === layout.landmarks.length,
+          curios: inspectorCount('curio') === layout.curios.length,
+          ecology: inspectorCount('ecology') === layout.ecology.length,
+          threats: inspectorCount('threat') === new Set(layout.threats.map((item) => item.defId)).size,
+          guardian: inspectorCount('guardian') === 1,
+          decorations: inspectorCount('decoration') === region.terrain.deco.length,
+          combat: inspectorCount('monster') === region.monsters.length && inspectorCount('boss') === 1,
+          allDecorInstanced: region.terrain.deco.every((def) =>
+            layout.props.some((prop) => !prop.campProp && prop.sprite === def.sprite)),
+          noMissingInspectorKey: !document.getElementById('inspector').textContent.includes('map.inspector.'),
+          tierLevel: Game.state.player.level === 1 + Math.max(0, region.tier - 1) * 9
+        }
       };
     })()`);
     assert.equal(demo.seed, '89ABCDEF');
@@ -3354,6 +3372,8 @@ async function run() {
     assert.equal(demo.explorationAssetCount, 18, 'split exploration manifest covers every source cell');
     assert.equal(demo.explorationAssetsRegistered, true, 'all split exploration assets reach the production registry');
     assert.equal(demo.explorationScriptCount, 10, 'manifest and nine exploration groups load independently');
+    assert.ok(Object.values(demo.registryDrivenInspector).every(Boolean),
+      'live inspector catalogs must match registered and generated content: ' + JSON.stringify(demo.registryDrivenInspector));
     const demoExploration = await cdp.evaluate(`(() => {
       const W = Game.world;
       const nodes = W.layout.nodes;

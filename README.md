@@ -30,7 +30,7 @@
 | **点触交互** | 点击怪物/地面发出交战或移动指令；点击掉落、采集节点、宝箱与交易实体会寻路走近并交互；点篝火=回营/拔营 |
 | **动作气泡** | 自动模式发现资源、开始采集、遭遇敌人、发现宝箱或拾取战利品时显示短时纯图形像素气泡（叶片/采集镐/交叉武器/宝箱/战利品袋）；左右行走时气泡落在后脑斜上方，上下行走时保持正上方，接敌/警戒按对手方向侧移并自动避开边缘与血条 |
 | **掉落与环境** | 普通战斗装备/药水以像素实体落地并自动拾取，支持 24 件/60 秒保底回收和关闭开关即时入包；八区共 40 种资源定义（16 个基础采集物 + 24 个 v3 区域资源），每区生成 16–22 个节点并使用独立 16-bit 世界精灵与持久冷却（成熟节点采集 1.2 秒、90–150 秒冷却）；合法移动可发现普通/稀有探索宝箱（同区至多一个、90 秒过期，稀有箱追加装备与魔晶石） |
-| 区域推进 | 8 大区域；揭雾、地标、资源、奇物、生态和守门精英共同构成准备度，达到 70 且发现巢穴后才能在地图实体处挑战 Boss；讨伐条下有自动讨伐开关（默认开启）与委托牌，关闭后满进度停留当前区、手动发起不受当前 v3 的 80% 生命安全线限制。首杀仍解锁下一地区并沿用完整换景；魔王城失守后须重打浮空遗迹 Boss 解锁 |
+| 区域推进 | 新档按经典八区顺序推进；`RoutePlan` 保存稳定主线拓扑，并为子任务地图、巢穴和限时事件预留带锚点、阶位、返回策略与生命周期的插入记录。揭雾、地标、资源、奇物、生态和守门精英共同构成准备度，达到 70 且发现巢穴后才能在地图实体处挑战 Boss；讨伐条下有自动讨伐开关（默认开启）与委托牌，关闭后满进度停留当前区、手动发起不受当前 v3 的 80% 生命安全线限制。首杀仍解锁下一地区并沿用完整换景；魔王城失守后须重打浮空遗迹 Boss 解锁 |
 | **最终通关** | 路线末区 Boss 首杀触发最终击杀演出与六句逐字后日谈，随后展示通关摘要（职业等级、累计游玩、总讨伐、Boss 击杀、世界种子）；演出期间暂停战斗、刷怪、世界时间、增益与统计，关闭后从已保存的后日谈或摘要恢复，完整结局每档只播放一次；可继续最终区域挂机或确认后重开新档，续玩战败仍适用魔王城失守规则 |
 | 装备 | 武器/护甲/饰品 3 槽；5 档稀有度（灰绿蓝紫橙）；随机词条、职业/区域感知的综合对比、一键出售、传说分解魔晶石；武器按职业呈现（长剑/短匕/法杖/战锤/长弓） |
 | 技能与 Talent | 五职业各有独立基础 Action Kit、资源和自动轮转；原 30 个稳定技能 ID 迁移为可投资 Talent，技能点仍按每级 +1、逐点产生真实收益 |
@@ -54,7 +54,7 @@
 | 牧师 Cleric | 远程支援 | 远程（圣辉） | 信仰、治疗、护盾、神圣范围伤害与可控打断 |
 | 游侠 Ranger | 远程物理 | 远程（箭矢） | 专注、猎人标记、强力/多重射击、鹰眼与后撤 |
 
-职业选定后不可更改；换职业需重置存档。v1–v11 存档经 v12 迁移进入 `ActorRecord`，旧技能投资按稳定 ID 转为 Talent；已下线内容会降级并退款，不把临时 Encounter、冷却、威胁或状态写入存档。
+职业选定后不可更改；换职业需重置存档。v1–v11 存档经 v12 迁移进入 `ActorRecord`，再由 v13 编译持久化 `RoutePlan`；旧技能投资按稳定 ID 转为 Talent，已下线内容会降级并退款，不把临时 Encounter、冷却、威胁或状态写入存档。
 
 ## 目录结构（引擎与内容分离）
 
@@ -73,7 +73,7 @@ js/
   core/               utils / eventbus / registry(只读兼容门面) / assets / save / loop / update
   i18n/               i18n 核心 + zh-CN/en 主语言包与 Combat V2 语言包
   data/packs/         战斗规则、五职业、世界 Actor 与八区纵向内容包
-  data/               旧系统仍消费的区域、物品、词条与成就数据
+  data/               区域、路线模板、物品、词条与成就数据
   sprites/            像素素材（字符网格+调色板；含 v3 资源/地标/奇物/生态/守门精英与 manifest）
   systems/actors/     ActorInstance / ActorRecord / Party / Relation
   systems/            encounters / combat / combat_ai / combat_estimator / world / terrain_v3 / exploration / expedition / offline 等
@@ -88,7 +88,7 @@ js/
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`。
 
-**区域顺序**：新档用 `world.worldSeed` 确定性排列前 4 个区域，后 4 个区域固定；怪物强度、奖励与推荐等级按本档推进位置计算。顺序写入存档，旧档迁移不会重新洗牌。
+**路线编排**：`js/data/routes.js` 声明 `lucia-campaign` 模板、可洗牌组与 excursion 插入策略，`js/systems/routes.js` 编译和校验持久化 `world.routePlan`。全局开关 `Game.ROUTE_FEATURES.randomizeNewGameMainline` 当前默认 `false`，所以新档固定为经典八区顺序；重新开启后只按 `worldSeed` 洗牌前四区。怪物强度、奖励与推荐等级始终按主线推进位置计算；`world.regionOrder` 保留为兼容投影，旧档迁移绝不重新洗牌。
 
 ## 开放地图与探索引擎
 
@@ -105,7 +105,7 @@ js/
 - localStorage 双槽写入（`firpg_save` + `firpg_save_backup`），主档损坏自动回退备份档。
 - 当前产品层为单个逻辑角色槽位 `expedition-1`，UI、回调与存储均按稳定槽位 ID 数组渲染以预留多档；选档前不启动主循环、不自动存档、不结算离线收益、不推进世界时间。这里的“双槽”指同一角色档案的主写入与容灾备份，不是两个可选角色。
 - 每 15 秒自动保存 + 关键事件（升级/Boss/穿戴/购买等）即时保存 + 页面隐藏/关闭时将短过场结算到安全状态后保存。
-- 当前存档 v12，采用逐版本迁移流水线。持久层只保存 Roster/ActorRecord、经济、背包、世界、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v11 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
+- 当前存档 v13，采用逐版本迁移流水线。持久层只保存 Roster/ActorRecord、经济、背包、世界（含 `RoutePlan`）、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v12 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
 - 过场与状态机：`Game.transitions` 统一 `startRegion / startDeath / cancel / update / isActive / blocksWorld / cameraTarget / settleBeforeSave`；玩家可见换区走 `Game.prog.requestRegion(rid,{source})`，`gotoRegion` 仅供遮罩中点、启动和导入等原子操作。事件 `region:travelStart / travelCancelled / arrived`、`player:reviveStart / revived` 仅在对应阶段触发，`region:changed` 只在真实世界重建时触发一次。
 - 导出/导入：Base64 串（末尾附 FNV-1a 校验和，截断/篡改会被拒绝）与 `.json` 文件下载/导入并存；重置需二次确认。
 - 检测到存档时间戳在未来（回调系统时间）时离线收益按 0 处理。
@@ -140,6 +140,7 @@ js/
 
 ```powershell
 node tests\v1_6.test.js
+node tests\route-planner.test.js
 node tests\v1_7.test.js
 node tests\v1_8.test.js
 node tests\v1_9.test.js
@@ -164,8 +165,8 @@ node tests\cache-version.test.js
 
 除 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：内容 schema/引用/i18n/资产/fingerprint、v1→v12 迁移、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10%，以及 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：内容 schema/引用/i18n/资产/fingerprint、v1→v13 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10%，以及 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
 
 ---
 
-Combat V2 · 存档 v12 · 纯 HTML/CSS/JS · UTF-8 · 离线可用
+Combat V2 · 存档 v13 · 纯 HTML/CSS/JS · UTF-8 · 离线可用
