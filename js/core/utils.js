@@ -6,7 +6,7 @@
 
   var Game = window.Game = window.Game || {};
   Game.VERSION = '2.0.0';
-  Game.BUILD_ID = '20260729.1';
+  Game.BUILD_ID = '20260729.2';
   Game.SAVE_VERSION = 12;
 
   var U = Game.util = {};

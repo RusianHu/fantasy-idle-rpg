@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260729.1') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260729.2') format('woff2');
   font-display: swap;
 }
 
@@ -3440,14 +3440,21 @@ textarea { width: 100%; min-height: 72px; resize: none; -webkit-user-select: tex
 @keyframes combat-warning { 50% { opacity: .5; } }
 
 @media (max-width: 620px) {
-  .combat-v2-hud { bottom: 62px; grid-template-columns: 90px 1fr; }
-  .combat-v2-enemy {
-    grid-column: 1 / -1;
-    grid-template-columns: 48px minmax(0, 1fr);
-    align-items: center;
+  .combat-v2-hud { bottom: 62px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .combat-v2-party, .combat-v2-enemy {
+    grid-row: 1;
+    align-items: start;
+    align-content: start;
   }
-  .combat-v2-enemy-copy { grid-column: 2; grid-row: 1; }
-  .combat-v2-enemy .combat-v2-portrait { grid-column: 1; grid-row: 1; }
+  .combat-v2-party { grid-template-columns: 48px minmax(0, 1fr); }
+  .combat-v2-party-members { grid-column: 2; grid-row: 1; }
+  .combat-v2-party .combat-v2-portrait { grid-column: 1; grid-row: 1; }
+  .combat-v2-enemy {
+    grid-template-columns: minmax(0, 1fr) 48px;
+  }
+  .combat-v2-enemy-copy { grid-column: 1; grid-row: 1; text-align: right; }
+  .combat-v2-enemy .combat-v2-portrait { grid-column: 2; grid-row: 1; }
+  .combat-v2-center { grid-column: 1 / -1; grid-row: 2; }
   .combat-v2-strategy button { flex: 1; padding-inline: 3px; }
 }
 @media (prefers-reduced-motion: reduce) {

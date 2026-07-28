@@ -608,6 +608,8 @@ async function run() {
 
     const combatHudLayouts = [];
     for (const viewport of [
+      { width: 320, height: 568, mobile: true, lang: 'en' },
+      { width: 360, height: 740, mobile: true, lang: 'zh-CN' },
       { width: 390, height: 700, mobile: true, lang: 'zh-CN' },
       { width: 390, height: 844, mobile: true, lang: 'en' },
       { width: 522, height: 1320, mobile: true, lang: 'zh-CN' },
@@ -623,6 +625,11 @@ async function run() {
         const root = document.getElementById('combat-v2-hud');
         const stage = document.getElementById('stage-wrap').getBoundingClientRect();
         const rect = root.getBoundingClientRect();
+        const party = document.getElementById('combat-v2-party').getBoundingClientRect();
+        const partyCopy = document.getElementById('combat-v2-party-members').getBoundingClientRect();
+        const center = root.querySelector('.combat-v2-center').getBoundingClientRect();
+        const enemy = root.querySelector('.combat-v2-enemy').getBoundingClientRect();
+        const enemyCopy = root.querySelector('.combat-v2-enemy-copy').getBoundingClientRect();
         const buttons = Array.from(root.querySelectorAll('.combat-v2-strategy button'));
         const portraitInfo = (id) => {
           const canvas = document.getElementById(id);
@@ -664,6 +671,17 @@ async function run() {
             ally: portraitInfo('combat-v2-party-portrait'),
             enemy: portraitInfo('combat-v2-enemy-portrait')
           },
+          mobileFlow: {
+            portraitTopDelta: Math.abs(
+              document.getElementById('combat-v2-party-portrait').getBoundingClientRect().top -
+              document.getElementById('combat-v2-enemy-portrait').getBoundingClientRect().top
+            ),
+            partyCopyFollowsPortrait: partyCopy.left >=
+              document.getElementById('combat-v2-party-portrait').getBoundingClientRect().right - .5,
+            enemyCopyPrecedesPortrait: enemyCopy.right <=
+              document.getElementById('combat-v2-enemy-portrait').getBoundingClientRect().left + .5,
+            centerFollowsActors: center.top >= Math.max(party.bottom, enemy.bottom) - .5
+          },
           strategyLabel: document.getElementById('combat-v2-strategy').getAttribute('aria-label'),
           noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
         };
@@ -686,6 +704,14 @@ async function run() {
       assert.ok(layout.portraits.enemy.width >= 44 && layout.portraits.enemy.height >= 44);
       assert.equal(layout.portraits.ally.within, true);
       assert.equal(layout.portraits.enemy.within, true);
+      if (viewport.width <= 620) {
+        assert.ok(layout.mobileFlow.portraitTopDelta <= .5,
+          'mobile combat portraits share one visual row at ' + viewport.width + '×' + viewport.height +
+          ': ' + JSON.stringify(layout.mobileFlow));
+        assert.equal(layout.mobileFlow.partyCopyFollowsPortrait, true);
+        assert.equal(layout.mobileFlow.enemyCopyPrecedesPortrait, true);
+        assert.equal(layout.mobileFlow.centerFollowsActors, true);
+      }
       assert.equal(layout.strategyLabel,
         viewport.lang === 'en' ? 'Auto-combat strategy' : '自动战斗策略');
       assert.equal(layout.buttons.length, 4);
