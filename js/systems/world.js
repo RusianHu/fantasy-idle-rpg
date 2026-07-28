@@ -19,6 +19,7 @@
   var CAMP_WARP_OUT_T = 0.38;
   var CAMP_WARP_IN_T = 0.42;
   var CAMP_APPROACH_DISTANCE = 46;
+  var LEASH_ENTRY_MARGIN = 8;
   var moveKeys = {};
   var controlsBound = false;
 
@@ -49,6 +50,24 @@
         Game.relations.resolve(source.id, target.id, source.encounterId || null) === 'hostile');
     },
 
+    isWithinEncounterLeash: function (actor, target) {
+      if (!actor || !target || !(target.packLeashRadius > 0) ||
+          !Number.isFinite(target.packAnchorX) || !Number.isFinite(target.packAnchorY)) return true;
+      return U.dist(actor.x, actor.y, target.packAnchorX, target.packAnchorY) <=
+        Math.max(0, target.packLeashRadius - LEASH_ENTRY_MARGIN);
+    },
+
+    monsterPatrolRadius: function (ent) {
+      var radius = ent && ent.territory && Number(ent.territory.radius) || 64;
+      if (!ent || !(ent.packLeashRadius > 0) ||
+          !Number.isFinite(ent.packAnchorX) || !Number.isFinite(ent.packAnchorY)) return radius;
+      var spawnX = Number.isFinite(ent.spawnX) ? ent.spawnX : ent.x;
+      var spawnY = Number.isFinite(ent.spawnY) ? ent.spawnY : ent.y;
+      var anchorOffset = U.dist(spawnX, spawnY, ent.packAnchorX, ent.packAnchorY);
+      return Math.max(0, Math.min(radius,
+        ent.packLeashRadius - LEASH_ENTRY_MARGIN - anchorOffset));
+    },
+
     endEncounter: function (reason) {
       var active = Game.encounters && Game.encounters.all().filter(function (encounter) {
         return encounter.lifecycle === 'active' && !encounter.context.estimator;
@@ -67,6 +86,9 @@
       var hero = W.hero;
       if (!W.isHostileActor(hero, target)) return null;
       if (hero.encounterId) return Game.encounters.get(hero.encounterId);
+      // Never create an encounter that the first fixed tick must immediately
+      // destroy. The target remains locked while the hero enters the pack leash.
+      if (!W.isWithinEncounterLeash(hero, target)) return null;
       var boss = target.rank === 'boss' || target.boss;
       var profileId = 'encounter.' + W.region.id + (boss ? '.boss' : '');
       var encounter = Game.encounters.start(profileId, {
@@ -1436,7 +1458,7 @@
       }
       e.engaged = false;
       if (e.state === 'fight') e.state = 'wander';
-      var territoryRadius = e.territory && e.territory.radius || 64;
+      var territoryRadius = W.monsterPatrolRadius(e);
       W.wanderTick(e, dt, MONSTER_WANDER_SPEED, e.spawnX, e.spawnY, territoryRadius);
     },
 
@@ -1497,13 +1519,21 @@
 
     wanderTick: function (ent, dt, speed, ax, ay, radius) {
       ent.wanderT = (ent.wanderT || 0) - dt;
-      if (ent.wanderT <= 0 || (ent.wx === undefined)) {
+      var cx = ax !== undefined ? ax : ent.x;
+      var cy = ay !== undefined ? ay : ent.y;
+      var r = radius === undefined ? 90 : Math.max(0, radius);
+      var invalidTarget = !Number.isFinite(ent.wx) || !Number.isFinite(ent.wy) ||
+        U.dist(ent.wx, ent.wy, cx, cy) > r + 0.01;
+      if (ent.wanderT <= 0 || invalidTarget) {
         ent.wanderT = U.rand(1.6, 4.2);
-        var cx = ax !== undefined ? ax : ent.x;
-        var cy = ay !== undefined ? ay : ent.y;
-        var r = radius || 90;
         ent.wx = U.clamp(cx + U.rand(-r, r), 30, W.region.world.w - 30);
         ent.wy = U.clamp(cy + U.rand(-r, r), BOUND_TOP + 16, W.region.world.h - 20);
+        var wanderDx = ent.wx - cx, wanderDy = ent.wy - cy;
+        var wanderDistance = Math.sqrt(wanderDx * wanderDx + wanderDy * wanderDy);
+        if (wanderDistance > r && wanderDistance > 0) {
+          ent.wx = cx + wanderDx / wanderDistance * r;
+          ent.wy = cy + wanderDy / wanderDistance * r;
+        }
         ent.wanderKey = (ent.wanderKey || 0) + 1;
       }
       var d = U.dist(ent.x, ent.y, ent.wx, ent.wy);

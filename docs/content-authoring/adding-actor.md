@@ -4,11 +4,12 @@
 2. 先定义 `statProfile`、Ability、Trait、Status 与 Reward，再定义 `actorArchetype`。
 3. `actorArchetype` 只声明稳定身份与引用；运行时属性、队伍、阵营覆盖和出生坐标进入 `SpawnSpec`。
 4. 中英文 `nameKey`、`descKey`、`loreKey` 必须同时存在；`spriteId` 必须已注册。
-5. 将 Pack 文件加入 `js/data/packs/manifest.js` 和正式/Lab 脚本入口。
+5. 将 Pack 文件加入 `js/data/packs/manifest.js`，并同步正式入口、Actor / Combat Lab 与世界现场的顺序脚本标签。
 6. 运行：
 
 ```powershell
 node tools/audit-content.js
+node tests/v2-content-entrypoints.test.js
 node tests/v2-authoring.test.js
 node tests/v2-runtime.test.js
 ```

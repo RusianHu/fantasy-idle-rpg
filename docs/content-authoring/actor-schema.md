@@ -8,7 +8,7 @@
 | `Class` / Variant | 职业能力、资源、Trait 和战术引用 | 内容 |
 | `ActorBlueprint` | `finalize()` 后解析出的只读组合 | 可重建 |
 | `ActorRecord` | 名册成长、Talent、装备、永久资源 | v12 |
-| `ActorInstance` | 位置、HP、Action、冷却、状态、威胁关系 | 不持久化 |
+| `ActorInstance` | 位置、HP、Action、冷却、状态与 Encounter 引用；威胁表归 Encounter 所有 | 不持久化 |
 
 ## 最小 `actorArchetype`
 
