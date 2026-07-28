@@ -225,7 +225,6 @@
     }, null);
     setHeroPosition(node.x - 32, node.y + 6);
     Game.exploration.revealAt(node.x, node.y, { force: true, rid: Game.world.region.id });
-    node.seenAt = Game.state.world.worldTime - Game.environment.AUTO_GATHER_REVEAL_GRACE;
     setExplorationEvent(tr('focused') + ' · ' + materialName(node.material));
   }
 
@@ -233,7 +232,6 @@
     Game.world.layout.nodes.forEach(function (node) {
       Game.state.world.nodeCooldowns[node.id] = 0;
       Game.exploration.revealAt(node.x, node.y, { force: true, rid: Game.world.region.id });
-      node.seenAt = Game.state.world.worldTime - Game.environment.AUTO_GATHER_REVEAL_GRACE;
     });
     setExplorationEvent(tr('revealed') + ' · ' + Game.world.layout.nodes.length);
   }

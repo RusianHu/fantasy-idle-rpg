@@ -14,7 +14,6 @@
   var moveTarget = 0;
   var sinceChest = F.BAL.chestMinGap;
   var chestSeq = 1;
-  var AUTO_GATHER_REVEAL_GRACE = 2.4;
 
   function nextMoveTarget() {
     moveTarget = U.rand(F.BAL.chestMoveMin, F.BAL.chestMoveMax);
@@ -34,7 +33,6 @@
   }
 
   var Env = Game.environment = {
-    AUTO_GATHER_REVEAL_GRACE: AUTO_GATHER_REVEAL_GRACE,
     chests: function () { return chests; },
 
     resetRegion: function () {
@@ -58,8 +56,7 @@
       var layout = Game.world && Game.world.layout;
       if (!layout || layout.version < 3) return true;
       if (!Game.exploration || !Game.exploration.isRevealed(node.x, node.y)) return false;
-      var now = Game.state && Game.state.world && Game.state.world.worldTime || 0;
-      return node.seenAt !== undefined && now - node.seenAt >= AUTO_GATHER_REVEAL_GRACE;
+      return true;
     },
 
     update: function (dt) {

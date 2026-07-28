@@ -394,15 +394,15 @@ assert.match(aiSource, /nextObjective/);
 assert.match(aiSource, /!visible\(n\)/,
   'resource circuits must never target exact coordinates in unexplored fog');
 assert.match(aiSource, /autoNodeReady\(n\)/,
-  'newly seen resources remain visible before automatic gathering');
+  'automatic gathering only targets revealed, ready resources');
 assert.doesNotMatch(aiSource, /layout\.(landmarks|nodes|curios|ecology)\[[^\]]+\].*frontier/);
 assert.match(aiSource, /boss && boss\.ready\.coverage >= 0\.60/);
 assert.match(aiSource, /balanced:.*engage: 72/,
   'balanced auto expeditions must notice monsters that are visibly along the route');
 assert.match(aiSource, /function preservedTravel\(hero\)/,
   'active AI travel keeps a stable target until arrival or a valid preemption');
-assert.match(aiSource, /reason: 'reveal-grace'/,
-  'newly revealed resources hold the route until the visibility grace elapses');
+assert.doesNotMatch(aiSource, /reveal-grace/,
+  'newly revealed resources divert the route immediately without a notice hold');
 assert.match(aiSource, /trace: function \(\) \{ return trace\.slice\(\); \}/,
   'AI exposes a bounded read-only decision trace for deterministic diagnostics');
 assert.match(aiSource, /Game\.actionBubbles\.show\(hero, 'gather'/,
@@ -431,13 +431,13 @@ assert.doesNotMatch(read('js/render/renderer.js'), /Math\.sin\([^;\n]*node\.phas
 assert.match(read('js/systems/environment.js'),
   /!Game\.exploration\.isRevealed\(node\.x, node\.y\)/,
   'ambient auto-gather must reject unrevealed resources');
-assert.match(read('js/systems/environment.js'), /AUTO_GATHER_REVEAL_GRACE = 2\.4/,
-  'ambient auto-gather must leave newly revealed resources on screen');
+assert.doesNotMatch(read('js/systems/environment.js'), /AUTO_GATHER_REVEAL_GRACE/,
+  'ambient auto-gather must not delay newly revealed resources');
 assert.match(read('js/systems/world.js'),
   /!Game\.exploration\.isRevealed\(gatherTarget\.x, gatherTarget\.y\)/,
   'the interaction boundary must reject hidden v3 resources');
 assert.match(read('js/systems/world.js'), /autoNodeReady\(gatherTarget\)/,
-  'the interaction boundary must enforce the visibility grace period');
+  'the interaction boundary must enforce ambient node visibility');
 assert.doesNotMatch(read('js/render/renderer.js'),
   /Game\.assets\.draw\(ctx, spriteId, 'idle0', x, y, \{ alpha: 0\.22/,
   'depleted resources must not render as a misleading translucent live node');

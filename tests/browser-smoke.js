@@ -1087,13 +1087,7 @@ async function run() {
       hero.interactOrder = null;
       Game.exploration.revealAt(node.x, node.y, { force: true });
       const revealed = Game.exploration.isRevealed(node.x, node.y);
-      const recorded = node.seenAt !== undefined;
-      const immediateRejected =
-        Game.world.startInteraction({ type: 'gather', target: node }, false) === false;
-      const before = Game.state.world.worldTime;
-      Game.state.world.worldTime = Math.max(before, node.seenAt) +
-        Game.environment.AUTO_GATHER_REVEAL_GRACE + 0.01;
-      const afterGraceAccepted =
+      const immediateAccepted =
         Game.world.startInteraction({ type: 'gather', target: node }, false) === true;
       Game.world.cancelInteraction('browser-probe');
       Game.world.setControlMode('manual');
@@ -1130,16 +1124,12 @@ async function run() {
         resourcePixelDiff,
         hiddenRejected,
         revealed,
-        recorded,
-        immediateRejected,
-        afterGraceAccepted
+        immediateAccepted
       };
     })()`);
     assert.equal(v3ResourceVisual.hiddenRejected, true);
     assert.equal(v3ResourceVisual.revealed, true);
-    assert.equal(v3ResourceVisual.recorded, true);
-    assert.equal(v3ResourceVisual.immediateRejected, true);
-    assert.equal(v3ResourceVisual.afterGraceAccepted, true);
+    assert.equal(v3ResourceVisual.immediateAccepted, true);
     assert.equal(v3ResourceVisual.phaseFinite, true);
     assert.ok(v3ResourceVisual.resourcePixelDiff >= 80,
       'a mature v3 gatherable must paint real pixels before gathering: ' +
@@ -1371,7 +1361,6 @@ async function run() {
       hero.target = null;
       hero.interactOrder = null;
       hero.navRoute = null;
-      delete node.seenAt;
       for (const entry of W.layout.nodes) {
         Game.state.world.nodeCooldowns[entry.id] = entry === node ? 0 : 9999;
       }
@@ -1475,10 +1464,10 @@ async function run() {
     assert.equal(v3AutoActions.resource.gathered, true);
     assert.ok(v3AutoActions.resource.materialGain > 0);
     assert.ok(v3AutoActions.resource.maxNodeDistance <= 70,
-      'new resource remains nearby through reveal grace: ' + JSON.stringify(v3AutoActions));
+      'auto route diverts to the nearby resource without wandering off: ' + JSON.stringify(v3AutoActions));
     assert.ok(v3AutoActions.resource.trace.some((entry) =>
-      entry.to === 'gather' && entry.reason === 'reveal-grace'),
-    'resource trace records reveal-grace preemption: ' + JSON.stringify(v3AutoActions));
+      entry.to === 'gather' && entry.reason === 'along-route'),
+    'resource trace records the along-route gather diversion: ' + JSON.stringify(v3AutoActions));
     assert.ok(v3AutoActions.resource.bubbleTypes.includes('resource') &&
       v3AutoActions.resource.bubbleTypes.includes('gather'),
     'resource discovery and gather action use distinct bubbles: ' + JSON.stringify(v3AutoActions));

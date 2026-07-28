@@ -199,9 +199,6 @@
         var radius = kind === 'threats' ? Math.max(90, ent.radius * 0.7) : (kind === 'ecology' ? 56 : 70);
         if (U.dist(x, y, ent.x, ent.y) > radius) continue;
         if (kind === 'ecology' && Game.expedition && !Game.expedition.isEcologyActive(ent.defId)) continue;
-        if (kind === 'resources' && ent.seenAt === undefined) {
-          ent.seenAt = Game.state.world.worldTime || 0;
-        }
         Collection.record(kind, ent.defId, {
           rid: rid, entity: ent, x: ent.x, y: ent.y
         });

@@ -11,7 +11,6 @@
   var progress = { x: 0, y: 0, still: 0, blocked: {} };
   var trace = [];
   var TRACE_LIMIT = 80;
-  var NODE_NOTICE_RADIUS = 92;
 
   var STRATEGIES = {
     safe: { hp: 0.58, danger: 1.55, resource: 0.8, route: 1.35, engage: 42 },
@@ -171,37 +170,9 @@
     });
   }
 
-  function pendingNode(hero) {
-    if (!Game.environment || !Game.exploration) return null;
-    var now = Game.state.world.worldTime || 0;
-    var grace = Game.environment.AUTO_GATHER_REVEAL_GRACE || 0;
-    var rs = Game.exploration.regionState(Game.state.world.region);
-    return nearest(Game.world.layout.nodes || [], hero, function (node) {
-      if (!visible(node) || !rs.discovered.resources[node.defId]) return false;
-      if (!Game.environment.nodeReady(node) || node.seenAt === undefined) return false;
-      var age = now - node.seenAt;
-      return age >= 0 && age < grace &&
-        U.dist(hero.x, hero.y, node.x, node.y) <= NODE_NOTICE_RADIUS;
-    });
-  }
-
   function nearbyMatureNode(hero) {
     if (!Game.environment) return null;
     return Game.environment.nearestNode(hero.x, hero.y, 120);
-  }
-
-  function holdForNode(hero, found) {
-    if (hero.moveOrder && hero.moveOrder.ai) {
-      hero.moveOrder = null;
-      if (Game.nav) Game.nav.clear(hero);
-    }
-    return emitIntent({
-      id: 'gather',
-      target: found.target,
-      distance: found.distance,
-      danger: Game.terrain.dangerAt(found.target.x, found.target.y),
-      reason: 'reveal-grace'
-    });
   }
 
   function preservedTravel(hero) {
@@ -296,9 +267,6 @@
         reason: 'route-encounter'
       });
     }
-
-    var waitingNode = pendingNode(hero);
-    if (waitingNode) return holdForNode(hero, waitingNode);
 
     var closeNode = nearbyMatureNode(hero);
     if (closeNode && Game.world.startInteraction({ type: 'gather', target: closeNode.target }, false)) {
