@@ -36,8 +36,25 @@
       var mExp = (s1.exp + s2.exp) / 2;
       var mGold = (s1.gold + s2.gold) / 2;
 
-      var dps = Game.player.estimateDps();
+      var estimate = Game.combatEstimator && Game.combatEstimator.evaluateCurrent
+        ? Game.combatEstimator.evaluateCurrent({
+            regionId: region.id,
+            tacticsProfile: Game.state.settings.combatStrategy || 'balanced',
+            sampleSeeds: [11, 29, 47],
+            maxTicks: 12000
+          })
+        : null;
+      var dps = estimate && estimate.averageDps || Game.player.estimateDps();
       var g = F.offlineGains(elapsedSec, dps, mHp, mExp, mGold, {});
+      if (estimate && estimate.averageSeconds > 0 && estimate.failureRate < 1) {
+        var encounters = Math.floor(elapsedSec / estimate.averageSeconds *
+          (1 - estimate.failureRate) * 0.72);
+        g.kills = Math.max(0, encounters * Math.max(1, estimate.enemyCount || 1));
+        g.exp = Math.round(g.kills * mExp);
+        g.gold = Math.round(g.kills * mGold);
+        g.items = Math.min(Math.floor(g.kills * F.BAL.dropEquip), F.BAL.offlineItemCap);
+        g.potions = Math.min(Math.floor(g.kills * F.BAL.dropPotion), 20);
+      }
       var d = Game.player.derived();
 
       if (Game.state.world.layoutVersion >= 3 && Game.exploration && region.exploration) {

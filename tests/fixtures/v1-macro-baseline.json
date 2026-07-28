@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "source": "v1.13 deterministic first-clear proxy before Actor/Combat V2",
+  "seeds": 100,
+  "regionCount": 8,
+  "medianThreatAnchors": 7.5,
+  "worldFixedSeconds": {
+    "perAnchorApproach": 30,
+    "guardianLairCinematic": 90
+  },
+  "classes": {
+    "fighter": { "medianMinutes": 32.7503, "medianCombatSeconds": 358.333 },
+    "rogue": { "medianMinutes": 31.9854, "medianCombatSeconds": 344.000 },
+    "mage": { "medianMinutes": 32.2743, "medianCombatSeconds": 337.630 },
+    "cleric": { "medianMinutes": 33.0694, "medianCombatSeconds": 373.913 },
+    "ranger": { "medianMinutes": 32.3246, "medianCombatSeconds": 350.880 }
+  }
+}

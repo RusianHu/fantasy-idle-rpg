@@ -35,15 +35,81 @@
     zzzT: 0,
     autoCampCycle: false,
     autoCampSuppressedUntil: 0,
+    settledPacks: {},
+    encounterSequence: 1,
 
     heroMoveSpeed: function () {
       if (!W.layout || W.layout.version < 3 || !Game.expedition) return HERO_SPEED;
       return HERO_SPEED * Game.expedition.currentModifier().move;
     },
 
+    isHostileActor: function (source, target) {
+      return !!(source && target && target.components && target.components.vitals &&
+        target.hp > 0 && !target.dead &&
+        Game.relations.resolve(source.id, target.id, source.encounterId || null) === 'hostile');
+    },
+
+    endEncounter: function (reason) {
+      var active = Game.encounters && Game.encounters.all().filter(function (encounter) {
+        return encounter.lifecycle === 'active' && !encounter.context.estimator;
+      }) || [];
+      active.forEach(function (encounter) {
+        Game.encounters.end(encounter.id, reason || 'world-safe-exit');
+      });
+      if (W.hero && W.hero.components && W.hero.components.vitals) {
+        var record = Game.roster && Game.roster.primaryActor();
+        if (record) record.persistentResources.hp = W.hero.hp;
+      }
+      return active.length;
+    },
+
+    startEncounter: function (target) {
+      var hero = W.hero;
+      if (!W.isHostileActor(hero, target)) return null;
+      if (hero.encounterId) return Game.encounters.get(hero.encounterId);
+      var boss = target.rank === 'boss' || target.boss;
+      var profileId = 'encounter.' + W.region.id + (boss ? '.boss' : '');
+      var encounter = Game.encounters.start(profileId, {
+        id: 'world:' + W.region.id + ':' + W.encounterSequence++,
+        seed: U.strSeed(W.region.id + '|' + (target.packAnchorId || target.id) + '|' + Math.floor(Game.state.world.worldTime)),
+        rewardBudget: target.rewardScale || (boss ? 4 : 1),
+        packId: target.packId || null,
+        leashActorId: hero.id,
+        leashAnchor: target.packLeashRadius ? {
+          x: target.packAnchorX, y: target.packAnchorY
+        } : null,
+        leashRadius: target.packLeashRadius || 0,
+        world: true
+      });
+      Game.encounters.join(encounter.id, hero.id, 'team-player');
+      var ids = boss ? [target.id] : (target.packMemberIds || [target.id]);
+      ids.map(Game.actors.get).filter(function (actor) {
+        return actor && !actor.dead && actor.hp > 0;
+      }).sort(function (a, b) { return a.id.localeCompare(b.id); }).forEach(function (actor) {
+        Game.encounters.join(encounter.id, actor.id, 'team-enemy');
+      });
+      Game.combatAI.strategy(hero.id, Game.state.settings.combatStrategy || 'balanced');
+      hero.tactics = Object.assign({}, Game.state.settings.combatTactics || {});
+      hero.components.targeting.priorityTargetId = target.id;
+      hero.target = target;
+      // Encounter movement is owned by the fixed-tick combat system. Do not
+      // retain an exploration route that can resume or overwrite its range intent.
+      hero.moveOrder = null;
+      if (Game.nav) Game.nav.clear(hero);
+      return encounter;
+    },
+
     /* ---------------- 初始化区域 ---------------- */
     init: function (rid) {
       W.bindControls();
+      W.endEncounter('region-change');
+      if (W.hero && W.hero.actorRecordId && W.hero.components.vitals) {
+        var oldRecord = Game.roster.getRecord(W.hero.actorRecordId);
+        if (oldRecord) oldRecord.persistentResources.hp = W.hero.hp;
+      }
+      Game.encounters.reset();
+      Game.parties.reset();
+      Game.actors.reset();
       if (W.groundLoot.length) W.flushGroundLoot('region');
       if (Game.environment) Game.environment.resetRegion();
       if (Game.trade) Game.trade.reset({ dynamic: true });
@@ -60,6 +126,8 @@
       W.pendingRespawn = [];
       W.groundLoot = [];
       W.autoCampCycle = false;
+      W.settledPacks = {};
+      W.encounterSequence = 1;
 
       W.layout = Game.terrain.build(
         region,
@@ -77,6 +145,7 @@
       }
       if (Game.particles) Game.particles.initRegion(W.region);
 
+      Game.parties.create({ id: 'party-player', maxMembers: 4 });
       var hero = W.hero = W.makeHero();
       hero.x = W.layout.camp.x + 30;
       hero.y = W.layout.camp.y + 26;
@@ -102,23 +171,22 @@
     makeHero: function () {
       var d = Game.player.derived();
       var cls = Game.player.classDef();
-      return {
-        kind: 'hero', sprite: 'hero_' + cls.id,
-        x: 100, y: 120, dir: 'd',
-        state: 'idle',
-        get hp() { return Game.state.player.hp; },
-        set hp(v) { Game.state.player.hp = v; },
-        maxHp: d.maxHp, atk: d.atk, def: d.def, spd: d.spd,
-        crit: d.crit, critDmg: d.critDmg,
-        range: d.range, projectile: d.projectile,
-        dodge: d.dodge, lifesteal: d.lifesteal, cdr: d.cdr,
-        shield: 0, buffs: [],
-        atkTimer: 0, animT: 0, animF: 0, flash: 0, lungeT: 0,
-        skillCd: {}, itemCd: { potion: 0 }, potionCd: 0,
-        target: null, stepAcc: 0, spriteH: 20,
-        deathT: 0, recoverT: 0, moving: false,
-        moveOrder: null, interactOrder: null, manualTarget: false, campWarp: null, navRoute: null
-      };
+      var hero = Game.actors.spawn({
+        instanceId: 'player-world',
+        actorRecordId: 'player-main',
+        partyId: 'party-player',
+        factionId: 'adventurers',
+        controllerId: 'ai:player-auto',
+        transform: { x: 100, y: 120, direction: 'd' },
+        spawnSource: { kind: 'world', sourceId: 'player', sequence: 0 }
+      });
+      hero.sprite = 'hero_' + cls.id;
+      hero.atk = d.atk; hero.def = d.def; hero.spd = d.spd;
+      hero.crit = d.crit; hero.critDmg = d.critDmg;
+      hero.range = d.range; hero.projectile = d.projectile;
+      hero.dodge = d.dodge; hero.lifesteal = d.lifesteal; hero.cdr = d.cdr;
+      hero.shield = 0; hero.skillCd = {}; hero.recoverT = 0; hero.campWarp = null;
+      return hero;
     },
 
     syncHeroStats: function () {
@@ -137,7 +205,7 @@
           critAdd += m.crit || 0; spdPct += m.spdPct || 0;
         }
       }
-      h.maxHp = d.maxHp;
+      h.maxHp = h.components.vitals.maxHp;
       h.atk = Math.round(d.atk * (1 + atkPct));
       h.def = Math.round(d.def * (1 + defPct));
       h.spd = +(d.spd * (1 + spdPct)).toFixed(2);
@@ -150,8 +218,16 @@
     /* ---------------- 刷怪 ---------------- */
     spawnMonster: function (initial, threat) {
       var region = W.region;
-      var mid = threat && threat.monster || U.choice(region.monsters);
-      var ent = W.makeMonster(mid, false);
+      var encounterProfile = Game.content.get('encounterProfile', 'encounter.' + region.id);
+      var packs = encounterProfile && encounterProfile.packs || [];
+      var seed = U.strSeed(region.id + '|' + (threat && threat.id || U.randomSeed()));
+      var totalWeight = packs.reduce(function (sum, pack) { return sum + (pack.weight || 1); }, 0);
+      var roll = totalWeight ? seed % totalWeight : 0;
+      var pack = packs[0] || { id: region.id + '.fallback', members: [threat && threat.monster || U.choice(region.monsters)], rewardBudget: 1 };
+      for (var pi = 0; pi < packs.length; pi++) {
+        roll -= packs[pi].weight || 1;
+        if (roll < 0) { pack = packs[pi]; break; }
+      }
       var candidates = threat ? [{ x: threat.x, y: threat.y, threatId: threat.id }] : W.layout.spawnCandidates;
       var fallback = W.layout.corridorCandidates;
       var point = null;
@@ -169,23 +245,53 @@
         }
       }
       if (!point) point = { x: W.layout.camp.x + W.layout.campSafeRadius + 36, y: W.layout.camp.y };
-      ent.x = point.x;
-      ent.y = point.y;
-      ent.spawnX = ent.x; ent.spawnY = ent.y;
-      if (threat) {
-        ent.threatId = threat.id;
-        ent.territory = threat;
-        ent.affix = Game.expedition ? Game.expedition.threatAffix(threat.id) : threat.affix;
-        var expeditionMod = Game.expedition ? Game.expedition.currentModifier() : { danger: 1, exp: 1 };
-        ent.hp = ent.maxHp = Math.round(ent.maxHp * expeditionMod.danger);
-        ent.atk = Math.round(ent.atk * Math.sqrt(expeditionMod.danger));
-        ent.exp = Math.round(ent.exp * expeditionMod.exp);
-        if (ent.affix === 'sturdy') { ent.hp = ent.maxHp = Math.round(ent.maxHp * 1.3); ent.def = Math.round(ent.def * 1.18); }
-        else if (ent.affix === 'swift') ent.spd += 3;
-        else if (ent.affix === 'miasma') ent.atk = Math.round(ent.atk * 1.18);
-      }
-      W.entities.push(ent);
-      return ent;
+      var members = [];
+      var memberIds = pack.members || [];
+      var expeditionMod = threat && Game.expedition
+        ? Game.expedition.currentModifier() : { danger: 1, exp: 1 };
+      var affix = threat && (Game.expedition ? Game.expedition.threatAffix(threat.id) : threat.affix);
+      memberIds.forEach(function (entry, index) {
+        var mid = typeof entry === 'string' ? entry : entry.archetypeId;
+        var modifiers = [];
+        if (expeditionMod.danger !== 1) {
+          modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: expeditionMod.danger });
+          modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
+          modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
+        }
+        if (affix === 'sturdy') {
+          modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: 1.3 });
+          modifiers.push({ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.18 });
+        } else if (affix === 'swift') {
+          modifiers.push({ stat: 'gcdSpeed', phase: 'otherFlat', operation: 'add', value: 0.18 });
+        } else if (affix === 'miasma') {
+          modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
+          modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
+        }
+        var ent = W.makeMonster(mid, false, { modifiers: modifiers });
+        var angle = memberIds.length === 1 ? 0 : Math.PI * 2 * index / memberIds.length;
+        var spacing = pack.spacing || 24;
+        ent.x = point.x + Math.cos(angle) * (index ? spacing : 0);
+        ent.y = point.y + Math.sin(angle) * (index ? spacing * 0.65 : 0);
+        ent.spawnX = ent.x; ent.spawnY = ent.y;
+        ent.packAnchorId = threat && threat.id || pack.id + ':' + seed;
+        ent.packId = pack.id;
+        ent.packAnchorX = point.x;
+        ent.packAnchorY = point.y;
+        ent.packLeashRadius = pack.leashRadius || 120;
+        ent.packPrimary = index === 0;
+        ent.rewardScale = (pack.rewardBudget || 1) / Math.max(1, memberIds.length);
+        ent.exp = Math.round(ent.exp * (expeditionMod.exp || 1) * ent.rewardScale);
+        ent.gold = Math.round(ent.gold * ent.rewardScale);
+        ent.threatId = threat && threat.id || null;
+        ent.territory = threat || null;
+        ent.affix = affix || null;
+        W.entities.push(ent);
+        members.push(ent);
+      });
+      members.forEach(function (member) {
+        member.packMemberIds = members.map(function (other) { return other.id; });
+      });
+      return members[0] || null;
     },
 
     spawnGuardian: function () {
@@ -207,25 +313,37 @@
       return ent;
     },
 
-    makeMonster: function (mid, isBossFight) {
+    makeMonster: function (mid, isBossFight, opts) {
+      opts = opts || {};
       var def = reg.get('monster', mid);
       var tier = Game.State.regionTier(W.region && W.region.id);
       var st = F.monsterStats(tier, def.mods, def.boss);
       var sp = Game.assets.sprite(def.sprite);
-      return {
-        kind: 'monster', mid: mid, sprite: def.sprite,
-        boss: !!def.boss, tier: tier,
-        x: 0, y: 0, dir: 'l',
-        state: 'wander',
-        hp: st.hp, maxHp: st.hp, atk: st.atk, def: st.def, spd: st.spd,
-        crit: 0.03, critDmg: 1.5,
-        exp: st.exp, gold: st.gold,
-        atkTimer: F.atkInterval(st.spd) * U.rand(0.5, 1),
-        animT: U.rand(0, 0.3), animF: 0, flash: 0, lungeT: 0,
-        wanderT: U.rand(0.5, 2), wx: 0, wy: 0,
-        engaged: false, stepAcc: 0, dots: [],
-        spriteH: sp.h, dead: false, deathT: 0, navRoute: null
-      };
+      var ent = Game.actors.spawn({
+        archetypeId: mid,
+        level: Math.max(1, Game.state.player.level),
+        tier: tier,
+        factionId: Game.content.get('actorArchetype', mid).defaultFactionId,
+        controllerId: 'ai:monster',
+        modifiers: opts.modifiers || [],
+        transform: { x: 0, y: 0, direction: 'l' },
+        spawnSource: { kind: 'world', sourceId: W.region && W.region.id || 'region', sequence: U.randomSeed() }
+      });
+      var reward = Game.content.get('rewardProfile', ent.blueprint.resolvedProfiles.rewardProfileId);
+      function rewardValue(value) {
+        if (typeof value === 'number') return value;
+        return (Number(value && value.base) || 0) * Math.pow(Number(value && value.tierScale) || 1, tier - 1);
+      }
+      ent.sprite = def.sprite;
+      ent.state = 'wander';
+      ent.atk = st.atk; ent.def = st.def; ent.spd = st.spd;
+      ent.crit = 0.03; ent.critDmg = 1.5;
+      ent.exp = Math.round(rewardValue(reward && reward.exp) || st.exp);
+      ent.gold = Math.round(rewardValue(reward && reward.gold) || st.gold);
+      ent.spriteH = sp.h;
+      ent.animT = U.rand(0, 0.3);
+      ent.wanderT = U.rand(0.5, 2);
+      return ent;
     },
 
     /* ---------------- 讨伐进度 / Boss ---------------- */
@@ -277,6 +395,13 @@
       ent.x = W.layout.bossPoint.x;
       ent.y = W.layout.bossPoint.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
+      var bossProfile = Game.content.get('encounterProfile', 'encounter.' + region.id + '.boss');
+      var bossPack = bossProfile && bossProfile.packs[0];
+      ent.packId = bossPack && bossPack.id || region.id + '.boss';
+      ent.packAnchorId = 'boss-lair:' + region.id;
+      ent.packAnchorX = ent.x;
+      ent.packAnchorY = ent.y;
+      ent.packLeashRadius = bossPack && bossPack.leashRadius || 170;
       ent.state = 'fight';
       W.entities.push(ent);
       W.bossEnt = ent;
@@ -322,8 +447,10 @@
         if (Game.expedition && reason !== 'retreat') Game.expedition.finish('boss-failed', region.id);
       }
       if (W.bossEnt) {
+        if (W.bossEnt.encounterId) W.endEncounter('boss-failed');
         var i = W.entities.indexOf(W.bossEnt);
         if (i >= 0) W.entities.splice(i, 1);
+        if (Game.actors) Game.actors.despawn(W.bossEnt.id, 'boss-failed');
         W.bossEnt = null;
       }
       W.cinematic = null;
@@ -461,7 +588,7 @@
     contactThreat: function (hero) {
       for (var i = 0; i < W.entities.length; i++) {
         var e = W.entities[i];
-        if (e.kind !== 'monster' || e.dead || e.hp <= 0) continue;
+        if (!W.isHostileActor(hero, e)) continue;
         if (e.boss || e.engaged || U.dist(hero.x, hero.y, e.x, e.y) <= MELEE_RANGE + 10) return e;
       }
       return null;
@@ -555,7 +682,8 @@
 
     /* ---------------- 击杀结算 ---------------- */
     onEntityKilled: function (ent, killer) {
-      if (ent.kind === 'monster' && !ent.dead) {
+      if ((ent.category === 'monster' || ent.category === 'summon') && !ent.rewardSettled) {
+        ent.rewardSettled = true;
         ent.dead = true;
         ent.deathT = 0.5;
         ent.state = 'dying';
@@ -580,9 +708,16 @@
             Game.collection.record('guardian', 'guardian', { rid: W.region.id, entity: ent });
           } else if (W.layout.version >= 3 && ent.territory) {
             var cooldown = ent.territory.respawn || 240;
-            Game.exploration.regionState(W.region.id).threatCooldowns[ent.threatId] =
-              Game.state.world.worldTime + cooldown;
-            W.pendingRespawn.push({ t: cooldown, threat: ent.territory });
+            var packDone = (ent.packMemberIds || [ent.id]).every(function (id) {
+              var member = Game.actors.get(id);
+              return !member || member.dead || member.hp <= 0;
+            });
+            if (packDone && !W.settledPacks[ent.packAnchorId]) {
+              W.settledPacks[ent.packAnchorId] = true;
+              Game.exploration.regionState(W.region.id).threatCooldowns[ent.threatId] =
+                Game.state.world.worldTime + cooldown;
+              W.pendingRespawn.push({ t: cooldown, threat: ent.territory });
+            }
           } else {
             W.pendingRespawn.push(RESPAWN_T);
           }
@@ -596,7 +731,7 @@
 
         if (W.hero.target === ent) W.hero.target = null;
         if (ent.boss) W.onBossDefeated(ent);
-      } else if (ent.kind === 'hero') {
+      } else if (ent.actorRecordId === 'player-main') {
         W.onHeroDeath();
       }
     },
@@ -612,6 +747,7 @@
       );
       W.flushGroundLoot('death');
       W.cancelInteraction('death');
+      W.endEncounter('player-defeated');
       Game.state.meta.stats.deaths++;
 
       if (byBoss) {
@@ -725,7 +861,7 @@
       var best = null, bestD = 1e9;
       for (var i = 0; i < W.entities.length; i++) {
         var e = W.entities[i];
-        if (e.kind !== 'monster' || e.dead || e.hp <= 0) continue;
+        if (!W.isHostileActor(hero, e)) continue;
         var d = Math.min(
           U.dist(wx, wy, e.x, e.y),
           U.dist(wx, wy, e.x, e.y - e.spriteH * 0.5)
@@ -832,6 +968,7 @@
       window.addEventListener('blur', function () { moveKeys = {}; });
       bus.on('save:before', function () { W.flushGroundLoot('save'); });
       bus.on('region:travelStart', function () {
+        W.endEncounter('travel');
         W.flushGroundLoot('travel');
         W.cancelInteraction('travel');
         if (Game.ui && Game.ui.trade) Game.ui.trade.close('travel');
@@ -839,6 +976,23 @@
       bus.on('boss:spawned', function () { W.cancelInteraction('boss'); });
       bus.on('settings:changed', function (p) {
         if (p && p.key === 'groundLoot' && p.value === false) W.flushGroundLoot('setting');
+        if (p && p.key === 'combatStrategy' && W.hero) {
+          Game.combatAI.strategy(W.hero.id, p.value);
+        }
+      });
+      bus.on('actor:defeated', function (event) {
+        var id = event && event.targetActorIds && event.targetActorIds[0];
+        var actor = id && Game.actors.get(id);
+        if (!actor) return;
+        if (actor.actorRecordId === 'player-main') W.onHeroDeath();
+        else if (actor.category === 'monster') {
+          W.onEntityKilled(actor, event.sourceActorId && Game.actors.get(event.sourceActorId));
+        }
+      });
+      bus.on('encounter:ended', function () {
+        if (!W.hero || !W.hero.components.vitals) return;
+        Game.state.player.hp = W.hero.hp;
+        W.hero.target = null;
       });
     },
 
@@ -871,6 +1025,7 @@
       w.mode = mode;
       var hero = W.hero;
       if (mode === 'rest') {
+        W.endEncounter('retreat');
         W.flushGroundLoot('rest');
         W.cancelInteraction('rest');
         // 先切换到安全模式，再撤掉 Boss，确保点击后的同一帧不再受击。
@@ -1046,11 +1201,16 @@
         if (e.kind !== 'monster') continue;
         if (e.dead) {
           e.deathT -= dt;
-          if (e.deathT <= 0) W.entities.splice(i, 1);
+          if (e.deathT <= 0) {
+            W.entities.splice(i, 1);
+            if (Game.actors) Game.actors.despawn(e.id, 'defeated');
+          }
           continue;
         }
         W.updateMonster(e, dt);
       }
+      Game.combat.update(dt);
+      if (hero.components.vitals) Game.state.player.hp = hero.hp;
 
       // 重生队列
       for (var r = W.pendingRespawn.length - 1; r >= 0; r--) {
@@ -1207,7 +1367,7 @@
             var best = 1e9;
             for (var i = 0; i < W.entities.length; i++) {
               var e = W.entities[i];
-              if (e.kind !== 'monster' || e.dead) continue;
+              if (!W.isHostileActor(hero, e)) continue;
               var d2 = U.dist(hero.x, hero.y, e.x, e.y);
               if (d2 < best) { best = d2; target = e; }
             }
@@ -1230,6 +1390,16 @@
       // 攻击距离：职业决定（远程站位输出）
       var range = (hero.range || MELEE_RANGE) + (target.boss ? 10 : 0);
       var distTo = U.dist(hero.x, hero.y, target.x, target.y);
+      if (!hero.encounterId && distTo <= Math.max(84, range + 24)) {
+        W.startEncounter(target);
+      }
+      var combatMove = hero.components.movement.intent;
+      if (hero.encounterId) {
+        hero.state = combatMove ? 'walk' : 'fight';
+        hero.moving = !!combatMove;
+        if (target) hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
+        return;
+      }
       if (distTo > range) {
         hero.state = 'walk';
         W.moveToward(hero, target.x, target.y, W.heroMoveSpeed(), dt, target);
@@ -1237,14 +1407,7 @@
         hero.state = 'fight';
         hero.dir = U.dirOf(target.x - hero.x, target.y - hero.y);
         target.engaged = true;
-
-        hero.atkTimer -= dt;
-        if (hero.atkTimer <= 0) {
-          hero.atkTimer = F.atkInterval(hero.spd);
-          hero.lungeT = 0.18;
-          Game.combat.heroAttack(hero, target, { mult: 1 });
-        }
-        Game.combat.tryCastSkills(hero, target, dt);
+        hero.components.targeting.currentTargetId = target.id;
       }
     },
 
@@ -1253,61 +1416,24 @@
       e.flash = Math.max(0, e.flash - dt);
       e.lungeT = Math.max(0, e.lungeT - dt);
       e.animT += dt;
-
-      // 持续伤害（中毒等）：可致死并正常结算
-      if (e.dots && e.dots.length) {
-        var dsum = 0;
-        for (var di = e.dots.length - 1; di >= 0; di--) {
-          var dot = e.dots[di];
-          dsum += dot.dps * Math.min(dt, Math.max(0, dot.t));
-          dot.t -= dt;
-          if (dot.t <= 0) e.dots.splice(di, 1);
-        }
-        if (dsum > 0) {
-          e.hp -= dsum;
-          e.dotAcc = (e.dotAcc || 0) + dsum;
-          e.dotFxT = (e.dotFxT || 0) - dt;
-          if (e.dotFxT <= 0 && Game.fx) {
-            e.dotFxT = 0.6;
-            Game.fx.floatText(e.x, e.y - e.spriteH - 2, '-' + Game.i18n.fmtNum(Math.round(e.dotAcc)), { color: '#9ae05a', small: true });
-            e.dotAcc = 0;
-          }
-          if (e.hp <= 0) {
-            e.hp = 0;
-            W.onEntityKilled(e, W.hero);
-            return;
-          }
-        }
-      }
-
       var hero = W.hero;
       var heroTargetable = hero && hero.state !== 'dead' && hero.state !== 'recover' &&
         Game.state.world.mode === 'battle' && Game.player.hasClass();
-
-      // 应战：被主角锁定后主动迎击（远程主角也会被近身）；Boss 恒主动。
-      // 1v1 基准不变：未被锁定的怪不加入围攻，AOE 波及仅是顺带伤害。
-      var engaged = heroTargetable && (hero.target === e || e.boss);
-
-      if (engaged) {
-        var reach = MELEE_RANGE + (e.boss ? 10 : 2);
-        var dist = U.dist(hero.x, hero.y, e.x, e.y);
-        if (dist > reach) {
-          W.moveToward(e, hero.x, hero.y, MONSTER_WANDER_SPEED + (e.boss ? 16 : 12), dt, hero);
+      if (e.encounterId && heroTargetable) {
+        var intent = e.components.movement.intent;
+        if (intent) {
           e.state = 'walk';
-          return;
+          e.moving = true;
+        } else {
+          e.moving = false;
+          var actionState = e.components.actionState.state;
+          e.state = actionState === 'casting' || actionState === 'resolving' ||
+            actionState === 'recovering' ? 'fight' : 'idle';
         }
-        e.state = 'fight';
-        e.dir = U.dirOf(hero.x - e.x, hero.y - e.y);
-        e.atkTimer -= dt;
-        if (e.atkTimer <= 0) {
-          e.atkTimer = F.atkInterval(e.spd);
-          e.lungeT = 0.16;
-          var r = Game.combat.attack(e, hero, {});
-          if (r.killed) W.onEntityKilled(hero, e);
-        }
+        var combatTarget = Game.combatAI.chooseTarget(Game.encounters.get(e.encounterId), e, { relation: 'hostile' });
+        if (combatTarget) e.dir = U.dirOf(combatTarget.x - e.x, combatTarget.y - e.y);
         return;
       }
-
       e.engaged = false;
       if (e.state === 'fight') e.state = 'wander';
       var territoryRadius = e.territory && e.territory.radius || 64;

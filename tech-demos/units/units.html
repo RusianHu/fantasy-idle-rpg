@@ -2,216 +2,194 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#151614">
-<meta name="build-id" content="20260728.8">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M4 12V6h2l2-2 2 2h2v6H4z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='3' fill='%23151614'/%3E%3C/svg%3E">
-<title data-demo-page-title="units.pageTitle">角色与怪物技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="units.css?v=20260728.8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111528">
+<meta name="build-id" content="20260728.15">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111528'/%3E%3Cpath d='M3 12V5h3l2-2 2 2h3v7H3z' fill='%23e7c45b'/%3E%3C/svg%3E">
+<title>Actor / Deterministic Combat Lab</title>
+<link rel="stylesheet" href="combat-lab.css?v=20260728.15">
 </head>
 <body>
-<div class="app-shell">
-  <header class="topbar">
+<main class="lab-shell">
+  <header>
     <div>
-      <p class="eyebrow">FANTASY IDLE RPG / UNITS LAB / UNITS-01</p>
-      <h1 data-demo-i18n="units.title">角色与怪物技术验证</h1>
+      <p>FANTASY IDLE RPG / PRODUCTION V2</p>
+      <h1 data-lab="title">Actor / 确定性战斗实验室</h1>
+      <small id="fingerprint"></small>
     </div>
-    <div class="top-actions">
-      <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
-        <select data-demo-locale><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+    <nav>
+      <label><span data-lab="language">语言</span>
+        <select id="locale"><option value="zh-CN">简体中文</option><option value="en">English</option></select>
       </label>
-      <a class="back-link" href="../index.html" data-demo-i18n="common.demoHub">演示中心</a>
-      <a class="back-link" href="../../index.html" data-demo-i18n="common.backGame">返回游戏</a>
-    </div>
+      <a href="../index.html" data-lab="hub">演示中心</a>
+      <a href="../../index.html" data-lab="game">正式游戏</a>
+    </nav>
   </header>
 
-  <main class="workspace">
-    <section class="preview-column" aria-labelledby="stage-title">
-      <div class="preview-toolbar">
-        <div class="stage-heading">
-          <span id="stage-index" class="stage-index">01</span>
-          <div>
-            <h2 id="stage-title">战士</h2>
-            <p id="stage-subtitle">class / fighter · hero_fighter</p>
-          </div>
-        </div>
-        <div class="icon-actions">
-          <button id="prev-unit" class="icon-button" type="button" title="上一个" aria-label="上一个" data-demo-i18n-title="common.previous" data-demo-i18n-aria="common.previous">&#8592;</button>
-          <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示" data-demo-i18n-title="common.pause" data-demo-i18n-aria="common.pause">&#8545;</button>
-          <button id="next-unit" class="icon-button" type="button" title="下一个" aria-label="下一个" data-demo-i18n-title="common.next" data-demo-i18n-aria="common.next">&#8594;</button>
-        </div>
-      </div>
+  <section class="setup panel">
+    <label><span data-lab="encounter">遭遇</span><select id="encounter"></select></label>
+    <label><span data-lab="actor">主 Actor</span><select id="actor"></select></label>
+    <label><span data-lab="class">职业</span><select id="class"></select></label>
+    <label><span data-lab="faction">阵营</span><select id="faction"></select></label>
+    <label><span data-lab="controller">控制器</span><select id="controller"></select></label>
+    <label><span data-lab="level">等级</span><input id="level" type="number" min="1" max="100" value="20"></label>
+    <label><span data-lab="tier">阶级</span><input id="tier" type="number" min="1" max="8" value="1"></label>
+    <label><span data-lab="strategy">策略</span><select id="strategy"></select></label>
+    <label><span data-lab="allies">友方 1–4</span><input id="allies" type="number" min="1" max="4" value="1"></label>
+    <label><span data-lab="enemies">敌方 1–8</span><input id="enemies" type="number" min="1" max="8" value="3"></label>
+    <label><span data-lab="seed">种子</span><input id="seed" type="number" value="20260728"></label>
+    <label><span data-lab="scenario">场景</span><select id="scenario"></select></label>
+    <button id="reset" type="button" data-lab="reset">重建</button>
+  </section>
 
-      <div id="stage-wrap" class="stage-wrap">
-        <canvas id="stage" aria-label="角色与怪物实时画布" data-demo-i18n-aria="units.stageAria"></canvas>
-        <div class="stage-badges" aria-hidden="true">
-          <span id="runtime-status" data-demo-i18n="units.runtime">开放探索 v3 战斗循环运行中</span>
-          <span id="runtime-count" data-demo-i18n="units.battleDemo">战斗演示</span>
-        </div>
-      </div>
-
-      <div class="control-strip">
-        <div class="mode-controls" aria-label="分类切换" data-demo-i18n-aria="units.category">
-          <button type="button" data-kind="hero" class="active" data-demo-i18n="units.heroes">职业</button>
-          <button type="button" data-kind="monster" data-demo-i18n="units.monsters">普通怪</button>
-          <button type="button" data-kind="boss" data-demo-i18n="units.bosses">Boss</button>
-        </div>
-        <div class="segmented" aria-label="日夜阶段" data-demo-i18n-aria="units.time">
-          <button type="button" data-time="cycle" class="active" data-demo-i18n="common.dayCycle">循环</button>
-          <button type="button" data-time="day" data-demo-i18n="common.day">昼间</button>
-          <button type="button" data-time="dusk" data-demo-i18n="common.dusk">黄昏</button>
-          <button type="button" data-time="night" data-demo-i18n="common.night">夜晚</button>
-        </div>
-        <label class="check-control">
-          <input id="effects-toggle" type="checkbox" checked>
-          <span data-demo-i18n="common.effects">环境效果</span>
+  <section class="runtime-grid">
+    <div class="stage-panel panel">
+      <div class="runtime-toolbar">
+        <button id="pause" type="button" data-lab="pause">暂停</button>
+        <button id="step" type="button" data-lab="step">单步 50ms</button>
+        <button id="impact" type="button" data-lab="impact">运行至下一次命中</button>
+        <label><span data-lab="speed">速度</span>
+          <select id="speed"><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="10">10×</option></select>
         </label>
-        <label class="check-control">
-          <input id="motion-toggle" type="checkbox" checked>
-          <span data-demo-i18n="common.motion">动态效果</span>
-        </label>
+        <output id="clock">tick 0</output>
       </div>
-
-      <section class="bubble-lab" aria-labelledby="bubble-lab-title">
-        <div class="bubble-lab-heading">
-          <div>
-            <p class="lab-kicker">ENTITY REACTIONS / LIVE QA</p>
-            <h3 id="bubble-lab-title" data-demo-i18n="units.bubbles">实体图形气泡</h3>
-          </div>
-          <div class="bubble-lab-status">
-            <output id="bubble-status" aria-live="polite" data-demo-i18n="units.bubbleStatus">自动轮播 · 等待气泡</output>
-            <button id="toggle-bubble-auto" class="switch-button active" type="button"
-              role="switch" aria-checked="true" data-demo-i18n="units.auto">自动轮播</button>
-          </div>
+      <canvas id="stage" width="960" height="480" aria-label="Combat stage"></canvas>
+      <div id="summary" class="summary"></div>
+      <section class="bubble-qa" aria-labelledby="bubble-title">
+        <div><strong id="bubble-title">Action Bubble QA</strong><output id="bubble-status">ready</output></div>
+        <div class="bubble-scenes">
+          <button type="button" data-bubble-scene="center">Vertical encounter</button>
+          <button type="button" data-bubble-scene="left">Left edge flip</button>
+          <button type="button" data-bubble-scene="right">Right edge flip</button>
         </div>
-        <div class="bubble-controls">
-          <div class="bubble-anchor-controls" aria-label="气泡锚点" data-demo-i18n-aria="units.bubbleAnchors">
-            <button type="button" data-bubble-anchor="hero" class="active" data-demo-i18n="units.hero">主角</button>
-            <button type="button" data-bubble-anchor="monster" data-demo-i18n="units.monster">怪物</button>
-            <button type="button" data-bubble-anchor="both" data-demo-i18n="units.both">双锚点</button>
-          </div>
-          <div class="bubble-type-controls" aria-label="图形气泡类型" data-demo-i18n-aria="units.bubbleTypes">
-            <button type="button" data-bubble-type="resource"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.resource">资源</span></button>
-            <button type="button" data-bubble-type="gather"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.gather">采集</span></button>
-            <button type="button" data-bubble-type="enemy"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.enemy">接敌</span></button>
-            <button type="button" data-bubble-type="alert"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.alert">警戒</span></button>
-            <button type="button" data-bubble-type="chest"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.chest">宝箱</span></button>
-            <button type="button" data-bubble-type="loot"><canvas width="24" height="24" aria-hidden="true"></canvas><span data-demo-i18n="units.loot">掉落</span></button>
-          </div>
-          <button id="clear-bubbles" class="clear-bubbles" type="button" title="清空气泡" aria-label="清空气泡" data-demo-i18n-title="units.clear" data-demo-i18n-aria="units.clear">&times;</button>
-        </div>
-        <div class="bubble-scene-row">
-          <span data-demo-i18n="units.bubbleScenes">斜向接敌布局</span>
-          <div class="bubble-scene-controls" aria-label="接敌气泡布局场景" data-demo-i18n-aria="units.bubbleScenesAria">
-            <button type="button" data-bubble-scene="center" data-demo-i18n="units.bubbleCenter">纵向接敌</button>
-            <button type="button" data-bubble-scene="left" data-demo-i18n="units.bubbleLeftEdge">左沿翻转</button>
-            <button type="button" data-bubble-scene="right" data-demo-i18n="units.bubbleRightEdge">右沿翻转</button>
-          </div>
-        </div>
-        <div class="bubble-scene-row">
-          <span data-demo-i18n="units.bubbleWalkScenes">行走气泡布局</span>
-          <div class="bubble-walk-controls" aria-label="行走气泡朝向场景" data-demo-i18n-aria="units.bubbleWalkScenesAria">
-            <button type="button" data-bubble-walk="l" data-demo-i18n="units.bubbleWalkLeft">向左行走</button>
-            <button type="button" data-bubble-walk="r" data-demo-i18n="units.bubbleWalkRight">向右行走</button>
-            <button type="button" data-bubble-walk="vertical" data-demo-i18n="units.bubbleWalkVertical">上下行走</button>
-          </div>
+        <div class="bubble-scenes">
+          <button type="button" data-bubble-walk="l">Walk left</button>
+          <button type="button" data-bubble-walk="r">Walk right</button>
+          <button type="button" data-bubble-walk="vertical">Walk vertically</button>
         </div>
       </section>
+      <section class="portrait-qa" aria-labelledby="portrait-title">
+        <div class="portrait-qa-head">
+          <h2 id="portrait-title" data-lab="portraits">双方肖像槽 QA</h2>
+          <output id="portrait-status">ready</output>
+        </div>
+        <div class="portrait-qa-versus">
+          <article class="portrait-qa-card is-ally">
+            <canvas id="portrait-qa-ally" width="48" height="48"></canvas>
+            <div>
+              <small data-lab="allyPortrait">友方肖像</small>
+              <strong id="portrait-qa-ally-name"></strong>
+              <code id="portrait-qa-ally-source"></code>
+            </div>
+          </article>
+          <b aria-hidden="true">VS</b>
+          <article class="portrait-qa-card is-enemy">
+            <canvas id="portrait-qa-enemy" width="48" height="48"></canvas>
+            <div>
+              <small data-lab="enemyPortrait">敌方肖像</small>
+              <strong id="portrait-qa-enemy-name"></strong>
+              <code id="portrait-qa-enemy-source"></code>
+            </div>
+          </article>
+        </div>
+      </section>
+    </div>
 
-      <div class="battle-lab" aria-labelledby="battle-lab-title">
-        <div class="lab-heading">
-          <div>
-            <p class="lab-kicker">COMBAT LOOP / LIVE QA</p>
-            <h3 id="battle-lab-title" data-demo-i18n="units.battleTitle">战斗循环演示</h3>
-            <p data-demo-i18n="units.battleCopy">直接调用 v3 世界、战斗与渲染系统。</p>
-          </div>
-          <output id="battle-event" class="lab-event" aria-live="polite" data-demo-i18n="units.waiting">等待战斗指令</output>
-        </div>
-        <div class="lab-runtime" aria-label="战斗运行状态" data-demo-i18n-aria="units.battleRuntime">
-          <div><span data-demo-i18n="units.target">目标</span><strong id="target-runtime" data-demo-i18n="units.none">无</strong></div>
-          <div><span data-demo-i18n="units.heroState">主角状态</span><strong id="hero-runtime">idle</strong></div>
-          <div><span data-demo-i18n="units.control">操控</span><strong id="control-runtime" data-demo-i18n="units.autoControl">自动</strong></div>
-        </div>
-        <div class="lab-actions">
-          <div class="lab-action-group">
-            <span data-demo-i18n="units.demo">演示</span>
-            <button id="spawn-sparring" type="button" data-demo-i18n="units.spawn">刷新陪练</button>
-            <button id="spawn-boss" type="button" data-demo-i18n="units.spawnBoss">召唤 Boss</button>
-          </div>
-          <div class="lab-action-group">
-            <span data-demo-i18n="units.control">操控</span>
-            <button id="toggle-control" type="button" data-demo-i18n="units.switchControl">切换自动/手动</button>
-            <button id="reset-hero" type="button" data-demo-i18n="units.resetHero">重置主角</button>
-          </div>
-        </div>
-        <p class="lab-hint" data-demo-i18n="units.hint">点击怪物锁定接敌，点击空白处移动；手动模式支持 WASD / 方向键。</p>
+    <aside class="panel inspector">
+      <h2 data-lab="inspector">深度检查</h2>
+      <label><span data-lab="inspectActor">运行时 Actor</span><select id="inspect-actor"></select></label>
+      <div class="tabs">
+        <button type="button" data-inspect="runtime" class="active">Runtime</button>
+        <button type="button" data-inspect="blueprint">Blueprint</button>
+        <button type="button" data-inspect="card">Card</button>
+        <button type="button" data-inspect="audit">Audit</button>
       </div>
+      <pre id="inspect-output"></pre>
+    </aside>
+  </section>
 
-      <div class="source-line">
-        <span data-demo-i18n="common.source">生产链路</span>
-        <code>terrain_v3.js</code><b>&#8594;</b><code>expedition_ai.js</code><b>&#8594;</b><code>combat.js</code><b>&#8594;</b><code>action_bubbles.js</code><b>&#8594;</b><code>renderer.js</code>
-      </div>
-    </section>
+  <section class="tools panel">
+    <h2 data-lab="tools">运行时工具</h2>
+    <label><span>Source</span><select id="tool-source"></select></label>
+    <label><span>Target</span><select id="tool-target"></select></label>
+    <label><span>Action</span><select id="tool-ability"></select></label>
+    <button id="force-action" type="button" data-lab="forceAction">指定 Action</button>
+    <label><span>Status</span><select id="tool-status"></select></label>
+    <button id="apply-status" type="button" data-lab="applyStatus">施加状态</button>
+    <button id="dispel" type="button" data-lab="dispel">驱散</button>
+    <button id="interrupt" type="button" data-lab="interrupt">打断</button>
+    <button id="move" type="button" data-lab="move">移动目标</button>
+    <button id="charm" type="button" data-lab="charm">魅惑/恢复</button>
+    <button id="summon" type="button" data-lab="summon">召唤</button>
+  </section>
 
-    <aside id="inspector" class="inspector" aria-label="角色与怪物属性明细" data-demo-i18n-aria="units.inspector"></aside>
-  </main>
-</div>
+  <section class="diagnostics">
+    <article class="panel"><h2 data-lab="participants">Actor / Party / Relation</h2><pre id="participants"></pre></article>
+    <article class="panel"><h2 data-lab="scheduler">Scheduler / Telegraph</h2><pre id="scheduler"></pre></article>
+    <article class="panel"><h2 data-lab="threat">Threat / Resources</h2><pre id="threat"></pre></article>
+    <article class="panel"><h2 data-lab="events">CombatEvent</h2><pre id="events"></pre></article>
+    <article class="panel"><h2 data-lab="presentationEvents">攻击表现日志</h2><pre id="presentation-events"></pre></article>
+    <article class="panel"><h2 data-lab="movementTrace">位移 / 接敌追踪</h2><pre id="movement-trace"></pre></article>
+  </section>
 
-<script src="../../js/core/utils.js?v=20260728.8"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260728.8"></script>
-<script src="../../js/core/eventbus.js?v=20260728.8"></script>
-<script src="../../js/core/registry.js?v=20260728.8"></script>
-<script src="../../js/i18n/i18n.js?v=20260728.8"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260728.8"></script>
-<script src="../../js/i18n/en.js?v=20260728.8"></script>
-<script src="../../js/core/assets.js?v=20260728.8"></script>
-<script src="../../js/data/formulas.js?v=20260728.8"></script>
-<script src="../../js/sprites/palettes.js?v=20260728.8"></script>
-<script src="../../js/sprites/hero.js?v=20260728.8"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260728.8"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260728.8"></script>
-<script src="../../js/sprites/props.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration_v3.manifest.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260728.8"></script>
-<script src="../../js/sprites/flora.js?v=20260728.8"></script>
-<script src="../../js/data/affixes.js?v=20260728.8"></script>
-<script src="../../js/data/items.js?v=20260728.8"></script>
-<script src="../../js/data/classes.js?v=20260728.8"></script>
-<script src="../../js/data/skills.js?v=20260728.8"></script>
-<script src="../../js/data/monsters.js?v=20260728.8"></script>
-<script src="../../js/data/regions.js?v=20260728.8"></script>
-<script src="../../js/systems/state.js?v=20260728.8"></script>
-<script src="../../js/systems/terrain.js?v=20260728.8"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260728.8"></script>
-<script src="../../js/systems/nav.js?v=20260728.8"></script>
-<script src="../../js/systems/inventory.js?v=20260728.8"></script>
-<script src="../../js/systems/items.js?v=20260728.8"></script>
-<script src="../../js/systems/automation.js?v=20260728.8"></script>
-<script src="../../js/systems/combat.js?v=20260728.8"></script>
-<script src="../../js/systems/environment.js?v=20260728.8"></script>
-<script src="../../js/systems/exploration.js?v=20260728.8"></script>
-<script src="../../js/systems/expedition.js?v=20260728.8"></script>
-<script src="../../js/systems/action_bubbles.js?v=20260728.8"></script>
-<script src="../../js/systems/expedition_ai.js?v=20260728.8"></script>
-<script src="../../js/systems/world.js?v=20260728.8"></script>
-<script src="../../js/systems/trade.js?v=20260728.8"></script>
-<script src="../../js/render/terrain.js?v=20260728.8"></script>
-<script src="../../js/render/exploration.js?v=20260728.8"></script>
-<script src="../../js/render/particles.js?v=20260728.8"></script>
-<script src="../../js/render/daynight.js?v=20260728.8"></script>
-<script src="../../js/render/effects.js?v=20260728.8"></script>
-<script src="../../js/render/renderer.js?v=20260728.8"></script>
-<script src="../demo-i18n.js?v=20260728.8"></script>
-<script src="units.js?v=20260728.8"></script>
+  <section class="catalog panel">
+    <h2 data-lab="catalog">生产内容目录</h2>
+    <div id="catalog-counts"></div>
+    <label><span data-lab="catalogType">类型</span><select id="catalog-type"></select></label>
+    <pre id="catalog-output"></pre>
+  </section>
+</main>
+
+<script src="../../js/core/utils.js?v=20260728.15"></script>
+<script src="../../js/core/eventbus.js?v=20260728.15"></script>
+<script src="../../js/core/registry.js?v=20260728.15"></script>
+<script src="../../js/i18n/i18n.js?v=20260728.15"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260728.15"></script>
+<script src="../../js/i18n/en.js?v=20260728.15"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260728.15"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260728.15"></script>
+<script src="../../js/core/assets.js?v=20260728.15"></script>
+<script src="../../js/systems/terrain.js?v=20260728.15"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260728.15"></script>
+<script src="../../js/sprites/palettes.js?v=20260728.15"></script>
+<script src="../../js/sprites/hero.js?v=20260728.15"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260728.15"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260728.15"></script>
+<script src="../../js/sprites/props.js?v=20260728.15"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260728.15"></script>
+<script src="../../js/core/content/rules.js?v=20260728.15"></script>
+<script src="../../js/core/content/schemas.js?v=20260728.15"></script>
+<script src="../../js/core/content/compiler.js?v=20260728.15"></script>
+<script src="../../js/core/content/audit.js?v=20260728.15"></script>
+<script src="../../js/core/content/registry.js?v=20260728.15"></script>
+<script src="../../js/data/packs/manifest.js?v=20260728.15"></script>
+<script src="../../js/data/packs/rules/core.js?v=20260728.15"></script>
+<script src="../../js/data/packs/jobs/fighter.js?v=20260728.15"></script>
+<script src="../../js/data/packs/jobs/rogue.js?v=20260728.15"></script>
+<script src="../../js/data/packs/jobs/mage.js?v=20260728.15"></script>
+<script src="../../js/data/packs/jobs/cleric.js?v=20260728.15"></script>
+<script src="../../js/data/packs/jobs/ranger.js?v=20260728.15"></script>
+<script src="../../js/data/packs/world/actors.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/factory.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/grassland.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/forest.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/mine.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/graveyard.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/snowpass.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/lavacave.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/skyruins.js?v=20260728.15"></script>
+<script src="../../js/data/packs/regions/darkcastle.js?v=20260728.15"></script>
+<script src="../../js/systems/actors/relations.js?v=20260728.15"></script>
+<script src="../../js/systems/actors/parties.js?v=20260728.15"></script>
+<script src="../../js/systems/actors/actors.js?v=20260728.15"></script>
+<script src="../../js/systems/encounters.js?v=20260728.15"></script>
+<script src="../../js/systems/combat_ai.js?v=20260728.15"></script>
+<script src="../../js/systems/combat.js?v=20260728.15"></script>
+<script src="../../js/systems/combat_estimator.js?v=20260728.15"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260728.15"></script>
+<script src="../../js/render/effects.js?v=20260728.15"></script>
+<script src="../../js/render/combat_presentation.js?v=20260728.15"></script>
+<script src="../../js/ui/combat_portraits.js?v=20260728.15"></script>
+<script src="combat-lab.js?v=20260728.15"></script>
 </body>
 </html>

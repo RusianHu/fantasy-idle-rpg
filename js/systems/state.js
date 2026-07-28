@@ -13,6 +13,52 @@
   Game.state = null;
 
   var State = Game.State = {
+    attachCompatibility: function (s) {
+      var record = s.roster.actors[s.roster.primaryActorId];
+      var player = {};
+      [
+        ['classId', 'classId'], ['level', 'level'], ['exp', 'exp'],
+        ['sp', 'skillPoints'], ['hp', 'persistentResources.hp'],
+        ['skills', 'talentRanks'], ['perms', 'permanentUpgrades']
+      ].forEach(function (map) {
+        var path = map[1].split('.');
+        Object.defineProperty(player, map[0], {
+          enumerable: true,
+          get: function () {
+            var value = record;
+            for (var i = 0; i < path.length; i++) value = value[path[i]];
+            return value;
+          },
+          set: function (next) {
+            var value = record;
+            for (var i = 0; i < path.length - 1; i++) value = value[path[i]];
+            value[path[path.length - 1]] = next;
+          }
+        });
+      });
+      ['gold', 'crystal'].forEach(function (key) {
+        Object.defineProperty(player, key, {
+          enumerable: true,
+          get: function () { return s.economy[key]; },
+          set: function (value) { s.economy[key] = value; }
+        });
+      });
+      Object.defineProperty(s, 'player', {
+        configurable: true, enumerable: false, value: player
+      });
+      Object.defineProperty(s.inv, 'equipped', {
+        configurable: true, enumerable: false,
+        get: function () { return record.loadout.equipment; },
+        set: function (value) { record.loadout.equipment = value; }
+      });
+      Object.defineProperty(s.inv, 'lockedSlots', {
+        configurable: true, enumerable: false,
+        get: function () { return record.loadout.lockedSlots; },
+        set: function (value) { record.loadout.lockedSlots = value; }
+      });
+      return s;
+    },
+
     /** 新档只打乱前四区；后半程与最终区域保持固定。 */
     makeRegionOrder: function (worldSeed) {
       var list = reg.ids('region');
@@ -88,20 +134,31 @@
           autoSkillUpgrade: true, autoEquip: true,
           groundLoot: true, autoCampRest: false,
           controlMode: 'auto', expeditionStrategy: 'balanced',
+          combatStrategy: 'balanced', combatTactics: {},
           sfx: true, music: true
         },
-        player: {
-          classId: null,
-          level: 1, exp: 0, sp: 0,
-          gold: 0, crystal: 0,
-          hp: 100,
-          skills: {},          // skillId -> lv
-          perms: {}            // shopItemId -> count
+        roster: {
+          primaryActorId: 'player-main',
+          activeParty: ['player-main'],
+          actors: {
+            'player-main': {
+              id: 'player-main',
+              archetypeId: 'adventurer',
+              classId: null,
+              level: 1, exp: 0, skillPoints: 0,
+              talentRanks: {},
+              permanentUpgrades: {},
+              persistentResources: { hp: 100 },
+              loadout: {
+                equipment: { weapon: null, armor: null, ring: null },
+                lockedSlots: { weapon: false, armor: false, ring: false }
+              }
+            }
+          }
         },
+        economy: { gold: 0, crystal: 0 },
         inv: {
           items: [],
-          equipped: { weapon: null, armor: null, ring: null },
-          lockedSlots: { weapon: false, armor: false, ring: false },
           potions: { potion_small: 3, potion_large: 0 },
           materials: {}
         },
@@ -135,7 +192,7 @@
           endingLine: 0
         }
       };
-      return s;
+      return State.attachCompatibility(s);
     },
 
     regionProg: function (rid) {
@@ -164,6 +221,13 @@
       s.player.classId = cid;
       Player.recalc();
       s.player.hp = s.derived.maxHp;
+      if (Game.actors) {
+        var hero = Game.actors.query({ actorRecordId: 'player-main' })[0];
+        if (hero) {
+          Game.actors.refresh(hero.id);
+          hero.components.vitals.hp = s.derived.maxHp;
+        }
+      }
       bus.emit('class:chosen', { cid: cid });
       return true;
     },
@@ -266,6 +330,13 @@
       var d = Player.previewDerived();
       s.derived = d;
       if (p.hp > d.maxHp) p.hp = d.maxHp;
+      if (Game.actors) {
+        var actor = Game.actors.query({ actorRecordId: 'player-main' })[0];
+        if (actor) {
+          Game.actors.refresh(actor.id);
+          actor.components.vitals.hp = p.hp;
+        }
+      }
       return d;
     },
 
@@ -299,6 +370,8 @@
         s.meta.stats.level = p.level;
         Player.recalc();
         p.hp = s.derived.maxHp;
+        var levelActor = Game.actors && Game.actors.query({ actorRecordId: 'player-main' })[0];
+        if (levelActor && levelActor.components.vitals) levelActor.hp = levelActor.maxHp;
         bus.emit('player:levelup', { level: p.level, ups: ups });
       }
       bus.emit('exp:gained', { amount: gain });
@@ -330,6 +403,10 @@
       var d = Player.derived();
       if (n > 0 && !(opts && opts.raw)) n *= d.healPow;
       p.hp = U.clamp(p.hp + n, 0, d.maxHp);
+      if (Game.actors) {
+        var actor = Game.actors.query({ actorRecordId: 'player-main' })[0];
+        if (actor && actor.components.vitals) actor.components.vitals.hp = p.hp;
+      }
       return p.hp;
     },
 
@@ -357,6 +434,16 @@
 
     /** 有效 DPS 估算（离线结算/战力参考；含职业爆发系数） */
     estimateDps: function () {
+      if (Game.combatEstimator && Game.content && Game.content.isFinalized() &&
+          State.isAdventureStarted()) {
+        var estimate = Game.combatEstimator.evaluateCurrent({
+          sampleSeeds: [11, 29, 47],
+          maxTicks: 6000
+        });
+        if (estimate && Number.isFinite(estimate.averageDps) && estimate.averageDps > 0) {
+          return estimate.averageDps;
+        }
+      }
       var d = Player.derived();
       var cls = Player.classDef();
       var tier = State.regionTier(Game.state.world.region);

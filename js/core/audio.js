@@ -47,7 +47,9 @@
     init: function () {
       var bus = Game.bus;
       bus.on('monster:killed', function (p) { A.playSfx(p && p.boss ? 'sfx_boss_die' : 'sfx_kill'); });
-      bus.on('combat:hit', function (p) { A.playSfx(p && p.crit ? 'sfx_crit' : 'sfx_hit'); });
+      bus.on('combat:hit', function (p) {
+        A.playSfx(p && (p.crit || p.payload && p.payload.crit) ? 'sfx_crit' : 'sfx_hit');
+      });
       bus.on('player:levelup', function () { A.playSfx('sfx_levelup'); });
       bus.on('item:dropped', function () { A.playSfx('sfx_drop'); });
       bus.on('item:equipped', function () { A.playSfx('sfx_equip'); });

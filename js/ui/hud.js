@@ -13,6 +13,143 @@
   var controlIcon = '';
   var potionIcon = '';
 
+  function defName(type, id, fallback) {
+    var def = Game.content.get(type, id);
+    var key = def && def.presentation && def.presentation.nameKey;
+    return key ? Game.i18n.t(key) : (fallback || id || '');
+  }
+
+  function actorName(actor, t) {
+    if (!actor) return '';
+    if (actor.actorRecordId) {
+      return t('class.' + (Game.state.player.classId || 'fighter') + '.name');
+    }
+    var archetype = actor.blueprint &&
+      Game.content.get('actorArchetype', actor.blueprint.archetypeId);
+    return archetype && archetype.identity && archetype.identity.nameKey
+      ? t(archetype.identity.nameKey)
+      : actor.id;
+  }
+
+  function updateCombatV2() {
+    var root = els.combatV2;
+    var hero = Game.world && Game.world.hero;
+    var encounter = hero && hero.encounterId && Game.encounters.get(hero.encounterId);
+    if (!root) return;
+    root.classList.toggle('hidden', !encounter || encounter.lifecycle !== 'active');
+    if (!encounter || encounter.lifecycle !== 'active') return;
+    var tick = encounter.tick;
+    var t = Game.i18n.t;
+    var allies = encounter.participants.map(Game.actors.get).filter(function (actor) {
+      return actor && actor.teamId === hero.teamId;
+    }).slice(0, 4);
+    els.combatPartyMembers.innerHTML = allies.map(function (actor) {
+      var hp = actor.components.vitals;
+      var pct = U.clamp(hp.hp / Math.max(1, hp.maxHp) * 100, 0, 100);
+      var name = actorName(actor, t);
+      return '<div class="combat-v2-member"><b>' + U.esc(name) + '</b><span>' +
+        Math.ceil(hp.hp) + '/' + Math.ceil(hp.maxHp) +
+        '</span><i style="--hp:' + pct + '%"></i></div>';
+    }).join('');
+    var portraitAlly = allies.filter(function (actor) { return actor.id === hero.id; })[0] || allies[0];
+    var allyName = actorName(portraitAlly, t);
+    Game.ui.combatPortraits.draw(
+      els.combatPartyPortrait,
+      portraitAlly,
+      t('combat.ui.allyPortrait', { name: allyName })
+    );
+
+    var action = hero.components.actionState;
+    els.combatActionName.textContent = action.abilityId
+      ? defName('ability', action.abilityId) : t('combat.ui.ready');
+    var actionSpan = Math.max(1, action.resolvesTick - action.startedTick);
+    var actionPct = action.state === 'casting' || action.state === 'channeling'
+      ? U.clamp((tick - action.startedTick) / actionSpan * 100, 0, 100)
+      : (action.state === 'recovering' ? 100 : 0);
+    els.combatActionFill.style.width = actionPct + '%';
+    var gcdReady = hero.components.cooldowns.groups.gcd || 0;
+    els.combatGcd.textContent = gcdReady > tick
+      ? t('combat.ui.gcd', { s: ((gcdReady - tick) * encounter.rules.tickMs / 1000).toFixed(1) })
+      : t('combat.ui.gcdReady');
+
+    var resources = Object.keys(hero.components.resources || {}).map(function (id) {
+      return hero.components.resources[id];
+    });
+    var resource = resources[0];
+    els.combatResourceName.textContent = resource
+      ? t('combat.resource.' + resource.id + '.name') + ' ' + Math.floor(resource.value) + '/' + resource.max
+      : t('combat.ui.noResource');
+    els.combatResourceFill.style.width = resource
+      ? U.clamp(resource.value / Math.max(1, resource.max) * 100, 0, 100) + '%' : '0%';
+    var combo = hero.components.comboState;
+    els.combatCombo.textContent = combo && combo.step
+      ? t('combat.ui.combo', { n: combo.step }) : '';
+    els.combatStatuses.innerHTML = (hero.components.statuses || []).slice(0, 5).map(function (status) {
+      return '<span title="' + status.statusId + '">' + defName('status', status.statusId) +
+        ' ' + Math.max(0, Math.ceil((status.expiresTick - tick) * encounter.rules.tickMs / 1000)) + 's</span>';
+    }).join('');
+
+    var enemies = encounter.participants.map(Game.actors.get).filter(function (actor) {
+      return actor && actor.teamId !== hero.teamId && actor.hp > 0;
+    }).sort(function (a, b) {
+      var ap = a.id === hero.components.targeting.priorityTargetId ? 1 : 0;
+      var bp = b.id === hero.components.targeting.priorityTargetId ? 1 : 0;
+      var ac = a.components.actionState.state === 'casting' ? 1 : 0;
+      var bc = b.components.actionState.state === 'casting' ? 1 : 0;
+      return bp - ap || bc - ac || a.id.localeCompare(b.id);
+    });
+    var enemy = enemies[0];
+    var enemyName = actorName(enemy, t);
+    els.combatEnemyName.textContent = enemyName;
+    if (enemy) {
+      Game.ui.combatPortraits.draw(
+        els.combatEnemyPortrait,
+        enemy,
+        t('combat.ui.enemyPortrait', { name: enemyName })
+      );
+      var enemyAction = enemy.components.actionState;
+      var enemyAbility = enemyAction.abilityId &&
+        Game.content.get('ability', enemyAction.abilityId);
+      var canInterrupt = enemyAction.state === 'casting' && enemyAbility &&
+        (!enemyAbility.timing || enemyAbility.timing.interruptible !== false);
+      els.combatEnemyCast.textContent = enemyAction.abilityId
+        ? defName('ability', enemyAction.abilityId) +
+          (canInterrupt ? ' · ' + t('combat.ui.interruptible') : '')
+        : t('combat.ui.enemyReady');
+      var enemySpan = Math.max(1, enemyAction.resolvesTick - enemyAction.startedTick);
+      var enemyPct = enemyAction.state === 'casting'
+        ? U.clamp((tick - enemyAction.startedTick) / enemySpan * 100, 0, 100) : 0;
+      els.combatEnemyCastFill.style.width = enemyPct + '%';
+    } else {
+      Game.ui.combatPortraits.clear(els.combatEnemyPortrait);
+      els.combatEnemyCast.textContent = '';
+      els.combatEnemyCastFill.style.width = '0%';
+    }
+    var phases = Object.keys(encounter.phaseTriggered || {});
+    els.combatPhase.textContent = phases.length
+      ? t('combat.ui.phase', { n: phases.length + 1 }) : '';
+    var telegraph = encounter.telegraphs.slice().sort(function (a, b) {
+      return a.resolveTick - b.resolveTick || a.id.localeCompare(b.id);
+    })[0];
+    els.combatTelegraph.textContent = telegraph
+      ? t('combat.ui.telegraph', {
+          ability: defName('ability', telegraph.abilityId),
+          s: Math.max(0, (telegraph.resolveTick - tick) * encounter.rules.tickMs / 1000).toFixed(1)
+        })
+      : '';
+    els.combatTelegraph.classList.toggle('danger', !!telegraph);
+    var strategy = Game.state.settings.combatStrategy || 'balanced';
+    els.combatStrategy.setAttribute('aria-label', t('combat.ui.strategyGroup'));
+    els.combatStrategyButtons.forEach(function (button) {
+      var id = button.getAttribute('data-combat-strategy');
+      button.textContent = t('combat.strategy.' + id);
+      button.classList.toggle('active', id === strategy);
+      button.setAttribute('aria-pressed', id === strategy ? 'true' : 'false');
+    });
+    els.combatTactics.textContent = t('combat.ui.tactics');
+    els.combatTactics.setAttribute('aria-label', t('combat.ui.tactics'));
+  }
+
   var Hud = Game.ui = Game.ui || {};
   Hud.hud = {
     init: function () {
@@ -55,7 +192,26 @@
         potionCount: $('#quick-potion-count'),
         potionCd: $('#quick-potion-cd'),
         btnTrade: $('#btn-trade'),
-        tradeLabel: $('#trade-button-label')
+        tradeLabel: $('#trade-button-label'),
+        combatV2: $('#combat-v2-hud'),
+        combatPartyMembers: $('#combat-v2-party-members'),
+        combatPartyPortrait: $('#combat-v2-party-portrait'),
+        combatActionName: $('#combat-v2-action-name'),
+        combatActionFill: $('#combat-v2-action-fill'),
+        combatGcd: $('#combat-v2-gcd'),
+        combatResourceName: $('#combat-v2-resource-name'),
+        combatResourceFill: $('#combat-v2-resource-fill'),
+        combatCombo: $('#combat-v2-combo'),
+        combatStatuses: $('#combat-v2-statuses'),
+        combatEnemyName: $('#combat-v2-enemy-name'),
+        combatEnemyCast: $('#combat-v2-enemy-cast'),
+        combatEnemyCastFill: $('#combat-v2-enemy-cast-fill'),
+        combatEnemyPortrait: $('#combat-v2-enemy-portrait'),
+        combatPhase: $('#combat-v2-phase'),
+        combatTelegraph: $('#combat-v2-telegraph'),
+        combatStrategy: $('#combat-v2-strategy'),
+        combatStrategyButtons: Array.prototype.slice.call(document.querySelectorAll('[data-combat-strategy]')),
+        combatTactics: $('#combat-v2-tactics')
       };
 
       Hud.hud.drawAvatar();
@@ -127,6 +283,18 @@
       els.btnTrade.addEventListener('click', function () {
         var context = Game.trade.current();
         if (context.available) Game.ui.trade.open(context.areaId);
+      });
+      els.combatStrategyButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          var strategy = button.getAttribute('data-combat-strategy');
+          Game.state.settings.combatStrategy = strategy;
+          if (Game.world.hero) Game.combatAI.strategy(Game.world.hero.id, strategy);
+          bus.emit('settings:changed', { key: 'combatStrategy', value: strategy });
+          Hud.hud.update(true);
+        });
+      });
+      els.combatTactics.addEventListener('click', function () {
+        Game.ui.tabs.open('settings');
       });
 
       bus.on('mode:changed', function () { Hud.hud.update(true); });
@@ -367,6 +535,7 @@
         chips += '<div class="buff-chip rest">' + t('ui.recovering', { s: Math.ceil(hero.recoverT) }) + '</div>';
       }
       if (els.buffChips.innerHTML !== chips) els.buffChips.innerHTML = chips;
+      updateCombatV2();
     }
   };
 })();

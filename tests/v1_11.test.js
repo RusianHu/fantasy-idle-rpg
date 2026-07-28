@@ -587,7 +587,7 @@ assert.deepEqual(
 );
 
 /* ------------------------------------------------------------------ *
- * v8→v11 migration defaults, serialization and script ordering.
+ * v8→current migration defaults, serialization and script ordering.
  * ------------------------------------------------------------------ */
 Game.state = Game.State.newGame();
 const v8 = Game.save.serialize();
@@ -599,24 +599,25 @@ delete v8.settings.autoCampRest;
 for (const key of ['pickups', 'gathers', 'materials', 'chests']) delete v8.meta.stats[key];
 localStorage.setItem('firpg_save', JSON.stringify(v8));
 localStorage.setItem('firpg_save_backup', JSON.stringify(v8));
-const migratedV11 = Game.save.load();
-assert.equal(migratedV11.v, 11);
-assert.deepEqual(Object.keys(migratedV11.inv.materials), []);
-assert.deepEqual(Object.keys(migratedV11.world.nodeCooldowns), []);
-assert.deepEqual(Object.keys(migratedV11.world.exploration), []);
-assert.equal(migratedV11.world.layoutVersion, 3);
-assert.equal(migratedV11.world.finalRegionLocked, false);
-assert.equal(migratedV11.settings.groundLoot, true);
-assert.equal(migratedV11.settings.autoCampRest, false);
-assert.equal(migratedV11.settings.expeditionStrategy, 'balanced');
-delete migratedV11.settings.autoBoss;
-Game.save.applyLoaded(migratedV11);
+const migratedCurrent = Game.save.load();
+assert.equal(migratedCurrent.v, 12);
+assert.deepEqual(Object.keys(migratedCurrent.inv.materials), []);
+assert.deepEqual(Object.keys(migratedCurrent.world.nodeCooldowns), []);
+assert.deepEqual(Object.keys(migratedCurrent.world.exploration), []);
+assert.equal(migratedCurrent.world.layoutVersion, 3);
+assert.equal(migratedCurrent.world.finalRegionLocked, false);
+assert.equal(migratedCurrent.settings.groundLoot, true);
+assert.equal(migratedCurrent.settings.autoCampRest, false);
+assert.equal(migratedCurrent.settings.expeditionStrategy, 'balanced');
+delete migratedCurrent.settings.autoBoss;
+Game.save.applyLoaded(migratedCurrent);
 assert.equal(Game.state.settings.autoBoss, true, 'old saves inherit automatic boss hunts');
 
 const interruptedFinalLoss = Game.save.serialize();
 interruptedFinalLoss.world.finalRegionLocked = true;
 interruptedFinalLoss.world.region = interruptedFinalLoss.world.regionOrder.at(-1);
-interruptedFinalLoss.player.hp = 0;
+interruptedFinalLoss.roster.actors[interruptedFinalLoss.roster.primaryActorId]
+  .persistentResources.hp = 0;
 Game.save.applyLoaded(interruptedFinalLoss);
 assert.equal(
   Game.state.world.region,
@@ -649,5 +650,5 @@ for (const event of [
 
 console.log(
   `v1.11 tests passed: ${nodeLayouts} node layouts, drops, item-use, ground guarantees, ` +
-  'movement chests, gathering, auto-camp, dynamic trade and v11 migration.'
+  'movement chests, gathering, auto-camp, dynamic trade and current migration.'
 );

@@ -535,6 +535,204 @@ async function run() {
     assert.ok(main.canvasColors > 20, 'main stage canvas is nonblank');
     assert.equal(main.noHorizontalOverflow, true, 'main mobile viewport has no horizontal overflow');
 
+    // Force a real production Boss encounter so the formal V2 HUD, telegraph,
+    // priority marker, interrupt label, and collision-safe engagement distance
+    // are validated independently of the player's current power.
+    const combatHudFixture = await cdp.evaluate(`(() => {
+      const W = Game.world;
+      const originalRegion = W.region.id;
+      W.endEncounter('browser-hud-fixture');
+      W.init('grassland');
+      Game.ui.tabs.open('battle');
+      const hero = W.hero;
+      const enemy = W.makeMonster(W.region.boss, true);
+      enemy.x = hero.x;
+      enemy.y = hero.y;
+      enemy.spawnX = enemy.x;
+      enemy.spawnY = enemy.y;
+      enemy.maxHp = 1e9;
+      enemy.hp = enemy.maxHp * 0.49;
+      hero.hp = hero.maxHp;
+      W.entities.push(enemy);
+      Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: 'grassland' });
+      W.bossEnt = enemy;
+      const encounter = W.startEncounter(enemy);
+      if (!encounter) throw new Error('production HUD encounter did not start');
+      hero.components.movement.intent = {
+        type: 'move', reason: 'range', targetId: enemy.id,
+        x: enemy.x, y: enemy.y, stopRange: hero.range || 24
+      };
+      enemy.components.movement.intent = {
+        type: 'move', reason: 'range', targetId: hero.id,
+        x: hero.x, y: hero.y, stopRange: 24
+      };
+      Game.combat.tickFixed(encounter.id);
+      const telegraphAbility = enemy.abilities.map((id) => Game.content.get('ability', id))
+        .find((def) => def && def.telegraph && def.target.relation === 'hostile');
+      if (!telegraphAbility) throw new Error('Boss telegraph ability missing');
+      enemy.components.actionState.state = 'idle';
+      enemy.components.actionState.actionId = null;
+      enemy.components.cooldowns.abilities = {};
+      enemy.components.cooldowns.groups = {};
+      const action = Game.combat.requestAction({
+        actorId: enemy.id, targetId: hero.id, abilityId: telegraphAbility.id
+      });
+      if (!action.ok) throw new Error('Boss telegraph action rejected: ' + action.reason);
+      Game.ui.hud.update(true);
+      window.__combatHudFixture = {
+        originalRegion,
+        encounterId: encounter.id,
+        heroId: hero.id,
+        enemyId: enemy.id,
+        telegraphAbilityId: telegraphAbility.id
+      };
+      const minimum = hero.components.body.collisionRadius +
+        enemy.components.body.collisionRadius + 2;
+      return {
+        actionOk: action.ok,
+        minimum,
+        distance: Game.util.dist(hero.x, hero.y, enemy.x, enemy.y),
+        priorityTargetId: hero.components.targeting.priorityTargetId,
+        enemyId: enemy.id,
+        phaseCount: Object.keys(encounter.phaseTriggered).length,
+        telegraphCount: encounter.telegraphs.length
+      };
+    })()`);
+    assert.equal(combatHudFixture.actionOk, true);
+    assert.ok(combatHudFixture.distance >= combatHudFixture.minimum,
+      'production combatants recover from coincident feet before rendering: ' +
+      JSON.stringify(combatHudFixture));
+    assert.equal(combatHudFixture.priorityTargetId, combatHudFixture.enemyId);
+    assert.equal(combatHudFixture.phaseCount, 1);
+    assert.equal(combatHudFixture.telegraphCount, 1);
+
+    const combatHudLayouts = [];
+    for (const viewport of [
+      { width: 390, height: 700, mobile: true, lang: 'zh-CN' },
+      { width: 390, height: 844, mobile: true, lang: 'en' },
+      { width: 522, height: 1320, mobile: true, lang: 'zh-CN' },
+      { width: 1280, height: 900, mobile: false, lang: 'en' }
+    ]) {
+      await cdp.send('Emulation.setDeviceMetricsOverride', {
+        width: viewport.width, height: viewport.height,
+        deviceScaleFactor: 1, mobile: viewport.mobile
+      });
+      const layout = await cdp.evaluate(`(() => {
+        Game.i18n.setLocale(${JSON.stringify(viewport.lang)});
+        Game.ui.hud.update(true);
+        const root = document.getElementById('combat-v2-hud');
+        const stage = document.getElementById('stage-wrap').getBoundingClientRect();
+        const rect = root.getBoundingClientRect();
+        const buttons = Array.from(root.querySelectorAll('.combat-v2-strategy button'));
+        const portraitInfo = (id) => {
+          const canvas = document.getElementById(id);
+          const box = canvas.getBoundingClientRect();
+          const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+          let opaquePixels = 0;
+          for (let at = 3; at < pixels.length; at += 4) if (pixels[at]) opaquePixels++;
+          return {
+            source: canvas.getAttribute('data-portrait-source'),
+            mode: canvas.getAttribute('data-portrait-mode'),
+            label: canvas.getAttribute('aria-label'),
+            width: box.width,
+            height: box.height,
+            opaquePixels,
+            within: box.left >= rect.left - .5 && box.right <= rect.right + .5 &&
+              box.top >= rect.top - .5 && box.bottom <= rect.bottom + .5
+          };
+        };
+        return {
+          lang: document.documentElement.lang,
+          visible: !root.classList.contains('hidden') && rect.width > 0 && rect.height > 0,
+          withinStage: rect.left >= stage.left - .5 && rect.right <= stage.right + .5 &&
+            rect.top >= stage.top - .5 && rect.bottom <= stage.bottom + .5,
+          buttons: buttons.map((button) => ({
+            text: button.textContent.trim(),
+            height: button.getBoundingClientRect().height,
+            within: button.getBoundingClientRect().left >= rect.left - .5 &&
+              button.getBoundingClientRect().right <= rect.right + .5
+          })),
+          partyRows: document.querySelectorAll('#combat-v2-party .combat-v2-member').length,
+          action: document.getElementById('combat-v2-action-name').textContent.trim(),
+          resource: document.getElementById('combat-v2-resource-name').textContent.trim(),
+          enemy: document.getElementById('combat-v2-enemy-name').textContent.trim(),
+          cast: document.getElementById('combat-v2-enemy-cast').textContent.trim(),
+          phase: document.getElementById('combat-v2-phase').textContent.trim(),
+          telegraph: document.getElementById('combat-v2-telegraph').textContent.trim(),
+          danger: document.getElementById('combat-v2-telegraph').classList.contains('danger'),
+          portraits: {
+            ally: portraitInfo('combat-v2-party-portrait'),
+            enemy: portraitInfo('combat-v2-enemy-portrait')
+          },
+          strategyLabel: document.getElementById('combat-v2-strategy').getAttribute('aria-label'),
+          noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+        };
+      })()`);
+      combatHudLayouts.push({ viewport, layout });
+      assert.equal(layout.lang, viewport.lang);
+      assert.equal(layout.visible, true);
+      assert.equal(layout.withinStage, true,
+        'formal combat HUD fits stage at ' + viewport.width + '×' + viewport.height);
+      assert.equal(layout.partyRows, 1);
+      assert.ok(layout.action && layout.resource && layout.enemy);
+      assert.ok(layout.cast.includes(viewport.lang === 'en' ? 'Interruptible' : '可打断'));
+      assert.ok(layout.phase && layout.telegraph);
+      assert.equal(layout.danger, true);
+      assert.equal(layout.portraits.ally.mode, 'dedicated-portrait');
+      assert.equal(layout.portraits.enemy.mode, 'sprite-portrait');
+      assert.ok(layout.portraits.ally.label && layout.portraits.enemy.label);
+      assert.ok(layout.portraits.ally.opaquePixels > 100 && layout.portraits.enemy.opaquePixels > 100);
+      assert.ok(layout.portraits.ally.width >= 44 && layout.portraits.ally.height >= 44);
+      assert.ok(layout.portraits.enemy.width >= 44 && layout.portraits.enemy.height >= 44);
+      assert.equal(layout.portraits.ally.within, true);
+      assert.equal(layout.portraits.enemy.within, true);
+      assert.equal(layout.strategyLabel,
+        viewport.lang === 'en' ? 'Auto-combat strategy' : '自动战斗策略');
+      assert.equal(layout.buttons.length, 4);
+      assert.ok(layout.buttons.every((button) => button.height >= 44 && button.within));
+      assert.equal(layout.noHorizontalOverflow, true);
+    }
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 390, height: 844, deviceScaleFactor: 1, mobile: true
+    });
+    await cdp.evaluate(`(() => {
+      Game.i18n.setLocale('zh-CN');
+      const fixture = window.__combatHudFixture;
+      const hero = Game.actors.get(fixture.heroId);
+      const enemy = Game.actors.get(fixture.enemyId);
+      const toastRoot = document.getElementById('toasts');
+      if (toastRoot) toastRoot.replaceChildren();
+      const camp = Game.world.layout.camp;
+      const minimum = hero.components.body.collisionRadius +
+        enemy.components.body.collisionRadius + 2;
+      hero.x = camp.x + 30;
+      hero.y = camp.y + 26;
+      enemy.x = hero.x + minimum;
+      enemy.y = hero.y;
+      const encounter = Game.encounters.get(fixture.encounterId);
+      encounter.telegraphs.forEach((telegraph) => {
+        telegraph.x = hero.x;
+        telegraph.y = hero.y;
+      });
+      Game.state.world.worldTime = 300;
+      Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: 'grassland' });
+      Game.terrain.rebuildDynamicSpatial(Game.world.entities.concat(Game.world.groundLoot));
+      Game.render.snapCamera((hero.x + enemy.x) / 2, (hero.y + enemy.y) / 2);
+      Game.ui.hud.update(true);
+      Game.render.frame(1 / 60);
+      return true;
+    })()`);
+    const combatHudCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    const combatHudScreenshot = path.join(os.tmpdir(), 'firpg-combat-v2-hud-mobile-cdp.png');
+    fs.writeFileSync(combatHudScreenshot, Buffer.from(combatHudCapture.data, 'base64'));
+    await cdp.evaluate(`(() => {
+      const fixture = window.__combatHudFixture;
+      Game.world.endEncounter('browser-hud-fixture-complete');
+      Game.world.init(fixture.originalRegion);
+      Game.ui.tabs.open('map');
+      return true;
+    })()`);
+
     const mapWheelMobile = await cdp.evaluate(`(() => {
       const canvas = document.querySelector('canvas[data-live-region-map]');
       const rect = canvas.getBoundingClientRect();
@@ -1223,7 +1421,6 @@ async function run() {
       }
       if (!encounterPoint) throw new Error('auto-action encounter point missing');
       const monster = W.makeMonster(W.region.monsters[0], false);
-      monster.id = 'test-route-monster';
       monster.x = encounterPoint.x;
       monster.y = encounterPoint.y;
       monster.spawnX = monster.x;
@@ -3194,74 +3391,52 @@ async function run() {
     const screenshot = path.join(os.tmpdir(), 'firpg-demo-mobile-cdp.png');
     fs.writeFileSync(screenshot, Buffer.from(capture.data, 'base64'));
 
-    await cdp.navigate(BASE + 'tech-demos/units/units.html');
-    await delay(250);
+    await cdp.navigate(BASE + 'tech-demos/units/units.html?scenario=overlap&lang=en');
     const unitsBubbleDemo = await cdp.evaluate(`(() => {
-      const stage = document.getElementById('stage');
-      const context = stage.getContext('2d');
-      Game.unitsBubbleDemo.setAuto(false);
-      Game.unitsBubbleDemo.clear();
-      Game.render.frame(0);
-      const before = context.getImageData(0, 0, stage.width, stage.height).data;
-      document.querySelector('[data-bubble-anchor="both"]').click();
-      document.querySelector('[data-bubble-type="enemy"]').click();
-      Game.render.frame(0);
-      const after = context.getImageData(0, 0, stage.width, stage.height).data;
-      let stagePixelDiff = 0;
-      for (let i = 0; i < before.length; i += 4) {
-        if (before[i] !== after[i] || before[i + 1] !== after[i + 1] ||
-            before[i + 2] !== after[i + 2] || before[i + 3] !== after[i + 3]) {
-          stagePixelDiff++;
-        }
-      }
-      const typeButtons = Array.from(document.querySelectorAll('[data-bubble-type]'));
-      const anchorButtons = Array.from(document.querySelectorAll('[data-bubble-anchor]'));
+      const api = Game.unitsBubbleDemo;
       const sceneButtons = Array.from(document.querySelectorAll('[data-bubble-scene]'));
       const walkButtons = Array.from(document.querySelectorAll('[data-bubble-walk]'));
-      const iconPixels = typeButtons.map((button) => {
-        const canvas = button.querySelector('canvas');
-        const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-        let visible = 0;
-        for (let i = 3; i < pixels.length; i += 4) if (pixels[i]) visible++;
-        return visible;
-      });
-      const walks = ['l', 'r', 'vertical'].map((scene) => ({
-        scene,
-        layouts: Game.unitsBubbleDemo.setWalkScene(scene)
+      const walks = ['l', 'r', 'vertical'].map((id) => ({
+        id,
+        layouts: api.setWalkScene(id),
+        active: document.querySelector('[data-bubble-walk="' + id + '"]').classList.contains('active')
       }));
-      const scenes = ['center', 'left', 'right'].map((scene) => {
-        const layouts = Game.unitsBubbleDemo.setScene(scene);
+      const scenes = ['center', 'left', 'right'].map((id) => {
+        const layouts = api.setScene(id);
         return {
-          scene,
+          id,
           layouts,
-          monster: layouts.find((layout) => layout.entityKind === 'monster')
+          active: document.querySelector('[data-bubble-scene="' + id + '"]').classList.contains('active')
         };
       });
+      const buttons = sceneButtons.concat(walkButtons);
       return {
-        snapshot: Game.unitsBubbleDemo.snapshot(),
+        catalog: api.catalog(),
+        snapshot: api.snapshot(),
         walks,
         scenes,
-        stagePixelDiff,
-        iconPixels,
-        typeCount: typeButtons.length,
-        allControlsTouchable: typeButtons.concat(anchorButtons, sceneButtons, walkButtons, [
-          document.getElementById('toggle-bubble-auto'),
-          document.getElementById('clear-bubbles')
-        ]).every((button) => button.getBoundingClientRect().height >= 44),
-        allControlsWithinViewport: typeButtons.concat(anchorButtons, sceneButtons, walkButtons).every((button) => {
+        locale: document.documentElement.lang,
+        sceneLabels: sceneButtons.map((button) => button.textContent.trim()),
+        walkLabels: walkButtons.map((button) => button.textContent.trim()),
+        allControlsTouchable: buttons.every((button) => button.getBoundingClientRect().height >= 44),
+        allControlsWithinViewport: buttons.every((button) => {
           const rect = button.getBoundingClientRect();
           return rect.left >= 0 && rect.right <= innerWidth;
         }),
-        autoSwitch: document.getElementById('toggle-bubble-auto').getAttribute('role') === 'switch',
         sourceLoaded: !!document.querySelector('script[src*="systems/action_bubbles.js"]'),
+        portraitSourceLoaded: !!document.querySelector('script[src*="ui/combat_portraits.js"]'),
+        portraits: api.portraits(),
         status: document.getElementById('bubble-status').textContent,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
       };
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
-    assert.equal(unitsBubbleDemo.typeCount, 6);
-    assert.ok(unitsBubbleDemo.iconPixels.every((count) => count >= 20),
-      'units QA uses nonblank production bubble icons: ' + JSON.stringify(unitsBubbleDemo));
+    assert.equal(unitsBubbleDemo.catalog.complete, true);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 28);
+    assert.equal(unitsBubbleDemo.catalog.classCount, 5);
+    assert.equal(unitsBubbleDemo.catalog.monsterCount, 24);
+    assert.equal(unitsBubbleDemo.catalog.encounterCount, 16);
+    assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.equal(unitsBubbleDemo.snapshot.length, 2,
       'units QA must expose both anchors: ' + JSON.stringify(unitsBubbleDemo));
     assert.equal(new Set(unitsBubbleDemo.snapshot.map((bubble) => bubble.anchorId)).size, 2,
@@ -3269,28 +3444,36 @@ async function run() {
     assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'hero'));
     assert.ok(unitsBubbleDemo.snapshot.some((bubble) => bubble.entityKind === 'monster'));
     assert.deepEqual(unitsBubbleDemo.walks.map((walk) => [
-      walk.scene, walk.layouts[0].placement, walk.layouts[0].mode, walk.layouts[0].side
+      walk.id, walk.layouts[0].mode, walk.layouts[0].side
     ]), [
-      ['l', 'directional', 'side', 'right'],
-      ['r', 'directional', 'side', 'left'],
-      ['vertical', 'directional', 'above', null]
+      ['l', 'side', 'right'],
+      ['r', 'side', 'left'],
+      ['vertical', 'above', null]
     ], 'movement bubbles stay behind horizontal facing and above vertical facing');
+    assert.ok(unitsBubbleDemo.walks.every((walk) =>
+      walk.active && walk.layouts.length === 1 && walk.layouts[0].withinViewport &&
+      !walk.layouts[0].overlapsHealthBar));
     assert.ok(unitsBubbleDemo.scenes.every((scene) => scene.layouts.length === 2));
     assert.ok(unitsBubbleDemo.scenes.every((scene) => scene.layouts.every((layout) =>
       layout.mode === 'side' && layout.healthBar && !layout.overlapsHealthBar && layout.withinViewport &&
       layout.tail.y + layout.tail.h > layout.body.y + layout.body.h)),
     'diagonal engagement bubbles avoid visible health bars and viewport edges: ' + JSON.stringify(unitsBubbleDemo.scenes));
-    assert.deepEqual(
-      unitsBubbleDemo.scenes.map((scene) => [scene.scene, scene.monster.side, scene.monster.flipped]),
-      [['center', 'right', false], ['left', 'right', true], ['right', 'left', true]],
-      'monster alert bubble uses the opposite side in a vertical encounter and flips inward at either viewport edge'
-    );
-    assert.ok(unitsBubbleDemo.stagePixelDiff >= 120,
-      'units QA bubble controls paint the production canvas: ' + JSON.stringify(unitsBubbleDemo));
+    assert.ok(unitsBubbleDemo.scenes.every((scene) => scene.active));
+    assert.equal(unitsBubbleDemo.locale, 'en');
+    assert.deepEqual(unitsBubbleDemo.sceneLabels,
+      ['Vertical encounter', 'Left edge flip', 'Right edge flip']);
+    assert.deepEqual(unitsBubbleDemo.walkLabels,
+      ['Walk left', 'Walk right', 'Walk vertically']);
     assert.equal(unitsBubbleDemo.allControlsTouchable, true);
     assert.equal(unitsBubbleDemo.allControlsWithinViewport, true);
-    assert.equal(unitsBubbleDemo.autoSwitch, true);
     assert.equal(unitsBubbleDemo.sourceLoaded, true);
+    assert.equal(unitsBubbleDemo.portraitSourceLoaded, true);
+    assert.equal(unitsBubbleDemo.portraits.ally.mode, 'dedicated-portrait');
+    assert.equal(unitsBubbleDemo.portraits.enemy.mode, 'sprite-portrait');
+    assert.ok(unitsBubbleDemo.portraits.ally.opaquePixels > 100);
+    assert.ok(unitsBubbleDemo.portraits.enemy.opaquePixels > 100);
+    assert.equal(unitsBubbleDemo.portraits.ally.withinCard, true);
+    assert.equal(unitsBubbleDemo.portraits.enemy.withinCard, true);
     assert.equal(unitsBubbleDemo.noHorizontalOverflow, true);
     assert.deepEqual(cdp.errors, [], 'units bubble QA has no browser errors');
     const unitsBubbleCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -3396,13 +3579,15 @@ async function run() {
     const restartCompleted = await cdp.evaluate(`(() => {
       const saved = JSON.parse(localStorage.getItem('firpg_save'));
       const backup = JSON.parse(localStorage.getItem('firpg_save_backup'));
+      const savedActor = saved.roster.actors[saved.roster.primaryActorId];
+      const backupActor = backup.roster.actors[backup.roster.primaryActorId];
       return {
         hasClass: Game.player.hasClass(),
         classId: Game.state.player.classId,
         titleGone: !document.getElementById('title-root'),
         classGone: !document.getElementById('class-root'),
-        saveMatches: saved.player.classId === Game.state.player.classId,
-        backupMatches: backup.player.classId === Game.state.player.classId,
+        saveMatches: savedActor.classId === Game.state.player.classId,
+        backupMatches: backupActor.classId === Game.state.player.classId,
         endingCleared: saved.meta.completedAt === null && backup.meta.completedAt === null,
         savedTs: saved.ts
       };
@@ -3650,6 +3835,7 @@ async function run() {
     console.log('Browser smoke passed: ' + JSON.stringify({
       titleScene, titleArchiveReveal, titleShortView, titleShortArchive, englishTitleFit,
       titleScreenshot, titleTallScreenshot, titleShortScreenshot, main,
+      combatHudFixture, combatHudLayouts, combatHudScreenshot,
       v3CampVisual, v3ResourceVisual, v3DepletedVisual, v3MineResourceVisual,
       v3Navigation, v3AutoActions, actionBubbleVisual, enemyBubbleVisual, v3ForestVisual,
       v3CampScreenshot, v3ResourceScreenshot, v3DepletedScreenshot,

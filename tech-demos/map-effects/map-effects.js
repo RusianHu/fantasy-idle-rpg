@@ -24,7 +24,7 @@
       seed: '世界种子', layout: '布局协议', strategy: '远征策略', intent: 'AI 意图', coverage: '迷雾揭示', gold: '金币',
       ready: '成熟', rare: '稀有', common: '常见', count: '数量', cooldown: '冷却', particle: '环境粒子',
       parallax: '视差层', generationNote: '所有指标来自本次 Game.terrain.generate/validate 结果，不是静态文档值。',
-      contentNote: '资源、地标、奇物、生态、威胁、守门精英和巢穴均使用稳定 ID 并写入 v11 探索状态。',
+      contentNote: '资源、地标、奇物、生态、威胁、守门精英和巢穴均使用稳定 ID 并写入 v12 世界状态。',
       focused: '已定位并揭示资源', revealed: '已揭示全部资源并恢复节点', noReady: '没有成熟资源',
       commonChest: '普通宝箱', rareChest: '稀有宝箱', spawned: '已生成', clickOpen: '点击箱体走近开启',
       spawnFailed: '当前镜头附近没有合法宝箱落点', bossBlocks: 'Boss 登场期间不可生成宝箱',
@@ -44,7 +44,7 @@
       seed: 'World seed', layout: 'Layout protocol', strategy: 'Expedition strategy', intent: 'AI intent', coverage: 'Fog revealed', gold: 'gold',
       ready: 'Ready', rare: 'Rare', common: 'Common', count: 'Count', cooldown: 'Cooldown', particle: 'World particles',
       parallax: 'Parallax layers', generationNote: 'Every metric comes from this Game.terrain.generate/validate result, not static documentation.',
-      contentNote: 'Resources, landmarks, curios, ecology, threats, guardian and lair use stable IDs in v11 exploration state.',
+      contentNote: 'Resources, landmarks, curios, ecology, threats, guardian and lair use stable IDs in the v12 world state.',
       focused: 'Focused and revealed resource', revealed: 'Revealed all resources and reset cooldowns', noReady: 'No ready resource',
       commonChest: 'Common chest', rareChest: 'Rare chest', spawned: 'Spawned', clickOpen: 'click the chest to approach and open',
       spawnFailed: 'No legal chest position near the current view', bossBlocks: 'Chests cannot spawn while a boss is active',
@@ -428,6 +428,7 @@
   }
 
   D.init();
+  Game.content.finalize({ strict: true });
   Game.state = Game.State.newGame();
   Game.i18n.setLocale(D.locale());
   Game.state.world.layoutVersion = 3;

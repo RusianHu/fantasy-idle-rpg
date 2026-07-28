@@ -35,6 +35,12 @@
 
     locale: function () { return cur; },
 
+    has: function (locale, key) {
+      return !!(packs[locale] && packs[locale][key] !== undefined);
+    },
+
+    locales: function () { return Object.keys(packs).sort(); },
+
     setLocale: function (locale) {
       if (!packs[locale]) return;
       cur = locale;

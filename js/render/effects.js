@@ -25,10 +25,15 @@
 
   var FX = Game.fx = {
     /* ---------- 弹道 ---------- */
-    projectile: function (x, y, target, kind, onHit) {
+    projectile: function (x, y, target, kind, onHit, opts) {
+      opts = opts || {};
       var st = PROJ_STYLE[kind] || PROJ_STYLE.bolt;
+      var targetX = target && Number(target.x);
+      var targetY = target && (Number(target.y) - (target.spriteH || 14) * 0.5);
       projs.push({
         x: x, y: y, target: target, kind: kind,
+        targetX: targetX, targetY: targetY,
+        allowDead: !!opts.allowDead,
         speed: st.speed, onHit: onHit, t: 0, trail: []
       });
     },
@@ -222,20 +227,53 @@
       wrap.classList.add('flash-red');
     },
 
+    inspect: function () {
+      var countKinds = function (items) {
+        return items.reduce(function (out, item) {
+          out[item.kind] = (out[item.kind] || 0) + 1;
+          return out;
+        }, {});
+      };
+      return {
+        floats: floats.length,
+        shapes: shapes.length,
+        projectiles: projs.length,
+        shapeKinds: countKinds(shapes),
+        projectileKinds: countKinds(projs)
+      };
+    },
+
+    reset: function () {
+      floats.length = 0;
+      shapes.length = 0;
+      projs.length = 0;
+      shake.p = 0;
+      shake.t = 0;
+      shake.d = 0;
+    },
+
     /* ---------- 更新与绘制 ---------- */
     update: function (dt) {
       if (shake.t > 0) shake.t -= dt;
       var i, f;
-      // 弹道：追踪目标当前位置，命中时结算；目标死亡则消散
+      // 弹道只承载表现。V2 数值已在事件发出前结算，因此致死命中也要
+      // 飞抵最后一个已知脚点，不能因目标已死亡而吞掉视觉反馈。
       for (i = projs.length - 1; i >= 0; i--) {
         var p = projs[i];
         p.t += dt;
         var tgt = p.target;
-        if (!tgt || tgt.dead || tgt.hp <= 0 || p.t > 2.5) {
+        var targetAlive = tgt && !tgt.dead && (tgt.hp === undefined || tgt.hp > 0);
+        if (targetAlive) {
+          p.targetX = tgt.x;
+          p.targetY = tgt.y - (tgt.spriteH || 14) * 0.5;
+        }
+        if ((!targetAlive && !p.allowDead) ||
+            !Number.isFinite(p.targetX) || !Number.isFinite(p.targetY) ||
+            p.t > 2.5) {
           projs.splice(i, 1);
           continue;
         }
-        var tx = tgt.x, ty = tgt.y - (tgt.spriteH || 14) * 0.5;
+        var tx = p.targetX, ty = p.targetY;
         var dx = tx - p.x, dy = ty - p.y;
         var dist = Math.sqrt(dx * dx + dy * dy);
         var step = p.speed * dt;

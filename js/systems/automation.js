@@ -113,7 +113,7 @@
         if (sk.dot) dotDps += atk * F.skillVal(sk.dot.mult, rank) / cd;
       } else if (sk.kind === 'aoe') {
         var aoeDps = hit * F.skillVal(sk.mult, rank) * critMult / cd;
-        directDps += aoeDps; // 项目统一以 1v1 为数值基准
+        directDps += aoeDps;
         if (sk.selfHealPct) {
           healingPerSec += d.maxHp * F.skillVal(sk.selfHealPct, rank) * d.healPow / cd;
         }
@@ -145,6 +145,29 @@
       w.offense * Math.log(offense) +
       w.survival * Math.log(survival) +
       w.economy * Math.log(economy);
+    var estimator = null;
+    if (Game.combatEstimator && Game.content && Game.content.isFinalized()) {
+      estimator = Game.combatEstimator.evaluateCurrent({
+        regionId: ctx.rid,
+        classId: classId,
+        level: level,
+        skills: skills,
+        equipped: equipped,
+        tacticsProfile: state.settings.combatStrategy || 'balanced',
+        sampleSeeds: [71],
+        maxTicks: 6000
+      });
+      if (estimator && Number.isFinite(estimator.averageDps) && estimator.averageDps > 0) {
+        offense = estimator.averageDps;
+        var success = Math.max(0.02, 1 - estimator.failureRate);
+        survival *= success;
+        utility =
+          w.offense * Math.log(Math.max(0.001, offense)) +
+          w.survival * Math.log(Math.max(0.001, survival)) +
+          w.economy * Math.log(economy) +
+          Math.log(success);
+      }
+    }
 
     return {
       offense: offense,
@@ -152,7 +175,8 @@
       economy: economy,
       utility: utility,
       derived: d,
-      context: ctx
+      context: ctx,
+      estimator: estimator
     };
   };
 

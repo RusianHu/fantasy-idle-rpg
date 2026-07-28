@@ -165,7 +165,7 @@
   function nearbyThreat(hero) {
     var radius = STRATEGIES[strategy()].engage;
     return nearest(Game.world.entities || [], hero, function (e) {
-      if (!e || e.kind !== 'monster' || e.dead || e.hp <= 0 || e.boss) return false;
+      if (!Game.world.isHostileActor(hero, e) || e.boss) return false;
       if (!visible(e)) return false;
       return U.dist(hero.x, hero.y, e.x, e.y) <= radius;
     });

@@ -24,6 +24,16 @@
     Game.i18n.detect();
     Game.entryState = 'menu';
 
+    try {
+      var contentAudit = Game.content.finalize({ strict: true });
+      console.info('[Content] ready', contentAudit.fingerprint, contentAudit.counts);
+    } catch (contentError) {
+      console.error(contentError);
+      document.body.innerHTML = '<main class="boot-error" role="alert"><h1>Content audit failed</h1>' +
+        '<p>' + String(contentError && contentError.message || contentError) + '</p></main>';
+      return;
+    }
+
     // 系统监听器
     Game.audio.init();
     Game.prog.init();

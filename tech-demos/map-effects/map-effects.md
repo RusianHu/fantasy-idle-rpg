@@ -1,6 +1,6 @@
 # 开放世界现场技术验证
 
-入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面创建独立 v11 QA 状态，固定使用 `layoutVersion:3`，并直接运行 `terrain_v3 → exploration → expedition_ai → world → renderer` 生产链路。
+入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面创建独立 v12 QA 状态，固定使用 `layoutVersion:3`，并直接运行统一内容编译、Actor/Encounter、`terrain_v3 → exploration → expedition_ai → world → renderer` 生产链路。
 
 ## 验证范围
 

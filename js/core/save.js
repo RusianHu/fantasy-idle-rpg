@@ -156,8 +156,58 @@
         data.meta.explorationMigrationGift = data.meta.explorationMigrationGift || false;
         data.v = 11;
       }
+    },
+    {
+      // v11 → v12：角色养成进入 Roster/ActorRecord，经济与装备归属分离。
+      // 旧技能 ID 在 V2 中继续作为 Talent ID，投入点数与装备完整保留。
+      from: 11,
+      fn: function (data) {
+        var player = data.player || {};
+        var inv = data.inv || {};
+        data.roster = {
+          primaryActorId: 'player-main',
+          activeParty: ['player-main'],
+          actors: {
+            'player-main': {
+              id: 'player-main',
+              archetypeId: 'adventurer',
+              classId: player.classId || null,
+              level: Math.max(1, player.level | 0 || 1),
+              exp: Math.max(0, Number(player.exp) || 0),
+              skillPoints: Math.max(0, player.sp | 0),
+              talentRanks: Object.assign({}, player.skills || {}),
+              permanentUpgrades: Object.assign({}, player.perms || {}),
+              persistentResources: { hp: Math.max(0, Number(player.hp) || 0) },
+              loadout: {
+                equipment: Object.assign({ weapon: null, armor: null, ring: null },
+                  inv.equipped || {}),
+                lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
+                  inv.lockedSlots || {})
+              }
+            }
+          }
+        };
+        data.economy = {
+          gold: Math.max(0, Number(player.gold) || 0),
+          crystal: Math.max(0, Number(player.crystal) || 0)
+        };
+        data.settings = data.settings || {};
+        if (!/^(safe|balanced|aggressive)$/.test(data.settings.combatStrategy || '')) {
+          data.settings.combatStrategy = 'balanced';
+        }
+        data.settings.combatTactics = data.settings.combatTactics || {};
+        delete data.player;
+        delete inv.equipped;
+        delete inv.lockedSlots;
+        data.v = 12;
+      }
     }
   ];
+
+  function validSaveShape(data) {
+    return !!(data && typeof data.v === 'number' &&
+      (data.player || data.roster && data.roster.actors));
+  }
 
   function runMigrations(data) {
     var guard = 0;
@@ -186,16 +236,20 @@
 
     serialize: function () {
       var st = Game.state;
+      var record = st.roster.actors[st.roster.primaryActorId];
+      if (record && Game.world && Game.world.hero && Game.world.hero.components &&
+          Game.world.hero.components.vitals) {
+        record.persistentResources.hp = Game.world.hero.components.vitals.hp;
+      }
       return {
         v: Game.SAVE_VERSION,
         ts: U.now(),
         createdAt: st.createdAt,
         settings: st.settings,
-        player: st.player,
+        roster: st.roster,
+        economy: st.economy,
         inv: {
           items: st.inv.items,
-          equipped: st.inv.equipped,
-          lockedSlots: st.inv.lockedSlots,
           potions: st.inv.potions,
           materials: st.inv.materials,
           uidSeq: Game.inv.peekUidSeq()
@@ -247,14 +301,14 @@
       if (raw) {
         try { data = JSON.parse(raw); } catch (e) { data = null; }
       }
-      if (!data || typeof data.v !== 'number' || !data.player) {
+      if (!validSaveShape(data)) {
         try { raw = localStorage.getItem(KEY_BAK); } catch (e) {}
         if (raw) {
           try { data = JSON.parse(raw); } catch (e) { data = null; }
           if (data) console.warn('[Save] 主档损坏，已从备份档恢复');
         }
       }
-      if (!data || typeof data.v !== 'number' || !data.player) return null;
+      if (!validSaveShape(data)) return null;
       runMigrations(data);
       lastLoadedTs = data.ts || 0;
       persistenceStarted = true;
@@ -277,12 +331,35 @@
       st.settings.expeditionStrategy = /^(safe|balanced|loot)$/.test(st.settings.expeditionStrategy)
         ? st.settings.expeditionStrategy
         : 'balanced';
+      st.settings.combatStrategy = /^(safe|balanced|aggressive)$/.test(st.settings.combatStrategy)
+        ? st.settings.combatStrategy
+        : 'balanced';
+      st.settings.combatTactics = st.settings.combatTactics &&
+        typeof st.settings.combatTactics === 'object' ? st.settings.combatTactics : {};
       st.settings.autoBoss = st.settings.autoBoss !== false;
-      U.merge(st.player, data.player || {});
+      var loadedRoster = data.roster || {};
+      var loadedPrimaryId = loadedRoster.primaryActorId || 'player-main';
+      var loadedRecord = loadedRoster.actors && loadedRoster.actors[loadedPrimaryId] || {};
+      var record = st.roster.actors['player-main'];
+      record.classId = loadedRecord.classId || null;
+      record.level = Math.max(1, loadedRecord.level | 0 || 1);
+      record.exp = Math.max(0, Number(loadedRecord.exp) || 0);
+      record.skillPoints = Math.max(0, loadedRecord.skillPoints | 0);
+      record.talentRanks = Object.assign({}, loadedRecord.talentRanks || {});
+      record.permanentUpgrades = Object.assign({}, loadedRecord.permanentUpgrades || {});
+      record.persistentResources = Object.assign({ hp: 1 }, loadedRecord.persistentResources || {});
+      record.loadout = {
+        equipment: Object.assign({ weapon: null, armor: null, ring: null },
+          loadedRecord.loadout && loadedRecord.loadout.equipment || {}),
+        lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
+          loadedRecord.loadout && loadedRecord.loadout.lockedSlots || {})
+      };
+      st.roster.activeParty = ['player-main'];
+      U.merge(st.economy, data.economy || {});
+      st.economy.gold = Math.max(0, Number(st.economy.gold) || 0);
+      st.economy.crystal = Math.max(0, Number(st.economy.crystal) || 0);
       if (data.inv) {
         st.inv.items = Array.isArray(data.inv.items) ? data.inv.items : [];
-        U.merge(st.inv.equipped, data.inv.equipped || {});
-        U.merge(st.inv.lockedSlots, data.inv.lockedSlots || {});
         U.merge(st.inv.potions, data.inv.potions || {});
         U.merge(st.inv.materials, data.inv.materials || {});
       }
@@ -306,6 +383,24 @@
         ? st.meta.endingPhase
         : null;
       st.meta.endingLine = Math.max(0, Math.min(5, Number(st.meta.endingLine) || 0));
+
+      // 内容缺失时从合法脱战状态降级：无效职业清空，Talent 全额退款。
+      if (record.classId && (!Game.content.has('class', record.classId) ||
+          !Game.reg.has('class', record.classId))) {
+        record.classId = null;
+      }
+      Object.keys(record.talentRanks).forEach(function (talentId) {
+        var rank = Math.max(0, record.talentRanks[talentId] | 0);
+        var talent = Game.content.get('talent', talentId);
+        if (!talent || talent.classId !== record.classId) {
+          record.skillPoints += rank;
+          delete record.talentRanks[talentId];
+        } else {
+          record.talentRanks[talentId] = Math.min(rank, talent.maxRank);
+          record.skillPoints += Math.max(0, rank - talent.maxRank);
+        }
+      });
+      record.persistentResources.hp = Math.max(0, Number(record.persistentResources.hp) || 0);
 
       // 数据卫生：清除引用已下线内容的装备（折算金币），装备指针失效则置空
       var validItems = [];
@@ -341,7 +436,7 @@
       });
       Game.inv.setUidSeq(maxUid);
 
-      Game.state = st;
+      Game.state = Game.State.attachCompatibility(st);
       // 损坏或尺寸不匹配的 bitset 只重置对应区域探索，不影响角色档。
       if (Game.exploration) {
         Game.State.normalizeRegionOrder(st.world.regionOrder).forEach(function (rid) {
@@ -366,7 +461,7 @@
         var sum = str.slice(dot + 1).trim();
         if (U.fnv1a(b64) !== sum) return { ok: false };
         var data = JSON.parse(U.b64decode(b64));
-        if (typeof data.v !== 'number' || !data.player) return { ok: false };
+        if (!validSaveShape(data)) return { ok: false };
         runMigrations(data);
         persistenceStarted = true;
         S.applyLoaded(data);
@@ -397,7 +492,7 @@
     importFileText: function (text) {
       try {
         var data = JSON.parse(text);
-        if (typeof data.v !== 'number' || !data.player) return { ok: false };
+        if (!validSaveShape(data)) return { ok: false };
         runMigrations(data);
         persistenceStarted = true;
         S.applyLoaded(data);

@@ -5,9 +5,9 @@
   'use strict';
 
   var Game = window.Game = window.Game || {};
-  Game.VERSION = '1.13.4';
-  Game.BUILD_ID = '20260728.8';
-  Game.SAVE_VERSION = 11;
+  Game.VERSION = '2.0.0';
+  Game.BUILD_ID = '20260728.15';
+  Game.SAVE_VERSION = 12;
 
   var U = Game.util = {};
 

@@ -731,6 +731,33 @@
         }
       }
 
+      // Encounter 预警与 priority target 直接读取确定性战斗状态。
+      var activeEncounter = hero0 && hero0.encounterId && Game.encounters.get(hero0.encounterId);
+      if (activeEncounter) {
+        var priorityId = hero0.components.targeting && hero0.components.targeting.priorityTargetId;
+        var priorityActor = priorityId && Game.actors.get(priorityId);
+        if (priorityActor && !priorityActor.dead) {
+          ctx.strokeStyle = 'rgba(255,213,92,' + (0.58 + 0.24 * Math.sin(t * 7)).toFixed(2) + ')';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(priorityActor.x, priorityActor.y + 1, priorityActor.boss ? 16 : 11,
+            priorityActor.boss ? 6 : 4, 0, 0, 6.29);
+          ctx.stroke();
+        }
+        activeEncounter.telegraphs.forEach(function (telegraph) {
+          var remain = Math.max(0, telegraph.resolveTick - activeEncounter.tick);
+          var total = Math.max(1, telegraph.resolveTick - telegraph.visibleTick);
+          var pulse = 0.3 + 0.45 * (1 - remain / total);
+          ctx.fillStyle = 'rgba(232,77,65,' + (pulse * 0.32).toFixed(2) + ')';
+          ctx.strokeStyle = 'rgba(255,137,120,' + Math.min(1, pulse + 0.2).toFixed(2) + ')';
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(telegraph.x, telegraph.y, telegraph.radius || 22, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
+      }
+
       for (j = 0; j < drawables.length; j++) {
         e = drawables[j];
         if (e.kind === 'hero' || e.kind === 'monster') R.drawEntity(e);
@@ -899,8 +926,10 @@
 
       // 突进位移
       var ox = 0, oy = 0;
-      if (e.lungeT > 0) {
-        var tgt = e.kind === 'hero' ? e.target : Game.world.hero;
+      if (e.lungeT > 0 && !e.presentationNoLunge) {
+        var tgt = e.presentationTargetId && Game.actors
+          ? Game.actors.get(e.presentationTargetId)
+          : (e.kind === 'hero' ? e.target : Game.world.hero);
         if (tgt) {
           var dd = Math.max(1, U.dist(e.x, e.y, tgt.x, tgt.y));
           var k = Math.sin((1 - e.lungeT / 0.18) * Math.PI) * 4;

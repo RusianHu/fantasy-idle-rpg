@@ -576,6 +576,50 @@
     langRow.appendChild(sel);
     root.appendChild(langRow);
 
+    // 自动战斗策略与有限 Tactics：只开放可理解、可持久化的阈值。
+    var strategyRow = U.el('div', 'setting-row',
+      '<div><div>' + t('settings.combatStrategy') + '</div><div class="hint">' +
+      t('settings.combatStrategyHint') + '</div></div>');
+    var strategySelect = U.el('select');
+    ['safe', 'balanced', 'aggressive'].forEach(function (id) {
+      var option = U.el('option', '', t('combat.strategy.' + id));
+      option.value = id;
+      option.selected = s.settings.combatStrategy === id;
+      strategySelect.appendChild(option);
+    });
+    strategySelect.addEventListener('change', function () {
+      s.settings.combatStrategy = strategySelect.value;
+      if (Game.world.hero) Game.combatAI.strategy(Game.world.hero.id, strategySelect.value);
+      bus.emit('settings:changed', { key: 'combatStrategy', value: strategySelect.value });
+    });
+    strategyRow.appendChild(strategySelect);
+    root.appendChild(strategyRow);
+
+    var tacticsHead = U.el('div', '', t('settings.combatTactics'));
+    tacticsHead.style.cssText = 'font-size:12px;color:var(--gold);margin:10px 0 4px;';
+    root.appendChild(tacticsHead);
+    [
+      ['healThreshold', 'settings.tacticHeal', 20, 90, 5, 50],
+      ['defenseThreshold', 'settings.tacticDefense', 20, 90, 5, 45],
+      ['dodgeDamageThreshold', 'settings.tacticDodge', 5, 50, 5, 12]
+    ].forEach(function (spec) {
+      var current = Math.round(Number(s.settings.combatTactics[spec[0]] === undefined
+        ? spec[5] / 100 : s.settings.combatTactics[spec[0]]) * 100);
+      var row = U.el('div', 'setting-row', '<div><div>' + t(spec[1]) +
+        '</div><div class="hint" data-tactic-value>' + current + '%</div></div>');
+      var input = U.el('input');
+      input.type = 'range'; input.min = spec[2]; input.max = spec[3]; input.step = spec[4];
+      input.value = current;
+      input.addEventListener('input', function () {
+        s.settings.combatTactics[spec[0]] = Number(input.value) / 100;
+        if (Game.world.hero) Game.world.hero.tactics = Object.assign({}, s.settings.combatTactics);
+        row.querySelector('[data-tactic-value]').textContent = input.value + '%';
+        bus.emit('settings:changed', { key: 'combatTactics', value: s.settings.combatTactics });
+      });
+      row.appendChild(input);
+      root.appendChild(row);
+    });
+
     // 特效
     root.appendChild(toggleRow(t('settings.effects'), t('settings.effectsHint'), s.settings.effects, function (v) {
       s.settings.effects = v;

@@ -4,7 +4,7 @@
 
 | 工作台 | URL 参数 | 生产链路与范围 |
 | --- | --- | --- |
-| 角色与怪物 | `units/units.html?region=forest&unit=treant_sapling&lang=en` | 注册表自动枚举的八区怪物目录与职业选项、随选区切换的 v3 世界、战斗/技能/弹道、朝向感知与双锚点斜向动作气泡 |
+| Actor / Combat Lab | `units/units.html?encounter=encounter.forest.boss&unit=adventurer&class=cleric&strategy=safe&seed=20260728&scenario=interrupt&lang=en` | 自动枚举正式 V2 内容；1–4 友方、1–8 敌方、暂停/单步/运行至命中/倍速、正式攻击 FX、双方肖像槽 QA，以及数值/表现/接敌三路日志 |
 | 开放世界现场 | `map-effects/map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN` | 2400×1440 v3 地图、迷雾/准备度、远征 AI、资源/宝箱、动态交易域、日夜与环境渲染 |
 | 生成器审计 | `exploration-v3/exploration-v3.html?seed=20260727&region=grassland&lang=en` | 宏观拓扑、硬阻挡、距离场、内容分布、5×3 区块、结构报告与 32 种子批量验证 |
 
@@ -18,4 +18,4 @@
 
 ## 自动验证
 
-`tests/browser-smoke.js` 在 390×844 与桌面视口验证三个工作台的非空 Canvas、无横向溢出、44px 控件、双语切换、v3 布局指标、资源/宝箱/动态交易域，以及双锚点气泡的左右翻转与血条避让。生成器的完整 1,600 布局与 5,000 拓扑模糊种子继续由 `tests/v1_13.test.js` 覆盖。
+`tests/browser-smoke.js` 在移动与桌面视口验证工作台的非空 Canvas、无横向溢出、44px 控件和双语切换。`tests/action-bubble-demo.test.js` 在 Lab 验证接敌不重叠、正式攻击 FX 与 PresentationEvent；Actor / Combat V2 的确定性、内容集合、4+8 性能与平衡矩阵由 `tests/v2-*.test.js` 覆盖。生成器的 1,600 布局与 5,000 拓扑模糊种子继续由 `tests/v1_13.test.js` 覆盖。
