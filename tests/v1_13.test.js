@@ -6,6 +6,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { performance } = require('node:perf_hooks');
+const { PRODUCTION_CONTENT_FILES, loadProductionContent } =
+  require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -21,16 +23,10 @@ function makeSandbox(files) {
   return sandbox;
 }
 
-const coreFiles = [
-  'js/core/utils.js',
-  'js/core/eventbus.js',
-  'js/core/registry.js',
-  'js/data/regions.js',
-  'js/systems/terrain.js',
-  'js/systems/terrain_v3.js'
-];
 global.window = global;
-for (const file of coreFiles) vm.runInThisContext(read(file), { filename: file });
+const loadGlobal = (file) => vm.runInThisContext(read(file), { filename: file });
+loadProductionContent(loadGlobal, global);
+['js/systems/terrain.js', 'js/systems/terrain_v3.js'].forEach(loadGlobal);
 const Game = global.Game;
 const regions = Game.reg.all('region');
 const golden = JSON.parse(read('tests/golden/exploration-v3.json'));
@@ -251,17 +247,15 @@ assert.deepEqual(
 
 /* Fog, collection, readiness, completion and dynamic expedition stability. */
 const systemsBox = makeSandbox([
-  'js/core/utils.js',
-  'js/core/eventbus.js',
-  'js/core/registry.js',
+  ...PRODUCTION_CONTENT_FILES,
   'js/data/formulas.js',
-  'js/data/regions.js',
   'js/systems/terrain.js',
   'js/systems/terrain_v3.js',
   'js/systems/exploration.js',
   'js/systems/expedition.js'
 ]);
 const G = systemsBox.Game;
+G.content.finalize({ strict: true });
 const grass = G.reg.get('region', 'grassland');
 const explorationLayout = G.terrain.generate(grass, 424242, 3);
 G.terrain.mount(explorationLayout, grass);
@@ -490,15 +484,13 @@ Bubble.clear();
 assert.deepEqual(Array.from(Bubble.active()), []);
 
 const offlineBox = makeSandbox([
-  'js/core/utils.js',
-  'js/core/eventbus.js',
-  'js/core/registry.js',
+  ...PRODUCTION_CONTENT_FILES,
   'js/data/formulas.js',
-  'js/data/regions.js',
-  'js/data/monsters.js',
+  'js/systems/world_population.js',
   'js/systems/offline.js'
 ]);
 const O = offlineBox.Game;
+O.content.finalize({ strict: true });
 let offlineDiscoveries = { resources: {} };
 let offlineCoverage = 0;
 O.entryState = 'playing';

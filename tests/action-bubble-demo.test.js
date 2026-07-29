@@ -8,7 +8,6 @@ const { spawn } = require('node:child_process');
 
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const BASE = process.env.FIRPG_URL || 'http://127.0.0.1:4176/';
-const port = 9700 + Math.floor(Math.random() * 200);
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'firpg-bubble-cdp-'));
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -22,6 +21,19 @@ async function waitJson(url, attempts = 80) {
     await delay(50);
   }
   throw last || new Error('Chrome debugging endpoint did not start');
+}
+
+async function waitDevToolsPort(attempts = 100) {
+  const activePort = path.join(profile, 'DevToolsActivePort');
+  let last;
+  for (let index = 0; index < attempts; index++) {
+    try {
+      const port = Number(fs.readFileSync(activePort, 'utf8').split(/\r?\n/)[0]);
+      if (Number.isInteger(port) && port > 0) return port;
+    } catch (error) { last = error; }
+    await delay(50);
+  }
+  throw last || new Error('Chrome did not publish DevToolsActivePort');
 }
 
 class Cdp {
@@ -93,10 +105,11 @@ class Cdp {
 async function run() {
   const chrome = spawn(CHROME, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--disable-default-apps',
-    '--remote-allow-origins=*', '--remote-debugging-port=' + port,
+    '--remote-allow-origins=*', '--remote-debugging-port=0',
     '--user-data-dir=' + profile, 'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
   try {
+    const port = await waitDevToolsPort();
     const targets = await waitJson('http://127.0.0.1:' + port + '/json/list');
     const page = targets.find((target) => target.type === 'page');
     assert.ok(page, 'Chrome page target exists');
@@ -165,10 +178,10 @@ async function run() {
     })()`);
 
     assert.equal(diagnostics.catalog.complete, true);
-    assert.equal(diagnostics.catalog.actorCount, 28);
+    assert.equal(diagnostics.catalog.actorCount, 29);
     assert.equal(diagnostics.catalog.classCount, 5);
     assert.equal(diagnostics.catalog.monsterCount, 24);
-    assert.equal(diagnostics.catalog.encounterCount, 16);
+    assert.equal(diagnostics.catalog.encounterCount, 18);
     assert.match(diagnostics.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.ok(diagnostics.combatPresentation.adapter.records.some((record) =>
       ['combat:hit', 'combat:miss', 'combat:healed', 'combat:shielded'].includes(record.eventType)));

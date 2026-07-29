@@ -8,7 +8,7 @@
   }
   Game.content.registerPack({
     id: 'job.cleric', version: '2.0.0', schemaVersion: 1,
-    sourceFile: 'js/data/packs/jobs/cleric.js',
+    sourceFile: 'js/data/packs/jobs/cleric.pack.js',
     requires: [{ id: 'core.combat', range: '^2.0.0' }],
     definitions: {
       statProfile: [{ id: 'stats.cleric', schemaVersion: 1, stats: {} }],

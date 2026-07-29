@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadProductionContent } = require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 global.window = global;
@@ -12,13 +13,10 @@ function load(file) {
   vm.runInThisContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file });
 }
 
-load('js/core/utils.js');
-load('js/core/eventbus.js');
-load('js/core/registry.js');
+loadProductionContent(load, global);
 Game.assets = {
   sprite() { return { w: 20, h: 24, frames: {} }; }
 };
-load('js/data/regions.js');
 load('js/systems/terrain.js');
 load('js/systems/terrain_v3.js');
 load('js/vendor/easystar-0.4.4.min.js');

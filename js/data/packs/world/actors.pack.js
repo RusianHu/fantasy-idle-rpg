@@ -3,7 +3,7 @@
   var Game = window.Game;
   Game.content.registerPack({
     id: 'world.actors', version: '2.0.0', schemaVersion: 1,
-    sourceFile: 'js/data/packs/world/actors.js',
+    sourceFile: 'js/data/packs/world/actors.pack.js',
     requires: [
       { id: 'core.combat', range: '^2.0.0' },
       { id: 'job.fighter', range: '^2.0.0' },

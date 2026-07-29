@@ -8,7 +8,10 @@
     'resourceProfile', 'faction', 'combatRules', 'renderProfile',
     'actorArchetype', 'class', 'equipmentProfile', 'talentTree', 'talent',
     'ability', 'trait', 'status', 'aiProfile', 'tacticsProfile',
-    'evaluationProfile', 'rewardProfile', 'encounterProfile'
+    'evaluationProfile', 'rewardProfile', 'encounterProfile',
+    'actorVariant', 'encounterPack', 'worldSpawnProfile',
+    'worldPopulationProfile', 'regionProfile', 'engagementPolicy',
+    'interactionProfile'
   ];
 
   var required = {
@@ -26,7 +29,14 @@
     aiProfile: ['id', 'priorities'],
     tacticsProfile: ['id', 'reactionDelayTicks'],
     rewardProfile: ['id'],
-    encounterProfile: ['id', 'regionId', 'rulesProfileId', 'packs']
+    encounterProfile: ['id', 'regionId', 'rulesProfileId'],
+    actorVariant: ['id', 'archetypeId', 'overrides'],
+    encounterPack: ['id', 'members'],
+    worldSpawnProfile: ['id', 'identity', 'mountTo', 'placement', 'lifecycle'],
+    worldPopulationProfile: ['id', 'regionId', 'channels'],
+    regionProfile: ['id', 'tier', 'populationProfileId'],
+    engagementPolicy: ['id', 'manualAttack', 'autoAggro'],
+    interactionProfile: ['id', 'actions']
   };
 
   var references = {
@@ -38,7 +48,8 @@
       resourceProfileIds: 'resourceProfile', abilityGrantIds: 'ability',
       traitIds: 'trait', resistanceProfileId: 'resistanceProfile',
       aiProfileId: 'aiProfile', rewardProfileId: 'rewardProfile',
-      renderProfileId: 'renderProfile'
+      renderProfileId: 'renderProfile', interactionProfileId: 'interactionProfile',
+      engagementPolicyId: 'engagementPolicy'
     },
     class: {
       statProfileId: 'statProfile', resourceProfileIds: 'resourceProfile',
@@ -50,13 +61,18 @@
     talentTree: { talentIds: 'talent' },
     talent: { classId: 'class', abilityIds: 'ability', traitIds: 'trait' },
     trait: { statusIds: 'status', abilityIds: 'ability' },
-    encounterProfile: { rulesProfileId: 'combatRules', bossEncounterId: 'encounterProfile' }
+    encounterProfile: { rulesProfileId: 'combatRules', bossEncounterId: 'encounterProfile' },
+    actorVariant: { archetypeId: 'actorArchetype' },
+    worldPopulationProfile: { regionId: 'regionProfile' },
+    regionProfile: { populationProfileId: 'worldPopulationProfile' }
   };
 
   var defaults = {
     actorArchetype: {
       schemaVersion: 1, rank: 'normal', tags: [], resourceProfileIds: [],
-      abilityGrantIds: [], traitIds: []
+      abilityGrantIds: [], traitIds: [],
+      interactionProfileId: 'interaction.protected-npc',
+      engagementPolicyId: 'engagement.protected'
     },
     class: {
       schemaVersion: 1, tags: [], roles: [], resourceProfileIds: [],
@@ -79,8 +95,36 @@
       tags: [], modifiers: [], periodic: [], presentation: {}
     },
     encounterProfile: {
-      schemaVersion: 1, packs: [], phaseRules: [], presentation: {}
-    }
+      schemaVersion: 1, packs: [], phaseRules: [], presentation: {},
+      teamSlots: [], relationMatrix: {}, objectives: [],
+      completionPolicy: { mode: 'allRequired' }
+    },
+    actorVariant: {
+      schemaVersion: 1, overrides: {}, transitions: [], tags: []
+    },
+    encounterPack: {
+      schemaVersion: 1, members: [], formation: { spacing: 22 },
+      leashRadius: 120, rewardBudget: 1, groupAlert: true
+    },
+    worldSpawnProfile: {
+      schemaVersion: 1, mountTo: [], identity: { scope: 'ephemeral' },
+      placement: { selector: 'candidate', source: 'spawnCandidates', required: false, onFailure: 'skipOptional' },
+      lifecycle: {
+        activation: 'regionActive', unload: 'despawn', onDefeat: 'closeLease',
+        onEscape: 'closeLease', respawn: { mode: 'delay', delay: 8, resetVariant: true }
+      },
+      offlineEligible: false
+    },
+    worldPopulationProfile: {
+      schemaVersion: 1, flags: {}, channels: {}, baseSpawnRefs: {},
+      offlineEligible: true
+    },
+    regionProfile: { schemaVersion: 1, flags: {} },
+    engagementPolicy: {
+      schemaVersion: 1, manualAttack: false, autoAggro: false,
+      groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
+    },
+    interactionProfile: { schemaVersion: 1, actions: [] }
   };
 
   Game.contentSchemas = {
@@ -90,6 +134,8 @@
     defaults: defaults,
     stableId: /^[a-z][A-Za-z0-9_.:-]*$/,
     categories: ['player', 'monster', 'npc', 'companion', 'summon', 'object'],
-    relations: ['self', 'ally', 'neutral', 'hostile']
+    relations: ['self', 'ally', 'neutral', 'hostile'],
+    populationChannels: ['regular', 'rare', 'guardian', 'npc', 'boss'],
+    objectiveTypes: ['eliminate', 'survive', 'protect', 'surrender', 'escape', 'timeout', 'custom']
   };
 })();

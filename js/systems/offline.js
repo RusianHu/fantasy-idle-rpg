@@ -27,14 +27,12 @@
 
       var region = reg.get('region', Game.state.world.region) ||
         reg.get('region', Game.State.regionOrder()[0]);
-      var m1 = reg.get('monster', region.monsters[0]);
-      var m2 = reg.get('monster', region.monsters[1] || region.monsters[0]);
       var tier = Game.State.regionTier(region.id);
-      var s1 = F.monsterStats(tier, m1.mods, false);
-      var s2 = F.monsterStats(tier, m2.mods, false);
-      var mHp = (s1.hp + s2.hp) / 2;
-      var mExp = (s1.exp + s2.exp) / 2;
-      var mGold = (s1.gold + s2.gold) / 2;
+      var population = Game.population && Game.population.offlineSummary(region.id, tier);
+      if (!population) return null;
+      var mHp = population.hp;
+      var mExp = population.exp;
+      var mGold = population.gold;
 
       var estimate = Game.combatEstimator && Game.combatEstimator.evaluateCurrent
         ? Game.combatEstimator.evaluateCurrent({

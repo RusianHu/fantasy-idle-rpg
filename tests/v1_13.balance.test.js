@@ -4,21 +4,20 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadProductionContent } = require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 global.window = global;
-for (const file of [
-  'js/core/utils.js',
-  'js/core/eventbus.js',
-  'js/core/registry.js',
-  'js/data/formulas.js',
-  'js/data/classes.js',
-  'js/data/regions.js',
-  'js/systems/terrain.js',
-  'js/systems/terrain_v3.js'
-]) {
+function load(file) {
   vm.runInThisContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file });
 }
+loadProductionContent(load, global);
+[
+  'js/data/formulas.js',
+  'js/data/classes.js',
+  'js/systems/terrain.js',
+  'js/systems/terrain_v3.js'
+].forEach(load);
 
 const regions = Game.reg.all('region');
 const classes = Game.reg.all('class');

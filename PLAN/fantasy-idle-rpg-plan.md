@@ -11,8 +11,9 @@
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
   - 单位状态边界固定为：`ActorRecord` 持久化 HP 且同一 Record 最多绑定一个存活 `ActorInstance`，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取轻量 Vitals/完整诊断快照，或提交伤害、治疗、死亡/复活、Modifier source 替换与无损重算。刷新保留同 ID 资源、SpawnSpec、Status 与外部 Modifier；禁止从旧派生值和实时组件拼接状态或直接修改 Ledger。
   - 正式内容为 5 职业、30 Talent、24 怪物、16 EncounterProfile；普通 pack 1–3 敌人，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
-  - 存档当前为 v13，只持久化 Roster、经济、背包、世界（含 `RoutePlan`）、设置和战术；Encounter、RNG、威胁、冷却、预警、状态与护盾不入档。离线、自动养成和战力比较复用同内容 fingerprint 下的 `CombatEstimator` 摘要。
-  - `tech-demos/units` 为 Actor / Deterministic Combat Lab；正式入口、Lab、地图演示和 Node 审计读取同一 Pack 清单。
+  - 存档当前为 v14，只持久化 Roster、经济、背包、世界（含 `RoutePlan` 与白名单化 `world.social`）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、RNG、威胁、冷却、预警、状态与护盾不入档。离线、自动养成和战力比较复用同内容 fingerprint 下的 `CombatEstimator` 摘要。
+  - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
+  - `tech-demos/units` 为 Actor / Deterministic Combat Lab；正式入口、Lab、地图演示与生成器审计只加载同一个确定性 `content.generated.js`，Node 工具从 `*.pack.js` / `*.support.js` 文件系统真源独立校验产物。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）
@@ -188,6 +189,7 @@
   - **开放探索持久化（v11）**：按区域保存迷雾 bitset、地标/资源/奇物/生态图鉴、采集计数、威胁冷却、远征周期和当前远征变化层；v10→v11 保留全部角色养成、经济、路线、Boss 首杀、结局与失守状态，并只将布局升级为 v3。迷雾损坏或尺寸不符时仅重置对应区域探索状态。
   - **Actor / Combat 持久化（v12+）**：持久层只保存 Roster/ActorRecord、经济、背包、世界、设置与 Tactics；ActorInstance、Encounter、RNG、威胁、施法、冷却、charge、预警、状态和护盾均为瞬态。v1–v11 逐版本迁移，旧技能投资按稳定 ID 转为 Talent；下线内容优雅降级并退款，读档从合法脱战状态恢复。
   - **区域路线持久化与兼容（v13）**：`world.routePlan` 是路线拓扑真源，`world.regionOrder` 作为现有推进系统的主线兼容投影继续入档；重载、离线回归、导出/导入后顺序不得变化。v12→v13 从已有顺序编译 `RoutePlan`，不读取新档随机化开关；更早旧档先按原迁移规则得到经典/既有顺序。读档去除重复/已下线区域、按注册顺序补入新区域，并清理无效 excursion。
+  - **世界生态持久化（v14）**：`world.social` 只保存声明持久化的世界 Spawn Variant，以及按 `spawnId/socialGroupId/factionId` 索引的 Relation/声望记忆；读取时按当前 WorldSpawnProfile、ActorVariant、Faction 与绝对 `worldTime` 白名单清理。ActorInstance ID、SpawnLease、spawn generation、EngagementCommand、临时 Relation override、Encounter 与事件序号均不入档；v13→v14 只补空社交层，不改变 RoutePlan、区域推进、离线摘要或布局。
 
   ## 标题存档门厅（必须）
   - 每次启动先停留在无遮挡的标题营地观景态，通过明确的「点击进入」打开公会「远征档案」；档案提供 ≥44px 的返回观景入口。已有角色不得直接进入世界；选择档案前冻结主循环、世界时间、离线结算和自动存档，避免预览阶段覆盖原时间戳。
@@ -230,7 +232,9 @@
   ## 模块化 / 插件化架构（当前基础与未来扩展）
   - **核心原则：引擎与内容分离，内容即数据**。引擎代码不写死任何具体区域/怪物/装备/技能，只面向「注册表 + 稳定字符串
   ID」编程。
-  - **当前内容编译器与注册表**：正式战斗内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义和条目，由编译器统一执行 schema/default、引用图、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。区域、怪物、Action、Talent、Status、Trait、AI、资源、阵营和 EncounterProfile 分层存放于 `js/data/packs/`，`js/data/packs/manifest.js` 是权威文件集合。由于项目支持 `file://` 顺序脚本，新增 Pack 还必须同步正式入口、Actor / Combat Lab 与世界现场的脚本标签；`tests/v2-content-entrypoints.test.js` 保证三者与 manifest 一致。生成器审计只读取区域与 v3 地形模块，不消费战斗 Pack。
+  - **当前内容编译器与注册表**：正式内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义、Pack-local 中英文与条目，由编译器统一执行 schema/default、引用图、反向 Population 挂载、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。`js/data/packs/**/*.pack.js` 与 `*.support.js` 是文件系统真源；Support 只获得声明的 `authoring.read/write`、`rules.formula/handler` 能力，并通过版本化 `Game.contentAuthoring` 注册值或纯 factory，注册期/安装期改写其他 `Game` 表面均使构建失败。构建器在独立源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring、locales、挂载视图、fingerprint 和 `sourceSetHash`。`js/data/content/*.generated.js` 只是确定性校验/运行产物，禁止手改；正式入口和三个技术演示均只加载一个当前 `BUILD_ID` 的 `content.generated.js`，新增内容不修改 HTML 或手写清单。
+  - **Actor 与世界生态合同**：ActorArchetype/Variant、Interaction/Engagement、EncounterPack、WorldSpawnProfile、WorldPopulationProfile 与 RegionProfile 使用稳定 ID 串成完整反向引用链。Population 决定通道和数量，并以不可变 `PopulationMountPlan` 按固定 channel 顺序完成槽位选择、坐标预留、放置失败与 delay/worldTime 重生调度；SpawnProfile 决定身份、放置与生命周期，EncounterPack 只描述可复用成员组。稳定 Spawn 使用 SpawnLease/generation，召唤使用确定性 ephemeral request key。外部攻击先入 EngagementCommand，并在固定 tick 通过 `EngagementDraft → CommitPlan → Game.encounters.startAtomic()` 原子提交 Variant、Relation、社交记忆、Encounter、join、target、ordinal 与 revision；完整 outbox 顺序为 `variant* → relation → started → joined* → committed`，提交后 opening Action 仍走正式 `requestAction()`。目标 DSL、多队伍/coalition、observer、投降/逃跑、奖励授权与版本化确定性 custom handler 统一由 Objective evaluator 决定。
+  - **单位作者入口**：新增单位以独立 `*.pack.js` 内容胶囊注册，通过 `WorldSpawnProfile.mountTo` 反向挂载 Population，不修改区域、引擎、HTML 或手写清单；Pack-local 中英文、内容引用与正式资产必须通过严格编译审计，生成产物禁止手改。
   - **Modifier / Status / Talent 合同**：内容 Modifier 必须显式声明已注册 `stat`、合法 `phase`、`operation` 与有限数值；`add/addPct` 按层线性累加，`multiply` 按层幂次相乘，`set` 不随层放大。`refresh/unique` 只允许一层，`stack` 声明正整数上限，周期效果按实例层数执行。Talent patch 只能指向已注册 Ability/Status 的现有数值路径，非法 stat、phase、operation、成本、层数、周期或 patch 在严格审计时阻止启动。
   - **事件总线（EventBus）**：引擎在关键节点广播事件（`monster:killed`、`player:levelup`、`item:dropped`、
   `boss:defeated`、`region:unlocked`、`save:before` 等）；成就、任务、统计等系统一律实现为事件监听器，与战斗核心解耦；
@@ -253,10 +257,10 @@
 
   ## 国际化 i18n（必须，首发中英双语）
   - 首发支持 **简体中文（zh-CN，默认语言）+ 英文（en）** 两种语言；架构上按「可随时新增语言包」设计，但本期不做其他语言。
-  - **全部用户可见文本走 `t(key)` 翻译函数**，禁止在逻辑/UI 代码中硬编码文案；语言包按语言一文件存放（如
-  `i18n/zh-CN.js`、`i18n/en.js`），以嵌套 key 组织（如 `ui.tab.battle`、`monster.slime_green.name`）。
+  - **全部用户可见文本走 `t(key)` 翻译函数**，禁止在逻辑/UI 代码中硬编码文案；核心 UI 语言包按语言一文件存放（如
+  `i18n/zh-CN.js`、`i18n/en.js`），内容译文由定义它的 Pack 以 Pack-local `locales` 同时提供中英文，编译后汇入同一查询层。
   - **内容文本同样走 key**：注册表条目（怪物/区域/装备/技能/成就）中不直接写名称与描述，只写文本
-  key（或按约定由 ID 自动推导 key），译文统一放语言包——新增语言时只需新增一个语言包文件，符合插件化原则。
+  key（或按约定由 ID 自动推导 key）；Pack locale 只允许提供本 Pack 实际引用的 key，缺中/英、冲突文本、越权或未使用 key 均由严格审计拒绝。
   - **语言切换**：设置面板内提供切换项，选择持久化到 localStorage，切换后即时刷新界面文案，无需重载页面（UI
   渲染层监听 `locale:changed` 事件重绘即可）。
   - **回退策略**：缺失译文时按 `en → zh-CN → 直接显示 key` 逐级回退，保证漏译不出现空白或报错。
@@ -277,4 +281,4 @@
   - 数值需自洽：给出一份简短的数值设计说明（升级曲线、DPS 与区域怪物血量的匹配关系、离线收益公式）。
   - **世界交互回归**：`tests/v1_11.test.js` 必须链接旧回归，并覆盖 800 张采集节点布局、掉落概率与保底、物品校验矩阵、合法位移、冷却/离线、兑换域、AI 次序、自动回营、动态交易域及 v8→v9；浏览器覆盖 390×844 中英文、44px 触控、减少动态效果，以及拾取/采集/宝箱/交易/用药/回营全链路。
   - **开放探索回归**：`tests/v1_13.test.js` 覆盖八区 1,600 张完整 v3 布局、5,000 个拓扑模糊种子、黄金摘要、硬阻挡、视线、迷雾、准备度、远征稳定性、离线情报边界和资产来源；`tests/v1_13.balance.test.js` 覆盖五职业各 100 种子与三种 AI 策略。浏览器覆盖 390×700、390×844、522×1320、桌面、中英文、点触/键盘、减少动态效果、关闭环境特效和性能指标。
-  - **Actor / Combat V2 回归**：内容 schema/引用/i18n/资产/fingerprint、v1→v13 迁移、RoutePlan 编排/旧顺序保持/插图恢复、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、事件到攻击表现桥接、五职业各 10 分钟、八 Boss phase、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 必须通过。Lab 必须并排记录 CombatEvent、PresentationEvent 与位移/接敌诊断，并验证双方肖像来源、非空像素和容器边界；浏览器覆盖正式 Combat HUD 中英文/44px 触控、Actor/Combat Lab、地图演示、存档重开和无横向溢出。
+  - **Actor / Combat V2 与生态回归**：内容自动发现/双 VM/schema/引用/Pack-local i18n/资产/fingerprint、v1→v14 迁移、RoutePlan/社交记忆清理、Population/SpawnLease/generation、Engagement 原子回滚与事件 outbox、方向性 Relation、持久 Variant、多阵营 Objective 与奖励授权、固定 tick/RNG、Action/Effect/Status/Threat/Encounter、charge/channel、脚点防重叠、事件到攻击表现桥接、16 个正式 Encounter 新旧结果差分、五职业各 10 分钟、八 Boss phase、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 必须通过。Lab 必须并排记录 external command、objective evaluation、Variant cleanup、CombatEvent、PresentationEvent 与位移/接敌诊断；浏览器覆盖正式 Combat HUD、三个技术演示、移动/桌面中英文、44px 触控、中立 Observe/Attack 二次确认、固定 tick Engagement 闭环、存档重开和无横向溢出。

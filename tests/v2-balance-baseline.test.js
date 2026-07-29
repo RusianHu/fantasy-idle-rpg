@@ -35,14 +35,14 @@ function load(file) { vm.runInContext(read(file), sandbox, { filename: file }); 
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
   'js/sprites/props.js', 'js/sprites/exploration_v3.js',
-  'js/data/packs/manifest.js'
+  'js/core/content/support.js', 'js/data/content/content.generated.js'
 ].forEach(load);
-sandbox.Game.CONTENT_PACK_FILES.forEach(load);
 const Game = sandbox.Game;
 Game.content.finalize({ strict: true });
 [
   'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
-  'js/systems/actors/actors.js', 'js/systems/encounters.js',
+  'js/systems/actors/actors.js', 'js/systems/world_population.js',
+  'js/systems/encounters.js', 'js/systems/engagement.js',
   'js/systems/combat_ai.js', 'js/systems/combat.js',
   'js/systems/combat_estimator.js'
 ].forEach(load);

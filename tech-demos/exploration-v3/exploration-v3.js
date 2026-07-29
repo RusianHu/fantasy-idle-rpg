@@ -11,6 +11,7 @@
   var latest = null;
   var latestRoute = null;
 
+  Game.content.finalize({ strict: true });
   D.init();
   Game.i18n.setLocale(D.locale());
   Game.state = { settings: { expeditionStrategy: 'balanced' } };
@@ -224,6 +225,9 @@
     var report = Game.terrain.validate(latest, region);
     var elapsed = performance.now() - started;
     latestRoute = simulateLongRoute(latest);
+    var regionProfile = Game.content.get('regionProfile', region.id);
+    var population = regionProfile &&
+      Game.content.populationView(regionProfile.populationProfileId);
     renderMetrics(Object.assign({
       generateMs: elapsed.toFixed(1),
       valid: report.valid,
@@ -259,6 +263,26 @@
         curios: latest.curios.map(function (item) { return item.defId; }),
         ecology: latest.ecology.map(function (item) { return item.defId; }),
         guardian: latest.guardian.defId
+      },
+      population: population && {
+        id: population.id,
+        sourceFingerprint: population.sourceFingerprint,
+        channels: Object.keys(population.channels).sort().reduce(function (out, channel) {
+          out[channel] = {
+            capacity: population.channels[channel].capacity,
+            selection: population.channels[channel].selection,
+            spawnProfiles: population.channels[channel].spawnRefs.map(function (entry) {
+              var profile = Game.content.get('worldSpawnProfile', entry.profileId);
+              return {
+                id: entry.profileId,
+                mode: entry.mode,
+                identity: profile && profile.identity,
+                placement: profile && profile.placement
+              };
+            })
+          };
+          return out;
+        }, {})
       }
     }, null, 2);
     if (location.protocol !== 'file:') {

@@ -9,6 +9,7 @@
   var root = null;
   var deferredToasts = [];
 
+  Game.ui = Game.ui || {};
   var M = Game.ui.modals = {
     init: function () {
       root = document.getElementById('modal-root');
@@ -110,6 +111,67 @@
       var api = M.show(c, { dismissable: false });
       no.addEventListener('click', function () { api.close(); if (onCancel) onCancel(); });
       yes.addEventListener('click', function () { api.close(); if (onOk) onOk(); });
+    },
+
+    actorActions: function (actor, handlers) {
+      if (!actor || !actor.blueprint) return null;
+      handlers = handlers || {};
+      var archetype = Game.content.get('actorArchetype', actor.blueprint.archetypeId);
+      var interactionId = actor.blueprint.resolvedProfiles.interactionProfileId;
+      var profile = interactionId && Game.content.get('interactionProfile', interactionId);
+      if (!archetype || !profile || !(profile.actions || []).length) return null;
+      var t = Game.i18n.t;
+      var name = t(archetype.identity.nameKey);
+      var descriptionKey = archetype.identity.loreKey || archetype.identity.descKey;
+      var c = U.el('div', 'actor-actions');
+      var heading = U.el('h3', '');
+      heading.textContent = t('ui.actorActionsTitle', { name: name });
+      c.appendChild(heading);
+      if (descriptionKey) {
+        var body = U.el('div', 'modal-body actor-action-description');
+        body.textContent = t(descriptionKey);
+        c.appendChild(body);
+      }
+      var list = U.el('div', 'actor-action-list');
+      c.appendChild(list);
+      var api = M.show(c);
+      (profile.actions || []).forEach(function (action) {
+        if (action.kind !== 'inspect' && action.kind !== 'attack') return;
+        var labelKey = action.kind === 'attack' ? 'ui.actorAttack' : 'ui.actorObserve';
+        var button = U.el('button',
+          'btn actor-action-btn' + (action.kind === 'attack' ? ' danger' : ''));
+        button.type = 'button';
+        button.setAttribute('aria-label', t(labelKey));
+        var icon = U.el('canvas', 'actor-action-icon');
+        icon.width = 18;
+        icon.height = 18;
+        button.appendChild(icon);
+        var label = U.el('span', 'actor-action-label');
+        label.textContent = t(labelKey);
+        button.appendChild(label);
+        Game.assets.drawToDom(
+          icon,
+          action.kind === 'attack' ? 'icon_skill_strike' : 'icon_nav_map',
+          'icon'
+        );
+        button.addEventListener('click', function () {
+          api.close();
+          if (action.kind === 'inspect') {
+            if (handlers.observe) handlers.observe(actor);
+            return;
+          }
+          var submit = function () {
+            if (handlers.attack) handlers.attack(actor);
+          };
+          if (action.requiresConfirmation) {
+            M.confirm(t('ui.actorAttackConfirm', { name: name }), submit);
+          } else {
+            submit();
+          }
+        });
+        list.appendChild(button);
+      });
+      return api;
     },
 
     toast: function (msg, cls, life) {

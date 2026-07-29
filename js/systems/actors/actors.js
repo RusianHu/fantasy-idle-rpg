@@ -25,7 +25,7 @@
 
   function presentationFor(archetype, blueprint) {
     var classDef = blueprint.classId && Game.content.get('class', blueprint.classId);
-    var base = archetype.presentation || {};
+    var base = blueprint.resolvedPresentation || archetype.presentation || {};
     var overlay = classDef && classDef.presentation || {};
     return {
       spriteId: overlay.spriteId || base.spriteId,
@@ -238,43 +238,62 @@
   }
 
   function defineCompatibility(instance) {
-    var c = instance.components;
     Object.defineProperties(instance, {
-      x: { enumerable: true, get: function () { return c.transform.x; }, set: function (v) { c.transform.x = v; } },
-      y: { enumerable: true, get: function () { return c.transform.y; }, set: function (v) { c.transform.y = v; } },
-      dir: { enumerable: true, get: function () { return c.transform.direction; }, set: function (v) { c.transform.direction = v; } },
+      x: { enumerable: true, get: function () { return instance.components.transform.x; }, set: function (v) { instance.components.transform.x = v; } },
+      y: { enumerable: true, get: function () { return instance.components.transform.y; }, set: function (v) { instance.components.transform.y = v; } },
+      dir: { enumerable: true, get: function () { return instance.components.transform.direction; }, set: function (v) { instance.components.transform.direction = v; } },
       hp: {
         enumerable: true,
-        get: function () { return c.vitals ? c.vitals.hp : undefined; },
+        get: function () { return instance.components.vitals ? instance.components.vitals.hp : undefined; },
         set: function (v) {
-          if (!c.vitals) return;
+          if (!instance.components.vitals) return;
           if (Game.units) Game.units.setHp(instance, v, { source: 'compat' });
-          else c.vitals.hp = v;
+          else instance.components.vitals.hp = v;
         }
       },
       maxHp: {
         enumerable: true,
-        get: function () { return c.vitals ? c.vitals.maxHp : undefined; },
+        get: function () { return instance.components.vitals ? instance.components.vitals.maxHp : undefined; },
         set: function (v) {
-          if (!c.vitals) return;
+          if (!instance.components.vitals) return;
           if (Game.units) Game.units.overrideMaxHp(instance, v, {
             hpPolicy: 'preserveAbsolute', source: 'compat'
           });
-          else c.vitals.maxHp = Math.max(1, Number(v) || 1);
+          else instance.components.vitals.maxHp = Math.max(1, Number(v) || 1);
         }
       },
       state: {
         enumerable: true,
-        get: function () { return c.presentation.state; },
-        set: function (v) { c.presentation.state = v; }
+        get: function () { return instance.components.presentation.state; },
+        set: function (v) { instance.components.presentation.state = v; }
       },
-      sprite: { enumerable: true, get: function () { return c.presentation.spriteId; }, set: function (v) { c.presentation.spriteId = v; } }
+      sprite: { enumerable: true, get: function () { return instance.components.presentation.spriteId; }, set: function (v) { instance.components.presentation.spriteId = v; } }
     });
     ['animT', 'animF', 'flash', 'lungeT'].forEach(function (key) {
       Object.defineProperty(instance, key, {
         enumerable: true,
-        get: function () { return c.presentation[key]; },
-        set: function (value) { c.presentation[key] = value; }
+        get: function () { return instance.components.presentation[key]; },
+        set: function (value) { instance.components.presentation[key] = value; }
+      });
+    });
+  }
+
+  function bindRuntimeState(instance) {
+    var keys = [
+      'blueprintKey', 'blueprint', 'variantId', 'buildSpec', 'category', 'rank',
+      'components', 'tags', 'abilities', 'traits'
+    ];
+    var runtimeState = {};
+    keys.forEach(function (key) { runtimeState[key] = instance[key]; });
+    instance.runtimeState = runtimeState;
+    instance.runtimeRevision = 0;
+    keys.forEach(function (key) {
+      delete instance[key];
+      Object.defineProperty(instance, key, {
+        enumerable: true,
+        configurable: false,
+        get: function () { return instance.runtimeState[key]; },
+        set: function (value) { instance.runtimeState[key] = value; }
       });
     });
   }
@@ -377,6 +396,208 @@
     return vitals;
   }
 
+  function transitionEdge(actor, toVariantId, opts) {
+    var fromVariantId = actor.variantId || null;
+    var edges = [];
+    Game.content.all('actorVariant').forEach(function (variant) {
+      if (variant.archetypeId !== actor.blueprint.archetypeId) return;
+      (variant.transitions || []).forEach(function (edge) {
+        if ((edge.from || null) === fromVariantId && edge.to === toVariantId &&
+            (!opts.triggerId || edge.triggerId === opts.triggerId)) edges.push(edge);
+      });
+    });
+    if (edges.length) return edges[0];
+    return opts.internal ? {
+      timing: actor.encounterId ? 'cleanup' : 'outOfEncounter',
+      activeAction: 'defer', persistence: 'none', triggerId: opts.triggerId || 'internal'
+    } : null;
+  }
+
+  function effectsContainCombo(effects, out) {
+    (effects || []).forEach(function (effect) {
+      if (effect.type === 'setCombo' && effect.comboId) out[effect.comboId] = true;
+      effectsContainCombo(effect.effects, out);
+      effectsContainCombo(effect.then, out);
+      effectsContainCombo(effect.else, out);
+    });
+  }
+
+  function runtimeAbility(state, abilityId) {
+    return state.components.runtimeContent &&
+      state.components.runtimeContent.abilities[abilityId] || Game.content.get('ability', abilityId);
+  }
+
+  function blueprintCapabilities(state) {
+    var abilityIds = {};
+    var groupIds = { gcd: true };
+    var comboIds = {};
+    (state.abilities || []).forEach(function (abilityId) {
+      abilityIds[abilityId] = true;
+      var ability = runtimeAbility(state, abilityId);
+      if (!ability) return;
+      if (ability.timing && ability.timing.sharedCooldownGroup) {
+        groupIds[ability.timing.sharedCooldownGroup] = true;
+      }
+      effectsContainCombo(ability.effects, comboIds);
+    });
+    return { abilityIds: abilityIds, groupIds: groupIds, comboIds: comboIds };
+  }
+
+  function buildVariantRuntime(actor, toVariantId, edge) {
+    var record = actor.actorRecordId && Game.roster && Game.roster.getRecord(actor.actorRecordId);
+    var buildSpec = clone(actor.buildSpec);
+    buildSpec.variantId = toVariantId;
+    var blueprint = Game.content.compileBlueprint({
+      archetypeId: actor.blueprint.archetypeId,
+      classId: record && record.classId || buildSpec.classId || null,
+      variantId: toVariantId
+    });
+    var archetype = Game.content.get('actorArchetype', blueprint.archetypeId);
+    var presentation = presentationFor(archetype, blueprint);
+    var components = {};
+    Object.keys(actor.components).forEach(function (key) {
+      if (key !== 'statBlock' && key !== 'modifierLedger') components[key] = clone(actor.components[key]);
+    });
+    components.presentation.spriteId = presentation.spriteId;
+    components.presentation.portraitId = presentation.portraitId;
+    components.presentation.scale = presentation.scale;
+    components.body = clone(blueprint.resolvedBody || archetype.body);
+    components.statBlock = modifierLedger(baseStats(blueprint, Object.assign({}, buildSpec, {
+      level: actor.level, tier: actor.tier
+    }), record));
+    components.modifierLedger = components.statBlock;
+    components.runtimeContent = buildRuntimeContent(blueprint, record, buildSpec);
+    applyBuildModifiers(components, blueprint, record, buildSpec);
+
+    var external = actor.components.modifierLedger.snapshot().entries.filter(function (entry) {
+      return !/^(trait|talent|spawn):/.test(entry.sourceId) &&
+        !(actor.components.statuses || []).some(function (status) { return status.id === entry.sourceId; });
+    });
+    external.forEach(function (entry) { components.modifierLedger.add(entry); });
+    components.statuses = (actor.components.statuses || []).filter(function (status) {
+      var definition = Game.content.get('status', status.statusId || status.definitionId);
+      return definition && !definition.removeOnVariantChange;
+    }).map(clone);
+    applyStatusModifiers(components);
+
+    var nextResources = resourceComponents(blueprint);
+    Object.keys(nextResources).forEach(function (resourceId) {
+      var previous = actor.components.resources && actor.components.resources[resourceId];
+      if (!previous) return;
+      nextResources[resourceId].value = Game.util.clamp(previous.value,
+        nextResources[resourceId].min, nextResources[resourceId].max);
+      nextResources[resourceId].reserved = Game.util.clamp(previous.reserved || 0,
+        0, nextResources[resourceId].value);
+    });
+    components.resources = nextResources;
+    if (!components.actionState) {
+      components.actionState = {
+        state: 'idle', actionId: null, abilityId: null, targetIds: [], startedTick: 0,
+        resolvesTick: 0, channelStartedTick: 0, recoveryUntilTick: 0,
+        reserved: [], reservedCharge: null, queued: null
+      };
+      components.cooldowns = { abilities: {}, groups: {}, charges: {} };
+      components.comboState = { id: null, step: 0, expiresTick: 0, markedTargetId: null };
+      components.targeting = { currentTargetId: null, priorityTargetId: null };
+    }
+
+    var beforeMax = Math.max(1, actor.components.vitals && actor.components.vitals.maxHp || 1);
+    var beforeHp = actor.components.vitals && actor.components.vitals.hp || 0;
+    var nextMax = Math.max(1, components.statBlock.value('maxHp'));
+    components.vitals = {
+      hp: actor.components.vitals
+        ? Game.util.clamp(beforeHp / beforeMax * nextMax, 0, nextMax)
+        : nextMax,
+      maxHp: nextMax,
+      shields: clone(actor.components.vitals && actor.components.vitals.shields || [])
+    };
+
+    var state = {
+      blueprintKey: blueprint.key, blueprint: blueprint, variantId: blueprint.variantId,
+      buildSpec: buildSpec, category: archetype.category, rank: archetype.rank,
+      components: components, tags: blueprint.resolvedTags.slice(),
+      abilities: blueprint.resolvedAbilityGrants.slice(), traits: blueprint.resolvedTraits.slice()
+    };
+    var capabilities = blueprintCapabilities(state);
+    var previousCooldowns = actor.components.cooldowns || { abilities: {}, groups: {}, charges: {} };
+    components.cooldowns = { abilities: {}, groups: {}, charges: {} };
+    Object.keys(previousCooldowns.abilities || {}).forEach(function (abilityId) {
+      if (capabilities.abilityIds[abilityId]) components.cooldowns.abilities[abilityId] = previousCooldowns.abilities[abilityId];
+    });
+    Object.keys(previousCooldowns.groups || {}).forEach(function (groupId) {
+      if (capabilities.groupIds[groupId]) components.cooldowns.groups[groupId] = previousCooldowns.groups[groupId];
+    });
+    Object.keys(previousCooldowns.charges || {}).forEach(function (abilityId) {
+      if (!capabilities.abilityIds[abilityId]) return;
+      var ability = runtimeAbility(state, abilityId);
+      var maximum = ability && ability.timing && ability.timing.charges | 0;
+      if (!maximum) return;
+      var charge = clone(previousCooldowns.charges[abilityId]);
+      charge.max = maximum;
+      charge.current = Game.util.clamp(charge.current, 0, maximum);
+      if (charge.current >= maximum) charge.nextChargeTick = 0;
+      components.cooldowns.charges[abilityId] = charge;
+    });
+    if (components.comboState && components.comboState.id &&
+        !capabilities.comboIds[components.comboState.id]) {
+      components.comboState = { id: null, step: 0, expiresTick: 0, markedTargetId: null };
+    }
+    if (edge.activeAction === 'cancel' && components.actionState &&
+        components.actionState.state !== 'idle' && components.actionState.state !== 'defeated') {
+      (components.actionState.reserved || []).forEach(function (cost) {
+        var resource = components.resources[cost.resourceId];
+        if (resource) resource.reserved = Math.max(0, resource.reserved - cost.amount);
+      });
+      components.actionState = Object.assign({}, components.actionState, {
+        state: 'idle', actionId: null, abilityId: null, targetIds: [], reserved: [],
+        reservedCharge: null, queued: null
+      });
+    }
+    var statValues = components.modifierLedger.snapshot().values;
+    Object.keys(statValues).forEach(function (id) {
+      if (!Number.isFinite(statValues[id])) throw new Error('non-finite stat: ' + id);
+    });
+    return state;
+  }
+
+  function prepareVariantTransition(actor, toVariantId, opts) {
+    opts = opts || {};
+    if (!actor) return { ok: false, reason: 'missing-actor' };
+    var targetVariant = Game.content.get('actorVariant', toVariantId);
+    if (!targetVariant || targetVariant.archetypeId !== actor.blueprint.archetypeId) {
+      return { ok: false, reason: 'variant-archetype' };
+    }
+    var edge = transitionEdge(actor, toVariantId, opts);
+    if (!edge) return { ok: false, reason: 'transition-edge' };
+    var actionState = actor.components.actionState;
+    if (actionState && actionState.state !== 'idle' && actionState.state !== 'defeated' &&
+        edge.activeAction === 'defer') return { ok: false, reason: 'active-action-defer' };
+    try {
+      var nextRuntimeState = buildVariantRuntime(actor, toVariantId, edge);
+      return {
+        ok: true,
+        draft: {
+          actorId: actor.id,
+          expectedRuntimeRevision: actor.runtimeRevision,
+          oldRuntimeState: actor.runtimeState,
+          nextRuntimeState: nextRuntimeState,
+          oldVariantId: actor.variantId || null,
+          newVariantId: toVariantId,
+          edge: clone(edge),
+          summary: {
+            hpRatio: nextRuntimeState.components.vitals.hp /
+              Math.max(1, nextRuntimeState.components.vitals.maxHp),
+            resources: Object.keys(nextRuntimeState.components.resources || {}).sort(),
+            statusesRemoved: (actor.components.statuses || []).length -
+              (nextRuntimeState.components.statuses || []).length
+          }
+        }
+      };
+    } catch (error) {
+      return { ok: false, reason: 'transition-prepare', error: error };
+    }
+  }
+
   var A = Game.actors = {
     spawn: function (spec) {
       spec = spec || {};
@@ -394,7 +615,7 @@
       var blueprint = Game.content.compileBlueprint({
         archetypeId: archetypeId,
         classId: record && record.classId || spec.classId || null,
-        variantId: spec.variantId || null
+        variantId: record && record.variantId || spec.variantId || null
       });
       var id = uniqueId(spec);
       if (instances[id]) throw new Error('[Actors] duplicate instance: ' + id);
@@ -403,7 +624,7 @@
       var buildSpec = {
         archetypeId: archetypeId,
         classId: record && record.classId || spec.classId || null,
-        variantId: spec.variantId || null,
+        variantId: record && record.variantId || spec.variantId || null,
         statValues: clone(spec.statValues || {}),
         modifiers: clone(spec.modifiers || []),
         talentRanks: clone(spec.talentRanks || {})
@@ -417,7 +638,7 @@
           y: spec.transform && Number(spec.transform.y) || 0,
           direction: spec.transform && spec.transform.direction || 'd'
         },
-        body: clone(archetype.body),
+        body: clone(blueprint.resolvedBody || archetype.body),
         statBlock: modifierLedger(stats),
         modifierLedger: null,
         presentation: {
@@ -460,6 +681,7 @@
         id: id,
         blueprintKey: blueprint.key,
         blueprint: blueprint,
+        variantId: blueprint.variantId,
         actorRecordId: record && record.id || null,
         level: record && record.level || Math.max(1, spec.level | 0 || 1),
         tier: Math.max(1, spec.tier | 0 || 1),
@@ -500,6 +722,7 @@
       instance.wy = 0;
       instance.engaged = false;
       instance.dots = [];
+      bindRuntimeState(instance);
       defineCompatibility(instance);
       if (components.vitals && components.vitals.hp <= 0) {
         instance.lifecycle = 'defeated';
@@ -532,7 +755,9 @@
       opts = opts || {};
       var actor = instances[id];
       if (!actor) return null;
-      var record = actor.actorRecordId && Game.roster.getRecord(actor.actorRecordId);
+      var record = actor.actorRecordId && Game.roster &&
+        Game.roster.getRecord(actor.actorRecordId);
+      var hadVitals = !!actor.components.vitals;
       var beforeMax = actor.components.vitals && actor.components.vitals.maxHp || 0;
       var beforeHp = actor.components.vitals && actor.components.vitals.hp || 0;
       var previousEntries = actor.components.modifierLedger.snapshot().entries;
@@ -545,6 +770,7 @@
         variantId: buildSpec.variantId || null
       });
       actor.blueprintKey = actor.blueprint.key;
+      actor.variantId = actor.blueprint.variantId;
       actor.abilities = actor.blueprint.resolvedAbilityGrants.slice();
       actor.traits = actor.blueprint.resolvedTraits.slice();
       if (record) actor.level = record.level;
@@ -556,6 +782,7 @@
       actor.components.presentation.spriteId = actorPresentation.spriteId;
       actor.components.presentation.portraitId = actorPresentation.portraitId;
       actor.components.presentation.scale = actorPresentation.scale;
+      actor.components.body = clone(actor.blueprint.resolvedBody || archetype.body);
       actor.components.statBlock = modifierLedger(stats);
       actor.components.modifierLedger = actor.components.statBlock;
       actor.components.runtimeContent = buildRuntimeContent(actor.blueprint, record, buildSpec);
@@ -581,7 +808,17 @@
       });
       actor.components.movement.speed = actor.components.statBlock.value('moveSpeed');
 
-      if (!actor.components.actionState && actor.blueprint.resolvedAbilityGrants.length) {
+      var combatCapable = !!actor.blueprint.resolvedProfiles.statProfileId &&
+        (actor.blueprint.resolvedAbilityGrants.length > 0 || archetype.category === 'player');
+      if (!actor.components.actionState && combatCapable) {
+        var initialMaxHp = Math.max(1, actor.components.statBlock.value('maxHp'));
+        actor.components.vitals = {
+          hp: Number.isFinite(opts.hp)
+            ? Game.util.clamp(opts.hp, 0, initialMaxHp)
+            : initialMaxHp,
+          maxHp: initialMaxHp,
+          shields: []
+        };
         actor.components.resources = resourceComponents(actor.blueprint);
         actor.components.actionState = {
           state: 'idle', actionId: null, abilityId: null, targetIds: [], startedTick: 0,
@@ -606,7 +843,7 @@
         });
         actor.components.resources = rebuiltResources;
       }
-      if (actor.components.vitals) {
+      if (hadVitals && actor.components.vitals) {
         reconcileVitals(actor, {
           beforeMax: beforeMax,
           beforeHp: beforeHp,
@@ -615,6 +852,169 @@
         });
       }
       return actor;
+    },
+    prepareVariantTransition: function (id, toVariantId, opts) {
+      return prepareVariantTransition(instances[id], toVariantId, opts || {});
+    },
+
+    commitPreparedVariant: function (draft, opts) {
+      opts = opts || {};
+      var actor = draft && instances[draft.actorId];
+      if (!actor || actor.runtimeRevision !== draft.expectedRuntimeRevision ||
+          actor.runtimeState !== draft.oldRuntimeState) {
+        return { ok: false, reason: 'runtime-revision' };
+      }
+      var record = actor.actorRecordId && Game.roster && Game.roster.getRecord(actor.actorRecordId);
+      var oldRecordVariant = record && record.variantId || null;
+      var social = Game.state && Game.state.world && Game.state.world.social;
+      var hadSpawnVariant = !!(social && actor.spawnId &&
+        Object.prototype.hasOwnProperty.call(social.spawnVariants, actor.spawnId));
+      var oldSpawnVariant = hadSpawnVariant ? social.spawnVariants[actor.spawnId] : null;
+      try {
+        if (draft.edge.activeAction === 'cancel' && actor.encounterId && Game.combat &&
+            actor.components.actionState && actor.components.actionState.actionId) {
+          Game.combat.cancelAction(actor.id, 'variant-change');
+        }
+        actor.runtimeState = draft.nextRuntimeState;
+        actor.runtimeRevision++;
+        if (draft.edge.persistence === 'actorRecord' && record) {
+          record.variantId = draft.newVariantId;
+        } else if (draft.edge.persistence === 'worldSpawn' && actor.spawnId && social) {
+          social.spawnVariants[actor.spawnId] = draft.newVariantId;
+        }
+        if (!opts.silent && Game.bus) Game.bus.emit('actor:variantChanged', {
+          actorId: actor.id, oldVariantId: draft.oldVariantId,
+          newVariantId: draft.newVariantId,
+          triggerId: draft.edge.triggerId, summary: clone(draft.summary)
+        });
+        return {
+          ok: true, oldVariantId: draft.oldVariantId,
+          newVariantId: draft.newVariantId, summary: clone(draft.summary),
+          runtimeRevision: actor.runtimeRevision
+        };
+      } catch (error) {
+        actor.runtimeState = draft.oldRuntimeState;
+        actor.runtimeRevision = draft.expectedRuntimeRevision;
+        if (record) record.variantId = oldRecordVariant;
+        if (social && actor.spawnId) {
+          if (hadSpawnVariant) social.spawnVariants[actor.spawnId] = oldSpawnVariant;
+          else delete social.spawnVariants[actor.spawnId];
+        }
+        return { ok: false, reason: 'transition-rollback', error: error };
+      }
+    },
+
+    transitionVariant: function (id, toVariantId, opts) {
+      opts = opts || {};
+      var actor = instances[id];
+      if (!actor) return { ok: false, reason: 'missing-actor' };
+      var edge = transitionEdge(actor, toVariantId, opts);
+      if (!edge) return { ok: false, reason: 'transition-edge' };
+      if (actor.encounterId && !opts.fromCleanup) {
+        var encounter = Game.encounters && Game.encounters.get(actor.encounterId);
+        if (!encounter || edge.timing !== 'cleanup') return { ok: false, reason: 'transition-timing' };
+        Game.encounters.schedule(encounter.id, {
+          dueTick: encounter.tick, phase: 'cleanup', kind: 'variantTransition',
+          actorId: actor.id, toVariantId: toVariantId, triggerId: edge.triggerId,
+          activeAction: edge.activeAction, persistence: edge.persistence
+        });
+        return {
+          ok: true, scheduled: true,
+          fromVariantId: actor.variantId || null, toVariantId: toVariantId
+        };
+      }
+      var prepared = prepareVariantTransition(actor, toVariantId, opts);
+      return prepared.ok ? A.commitPreparedVariant(prepared.draft, opts) : prepared;
+    },
+    captureTransactionState: function (id) {
+      var actor = instances[id];
+      if (!actor) return null;
+      var componentState = {};
+      Object.keys(actor.components).forEach(function (key) {
+        if (key === 'statBlock' || key === 'modifierLedger') return;
+        componentState[key] = clone(actor.components[key]);
+      });
+      var record = actor.actorRecordId && Game.roster &&
+        Game.roster.getRecord(actor.actorRecordId);
+      return {
+        actorId: actor.id,
+        runtimeRevision: actor.runtimeRevision,
+        buildSpec: clone(actor.buildSpec),
+        components: componentState,
+        modifierEntries: actor.components.modifierLedger.snapshot().entries,
+        encounterId: actor.encounterId,
+        teamId: actor.teamId,
+        targetId: actor.target && actor.target.id || null,
+        engaged: !!actor.engaged,
+        manualTarget: !!actor.manualTarget,
+        moveOrder: clone(actor.moveOrder),
+        interactOrder: clone(actor.interactOrder),
+        lifecycle: actor.lifecycle,
+        dead: !!actor.dead,
+        record: record ? {
+          variantId: record.variantId || null,
+          persistentResources: clone(record.persistentResources || {})
+        } : null
+      };
+    },
+    restoreTransactionState: function (snapshot) {
+      var actor = snapshot && instances[snapshot.actorId];
+      if (!actor) return false;
+      var record = actor.actorRecordId && Game.roster &&
+        Game.roster.getRecord(actor.actorRecordId);
+      if (record && snapshot.record) {
+        record.variantId = snapshot.record.variantId || null;
+        record.persistentResources = clone(snapshot.record.persistentResources || {});
+      }
+      actor.buildSpec = clone(snapshot.buildSpec);
+      actor.blueprint = Game.content.compileBlueprint({
+        archetypeId: actor.buildSpec.archetypeId,
+        classId: actor.buildSpec.classId || null,
+        variantId: actor.buildSpec.variantId || null
+      });
+      actor.blueprintKey = actor.blueprint.key;
+      actor.variantId = actor.blueprint.variantId;
+      actor.abilities = actor.blueprint.resolvedAbilityGrants.slice();
+      actor.traits = actor.blueprint.resolvedTraits.slice();
+      actor.tags = actor.blueprint.resolvedTags.slice();
+      var archetype = Game.content.get('actorArchetype', actor.blueprint.archetypeId);
+      actor.category = archetype.category;
+      actor.rank = archetype.rank;
+      actor.kind = archetype.category === 'player' ? 'hero'
+        : (archetype.category === 'monster' || archetype.category === 'summon'
+          ? 'monster' : 'actor');
+      actor.mid = archetype.category === 'monster' ? archetype.id : null;
+      actor.boss = archetype.rank === 'boss';
+
+      Object.keys(actor.components).forEach(function (key) {
+        if (key !== 'statBlock' && key !== 'modifierLedger' &&
+            !Object.prototype.hasOwnProperty.call(snapshot.components, key)) {
+          delete actor.components[key];
+        }
+      });
+      Object.keys(snapshot.components).forEach(function (key) {
+        actor.components[key] = clone(snapshot.components[key]);
+      });
+      var stats = baseStats(actor.blueprint, Object.assign({}, actor.buildSpec, {
+        level: actor.level, tier: actor.tier
+      }), record);
+      var ledger = modifierLedger(stats);
+      (snapshot.modifierEntries || []).forEach(function (entry) {
+        ledger.add(clone(entry));
+      });
+      actor.components.statBlock = ledger;
+      actor.components.modifierLedger = ledger;
+      actor.encounterId = snapshot.encounterId || null;
+      actor.teamId = snapshot.teamId || null;
+      actor.target = snapshot.targetId ? instances[snapshot.targetId] || null : null;
+      actor.engaged = !!snapshot.engaged;
+      actor.manualTarget = !!snapshot.manualTarget;
+      actor.moveOrder = clone(snapshot.moveOrder);
+      actor.interactOrder = clone(snapshot.interactOrder);
+      actor.lifecycle = snapshot.lifecycle;
+      actor.dead = !!snapshot.dead;
+      actor.runtimeRevision = snapshot.runtimeRevision || 0;
+      return true;
     },
     query: function (filter) {
       filter = filter || {};
@@ -642,7 +1042,8 @@
       var actor = instances[id];
       if (!actor) return null;
       var out = {
-        id: actor.id, blueprintKey: actor.blueprintKey, actorRecordId: actor.actorRecordId,
+        id: actor.id, blueprintKey: actor.blueprintKey, variantId: actor.variantId,
+        runtimeRevision: actor.runtimeRevision, actorRecordId: actor.actorRecordId,
         level: actor.level, tier: actor.tier, partyId: actor.partyId, teamId: actor.teamId,
         factionId: actor.factionId, controllerId: actor.controllerId,
         encounterId: actor.encounterId, lifecycle: actor.lifecycle,

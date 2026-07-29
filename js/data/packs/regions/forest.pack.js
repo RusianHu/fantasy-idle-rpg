@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  Game.content.registerPack(Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  Game.content.registerPack(Game.contentAuthoring.factory('region.pack')({
     regionId: 'forest', factionId: 'forest_guardians',
-    sourceFile: 'js/data/packs/regions/forest.js',
+    sourceFile: 'js/data/packs/regions/forest.pack.js',
     statuses: [
       {
         id: 'forest.poisoned', stacking: 'stack', maxStacks: 4, durationTicks: 160,

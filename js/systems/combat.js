@@ -11,6 +11,10 @@
     return !!(actor && actor.components.vitals && actor.components.vitals.hp > 0 &&
       actor.components.actionState && actor.components.actionState.state !== 'defeated');
   }
+  function targetable(encounter, actor) {
+    var participant = encounter && actor && encounter.participantStates[actor.id];
+    return !participant || participant.role !== 'observer';
+  }
   function emit(encounter, type, spec) {
     return Game.encounters.log(encounter.id, Object.assign({ type: type }, spec || {}));
   }
@@ -144,7 +148,8 @@
     if (spec.relation === 'self') return [source];
     var relation = spec.relation || 'hostile';
     var candidates = encounter.participants.map(Game.actors.get).filter(function (target) {
-      return alive(target) && Game.relations.resolve(source.id, target.id, encounter.id) === relation;
+      return alive(target) && targetable(encounter, target) &&
+        Game.relations.resolve(source.id, target.id, encounter.id) === relation;
     });
     candidates = candidates.filter(function (target) {
       var hpRatio = target.hp / Math.max(1, target.maxHp);
@@ -555,6 +560,7 @@
           ? primaryTarget
           : encounter.participants.map(Game.actors.get).filter(function (actor) {
               return alive(actor) &&
+                targetable(encounter, actor) &&
                 Game.relations.resolve(source.id, actor.id, encounter.id) === 'hostile';
             }).sort(function (a, b) {
               return distance(source, a) - distance(source, b) || a.id.localeCompare(b.id);
@@ -954,6 +960,17 @@
     } else if (item.kind === 'restoreTeam') {
       var teamActor = Game.actors.get(item.actorId);
       if (teamActor) teamActor.teamId = item.teamId;
+    } else if (item.kind === 'variantTransition') {
+      var variantActor = Game.actors.get(item.actorId);
+      if (!variantActor) return;
+      var state = variantActor.components.actionState;
+      if (item.activeAction === 'defer' && state && state.state !== 'idle' && state.state !== 'defeated') {
+        Game.encounters.schedule(encounter.id, Object.assign({}, item, { dueTick: encounter.tick + 1 }));
+        return;
+      }
+      Game.actors.transitionVariant(item.actorId, item.toVariantId, {
+        triggerId: item.triggerId, fromCleanup: true
+      });
     }
   }
 
@@ -999,16 +1016,18 @@
     });
     Game.encounters.due(encounter.id, 'cleanup').forEach(function (item) { processCleanup(encounter, item); });
     phaseRules(encounter);
+    var objectiveState = Game.encounters.evaluateObjectives(encounter.id);
+    if (objectiveState && objectiveState.done) return;
     if (encounter.tick % (encounter.rules.aiIntervalTicks || 2) === 0) {
       actors.forEach(function (actor) {
         if (!alive(actor) || actor.components.actionState.state === 'casting' ||
-            actor.components.actionState.state === 'channeling') return;
+            actor.components.actionState.state === 'channeling' ||
+            !targetable(encounter, actor)) return;
         var intent = Game.combatAI.decide(encounter.id, actor.id);
         actor.components.movement.intent = intent && intent.type === 'move' ? intent : null;
         if (intent && intent.type === 'action') Game.combat.requestAction(intent);
       });
     }
-    Game.encounters.checkEnd(encounter.id);
   }
 
   var C = Game.combat = {
@@ -1021,7 +1040,8 @@
       if (!def || def.kind !== 'action') return { ok: false, reason: 'ability' };
       var target = Game.actors.get(command.targetId);
       if (def.target.relation === 'self') target = actor;
-      if (!target || !alive(target)) return { ok: false, reason: 'target' };
+      if (!target || !alive(target) ||
+          (target !== actor && !targetable(encounter, target))) return { ok: false, reason: 'target' };
       var relation = Game.relations.resolve(actor.id, target.id, encounter.id);
       if (def.target.relation !== 'self' && relation !== def.target.relation) return { ok: false, reason: 'relation' };
       var state = actor.components.actionState;
@@ -1165,13 +1185,14 @@
     },
     update: function (dt) {
       accumulatorMs += Math.max(0, dt) * 1000;
-      var active = Game.encounters.all().filter(function (encounter) { return encounter.lifecycle === 'active' && !encounter.context.estimator; });
-      if (!active.length) { accumulatorMs = Math.min(accumulatorMs, 50); return; }
-      var tickMs = active[0].rules.tickMs;
       var steps = 0;
-      while (accumulatorMs >= tickMs && steps < (active[0].rules.maxCatchupTicks || 20)) {
+      while (accumulatorMs >= 50 && steps < 20) {
+        if (Game.engagement) Game.engagement.advanceTick();
+        var active = Game.encounters.all().filter(function (encounter) {
+          return encounter.lifecycle === 'active' && !encounter.context.estimator;
+        });
         active.forEach(fixedTick);
-        accumulatorMs -= tickMs;
+        accumulatorMs -= 50;
         steps++;
       }
     },
@@ -1229,6 +1250,9 @@
       Game.inv.consumePotion({ source: 'auto' });
     },
     inspect: function (encounterId) { return Game.encounters.snapshot(encounterId); },
-    resetClock: function () { accumulatorMs = 0; }
+    resetClock: function () { accumulatorMs = 0; },
+    combatClockTick: function () {
+      return Game.engagement ? Game.engagement.clockTick() : 0;
+    }
   };
 })();

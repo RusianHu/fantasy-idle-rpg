@@ -26,13 +26,13 @@
   ].map(function (row) { return { id: row[0], schemaVersion: 1, category: row[1] }; });
   var factions = [
     'adventurers', 'wild', 'forest_guardians', 'mine_denizens', 'undead',
-    'frost_clans', 'infernal', 'ruin_guardians', 'demon_army'
+    'frost_clans', 'infernal', 'ruin_guardians', 'demon_army', 'wildlife'
   ].map(function (id) {
     var hostile = {};
     if (id === 'adventurers') {
       ['wild', 'forest_guardians', 'mine_denizens', 'undead', 'frost_clans', 'infernal', 'ruin_guardians', 'demon_army']
         .forEach(function (target) { hostile[target] = 'hostile'; });
-    } else {
+    } else if (id !== 'wildlife') {
       hostile.adventurers = 'hostile';
     }
     return { id: id, schemaVersion: 1, relations: hostile };
@@ -42,7 +42,7 @@
     id: 'core.combat',
     version: '2.0.0',
     schemaVersion: 1,
-    sourceFile: 'js/data/packs/rules/core.js',
+    sourceFile: 'js/data/packs/rules/core.pack.js',
     requires: [],
     definitions: {
       stat: statIds,
@@ -123,6 +123,28 @@
         { id: 'render.actor.standard', schemaVersion: 1, layer: 'actor', hpBar: true },
         { id: 'render.actor.npc', schemaVersion: 1, layer: 'actor', hpBar: false },
         { id: 'render.actor.object', schemaVersion: 1, layer: 'object', hpBar: true }
+      ],
+      interactionProfile: [
+        { id: 'interaction.hostile', actions: [{ id: 'attack', kind: 'attack', primary: true }] },
+        { id: 'interaction.protected-npc', actions: [{ id: 'talk', kind: 'talk', primary: true }] },
+        { id: 'interaction.attackable-neutral', actions: [
+          { id: 'observe', kind: 'inspect', primary: true },
+          { id: 'attack', kind: 'attack', requiresConfirmation: true }
+        ] }
+      ],
+      engagementPolicy: [
+        {
+          id: 'engagement.hostile', manualAttack: true, autoAggro: true,
+          groupPropagation: 'socialGroup', rewardEligible: true, memorySeconds: 180
+        },
+        {
+          id: 'engagement.protected', manualAttack: false, autoAggro: false,
+          groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
+        },
+        {
+          id: 'engagement.neutral-provokable', manualAttack: true, autoAggro: false,
+          groupPropagation: 'socialGroup', rewardEligible: false, memorySeconds: 180
+        }
       ],
       tacticsProfile: [
         {

@@ -13,6 +13,8 @@
   var fingerprint = null;
   var lastAudit = null;
   var blueprintCache = {};
+  var populationViews = {};
+  var reverseReferences = {};
 
   function issue(list, code, spec) {
     list.push(Game.contentAudit.issue(code, spec));
@@ -26,6 +28,272 @@
       if (S.definitionTypes.indexOf(type) < 0) issue(issues, 'unknown-definition-type', { packId: pack.id, type: type });
       if (!Array.isArray(pack.definitions[type])) issue(issues, 'definition-list', { packId: pack.id, type: type });
     });
+  }
+
+  function flattenLocale(value, prefix, out) {
+    out = out || {};
+    Object.keys(value || {}).forEach(function (key) {
+      var path = prefix ? prefix + '.' + key : key;
+      if (value[key] && typeof value[key] === 'object') flattenLocale(value[key], path, out);
+      else out[path] = String(value[key]);
+    });
+    return out;
+  }
+
+  function referencedLocaleKeys(pack) {
+    var keys = {};
+    function visit(value, field) {
+      if (Array.isArray(value)) return value.forEach(function (entry) { visit(entry, field); });
+      if (!value || typeof value !== 'object') {
+        if (typeof value === 'string' && /Key$/.test(field || '')) keys[value] = true;
+        return;
+      }
+      Object.keys(value).forEach(function (key) { visit(value[key], key); });
+    }
+    visit(pack.definitions || {}, 'definitions');
+    return keys;
+  }
+
+  function installPackLocales(sorted, issues) {
+    var owners = {};
+    sorted.forEach(function (pack) {
+      if (!pack.locales) return;
+      var refs = referencedLocaleKeys(pack);
+      ['zh-CN', 'en'].forEach(function (locale) {
+        if (!pack.locales[locale]) {
+          issue(issues, 'pack-locale-missing', { packId: pack.id, locale: locale });
+          return;
+        }
+        var flat = flattenLocale(pack.locales[locale], '', {});
+        Object.keys(flat).sort().forEach(function (key) {
+          if (!refs[key]) {
+            issue(issues, 'pack-locale-unreferenced', { packId: pack.id, locale: locale, ref: key });
+            return;
+          }
+          var existing = Game.i18n && Game.i18n.raw && Game.i18n.raw(locale, key);
+          if (existing !== undefined && existing !== flat[key]) {
+            issue(issues, 'pack-locale-conflict', {
+              packId: pack.id, locale: locale, ref: key, owner: owners[locale + '|' + key] || 'base'
+            });
+            return;
+          }
+          owners[locale + '|' + key] = pack.id;
+        });
+        if (Game.i18n && Game.i18n.addPack) Game.i18n.addPack(locale, pack.locales[locale]);
+      });
+    });
+  }
+
+  function refExists(definitions, targetType, id, type, def, path, issues) {
+    if (!id) return false;
+    if (!definitions[targetType] || !definitions[targetType][id]) {
+      issue(issues, 'missing-reference', {
+        type: type, id: def.id, path: path, refType: targetType, ref: id,
+        sourcePackId: def.sourcePackId, sourceFile: def.sourceFile
+      });
+      return false;
+    }
+    return true;
+  }
+
+  function unexpectedFields(value, allowed, type, def, path, issues) {
+    Object.keys(value || {}).forEach(function (field) {
+      if (allowed.indexOf(field) < 0) issue(issues, 'unknown-field', {
+        type: type, id: def.id, path: path + '.' + field
+      });
+    });
+  }
+
+  function positiveCount(value) {
+    if (Number.isInteger(value)) return value > 0;
+    return Array.isArray(value) && value.length === 2 &&
+      Number.isInteger(value[0]) && Number.isInteger(value[1]) &&
+      value[0] > 0 && value[1] >= value[0];
+  }
+
+  function validateAdvanced(type, def, definitions, issues) {
+    if (type === 'encounterProfile') {
+      var teamIds = {};
+      var objectiveIds = {};
+      (def.teamSlots || []).forEach(function (slot, index) {
+        if (!slot || !S.stableId.test(slot.id || '') || teamIds[slot.id]) issue(issues, 'encounter-team-slot', { type: type, id: def.id, path: 'teamSlots.' + index });
+        if (slot && ['combatant', 'objective', 'observer'].indexOf(slot.role) < 0) issue(issues, 'encounter-team-role', { type: type, id: def.id, path: 'teamSlots.' + index + '.role' });
+        if (slot) {
+          unexpectedFields(slot, ['id', 'role', 'coalitionId', 'countsForCompletion', 'rewardEligible'], type, def, 'teamSlots.' + index, issues);
+          if (typeof slot.countsForCompletion !== 'boolean' || typeof slot.rewardEligible !== 'boolean') {
+            issue(issues, 'encounter-team-flags', { type: type, id: def.id, path: 'teamSlots.' + index });
+          }
+          if (!S.stableId.test(slot.coalitionId || '')) issue(issues, 'encounter-coalition', { type: type, id: def.id, path: 'teamSlots.' + index + '.coalitionId' });
+        }
+        if (slot && slot.id) teamIds[slot.id] = true;
+      });
+      (def.objectives || []).forEach(function (objective, index) {
+        if (!objective || !S.stableId.test(objective.id || '') || objectiveIds[objective.id]) issue(issues, 'encounter-objective-id', { type: type, id: def.id, path: 'objectives.' + index + '.id' });
+        if (objective && objective.id) objectiveIds[objective.id] = true;
+        if (!objective || S.objectiveTypes.indexOf(objective.type) < 0) issue(issues, 'encounter-objective-type', { type: type, id: def.id, path: 'objectives.' + index + '.type' });
+        if (objective && objective.teamId && !teamIds[objective.teamId]) issue(issues, 'encounter-objective-team', { type: type, id: def.id, path: 'objectives.' + index + '.teamId', ref: objective.teamId });
+        if (objective && objective.tick !== undefined && (!Number.isInteger(objective.tick) || objective.tick < 0)) {
+          issue(issues, 'encounter-objective-tick', { type: type, id: def.id, path: 'objectives.' + index + '.tick' });
+        }
+        if (objective) {
+          unexpectedFields(objective, [
+            'id', 'type', 'required', 'actorId', 'teamId', 'coalitionId', 'tag',
+            'tick', 'minimum', 'handlerId', 'handlerVersion', 'params'
+          ], type, def, 'objectives.' + index, issues);
+          if (typeof objective.required !== 'boolean') issue(issues, 'encounter-objective-required', { type: type, id: def.id, path: 'objectives.' + index + '.required' });
+          if (objective.minimum !== undefined && (!Number.isInteger(objective.minimum) || objective.minimum < 1)) issue(issues, 'encounter-objective-minimum', { type: type, id: def.id, path: 'objectives.' + index + '.minimum' });
+          if (objective.type === 'custom') {
+            var handler = Game.rules && Game.rules.handler('objective', objective.handlerId);
+            if (!handler || handler.version !== objective.handlerVersion) issue(issues, 'encounter-objective-handler', {
+              type: type, id: def.id, path: 'objectives.' + index + '.handlerId', ref: objective.handlerId
+            });
+          } else if (objective.handlerId !== undefined || objective.handlerVersion !== undefined) {
+            issue(issues, 'encounter-objective-handler', { type: type, id: def.id, path: 'objectives.' + index });
+          }
+        }
+      });
+      unexpectedFields(def.completionPolicy || {}, ['mode'], type, def, 'completionPolicy', issues);
+      if (!def.completionPolicy || def.completionPolicy.mode !== 'allRequired') {
+        issue(issues, 'encounter-completion-policy', { type: type, id: def.id, path: 'completionPolicy.mode' });
+      }
+      if (!(def.objectives || []).some(function (objective) { return objective.required === true; })) {
+        issue(issues, 'encounter-required-objective', { type: type, id: def.id, path: 'objectives' });
+      }
+      Object.keys(def.relationMatrix || {}).forEach(function (sourceTeamId) {
+        if (!teamIds[sourceTeamId]) issue(issues, 'encounter-relation-team', { type: type, id: def.id, path: 'relationMatrix.' + sourceTeamId });
+        Object.keys(def.relationMatrix[sourceTeamId] || {}).forEach(function (targetTeamId) {
+          if (!teamIds[targetTeamId]) issue(issues, 'encounter-relation-team', { type: type, id: def.id, path: 'relationMatrix.' + sourceTeamId + '.' + targetTeamId });
+          if (S.relations.indexOf(def.relationMatrix[sourceTeamId][targetTeamId]) < 0 ||
+              def.relationMatrix[sourceTeamId][targetTeamId] === 'self') {
+            issue(issues, 'encounter-relation-value', { type: type, id: def.id, path: 'relationMatrix.' + sourceTeamId + '.' + targetTeamId });
+          }
+        });
+      });
+    }
+    if (type === 'actorVariant') {
+      var allowed = [
+        'statProfileId', 'resourceProfileIds', 'abilityGrantIds', 'traitIds',
+        'resistanceProfileId', 'aiProfileId', 'rewardProfileId', 'presentation',
+        'body', 'interactionProfileId', 'engagementPolicyId', 'tags'
+      ];
+      Object.keys(def.overrides || {}).forEach(function (key) {
+        if (allowed.indexOf(key) < 0) issue(issues, 'variant-override-field', { type: type, id: def.id, path: 'overrides.' + key });
+      });
+      var o = def.overrides || {};
+      [
+        ['statProfileId', 'statProfile'], ['resistanceProfileId', 'resistanceProfile'],
+        ['aiProfileId', 'aiProfile'], ['rewardProfileId', 'rewardProfile'],
+        ['interactionProfileId', 'interactionProfile'], ['engagementPolicyId', 'engagementPolicy']
+      ].forEach(function (entry) {
+        if (o[entry[0]]) refExists(definitions, entry[1], o[entry[0]], type, def, 'overrides.' + entry[0], issues);
+      });
+      [
+        ['resourceProfileIds', 'resourceProfile'], ['abilityGrantIds', 'ability'], ['traitIds', 'trait']
+      ].forEach(function (entry) {
+        (o[entry[0]] || []).forEach(function (id, index) {
+          refExists(definitions, entry[1], id, type, def, 'overrides.' + entry[0] + '.' + index, issues);
+        });
+      });
+      (def.transitions || []).forEach(function (edge, index) {
+        if (edge.from && edge.from !== def.id) issue(issues, 'variant-transition-from', { type: type, id: def.id, path: 'transitions.' + index + '.from' });
+        if (edge.to && refExists(definitions, 'actorVariant', edge.to, type, def, 'transitions.' + index + '.to', issues) &&
+            definitions.actorVariant[edge.to].archetypeId !== def.archetypeId) {
+          issue(issues, 'variant-transition-archetype', { type: type, id: def.id, path: 'transitions.' + index + '.to', ref: edge.to });
+        }
+        if (!edge.triggerId || !S.stableId.test(edge.triggerId)) issue(issues, 'variant-transition-trigger', { type: type, id: def.id, path: 'transitions.' + index + '.triggerId' });
+        if (['outOfEncounter', 'cleanup'].indexOf(edge.timing) < 0) issue(issues, 'variant-transition-timing', { type: type, id: def.id, path: 'transitions.' + index + '.timing' });
+        if (['defer', 'cancel'].indexOf(edge.activeAction) < 0) issue(issues, 'variant-transition-action', { type: type, id: def.id, path: 'transitions.' + index + '.activeAction' });
+        if (['none', 'actorRecord', 'worldSpawn'].indexOf(edge.persistence) < 0) issue(issues, 'variant-transition-persistence', { type: type, id: def.id, path: 'transitions.' + index + '.persistence' });
+      });
+    }
+    if (type === 'encounterPack') {
+      var slots = {};
+      (def.members || []).forEach(function (member, index) {
+        if (!member || !S.stableId.test(member.slotId || '') || slots[member.slotId]) {
+          issue(issues, slots[member && member.slotId] ? 'duplicate-member-slot' : 'member-slot', { type: type, id: def.id, path: 'members.' + index + '.slotId' });
+        }
+        if (member && member.slotId) slots[member.slotId] = true;
+        if (!member || !refExists(definitions, 'actorArchetype', member.archetypeId, type, def, 'members.' + index + '.archetypeId', issues)) return;
+        if (member.variantId && refExists(definitions, 'actorVariant', member.variantId, type, def, 'members.' + index + '.variantId', issues) &&
+            definitions.actorVariant[member.variantId].archetypeId !== member.archetypeId) {
+          issue(issues, 'variant-archetype', { type: type, id: def.id, path: 'members.' + index + '.variantId', ref: member.variantId });
+        }
+      });
+    }
+    if (type === 'worldSpawnProfile') {
+      var refCount = (def.actorRef ? 1 : 0) + (def.encounterPackId ? 1 : 0);
+      if (refCount !== 1) issue(issues, 'spawn-content-ref', { type: type, id: def.id, path: 'actorRef|encounterPackId' });
+      if (def.actorRef) {
+        refExists(definitions, 'actorArchetype', def.actorRef.archetypeId, type, def, 'actorRef.archetypeId', issues);
+        if (def.actorRef.variantId) refExists(definitions, 'actorVariant', def.actorRef.variantId, type, def, 'actorRef.variantId', issues);
+      }
+      if (def.encounterPackId) refExists(definitions, 'encounterPack', def.encounterPackId, type, def, 'encounterPackId', issues);
+      if (def.onProvokedVariantId) {
+        if (refExists(definitions, 'actorVariant', def.onProvokedVariantId, type, def, 'onProvokedVariantId', issues) &&
+            def.actorRef && definitions.actorVariant[def.onProvokedVariantId].archetypeId !== def.actorRef.archetypeId) {
+          issue(issues, 'spawn-provoked-archetype', { type: type, id: def.id, path: 'onProvokedVariantId', ref: def.onProvokedVariantId });
+        }
+      }
+      if (def.encounterPackIdOnProvoked) {
+        refExists(definitions, 'encounterPack', def.encounterPackIdOnProvoked, type, def,
+          'encounterPackIdOnProvoked', issues);
+      }
+      if ((def.onProvokedVariantId && !def.encounterPackIdOnProvoked) ||
+          (!def.onProvokedVariantId && def.encounterPackIdOnProvoked)) {
+        issue(issues, 'spawn-provoked-pair', { type: type, id: def.id, path: 'onProvokedVariantId|encounterPackIdOnProvoked' });
+      }
+      var scope = def.identity && def.identity.scope;
+      if (['ephemeral', 'regionStable', 'worldStable'].indexOf(scope) < 0) issue(issues, 'spawn-identity-scope', { type: type, id: def.id, path: 'identity.scope' });
+      if (scope === 'worldStable' && !(def.identity && def.identity.persistentKey)) issue(issues, 'spawn-persistent-key', { type: type, id: def.id, path: 'identity.persistentKey' });
+      var placement = def.placement || {};
+      unexpectedFields(placement, [
+        'selector', 'source', 'id', 'tag', 'offset', 'required', 'onFailure',
+        'minClearance', 'maxDanger', 'minCampDistance', 'occupancyRadius'
+      ], type, def, 'placement', issues);
+      if (['anchor', 'layoutEntity', 'candidate'].indexOf(placement.selector) < 0) issue(issues, 'spawn-placement-selector', { type: type, id: def.id, path: 'placement.selector' });
+      var sourcesBySelector = {
+        anchor: ['camp', 'bossPoint', 'summoner'],
+        layoutEntity: ['guardian', 'threat', 'landmark', 'ecology'],
+        candidate: ['spawnCandidates', 'corridorCandidates', 'walkableNav']
+      };
+      if (sourcesBySelector[placement.selector] && sourcesBySelector[placement.selector].indexOf(placement.source) < 0) issue(issues, 'spawn-placement-source', { type: type, id: def.id, path: 'placement.source', ref: placement.source });
+      if (typeof placement.required !== 'boolean' ||
+          (placement.required && ['rejectRegionMount', 'abortGroup'].indexOf(placement.onFailure) < 0) ||
+          (!placement.required && placement.onFailure !== 'skipOptional')) {
+        issue(issues, 'spawn-placement-failure', { type: type, id: def.id, path: 'placement.onFailure' });
+      }
+      if (placement.offset && (!Number.isFinite(placement.offset.x) || !Number.isFinite(placement.offset.y))) issue(issues, 'spawn-placement-offset', { type: type, id: def.id, path: 'placement.offset' });
+      ['minClearance', 'minCampDistance', 'occupancyRadius'].forEach(function (field) {
+        if (placement[field] !== undefined && (!Number.isFinite(placement[field]) || placement[field] < 0)) issue(issues, 'spawn-placement-number', { type: type, id: def.id, path: 'placement.' + field });
+      });
+      if (placement.maxDanger !== undefined && (!Number.isFinite(placement.maxDanger) || placement.maxDanger < 0 || placement.maxDanger > 1)) issue(issues, 'spawn-placement-number', { type: type, id: def.id, path: 'placement.maxDanger' });
+      var lifecycle = def.lifecycle || {};
+      unexpectedFields(lifecycle, ['activation', 'unload', 'onDefeat', 'onEscape', 'respawn'], type, def, 'lifecycle', issues);
+      if (['regionActive', 'bossRequested', 'scripted'].indexOf(lifecycle.activation) < 0 || lifecycle.unload !== 'despawn' || lifecycle.onDefeat !== 'closeLease' || lifecycle.onEscape !== 'closeLease') issue(issues, 'spawn-lifecycle', { type: type, id: def.id, path: 'lifecycle' });
+      var respawn = lifecycle.respawn || {};
+      unexpectedFields(respawn, ['mode', 'delay', 'resetVariant'], type, def, 'lifecycle.respawn', issues);
+      if (['none', 'delay', 'worldTime'].indexOf(respawn.mode) < 0 || typeof respawn.resetVariant !== 'boolean' ||
+          (respawn.mode !== 'none' && (!Number.isFinite(respawn.delay) || respawn.delay <= 0))) {
+        issue(issues, 'spawn-respawn', { type: type, id: def.id, path: 'lifecycle.respawn' });
+      }
+    }
+    if (type === 'worldPopulationProfile') {
+      Object.keys(def.channels || {}).forEach(function (channel) {
+        if (S.populationChannels.indexOf(channel) < 0) issue(issues, 'population-channel', { type: type, id: def.id, path: 'channels.' + channel });
+        var capacity = def.channels[channel] && def.channels[channel].capacity;
+        if (!Number.isInteger(capacity) || capacity < 0) issue(issues, 'population-capacity', { type: type, id: def.id, path: 'channels.' + channel + '.capacity' });
+      });
+    }
+    if (type === 'engagementPolicy') {
+      if (typeof def.manualAttack !== 'boolean' || typeof def.autoAggro !== 'boolean') issue(issues, 'engagement-policy-flags', { type: type, id: def.id });
+    }
+    if (type === 'interactionProfile') {
+      var actionIds = {};
+      (def.actions || []).forEach(function (action, index) {
+        if (!action || !S.stableId.test(action.id || '') || actionIds[action.id]) issue(issues, 'interaction-action', { type: type, id: def.id, path: 'actions.' + index });
+        if (action && action.id) actionIds[action.id] = true;
+      });
+    }
   }
 
   function valueAt(def, path) {
@@ -339,6 +607,13 @@
         validateEffectNumbers(type, def, effect, 'periodic.' + index, issues);
       });
     }
+    if (type === 'encounterProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'encounterPack') validateAdvanced(type, def, definitions, issues);
+    if (type === 'actorVariant') validateAdvanced(type, def, definitions, issues);
+    if (type === 'worldSpawnProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'worldPopulationProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'engagementPolicy') validateAdvanced(type, def, definitions, issues);
+    if (type === 'interactionProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'damageType' && ['physical', 'magic', 'true'].indexOf(def.category) < 0) {
       issue(issues, 'damage-category', { type: type, id: def.id, path: 'category' });
     }
@@ -362,6 +637,162 @@
         ref: def.presentation.spriteId, sourcePackId: def.sourcePackId, sourceFile: def.sourceFile
       });
     }
+  }
+
+  function countMinimum(value) {
+    if (Array.isArray(value)) return Math.max(0, value[0] | 0);
+    return Math.max(0, value | 0);
+  }
+
+  function buildPopulationViews(sorted, definitions, issues) {
+    var views = {};
+    var packOrder = {};
+    sorted.forEach(function (pack, index) { packOrder[pack.id] = index; });
+    Object.keys(definitions.worldPopulationProfile || {}).sort().forEach(function (id) {
+      var def = definitions.worldPopulationProfile[id];
+      var channels = {};
+      S.populationChannels.forEach(function (channel) {
+        var config = C.clone(def.channels[channel] || { capacity: 0 });
+        config.capacity = Math.max(0, config.capacity | 0);
+        config.spawnRefs = [];
+        (def.baseSpawnRefs && def.baseSpawnRefs[channel] || []).forEach(function (entry) {
+          var profileId = typeof entry === 'string' ? entry : entry.profileId;
+          if (!refExists(definitions, 'worldSpawnProfile', profileId, 'worldPopulationProfile', def,
+              'baseSpawnRefs.' + channel, issues)) return;
+          config.spawnRefs.push(C.merge({ profileId: profileId, mode: 'weighted', weight: 1 },
+            typeof entry === 'string' ? {} : entry));
+        });
+        channels[channel] = config;
+      });
+      views[id] = {
+        id: id, regionId: def.regionId, flags: C.clone(def.flags || {}),
+        channels: channels, offlineEligible: def.offlineEligible !== false,
+        offlineRepresentative: def.offlineRepresentative || null,
+        sourceFingerprint: null
+      };
+    });
+
+    var mounts = [];
+    Object.keys(definitions.worldSpawnProfile || {}).forEach(function (profileId) {
+      var profile = definitions.worldSpawnProfile[profileId];
+      (profile.mountTo || []).forEach(function (mount, index) {
+        mounts.push({ profile: profile, mount: mount, index: index });
+      });
+    });
+    mounts.sort(function (a, b) {
+      var pa = packOrder[a.profile.sourcePackId] || 0;
+      var pb = packOrder[b.profile.sourcePackId] || 0;
+      return pa - pb || a.profile.id.localeCompare(b.profile.id) || a.index - b.index;
+    });
+    var duplicate = {};
+    mounts.forEach(function (item) {
+      var profile = item.profile, mount = item.mount || {};
+      var view = views[mount.populationId];
+      var key = profile.id + '|' + mount.populationId + '|' + mount.channel;
+      if (duplicate[key]) issue(issues, 'duplicate-mount', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index });
+      duplicate[key] = true;
+      if (!view) {
+        issue(issues, 'missing-population', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.populationId', ref: mount.populationId });
+        return;
+      }
+      if (S.populationChannels.indexOf(mount.channel) < 0) {
+        issue(issues, 'mount-channel', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.channel', ref: mount.channel });
+        return;
+      }
+      if (['required', 'weighted'].indexOf(mount.mode) < 0) {
+        issue(issues, 'mount-mode', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.mode', ref: mount.mode });
+        return;
+      }
+      unexpectedFields(mount, [
+        'populationId', 'channel', 'mode', 'count', 'weight', 'maxCount',
+        'condition', 'priority'
+      ], 'worldSpawnProfile', profile, 'mountTo.' + item.index, issues);
+      if (mount.mode === 'required' && (!positiveCount(mount.count) ||
+          mount.weight !== undefined || mount.maxCount !== undefined)) {
+        issue(issues, 'mount-count', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.count' });
+      }
+      if (mount.mode === 'weighted' && ((!Number.isInteger(mount.weight) || mount.weight < 1) ||
+          mount.count !== undefined)) {
+        issue(issues, 'mount-weight', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.weight' });
+      }
+      if (mount.mode === 'weighted' && mount.maxCount !== undefined &&
+          (!Number.isInteger(mount.maxCount) || mount.maxCount < 1)) issue(issues, 'mount-max-count', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.maxCount' });
+      if (mount.priority !== undefined && !Number.isInteger(mount.priority)) issue(issues, 'mount-priority', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.priority' });
+      var condition = mount.condition || {};
+      Object.keys(condition).forEach(function (field) {
+        if (['minTier', 'maxTier', 'flags'].indexOf(field) < 0) issue(issues, 'mount-condition', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.condition.' + field });
+      });
+      ['minTier', 'maxTier'].forEach(function (field) {
+        if (condition[field] !== undefined && (!Number.isInteger(condition[field]) || condition[field] < 1)) issue(issues, 'mount-condition', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.condition.' + field });
+      });
+      if (condition.minTier !== undefined && condition.maxTier !== undefined && condition.minTier > condition.maxTier) issue(issues, 'mount-condition', { type: 'worldSpawnProfile', id: profile.id, path: 'mountTo.' + item.index + '.condition' });
+      var regionFlags = definitions.regionProfile && definitions.regionProfile[view.regionId] &&
+        definitions.regionProfile[view.regionId].flags || {};
+      Object.keys(condition.flags || {}).forEach(function (flag) {
+        if (typeof condition.flags[flag] !== 'boolean' ||
+            (!(flag in view.flags) && !(flag in regionFlags))) issue(issues, 'mount-condition-flag', {
+          type: 'worldSpawnProfile', id: profile.id,
+          path: 'mountTo.' + item.index + '.condition.flags.' + flag
+        });
+      });
+      view.channels[mount.channel].spawnRefs.push({
+        profileId: profile.id, mode: mount.mode,
+        count: C.clone(mount.count), weight: mount.weight,
+        maxCount: mount.maxCount, condition: C.clone(condition),
+        priority: mount.priority | 0, sourcePackId: profile.sourcePackId
+      });
+    });
+    Object.keys(views).forEach(function (id) {
+      S.populationChannels.forEach(function (channel) {
+        var config = views[id].channels[channel];
+        var minimum = config.spawnRefs.reduce(function (sum, entry) {
+          return sum + (entry.mode === 'required' ? countMinimum(entry.count) : 0);
+        }, 0);
+        if (minimum > config.capacity) issue(issues, 'population-required-capacity', { type: 'worldPopulationProfile', id: id, path: 'channels.' + channel, required: minimum, capacity: config.capacity });
+      });
+      views[id].sourceFingerprint = ('00000000' + Game.util.fnv1a(C.stableStringify(views[id]))).slice(-8);
+    });
+    return views;
+  }
+
+  function buildReverseReferences(definitions, views) {
+    var out = {};
+    function add(actorId, field, value) {
+      out[actorId] = out[actorId] || { actorId: actorId, variants: [], encounterPacks: [], worldSpawns: [], populations: [], regions: [] };
+      if (out[actorId][field].indexOf(value) < 0) out[actorId][field].push(value);
+    }
+    Object.keys(definitions.actorVariant || {}).forEach(function (id) { add(definitions.actorVariant[id].archetypeId, 'variants', id); });
+    Object.keys(definitions.encounterPack || {}).forEach(function (id) {
+      (definitions.encounterPack[id].members || []).forEach(function (member) { add(member.archetypeId, 'encounterPacks', id); });
+    });
+    Object.keys(definitions.worldSpawnProfile || {}).forEach(function (id) {
+      var spawn = definitions.worldSpawnProfile[id];
+      var actors = [];
+      if (spawn.actorRef) actors.push(spawn.actorRef.archetypeId);
+      if (spawn.encounterPackId && definitions.encounterPack[spawn.encounterPackId]) {
+        definitions.encounterPack[spawn.encounterPackId].members.forEach(function (member) { actors.push(member.archetypeId); });
+      }
+      actors.forEach(function (actorId) { add(actorId, 'worldSpawns', id); });
+    });
+    Object.keys(views || {}).forEach(function (populationId) {
+      var view = views[populationId];
+      S.populationChannels.forEach(function (channel) {
+        view.channels[channel].spawnRefs.forEach(function (entry) {
+          Object.keys(out).forEach(function (actorId) {
+            if (out[actorId].worldSpawns.indexOf(entry.profileId) >= 0) {
+              add(actorId, 'populations', populationId);
+              add(actorId, 'regions', view.regionId);
+            }
+          });
+        });
+      });
+    });
+    Object.keys(out).forEach(function (actorId) {
+      Object.keys(out[actorId]).forEach(function (field) {
+        if (Array.isArray(out[actorId][field])) out[actorId][field].sort();
+      });
+    });
+    return out;
   }
 
   function definitionIdentity(def) {
@@ -389,6 +820,7 @@
       var issues = [];
       packs.forEach(function (pack) { validatePack(pack, issues); });
       var sorted = C.topoSort(packs, issues);
+      installPackLocales(sorted, issues);
       S.definitionTypes.forEach(function (type) {
         compiled[type] = {};
         ordered[type] = [];
@@ -436,6 +868,8 @@
           collectRefs(type, compiled[type][id], compiled, issues);
         });
       });
+      populationViews = buildPopulationViews(sorted, compiled, issues);
+      reverseReferences = buildReverseReferences(compiled, populationViews);
 
       var abilityEdges = {};
       function collectAbilityEdges(effect, list) {
@@ -469,20 +903,65 @@
       }
       ordered.ability.forEach(function (id) { visitAbility(id, []); });
 
-      var canonical = sorted.map(function (pack) {
+      var variantEdges = {};
+      ordered.actorVariant.forEach(function (id) {
+        variantEdges[id] = (compiled.actorVariant[id].transitions || []).filter(function (edge) {
+          return edge.from && edge.to;
+        }).map(function (edge) { return edge.to; });
+      });
+      var visitingVariants = {}, visitedVariants = {};
+      function visitVariant(id, path) {
+        if (visitingVariants[id]) {
+          issue(issues, 'variant-transition-cycle', {
+            type: 'actorVariant', id: id, path: path.concat(id).join(' -> ')
+          });
+          return;
+        }
+        if (visitedVariants[id]) return;
+        visitingVariants[id] = true;
+        (variantEdges[id] || []).forEach(function (next) { visitVariant(next, path.concat(id)); });
+        visitingVariants[id] = false;
+        visitedVariants[id] = true;
+      }
+      ordered.actorVariant.forEach(function (id) { visitVariant(id, []); });
+
+      var persistentSpawnKeys = {};
+      ordered.worldSpawnProfile.forEach(function (id) {
+        var spawn = compiled.worldSpawnProfile[id];
+        if (!spawn.identity || spawn.identity.scope !== 'worldStable') return;
+        var key = spawn.identity.persistentKey;
+        if (persistentSpawnKeys[key]) {
+          issue(issues, 'spawn-persistent-key-conflict', {
+            type: 'worldSpawnProfile', id: id, path: 'identity.persistentKey', ref: key
+          });
+        }
+        persistentSpawnKeys[key] = id;
+      });
+
+      var canonicalPacks = sorted.map(function (pack) {
         return {
           id: pack.id, version: pack.version, schemaVersion: pack.schemaVersion,
+          locales: C.clone(pack.locales || {}),
           definitions: Object.keys(pack.definitions || {}).sort().reduce(function (acc, type) {
             acc[type] = (pack.definitions[type] || []).map(definitionIdentity);
             return acc;
           }, {})
         };
       });
+      var canonical = {
+        packs: canonicalPacks,
+        populationViews: populationViews,
+        rules: Game.rules && Game.rules.audit ? Game.rules.audit() : [],
+        authoring: Game.contentAuthoring && Game.contentAuthoring.audit
+          ? Game.contentAuthoring.audit() : []
+      };
       // Content fingerprints are a fixed-width public contract. Keep the
       // generic hash helper unchanged because save export checksums produced by
       // older builds used its unpadded form.
       fingerprint = ('00000000' + Game.util.fnv1a(C.stableStringify(canonical))).slice(-8);
       lastAudit = Game.contentAudit.summary(issues, sorted, compiled, fingerprint);
+      lastAudit.populationViews = C.clone(populationViews);
+      lastAudit.reverseReferences = C.clone(reverseReferences);
       if (opts.strict && !lastAudit.ok) {
         var message = lastAudit.issues.slice(0, 12).map(function (x) {
           return x.code + ':' + (x.type || x.packId || '') + ':' + (x.id || x.ref || '');
@@ -494,7 +973,31 @@
         C.deepFreeze(ordered[type]);
         C.deepFreeze(compiled[type]);
       });
+      Object.keys(populationViews).forEach(function (id) { C.deepFreeze(populationViews[id]); });
+      C.deepFreeze(populationViews);
+      Object.keys(reverseReferences).forEach(function (id) { C.deepFreeze(reverseReferences[id]); });
+      C.deepFreeze(reverseReferences);
       C.deepFreeze(compiled);
+      ordered.regionProfile.slice().sort(function (leftId, rightId) {
+        var left = compiled.regionProfile[leftId];
+        var right = compiled.regionProfile[rightId];
+        return left.tier - right.tier || leftId.localeCompare(rightId);
+      }).forEach(function (id) {
+        var regionDef = compiled.regionProfile[id];
+        var projection = regionDef.projection
+          ? C.clone(regionDef.projection)
+          : definitionIdentity(regionDef);
+        Game.reg.register('region', C.deepFreeze(projection));
+      });
+      ordered.actorArchetype.forEach(function (id) {
+        var archetype = compiled.actorArchetype[id];
+        if (archetype.category !== 'monster') return;
+        var legacy = C.clone(archetype.legacy || {});
+        legacy.id = id;
+        legacy.sprite = archetype.presentation && archetype.presentation.spriteId || id;
+        legacy.boss = archetype.rank === 'boss';
+        Game.reg.register('monster', C.deepFreeze(legacy));
+      });
       finalized = true;
       return lastAudit;
     },
@@ -512,19 +1015,30 @@
       }).sort(function (a, b) { return a.id.localeCompare(b.id); });
     },
     isFinalized: function () { return finalized; },
+    populationView: function (id) { return populationViews[id] || null; },
+    populationViews: function () {
+      return Object.keys(populationViews).sort().map(function (id) { return populationViews[id]; });
+    },
+    reverseReferences: function (actorId) { return reverseReferences[actorId] || null; },
 
     compileBlueprint: function (spec) {
       if (!finalized) throw new Error('[Content] finalize before compiling blueprints');
       spec = spec || {};
       var archetype = API.get('actorArchetype', spec.archetypeId);
       if (!archetype) throw new Error('[Content] unknown archetype: ' + spec.archetypeId);
+      var variant = spec.variantId ? API.get('actorVariant', spec.variantId) : null;
+      if (spec.variantId && !variant) throw new Error('[Content] unknown variant: ' + spec.variantId);
+      if (variant && variant.archetypeId !== archetype.id) {
+        throw new Error('[Content] variant/archetype mismatch: ' + spec.variantId);
+      }
       var classDef = spec.classId ? API.get('class', spec.classId) : null;
       if (spec.classId && !classDef) throw new Error('[Content] unknown class: ' + spec.classId);
       var key = [spec.archetypeId, spec.classId || '-', spec.variantId || '-', fingerprint].join('|');
       if (blueprintCache[key]) return blueprintCache[key];
-      var abilities = (archetype.abilityGrantIds || []).slice();
-      var traits = (archetype.traitIds || []).slice();
-      var resources = (archetype.resourceProfileIds || []).slice();
+      var resolved = C.merge(C.clone(archetype), variant && variant.overrides || {});
+      var abilities = (resolved.abilityGrantIds || []).slice();
+      var traits = (resolved.traitIds || []).slice();
+      var resources = (resolved.resourceProfileIds || []).slice();
       if (classDef) {
         abilities = abilities.concat(classDef.baseAbilityGrantIds || []);
         traits = traits.concat(classDef.traitIds || []);
@@ -533,19 +1047,24 @@
       var blueprint = {
         key: key,
         archetypeId: archetype.id,
+        variantId: variant && variant.id || null,
         classId: classDef && classDef.id || null,
-        category: archetype.category,
-        rank: archetype.rank,
-        resolvedTags: (archetype.tags || []).concat(classDef && classDef.tags || []),
+        category: resolved.category,
+        rank: resolved.rank,
+        resolvedTags: (resolved.tags || []).concat(classDef && classDef.tags || []),
         resolvedProfiles: {
-          statProfileId: classDef && classDef.statProfileId || archetype.statProfileId || null,
+          statProfileId: classDef && classDef.statProfileId || resolved.statProfileId || null,
           resourceProfileIds: resources,
-          resistanceProfileId: archetype.resistanceProfileId || null,
-          aiProfileId: classDef && classDef.aiProfileId || archetype.aiProfileId || null,
-          rewardProfileId: archetype.rewardProfileId || null,
-          renderProfileId: archetype.presentation && archetype.presentation.renderProfileId || null,
+          resistanceProfileId: resolved.resistanceProfileId || null,
+          aiProfileId: classDef && classDef.aiProfileId || resolved.aiProfileId || null,
+          rewardProfileId: resolved.rewardProfileId || null,
+          renderProfileId: resolved.presentation && resolved.presentation.renderProfileId || null,
+          interactionProfileId: resolved.interactionProfileId || null,
+          engagementPolicyId: resolved.engagementPolicyId || null,
           tacticsProfileIds: classDef && classDef.tacticsProfileIds || []
         },
+        resolvedPresentation: C.clone(resolved.presentation || {}),
+        resolvedBody: C.clone(resolved.body || {}),
         resolvedAbilityGrants: abilities.filter(function (id, at) { return abilities.indexOf(id) === at; }),
         resolvedTraits: traits.filter(function (id, at) { return traits.indexOf(id) === at; }),
         sourceFingerprint: fingerprint

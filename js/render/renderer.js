@@ -235,6 +235,15 @@
     return ((m.animT / 0.36) | 0) % 2 === 0 ? 'idle0' : 'idle1';
   }
 
+  function isActorEntity(entity) {
+    return !!(entity && entity.components && entity.components.transform &&
+      entity.components.presentation);
+  }
+
+  function isNonHeroActor(entity) {
+    return isActorEntity(entity) && entity.kind !== 'hero';
+  }
+
   function drawBubbleIcon(graphics, icon, x, y, accent, ink) {
     var px;
     graphics.fillStyle = ink;
@@ -298,8 +307,8 @@
   }
 
   function healthBarRect(anchor) {
-    if (!anchor || (anchor.kind !== 'hero' && anchor.kind !== 'monster')) return null;
-    var visible = anchor.kind === 'monster'
+    if (!isActorEntity(anchor) || !anchor.components.vitals) return null;
+    var visible = isNonHeroActor(anchor)
       ? (!anchor.dead && (anchor.hp < anchor.maxHp || anchor.engaged || anchor.boss))
       : anchor.hp < anchor.maxHp;
     if (!visible) return null;
@@ -322,7 +331,7 @@
     var opponent = null;
     if (anchor.kind === 'hero' && anchor.target && Number.isFinite(anchor.target.x)) {
       opponent = anchor.target;
-    } else if (anchor.kind === 'monster' && Game.world && Game.world.hero &&
+    } else if (isNonHeroActor(anchor) && Game.world && Game.world.hero &&
         (anchor.engaged || bubble.type === 'alert')) {
       opponent = Game.world.hero;
     }
@@ -330,7 +339,7 @@
       if (Math.abs(opponent.x - anchor.x) >= 1) {
         return opponent.x > anchor.x ? 'left' : 'right';
       }
-      return anchor.kind === 'monster' ? 'right' : 'left';
+      return isNonHeroActor(anchor) ? 'right' : 'left';
     }
     if (anchor.dir === 'r') return 'left';
     if (anchor.dir === 'l') return 'right';
@@ -530,7 +539,7 @@
       R.resize();
       window.addEventListener('resize', R.resize);
       // 点击/触摸交互：点怪=锁定目标，点地=移动指令，点营地=扎营/拔营
-      canvas.addEventListener('pointerdown', function (e) {
+      canvas.addEventListener('click', function (e) {
         var rect = canvas.getBoundingClientRect();
         var pt = R.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
         if (Game.world && Game.world.handleTap) Game.world.handleTap(pt.x, pt.y);
@@ -760,7 +769,7 @@
 
       for (j = 0; j < drawables.length; j++) {
         e = drawables[j];
-        if (e.kind === 'hero' || e.kind === 'monster') R.drawEntity(e);
+        if (isActorEntity(e)) R.drawEntity(e);
         else if (e.kind === 'groundLoot') R.drawGroundLoot(e, t);
         else if (e.kind === 'gatherNode') R.drawGatherNode(e, t);
         else if (e.kind === 'chest') R.drawChest(e, t);
@@ -898,7 +907,7 @@
       var sceneStyle = Game.transitions && Game.transitions.entityStyle(e);
       var visualLift = sceneStyle ? (sceneStyle.lift || 0) : 0;
 
-      if (e.kind === 'monster' && e.dead) {
+      if (isNonHeroActor(e) && e.dead) {
         alpha = e.finaleFade !== undefined
           ? U.clamp(e.finaleFade, 0, 1)
           : Math.max(0, e.deathT / 0.5);
@@ -940,7 +949,7 @@
 
       var frame = e.kind === 'hero' ? heroFrame(e) : monsterFrame(e);
       var flip = false;
-      if (e.kind === 'monster') {
+      if (isNonHeroActor(e)) {
         // 怪物素材默认朝左；面向右时镜像
         flip = (e.dir === 'r');
       } else if ((e.state === 'sitting' || e.state === 'recover') && e.dir === 'l') {
@@ -967,7 +976,9 @@
       });
 
       // 头顶血条
-      var showBar = e.kind === 'monster' ? (!e.dead && (e.hp < e.maxHp || e.engaged || e.boss)) : (e.hp < e.maxHp);
+      var showBar = !!e.components.vitals && (isNonHeroActor(e)
+        ? (!e.dead && (e.hp < e.maxHp || e.engaged || e.boss))
+        : (e.hp < e.maxHp));
       if (showBar && alpha > 0.4) {
         var bw = e.boss ? 26 : 14;
         var bx = e.x - bw / 2, by = e.y - sp.h - 4;

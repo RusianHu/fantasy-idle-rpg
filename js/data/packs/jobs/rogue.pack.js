@@ -8,7 +8,7 @@
   }
   Game.content.registerPack({
     id: 'job.rogue', version: '2.0.0', schemaVersion: 1,
-    sourceFile: 'js/data/packs/jobs/rogue.js',
+    sourceFile: 'js/data/packs/jobs/rogue.pack.js',
     requires: [{ id: 'core.combat', range: '^2.0.0' }],
     definitions: {
       statProfile: [{ id: 'stats.rogue', schemaVersion: 1, stats: {} }],

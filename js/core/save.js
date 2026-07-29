@@ -216,6 +216,24 @@
         data.world.regionOrder = Game.routes.mainlineRegionOrder(data.world.routePlan);
         data.v = 13;
       }
+    },
+    {
+      // v13 → v14：ActorRecord 可持久化 Variant，并加入仅使用稳定世界键的
+      // 社交状态。Encounter、临时 Actor ID、generation 与战斗时钟均不入档。
+      from: 13,
+      fn: function (data) {
+        data.roster = data.roster || { actors: {} };
+        Object.keys(data.roster.actors || {}).forEach(function (actorRecordId) {
+          var record = data.roster.actors[actorRecordId];
+          if (record && record.variantId === undefined) record.variantId = null;
+        });
+        data.world = data.world || {};
+        data.world.social = {
+          spawnVariants: {},
+          memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
+        };
+        data.v = 14;
+      }
     }
   ];
 
@@ -238,6 +256,67 @@
       if (!found) { data.v = Game.SAVE_VERSION; }
     }
     return data;
+  }
+
+  function validVariantForArchetype(variantId, archetypeId) {
+    if (!variantId || !Game.content) return null;
+    var variant = Game.content.get('actorVariant', variantId);
+    return variant && variant.archetypeId === archetypeId ? variantId : null;
+  }
+
+  function normalizeMemoryRecord(record, kind) {
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return null;
+    var relation = /^(ally|neutral|hostile)$/.test(record.relation || '')
+      ? record.relation : null;
+    var reputation = Number(record.reputation);
+    if (!relation && !Number.isFinite(reputation)) return null;
+    var expires = record.expiresAtWorldTime;
+    if (expires !== null && expires !== undefined &&
+        (!Number.isFinite(Number(expires)) || Number(expires) < 0)) return null;
+    if (record.profileId && (!Game.content ||
+        !Game.content.has('worldSpawnProfile', record.profileId))) return null;
+    if (kind === 'factionId' && record.factionId &&
+        record.factionId !== record.indexId) return null;
+    return {
+      relation: relation,
+      reputation: Number.isFinite(reputation) ? reputation : null,
+      expiresAtWorldTime: expires === null || expires === undefined
+        ? null : Number(expires),
+      profileId: record.profileId || null,
+      reason: typeof record.reason === 'string' ? record.reason.slice(0, 80) : null
+    };
+  }
+
+  function normalizeSocial(saved, worldTime) {
+    saved = saved && typeof saved === 'object' ? saved : {};
+    var out = {
+      spawnVariants: {},
+      memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
+    };
+    Object.keys(saved.spawnVariants || {}).sort().forEach(function (spawnId) {
+      if (!spawnId || spawnId.length > 256) return;
+      var variantId = saved.spawnVariants[spawnId];
+      var variant = Game.content && Game.content.get('actorVariant', variantId);
+      var persistent = variant && (variant.transitions || []).some(function (edge) {
+        return edge.persistence === 'worldSpawn';
+      });
+      if (persistent) out.spawnVariants[spawnId] = variantId;
+    });
+    var memories = saved.memories || {};
+    ['spawnId', 'socialGroupId', 'factionId'].forEach(function (kind) {
+      Object.keys(memories[kind] || {}).sort().forEach(function (indexId) {
+        if (!indexId || indexId.length > 256) return;
+        if (kind === 'factionId' && (!Game.content ||
+            !Game.content.has('faction', indexId))) return;
+        var source = Object.assign({}, memories[kind][indexId], { indexId: indexId });
+        var normalized = normalizeMemoryRecord(source, kind);
+        if (!normalized) return;
+        if (normalized.expiresAtWorldTime !== null &&
+            normalized.expiresAtWorldTime <= worldTime) return;
+        out.memories[kind][indexId] = normalized;
+      });
+    });
+    return out;
   }
 
   var S = Game.save = {
@@ -280,6 +359,7 @@
           regionProg: st.world.regionProg,
           nodeCooldowns: st.world.nodeCooldowns,
           exploration: st.world.exploration,
+          social: st.world.social,
           finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
         },
@@ -370,6 +450,7 @@
         normalizedActors[actorRecordId] = {
           id: actorRecordId,
           archetypeId: archetypeId,
+          variantId: validVariantForArchetype(loadedRecord.variantId, archetypeId),
           classId: loadedRecord.classId || null,
           level: Math.max(1, loadedRecord.level | 0 || 1),
           exp: Math.max(0, Number(loadedRecord.exp) || 0),
@@ -417,6 +498,10 @@
       st.world.layoutVersion = 3;
       st.world.exploration = data.world && data.world.exploration &&
         typeof data.world.exploration === 'object' ? data.world.exploration : {};
+      st.world.social = normalizeSocial(
+        data.world && data.world.social,
+        Math.max(0, Number(st.world.worldTime) || 0)
+      );
       st.world.routePlan = Game.routes.normalize(
         data.world && data.world.routePlan,
         data.world && data.world.regionOrder,

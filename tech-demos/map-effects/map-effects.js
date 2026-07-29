@@ -4,7 +4,7 @@
 
   var U = Game.util;
   var D = DemoI18n;
-  var regions = Game.reg.all('region');
+  var regions = [];
   var currentIndex = 0;
   var paused = false;
   var timeMode = 'cycle';
@@ -191,6 +191,80 @@
       var def = Game.reg.get('monster', id);
       return spriteRow(def && def.sprite || id, monsterName(id), trait(tr('monster')), 'monster', id);
     }).join('') + spriteRow(region.boss, monsterName(region.boss), trait(tr('boss'), 'boss'), 'boss', region.boss);
+    var regionProfile = Game.content.get('regionProfile', region.id);
+    var population = regionProfile &&
+      Game.content.populationView(regionProfile.populationProfileId);
+    var populationRows = population ? Object.keys(population.channels).sort().map(function (channel) {
+      var definition = population.channels[channel];
+      var refs = definition.spawnRefs.map(function (entry) {
+        return entry.profileId + ' [' + entry.mode + ']';
+      });
+      return configRow(
+        channel,
+        refs.join(' / ') || tr('none'),
+        tr('capacity') + ' ' + definition.capacity + ' / ' +
+          tr('selection') + ' ' + definition.selection,
+        'population-channel',
+        channel
+      );
+    }).join('') : configRow(tr('population'), tr('none'));
+    var mountPlan = Game.population.mountPlan();
+    if (mountPlan && mountPlan.regionId !== region.id) mountPlan = null;
+    var mountPlanRows = mountPlan ? configRow(
+      mountPlan.populationId,
+      tr('reservations') + ' ' + mountPlan.reservations.length + ' / ' +
+        tr('failures') + ' ' + mountPlan.failures.length,
+      tr('layout') + ' v' + mountPlan.layoutVersion + ' / ' + mountPlan.contentFingerprint,
+      'population-mount-plan', mountPlan.populationId
+    ) : configRow(tr('mountPlan'), tr('none'));
+    var reservationRows = mountPlan && mountPlan.reservations.length
+      ? mountPlan.reservations.map(function (reservation) {
+        var slot = mountPlan.slots.filter(function (entry) {
+          return entry.id === reservation.slotId;
+        })[0];
+        var runtime = mountPlan.runtime && mountPlan.runtime[reservation.slotId];
+        return configRow(
+          slot && slot.profileId || reservation.slotId,
+          (slot && slot.layoutSlotKey || tr('none')) + ' @ ' +
+            Math.round(reservation.x) + ', ' + Math.round(reservation.y),
+          (slot && slot.channel || tr('none')) + ' / ' +
+            (runtime && runtime.state || 'planned') + ' / ' +
+            tr('radius') + ' ' + reservation.occupancyRadius,
+          'population-reservation', reservation.slotId
+        );
+      }).join('') : configRow(tr('reservations'), tr('none'));
+    var failureRows = mountPlan && mountPlan.failures.length
+      ? mountPlan.failures.map(function (failure) {
+        return configRow(
+          failure.profileId,
+          failure.reason,
+          failure.channel + ' / ' + failure.onFailure,
+          'population-failure', failure.profileId + ':' + failure.ordinal
+        );
+      }).join('') : configRow(tr('failures'), tr('none'));
+    var respawnRows = mountPlan && mountPlan.respawnSchedules.length
+      ? mountPlan.respawnSchedules.map(function (schedule) {
+        var timing = schedule.mode === 'worldTime'
+          ? schedule.eligibleAtWorldTime
+          : Math.max(0, schedule.remaining).toFixed(1) + 's';
+        return configRow(
+          schedule.profileId,
+          schedule.spawnId + ' @' + schedule.generation,
+          schedule.mode + ' / ' + timing,
+          'population-respawn', schedule.spawnId
+        );
+      }).join('') : configRow(tr('respawns'), tr('none'));
+    var leaseRows = Game.population.leases().filter(function (lease) {
+      return lease.context && lease.context.regionId === region.id;
+    }).map(function (lease) {
+      return configRow(
+        lease.profileId,
+        lease.spawnId + ' @' + lease.generation,
+        lease.actorIds.join(', '),
+        'spawn-lease',
+        lease.spawnId
+      );
+    }).join('') || configRow(tr('leases'), tr('none'));
 
     var anomalyNames = expedition.anomalies.map(function (id) { return idName('anomaly', id); });
     var activeEcologyNames = activeEcology.map(function (id) {
@@ -246,6 +320,13 @@
         configRow(tr('flowers'), layout.flowers.length) + '</div>' +
         catalogGroup(tr('decorations'), decorRows, 'decorations') + catalogGroup(tr('parallax'), parallaxRows, 'parallax') + '</section>' +
       '<section class="inspect-section"><h3>' + esc(tr('combat')) + '</h3><div class="sprite-list">' + monsterRows + '</div></section>' +
+      '<section class="inspect-section"><h3>' + esc(tr('population')) + '</h3><div class="row-list">' +
+        populationRows + '</div><h3>' + esc(tr('mountPlan')) + '</h3><div class="row-list">' +
+        mountPlanRows + '</div><h3>' + esc(tr('reservations')) + '</h3><div class="row-list">' +
+        reservationRows + '</div><h3>' + esc(tr('failures')) + '</h3><div class="row-list">' +
+        failureRows + '</div><h3>' + esc(tr('respawns')) + '</h3><div class="row-list">' +
+        respawnRows + '</div><h3>' + esc(tr('leases')) + '</h3><div class="row-list">' +
+        leaseRows + '</div></section>' +
       '<section class="inspect-section"><h3>' + esc(tr('expedition')) + '</h3><div class="row-list">' +
         configRow(tr('expeditionIndex'), expedition.index) + configRow(tr('expeditionSeed'), U.hex32(expedition.seed), String(expedition.seed)) +
         configRow(tr('anomalies'), anomalyNames.join(' / ') || tr('none'), expedition.anomalies.join(', '), 'anomaly', 'active') +
@@ -534,6 +615,8 @@
 
   D.init();
   Game.content.finalize({ strict: true });
+  regions = Game.reg.all('region');
+  Game.ui.modals.init();
   Game.state = Game.State.newGame();
   Game.i18n.setLocale(D.locale());
   Game.state.world.layoutVersion = 3;

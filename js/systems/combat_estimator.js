@@ -20,6 +20,7 @@
       instanceId: encounter.id + ':' + teamId + ':' + index,
       archetypeId: spec.archetypeId,
       classId: spec.classId || null,
+      variantId: spec.variantId || null,
       level: spec.level || 1,
       tier: spec.tier || 1,
       transform: { x: teamId === 'party' ? 120 + index * 18 : 180 + index * 22, y: 160 + index * 20, direction: 'r' },
@@ -47,11 +48,15 @@
   }
 
   function enemySpecs(profile, packId, tier) {
-    var pack = profile.packs.filter(function (candidate) { return !packId || candidate.id === packId; })[0] || profile.packs[0];
+    var ids = profile.encounterPackIds || [];
+    var selectedId = packId && ids.indexOf(packId) >= 0 ? packId : ids[0];
+    var pack = selectedId && Game.content.get('encounterPack', selectedId);
     return (pack && pack.members || []).map(function (member) {
-      return typeof member === 'string'
-        ? { archetypeId: member, tier: tier }
-        : Object.assign({ tier: tier }, member);
+      return {
+        archetypeId: member.archetypeId,
+        variantId: member.variantId || null,
+        tier: tier
+      };
     });
   }
 
@@ -175,7 +180,7 @@
       return Game.combatEstimator.evaluate({
         partySnapshot: Game.combatEstimator.partySnapshotFromState(opts),
         encounterProfileId: profile.id,
-        packId: opts.packId || profile.packs[0].id,
+        packId: opts.packId || profile.encounterPackIds[0],
         tier: opts.tier || Game.State.regionTier(regionId),
         tacticsProfile: opts.tacticsProfile || Game.state.settings.combatStrategy || 'balanced',
         sampleSeeds: opts.sampleSeeds || [11, 29, 47],
@@ -185,11 +190,11 @@
     evaluateRegion: function (partySnapshot, regionId, tacticsProfile) {
       var profile = Game.content.get('encounterProfile', 'encounter.' + regionId);
       if (!profile) return null;
-      return profile.packs.map(function (pack) {
+      return (profile.encounterPackIds || []).map(function (packId) {
         return Game.combatEstimator.evaluate({
           partySnapshot: partySnapshot,
           encounterProfileId: profile.id,
-          packId: pack.id,
+          packId: packId,
           tier: Game.State && Game.State.regionTier ? Game.State.regionTier(regionId) : 1,
           tacticsProfile: tacticsProfile || 'balanced',
           sampleSeeds: [11, 29, 47]

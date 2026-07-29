@@ -10,7 +10,9 @@
   }
   function living(encounter, relation, source) {
     return encounter.participants.map(Game.actors.get).filter(function (target) {
-      return target && target.components.vitals && target.components.vitals.hp > 0 &&
+      var participant = target && encounter.participantStates[target.id];
+      return target && (!participant || participant.role !== 'observer') &&
+        target.components.vitals && target.components.vitals.hp > 0 &&
         Game.relations.resolve(source.id, target.id, encounter.id) === relation;
     }).sort(function (a, b) { return a.id.localeCompare(b.id); });
   }

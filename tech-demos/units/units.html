@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111528">
-<meta name="build-id" content="20260729.8">
+<meta name="build-id" content="20260729.10">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111528'/%3E%3Cpath d='M3 12V5h3l2-2 2 2h3v7H3z' fill='%23e7c45b'/%3E%3C/svg%3E">
 <title>Actor / Deterministic Combat Lab</title>
-<link rel="stylesheet" href="combat-lab.css?v=20260729.8">
+<link rel="stylesheet" href="combat-lab.css?v=20260729.10">
 </head>
 <body>
 <main class="lab-shell">
@@ -121,6 +121,9 @@
     <button id="move" type="button" data-lab="move">移动目标</button>
     <button id="charm" type="button" data-lab="charm">魅惑/恢复</button>
     <button id="summon" type="button" data-lab="summon">召唤</button>
+    <button id="lab-provoke" type="button" data-lab="provoke">中立群体挑衅</button>
+    <button id="lab-surrender" type="button" data-lab="surrenderAction">目标投降</button>
+    <button id="lab-forgive" type="button" data-lab="forgive">赎罪 / 清除记忆</button>
   </section>
 
   <section class="diagnostics">
@@ -130,6 +133,7 @@
     <article class="panel"><h2 data-lab="events">CombatEvent</h2><pre id="events"></pre></article>
     <article class="panel"><h2 data-lab="presentationEvents">攻击表现日志</h2><pre id="presentation-events"></pre></article>
     <article class="panel"><h2 data-lab="movementTrace">位移 / 接敌追踪</h2><pre id="movement-trace"></pre></article>
+    <article class="panel"><h2 data-lab="ecosystem">Population / Engagement / Objective / Variant</h2><pre id="ecosystem"></pre></article>
   </section>
 
   <section class="catalog panel">
@@ -140,56 +144,43 @@
   </section>
 </main>
 
-<script src="../../js/core/utils.js?v=20260729.8"></script>
-<script src="../../js/core/eventbus.js?v=20260729.8"></script>
-<script src="../../js/core/registry.js?v=20260729.8"></script>
-<script src="../../js/i18n/i18n.js?v=20260729.8"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260729.8"></script>
-<script src="../../js/i18n/en.js?v=20260729.8"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260729.8"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260729.8"></script>
-<script src="../../js/core/assets.js?v=20260729.8"></script>
-<script src="../../js/systems/terrain.js?v=20260729.8"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260729.8"></script>
-<script src="../../js/sprites/palettes.js?v=20260729.8"></script>
-<script src="../../js/sprites/hero.js?v=20260729.8"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260729.8"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260729.8"></script>
-<script src="../../js/sprites/props.js?v=20260729.8"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260729.8"></script>
-<script src="../../js/core/content/rules.js?v=20260729.8"></script>
-<script src="../../js/core/content/schemas.js?v=20260729.8"></script>
-<script src="../../js/core/content/compiler.js?v=20260729.8"></script>
-<script src="../../js/core/content/audit.js?v=20260729.8"></script>
-<script src="../../js/core/content/registry.js?v=20260729.8"></script>
-<script src="../../js/data/packs/manifest.js?v=20260729.8"></script>
-<script src="../../js/data/packs/rules/core.js?v=20260729.8"></script>
-<script src="../../js/data/packs/jobs/fighter.js?v=20260729.8"></script>
-<script src="../../js/data/packs/jobs/rogue.js?v=20260729.8"></script>
-<script src="../../js/data/packs/jobs/mage.js?v=20260729.8"></script>
-<script src="../../js/data/packs/jobs/cleric.js?v=20260729.8"></script>
-<script src="../../js/data/packs/jobs/ranger.js?v=20260729.8"></script>
-<script src="../../js/data/packs/world/actors.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/factory.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/grassland.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/forest.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/mine.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/graveyard.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/snowpass.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/lavacave.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/skyruins.js?v=20260729.8"></script>
-<script src="../../js/data/packs/regions/darkcastle.js?v=20260729.8"></script>
-<script src="../../js/systems/actors/relations.js?v=20260729.8"></script>
-<script src="../../js/systems/actors/parties.js?v=20260729.8"></script>
-<script src="../../js/systems/actors/actors.js?v=20260729.8"></script>
-<script src="../../js/systems/encounters.js?v=20260729.8"></script>
-<script src="../../js/systems/combat_ai.js?v=20260729.8"></script>
-<script src="../../js/systems/combat.js?v=20260729.8"></script>
-<script src="../../js/systems/combat_estimator.js?v=20260729.8"></script>
-<script src="../../js/systems/action_bubbles.js?v=20260729.8"></script>
-<script src="../../js/render/effects.js?v=20260729.8"></script>
-<script src="../../js/render/combat_presentation.js?v=20260729.8"></script>
-<script src="../../js/ui/combat_portraits.js?v=20260729.8"></script>
-<script src="combat-lab.js?v=20260729.8"></script>
+<script src="../../js/core/utils.js?v=20260729.10"></script>
+<script src="../../js/core/eventbus.js?v=20260729.10"></script>
+<script src="../../js/core/registry.js?v=20260729.10"></script>
+<script src="../../js/i18n/i18n.js?v=20260729.10"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260729.10"></script>
+<script src="../../js/i18n/en.js?v=20260729.10"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260729.10"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260729.10"></script>
+<script src="../../js/core/assets.js?v=20260729.10"></script>
+<script src="../../js/systems/terrain.js?v=20260729.10"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260729.10"></script>
+<script src="../../js/sprites/palettes.js?v=20260729.10"></script>
+<script src="../../js/sprites/hero.js?v=20260729.10"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260729.10"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260729.10"></script>
+<script src="../../js/sprites/props.js?v=20260729.10"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260729.10"></script>
+<script src="../../js/core/content/rules.js?v=20260729.10"></script>
+<script src="../../js/core/content/schemas.js?v=20260729.10"></script>
+<script src="../../js/core/content/compiler.js?v=20260729.10"></script>
+<script src="../../js/core/content/audit.js?v=20260729.10"></script>
+<script src="../../js/core/content/registry.js?v=20260729.10"></script>
+<script src="../../js/core/content/support.js?v=20260729.10"></script>
+<script src="../../js/data/content/content.generated.js?v=20260729.10"></script>
+<script src="../../js/systems/actors/relations.js?v=20260729.10"></script>
+<script src="../../js/systems/actors/parties.js?v=20260729.10"></script>
+<script src="../../js/systems/actors/actors.js?v=20260729.10"></script>
+<script src="../../js/systems/world_population.js?v=20260729.10"></script>
+<script src="../../js/systems/encounters.js?v=20260729.10"></script>
+<script src="../../js/systems/engagement.js?v=20260729.10"></script>
+<script src="../../js/systems/combat_ai.js?v=20260729.10"></script>
+<script src="../../js/systems/combat.js?v=20260729.10"></script>
+<script src="../../js/systems/combat_estimator.js?v=20260729.10"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260729.10"></script>
+<script src="../../js/render/effects.js?v=20260729.10"></script>
+<script src="../../js/render/combat_presentation.js?v=20260729.10"></script>
+<script src="../../js/ui/combat_portraits.js?v=20260729.10"></script>
+<script src="combat-lab.js?v=20260729.10"></script>
 </body>
 </html>

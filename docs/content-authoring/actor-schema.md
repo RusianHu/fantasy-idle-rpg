@@ -50,6 +50,17 @@
 - `Game.actors.refresh()` 重建 Blueprint、Talent 私有内容和 StatBlock，同时保留同 ID 资源当前值、现存 Status、SpawnSpec 与外部 Modifier source；HP 策略显式选择绝对值、比例或回满。
 - `Game.units.assertInvariant()` 检查 StatBlock/Vitals 上限、HP、有限属性、资源边界、生命周期、Record HP 同步与 Record 单实例。
 
+## Variant 转换边界
+
+- `Game.actors.transitionVariant()` 只接受同 Archetype 的已声明转换边；脱战即时提交，战中只在 cleanup phase 执行 `defer/cancel`。
+- prepare 在分离的候选 runtime state 中重建 Blueprint 与组件；commit 只替换一次 `runtimeState` 引用并递增 `runtimeRevision`，失败恢复原引用且不增加 Encounter sequence。
+- HP 按比例映射；同 ID Resource、Ability cooldown/group/charge、兼容 Status/Shield/Threat/Targeting 保留并按新上限裁剪；失效 Status 与新 Blueprint 不再授予的 Combo 被移除。
+- `actorRecord/worldSpawn/none` persistence 只由转换边决定。普通怪或 `resetVariant` Spawn 重生回到 WorldSpawnProfile 默认 Variant。
+
+## Encounter 与 Objective
+
+`teamSlots` 显式声明 `combatant/objective/observer`、coalition、`countsForCompletion` 与奖励资格。胜负只由 `completionPolicy.mode: 'allRequired'` 和 Objective evaluator 决定；observer 不建 threat table、不可成为 Action/AOE 目标，也不运行 AI。custom Objective 只引用经 `rules.handler` 注册、带版本且确定性的 handler。
+
 ## Modifier、Status 与 Talent
 
 Modifier 必须显式写 `stat / phase / operation / value`；Talent Modifier 使用 `perRank`。叠层规则固定为：

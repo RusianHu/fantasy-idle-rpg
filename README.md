@@ -8,12 +8,12 @@
 - **双击直开**：直接用浏览器打开 `index.html` 即可游玩（全部脚本按序 `<script>` 加载，无 ES Modules，file:// 协议可用）。
 - **静态服务器**（可选）：`python -m http.server 8080` 后访问 `http://localhost:8080/`。
 - **移动端优先**：设计基准 390×844 竖屏；桌面浏览器居中显示手机比例容器。
-- 无任何构建步骤、无外部网络依赖（EasyStar.js 0.4.4 MIT 与 Fusion Pixel 字体均已本地固定）。
+- 游玩无需现场构建、无外部网络依赖（仓库已提交确定性内容 Bundle；EasyStar.js 0.4.4 MIT 与 Fusion Pixel 字体均已本地固定）。修改 `*.pack.js` / `*.support.js` 后需重建内容 Bundle。
 
 ## 发布与缓存
 
 - HTML 始终重新校验；CSS、JS、字体统一使用 `BUILD_ID` 查询版本并长期不可变缓存，避免手机端新旧资源混用。
-- 发布前执行 `.\tools\set-build-id.ps1 -BuildId YYYYMMDD.N`，随后运行 `node tests\cache-version.test.js`。同一发布内 `index.html`、技术演示、`Game.BUILD_ID`、字体 URL 与 `version.json` 必须一致。
+- 发布前先重建并校验内容 Bundle、完成全量功能回归；确认 HTML/CSS/JS/字体不再变化后，执行唯一一次 `.\tools\set-build-id.ps1 -BuildId YYYYMMDD.N`，随后运行 `node tests\cache-version.test.js`。同一发布内 `index.html`、技术演示、`Game.BUILD_ID`、字体 URL 与 `version.json` 必须一致；bump 后若再修改发布资源，必须使用新的 `BUILD_ID` 重走此序列。
 - 长开标签页每 5 分钟及 `pageshow` / 重新可见时以 `no-store` 检查 `version.json`；发现新版后显示中英文更新按钮，点击时先收束过场并保存，再重载页面。
 - VPS 的项目专属 Nginx 规则位于 `deploy/nginx/fantasy-idle-rpg-cache.conf`。部署规则后必须先执行 `nginx -t`，通过后才能 reload。
 
@@ -26,6 +26,7 @@
 | **环境视觉** | 程序化多阶树冠大树（摇曳）、草簇风场行波、烘焙花簇/色斑/裂纹/雪地反光、发光体光晕（水晶/烛火/营灯）、林间光柱、道具软阴影、暗角；营地含磨损地垫、刻印、旗帜、补给、铺盖、坐木与炊具；全部可开关、视口剔除（实测满帧） |
 | 挂机战斗 | 50ms 整数 tick 的确定性自动时间轴：GCD/oGCD、队列窗口、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、威胁、护盾和治疗共用一条结算管线；普通遭遇为 1–3 人 pack，巡逻与接敌入口统一受共享 leash 约束，Boss 具备预警、阶段与有限增援 |
 | 开放远征世界 | 八区均以世界种子生成稳定的 `2400×1440` 连续开放地图；14–18 个宏观中心、硬阻挡、宽窄路线、支路与环路共同形成可选择拓扑，16px 分层导航、扫掠碰撞、512px 分块渲染和空间桶支撑长途探索 |
+| 世界生态 | 八区 Population 先生成不可变 `PopulationMountPlan`，按 Boss→守门→NPC→稀有→常规顺序预留合法坐标，再通过稳定 SpawnLease 统一生成普通怪、Boss、NPC、和平生物与召唤物；Population 统一管理死亡/逃跑后的 delay 或 worldTime 重生，`spawnId + generation` 隔离旧命令。中立目标只在明确交互后提交 EngagementCommand，并于固定战斗 tick 原子建立 Variant、Relation、Encounter 与 opening Action |
 | **自动/手动操控** | 世界舞台常驻双态开关，默认自动挂机；手动时停止游走、索敌和击杀后续敌，支持点地移动、点怪交战及 WASD/方向键，锁定后仍由固定时间轴自动轮转。自动 AI 优先级固定为接敌→掉落→宝箱→采集→游走，安全/均衡/掠夺沿途接敌半径 42/72/96px，玩家临时指令优先于非接触索敌 |
 | **点触交互** | 点击怪物/地面发出交战或移动指令；点击掉落、采集节点、宝箱与交易实体会寻路走近并交互；点篝火=回营/拔营 |
 | **动作气泡** | 自动模式发现资源、开始采集、遭遇敌人、发现宝箱或拾取战利品时显示短时纯图形像素气泡（叶片/采集镐/交叉武器/宝箱/战利品袋）；左右行走时气泡落在后脑斜上方，上下行走时保持正上方，接敌/警戒按对手方向侧移并自动避开边缘与血条 |
@@ -54,7 +55,7 @@
 | 牧师 Cleric | 远程支援 | 远程（圣辉） | 信仰、治疗、护盾、神圣范围伤害与可控打断 |
 | 游侠 Ranger | 远程物理 | 远程（箭矢） | 专注、猎人标记、强力/多重射击、鹰眼与后撤 |
 
-职业选定后不可更改；换职业需重置存档。v1–v11 存档经 v12 迁移进入 `ActorRecord`，再由 v13 编译持久化 `RoutePlan`；旧技能投资按稳定 ID 转为 Talent，已下线内容会降级并退款，不把临时 Encounter、冷却、威胁或状态写入存档。
+职业选定后不可更改；换职业需重置存档。v1–v11 存档经 v12 迁移进入 `ActorRecord`，v13 编译持久化 `RoutePlan`，v14 增加经过白名单清理的 `world.social`；旧技能投资按稳定 ID 转为 Talent，已下线内容会降级并退款，不把 ActorInstance ID、SpawnLease、临时 Encounter、冷却、威胁或状态写入存档。
 
 ## 目录结构（引擎与内容分离）
 
@@ -72,7 +73,8 @@ js/
   core/content/       Pack/schema/引用/公式编译、严格审计、深冻结与 fingerprint
   core/               utils / eventbus / registry(只读兼容门面) / assets / save / loop / update
   i18n/               i18n 核心 + zh-CN/en 主语言包与 Combat V2 语言包
-  data/packs/         战斗规则、五职业、世界 Actor 与八区纵向内容包
+  data/content/       自动生成的内容 manifest 与单一运行时 Bundle（禁止手改）
+  data/packs/         自动发现的 *.pack.js 内容胶囊与 *.support.js 作者辅助
   data/               区域、路线模板、物品、词条与成就数据
   sprites/            像素素材（字符网格+调色板；含 v3 资源/地标/奇物/生态/守门精英与 manifest）
   systems/actors/     ActorInstance / ActorRecord / Unit State / Party / Relation
@@ -84,7 +86,7 @@ js/
 
 **探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。`*.generated.js` 不直接手改。
 
-**扩展方式**：新增 Actor/Ability/Status/Encounter 时按 `docs/content-authoring/adding-actor.md` 创建或扩展纵向 Pack，加入 `js/data/packs/manifest.js`，并同步正式入口、Actor / Combat Lab 与世界现场的顺序脚本标签，再运行 `node tools/audit-content.js` 和 `node tests/v2-content-entrypoints.test.js`。这三个运行时入口与 Node 审计共享同一 Pack 集合；生成器审计只读取区域与 v3 地形模块，不消费战斗 Pack。常规内容扩展不修改 combat/world/renderer。所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
+**扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与三个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`。
 
@@ -105,7 +107,7 @@ js/
 - localStorage 双槽写入（`firpg_save` + `firpg_save_backup`），主档损坏自动回退备份档。
 - 当前产品层为单个逻辑角色槽位 `expedition-1`，UI、回调与存储均按稳定槽位 ID 数组渲染以预留多档；选档前不启动主循环、不自动存档、不结算离线收益、不推进世界时间。这里的“双槽”指同一角色档案的主写入与容灾备份，不是两个可选角色。
 - 每 15 秒自动保存 + 关键事件（升级/Boss/穿戴/购买等）即时保存 + 页面隐藏/关闭时将短过场结算到安全状态后保存。
-- 当前存档 v13，采用逐版本迁移流水线。持久层保存完整 Roster/ActorRecord 集合、主控与活动队伍引用、经济、背包、世界（含 `RoutePlan`）、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v12 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
+- 当前存档 v14，采用逐版本迁移流水线。持久层保存完整 Roster/ActorRecord 集合、主控与活动队伍引用、经济、背包、世界（含 `RoutePlan` 与 `world.social`）、设置和战术；社交层只保存合法持久 Spawn 的 Variant，以及按 `spawnId/socialGroupId/factionId` 索引的 Relation/声望记忆。ActorInstance、SpawnLease、generation、EngagementCommand、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v13 可完整迁移；无效内容引用自动清理，无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
 - 单位状态由 `Game.units` 统一投影和修改：ActorRecord 持久化 HP 且同一 Record 最多绑定一个存活 ActorInstance，ActorInstance 保存实时状态，StatBlock 独占运行时 `maxHp` 派生。伤害、治疗、死亡/复活、Modifier source 替换、上限协调和属性重建都走该边界；HUD 高频读取使用轻量 `vitals()`，完整诊断才使用 `snapshot()`。
 - Actor 刷新必须无损保留同 ID 资源当前值、SpawnSpec 数值、现存 Status 和外部 Modifier source；状态叠层固定为 `add/addPct` 线性累加、`multiply` 幂次叠乘、`set` 不随层数放大，周期效果按层数结算。禁止业务系统直接改写 ModifierLedger 或自行同步 Vitals。
 - 过场与状态机：`Game.transitions` 统一 `startRegion / startDeath / cancel / update / isActive / blocksWorld / cameraTarget / settleBeforeSave`；玩家可见换区走 `Game.prog.requestRegion(rid,{source})`，`gotoRegion` 仅供遮罩中点、启动和导入等原子操作。事件 `region:travelStart / travelCancelled / arrived`、`player:reviveStart / revived` 仅在对应阶段触发，`region:changed` 只在真实世界重建时触发一次。
@@ -141,6 +143,8 @@ js/
 ## 验证
 
 ```powershell
+node tools\build-content-bundle.js
+node tools\build-content-bundle.js --check
 node tests\v1_6.test.js
 node tests\route-planner.test.js
 node tests\v1_7.test.js
@@ -153,9 +157,11 @@ node tests\v1_13.balance.test.js
 node tests\navigation-long-route.test.js
 node tests\final-region-lock.test.js
 node tools\audit-content.js
+node tests\content-support-capabilities.test.js
 node tests\v2-authoring.test.js
 node tests\v2-content-validation.test.js
 node tests\v2-content-entrypoints.test.js
+node tests\unit-ecosystem-v14.test.js
 node tests\v2-save.test.js
 node tests\v2-runtime.test.js
 node tests\unit-state.test.js
@@ -164,14 +170,15 @@ node tests\v2-presentation.test.js
 node tests\combat-portraits.test.js
 node tests\v2-balance-baseline.test.js
 node tests\action-bubble-demo.test.js
+node tests\map-effects-inspector.test.js
 node tests\browser-smoke.js
 node tests\cache-version.test.js
 ```
 
 除 `action-bubble-demo.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容 schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v13 与多 ActorRecord 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、单位上限/生命周期/资源/Record 同步、刷新无损、Status 叠层与周期层数、固定 tick/RNG、Action/Effect/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v14 与多 ActorRecord/RoutePlan/社交记忆迁移、PopulationMountPlan/放置预留/SpawnLease/generation/delay 与 worldTime 重生、Engagement 全 primitive 原子回滚与有序 outbox、方向性 Relation、持久 Variant、版本化自定义 Objective 与奖励授权、单位状态、固定 tick/RNG、Action/Effect/Threat、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter 差分、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证移动与桌面中英文、44px 触控、正式 Combat HUD、Actor / Combat Lab、开放世界现场、生成器审计、中立 Observe/Attack 二次确认、固定 tick Engagement 闭环、存档重开和无横向溢出。
 
 ---
 
-Combat V2 · 存档 v13 · 纯 HTML/CSS/JS · UTF-8 · 离线可用
+Combat V2 · 世界生态 v14 · 纯 HTML/CSS/JS · UTF-8 · 离线可用

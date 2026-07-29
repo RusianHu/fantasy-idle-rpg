@@ -24,15 +24,14 @@ function load(file) {
   'js/core/utils.js', 'js/core/eventbus.js', 'js/core/registry.js',
   'js/core/content/rules.js', 'js/core/content/schemas.js',
   'js/core/content/compiler.js', 'js/core/content/audit.js',
-  'js/core/content/registry.js', 'js/i18n/i18n.js',
+  'js/core/content/registry.js', 'js/core/content/support.js', 'js/i18n/i18n.js',
   'js/i18n/zh-CN.js', 'js/i18n/en.js',
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
   'js/sprites/props.js', 'js/sprites/exploration_v3.js',
-  'js/data/packs/manifest.js'
+  'js/data/content/content.generated.js'
 ].forEach(load);
-sandbox.Game.CONTENT_PACK_FILES.forEach(load);
 
 sandbox.Game.content.registerPack({
   id: 'fixture.invalid-contracts',
@@ -83,7 +82,77 @@ sandbox.Game.content.registerPack({
         nameKey: 'combat.status.fighter_guard.name',
         icon: 'icon_skill_guard'
       }
-    }]
+    }],
+    encounterProfile: [{
+      id: 'fixture.invalid.encounter',
+      regionId: 'grassland',
+      rulesProfileId: 'core.rules.standard-v1',
+      teamSlots: [{
+        id: 'heroes', role: 'combatant', coalitionId: 'heroes',
+        countsForCompletion: 'yes', rewardEligible: false
+      }],
+      relationMatrix: {},
+      objectives: [{
+        id: 'custom', type: 'custom', required: true,
+        handlerId: 'fixture.missing-objective-handler', handlerVersion: 9,
+        params: { threshold: 1 }
+      }],
+      completionPolicy: { mode: 'firstRequired', extra: true }
+    }],
+    worldSpawnProfile: [
+      {
+        id: 'fixture.invalid.spawn-mount',
+        actorRef: { archetypeId: 'wolf_gray' },
+        mountTo: [{
+          populationId: 'population.grassland', channel: 'npc', mode: 'invalid'
+        }],
+        identity: { scope: 'regionStable' },
+        placement: {
+          selector: 'anchor', source: 'walkableNav', required: true,
+          onFailure: 'skipOptional', offset: { x: 'bad', y: 0 },
+          minClearance: -1, maxDanger: 2, extra: true
+        },
+        lifecycle: {
+          activation: 'always', unload: 'keep', onDefeat: 'ignore', onEscape: 'ignore',
+          respawn: { mode: 'sometimes', delay: 0, resetVariant: 'yes', extra: true },
+          extra: true
+        }
+      },
+      {
+        id: 'fixture.invalid.spawn-count',
+        actorRef: { archetypeId: 'wolf_gray' },
+        mountTo: [{
+          populationId: 'population.grassland', channel: 'rare',
+          mode: 'required', count: 0
+        }],
+        identity: { scope: 'regionStable' },
+        placement: {
+          selector: 'candidate', source: 'spawnCandidates', required: false,
+          onFailure: 'skipOptional'
+        },
+        lifecycle: {
+          activation: 'regionActive', unload: 'despawn', onDefeat: 'closeLease',
+          onEscape: 'closeLease', respawn: { mode: 'none', resetVariant: true }
+        }
+      },
+      {
+        id: 'fixture.invalid.spawn-weight',
+        actorRef: { archetypeId: 'wolf_gray' },
+        mountTo: [{
+          populationId: 'population.grassland', channel: 'rare',
+          mode: 'weighted', weight: 0, maxCount: 0
+        }],
+        identity: { scope: 'regionStable' },
+        placement: {
+          selector: 'candidate', source: 'spawnCandidates', required: false,
+          onFailure: 'skipOptional'
+        },
+        lifecycle: {
+          activation: 'regionActive', unload: 'despawn', onDefeat: 'closeLease',
+          onEscape: 'closeLease', respawn: { mode: 'none', resetVariant: true }
+        }
+      }
+    ]
   }
 });
 
@@ -98,5 +167,15 @@ assert.ok(codes.has('modifier-operation'));
 assert.ok(codes.has('status-max-stacks'));
 assert.ok(audit.issues.some((entry) =>
   entry.type === 'status' && entry.path === 'periodic.0.damageTypeId'));
+for (const code of [
+  'encounter-team-flags', 'encounter-objective-handler',
+  'encounter-completion-policy', 'unknown-field',
+  'mount-mode', 'mount-count', 'mount-weight', 'mount-max-count',
+  'spawn-placement-source', 'spawn-placement-failure',
+  'spawn-placement-offset', 'spawn-placement-number',
+  'spawn-lifecycle', 'spawn-respawn'
+]) {
+  assert.ok(codes.has(code), `expected strict validation issue ${code}`);
+}
 
-console.log('V2 content validation tests passed: modifier, status, talent patch guardrails.');
+console.log('V2 content validation tests passed: nested authoring and runtime contract guardrails.');

@@ -31,6 +31,7 @@ const bootstrap = [
   'js/core/content/compiler.js',
   'js/core/content/audit.js',
   'js/core/content/registry.js',
+  'js/core/content/support.js',
   'js/i18n/i18n.js',
   'js/i18n/zh-CN.js',
   'js/i18n/en.js',
@@ -43,13 +44,20 @@ const bootstrap = [
   'js/sprites/monsters_b.js',
   'js/sprites/props.js',
   'js/sprites/exploration_v3.js',
-  'js/data/packs/manifest.js'
+  'js/data/content/content.generated.js'
 ];
 for (const file of bootstrap) vm.runInContext(read(file), sandbox, { filename: file });
-for (const file of sandbox.Game.CONTENT_PACK_FILES) vm.runInContext(read(file), sandbox, { filename: file });
-if (process.argv.includes('--fixture')) {
-  const fixture = 'tests/fixtures/packs/authoring-smoke.js';
-  vm.runInContext(read(fixture), sandbox, { filename: fixture });
+const fixtureOption = process.argv.find((argument) => argument.startsWith('--fixture='));
+if (process.argv.includes('--fixture') || fixtureOption) {
+  const fixture = fixtureOption
+    ? fixtureOption.slice('--fixture='.length).replace(/\\/g, '/')
+    : 'tests/fixtures/packs/authoring-smoke.pack.js';
+  const fixturePath = path.resolve(root, fixture);
+  const rootPrefix = root.endsWith(path.sep) ? root : root + path.sep;
+  if (!fixturePath.startsWith(rootPrefix) || !fixture.endsWith('.pack.js')) {
+    throw new Error('Fixture must be a *.pack.js file inside the workspace');
+  }
+  vm.runInContext(fs.readFileSync(fixturePath, 'utf8'), sandbox, { filename: fixture });
 }
 
 let audit;

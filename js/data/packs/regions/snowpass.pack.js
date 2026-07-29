@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  Game.content.registerPack(Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  Game.content.registerPack(Game.contentAuthoring.factory('region.pack')({
     regionId: 'snowpass', factionId: 'frost_clans',
-    sourceFile: 'js/data/packs/regions/snowpass.js',
+    sourceFile: 'js/data/packs/regions/snowpass.pack.js',
     statuses: [
       {
         id: 'snowpass.chilled', stacking: 'stack', maxStacks: 4, durationTicks: 140,

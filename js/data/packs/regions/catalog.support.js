@@ -1,5 +1,5 @@
 /* ============================================================
- * data/regions.js — 八大区域注册表
+ * regions/catalog.support.js — 八大区域确定性作者数据
  * 每个区域：怪物、Boss、讨伐数、地形配置（底材/材质补丁/装饰丛聚/
  * 草簇配色/花簇/发光体）、环境粒子、视差远景层、林间光柱。
  * 新增区域 = 新增一条注册，零引擎改动。
@@ -13,6 +13,13 @@
 (function () {
   'use strict';
   var Game = window.Game;
+  Game.contentSupport.register({
+    id: 'authoring.region-catalog',
+    version: '1.0.0',
+    requires: [],
+    capabilities: ['authoring.write'],
+    sourceFile: 'js/data/packs/regions/catalog.support.js',
+    install: function (capabilities) {
 
   var W = 900, H = 520;
 
@@ -521,6 +528,16 @@
       });
     }
     R[i].tradeAreas = tradeAreas;
-    Game.register('region', R[i]);
   }
+      capabilities.authoring.provideValue({
+        id: 'region.catalog', version: 1, value: R
+      });
+      capabilities.authoring.provideFactory({
+        id: 'region.by-id', version: 1, fn: function (id) {
+        for (var ri = 0; ri < R.length; ri++) if (R[ri].id === id) return R[ri];
+        return null;
+        }
+      });
+    }
+  });
 })();

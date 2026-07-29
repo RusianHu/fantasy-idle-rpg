@@ -52,26 +52,4 @@
     }
   };
 
-  Game.rules.registerFormula({
-    id: 'core.damage.power-coefficient-v1',
-    version: 1,
-    deterministic: true,
-    access: ['source.statBlock', 'target.statBlock'],
-    fn: function (ctx, params) {
-      var source = ctx.sourceStats || {};
-      var power = Number(source[params.powerStat || 'physicalPower']) || 0;
-      return power * (Number(params.coefficient) || 1) + (Number(params.flat) || 0);
-    }
-  });
-  Game.rules.registerFormula({
-    id: 'core.heal.power-coefficient-v1',
-    version: 1,
-    deterministic: true,
-    access: ['source.statBlock'],
-    fn: function (ctx, params) {
-      var source = ctx.sourceStats || {};
-      var power = Number(source[params.powerStat || 'healingPower']) || 0;
-      return power * (Number(params.coefficient) || 1) + (Number(params.flat) || 0);
-    }
-  });
 })();

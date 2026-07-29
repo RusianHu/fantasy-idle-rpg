@@ -8,7 +8,7 @@
   }
   Game.content.registerPack({
     id: 'job.mage', version: '2.0.0', schemaVersion: 1,
-    sourceFile: 'js/data/packs/jobs/mage.js',
+    sourceFile: 'js/data/packs/jobs/mage.pack.js',
     requires: [{ id: 'core.combat', range: '^2.0.0' }],
     definitions: {
       statProfile: [{ id: 'stats.mage', schemaVersion: 1, stats: {} }],

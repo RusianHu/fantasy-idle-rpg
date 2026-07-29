@@ -8,7 +8,7 @@
   }
   Game.content.registerPack({
     id: 'job.ranger', version: '2.0.0', schemaVersion: 1,
-    sourceFile: 'js/data/packs/jobs/ranger.js',
+    sourceFile: 'js/data/packs/jobs/ranger.pack.js',
     requires: [{ id: 'core.combat', range: '^2.0.0' }],
     definitions: {
       statProfile: [{ id: 'stats.ranger', schemaVersion: 1, stats: {} }],

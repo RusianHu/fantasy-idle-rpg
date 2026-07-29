@@ -1,7 +1,76 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.8") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.10") format("woff2");
   font-display: swap;
+}
+#modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.modal-mask {
+  position: absolute;
+  inset: 0;
+  padding: 18px;
+  background: #05060fd0;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal {
+  width: min(92vw, 400px);
+  max-height: 82vh;
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid #8b7946;
+  border-radius: 4px;
+  background: #171a18;
+}
+.modal h3 { margin: 0 0 10px; color: #e5c66c; text-align: center; font-size: 15px; }
+.modal-body { color: #aeb4aa; font-size: 12px; line-height: 1.7; }
+.modal-btns, .actor-action-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.btn, .actor-action-btn {
+  min-height: 44px;
+  padding: 8px 10px;
+  color: #ecd47f;
+  border: 1px solid #877441;
+  background: #20231f;
+  cursor: pointer;
+}
+.actor-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.actor-action-icon { width: 18px; height: 18px; image-rendering: pixelated; }
+.btn.danger, .actor-action-btn.danger { color: #f3a28b; border-color: #875044; }
+#toasts {
+  position: fixed;
+  z-index: 110;
+  left: 50%;
+  bottom: 24px;
+  width: min(92vw, 420px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast {
+  margin-top: 6px;
+  padding: 9px 12px;
+  color: #e7e2d2;
+  border: 1px solid #5c5f55;
+  background: #171a18;
+  text-align: center;
+  font-size: 11px;
 }
 
 :root {
@@ -221,7 +290,7 @@ h1 {
 .seed-control label { color: var(--muted); font-size: 11px; }
 .seed-control input {
   width: 92px;
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: 2px;
@@ -231,7 +300,7 @@ h1 {
   text-transform: uppercase;
 }
 .seed-control button {
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 11px;
   border: 1px solid var(--line-strong);
   border-radius: 2px;
@@ -250,7 +319,7 @@ h1 {
 }
 
 .segmented button, .focus-actions button, .strategy-actions button {
-  min-height: 42px;
+  min-height: 44px;
   padding: 0 11px;
   border: 0;
   border-right: 1px solid var(--line);
@@ -453,8 +522,13 @@ h1 {
   line-height: 1.55;
 }
 
+.config-row > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .config-row > span:first-child { color: var(--text); }
-.config-value { display: block; }
+.config-value { display: block; min-width: 0; overflow-wrap: anywhere; }
 .raw-id { color: #858777; font: 10px Consolas, monospace; overflow-wrap: anywhere; }
 
 .swatches { display: inline-flex; gap: 4px; margin-left: 6px; vertical-align: middle; }

@@ -43,10 +43,9 @@ function boot(saved) {
     'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/props.js',
     'js/sprites/exploration_v3.js',
     'js/data/formulas.js', 'js/data/affixes.js', 'js/data/items.js',
-    'js/data/classes.js', 'js/data/skills.js', 'js/data/monsters.js',
-    'js/data/regions.js', 'js/data/routes.js', 'js/data/packs/manifest.js'
+    'js/data/classes.js', 'js/data/skills.js', 'js/data/routes.js',
+    'js/core/content/support.js', 'js/data/content/content.generated.js'
   ].forEach(load);
-  sandbox.Game.CONTENT_PACK_FILES.forEach(load);
   sandbox.Game.content.finalize({ strict: true });
   [
     'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
@@ -84,7 +83,7 @@ function legacy(version) {
 
 const v11 = boot(legacy(11));
 const migrated = v11.Game.save.load();
-assert.equal(migrated.v, 13);
+assert.equal(migrated.v, 14);
 assert.equal(migrated.player, undefined);
 assert.equal(migrated.roster.actors['player-main'].talentRanks.ft_heavy, 3);
 v11.Game.save.applyLoaded(migrated);
@@ -93,13 +92,17 @@ assert.equal(v11.Game.state.player.skills.ft_tough, 2);
 assert.equal(v11.Game.state.inv.lockedSlots.weapon, true);
 assert.equal(Object.prototype.propertyIsEnumerable.call(v11.Game.state, 'player'), false);
 const serialized = v11.Game.save.serialize();
-assert.equal(serialized.v, 13);
+assert.equal(serialized.v, 14);
 assert.equal(serialized.player, undefined);
 assert.ok(serialized.roster && serialized.economy);
 assert.equal(v11.Game.routes.validate(serialized.world.routePlan).length, 0);
 assert.equal(serialized.roster.actors['player-main'].loadout.lockedSlots.weapon, true);
 assert.equal(JSON.stringify(serialized).includes('encounterId'), false);
 assert.equal(JSON.stringify(serialized).includes('cooldowns'), false);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(serialized.world.social)),
+  { spawnVariants: {}, memories: { spawnId: {}, socialGroupId: {}, factionId: {} } }
+);
 
 // The serialized roster is a real persistence boundary, not a primary-only view.
 const multiRoster = JSON.parse(JSON.stringify(serialized));
@@ -139,9 +142,106 @@ assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);
 // Full migration chain remains executable for the oldest supported save.
 const v1 = boot(legacy(1));
 const oldest = v1.Game.save.load();
-assert.equal(oldest.v, 13);
+assert.equal(oldest.v, 14);
 v1.Game.save.applyLoaded(oldest);
 assert.equal(v1.Game.state.roster.primaryActorId, 'player-main');
 assert.ok(v1.Game.State.normalizeRegionOrder(v1.Game.state.world.regionOrder).length >= 8);
 
-console.log('V2 save tests passed: v1→v13 and v11→v13 migration, downgrade, route plan, transient boundary.');
+// v13 social state and ActorRecord Variants are normalized against live content.
+const v13Save = JSON.parse(JSON.stringify(serialized));
+v13Save.v = 13;
+v13Save.roster.actors['player-main'].variantId = 'removed.variant';
+delete v13Save.world.social;
+const v13 = boot(v13Save);
+const upgradedV14 = v13.Game.save.load();
+assert.equal(upgradedV14.v, 14);
+v13.Game.save.applyLoaded(upgradedV14);
+assert.equal(v13.Game.state.roster.actors['player-main'].variantId, null);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(v13.Game.state.world.social)),
+  { spawnVariants: {}, memories: { spawnId: {}, socialGroupId: {}, factionId: {} } }
+);
+
+const socialSave = JSON.parse(JSON.stringify(serialized));
+socialSave.roster.actors['meadow-fox-npc'] = {
+  id: 'meadow-fox-npc',
+  archetypeId: 'creature.meadow_fox',
+  variantId: 'creature.meadow_fox.cornered',
+  classId: null,
+  level: 1,
+  exp: 0,
+  skillPoints: 0,
+  talentRanks: {},
+  permanentUpgrades: {},
+  persistentResources: { hp: 20 },
+  loadout: {
+    equipment: { weapon: null, armor: null, ring: null },
+    lockedSlots: { weapon: false, armor: false, ring: false }
+  }
+};
+socialSave.world.social = {
+  spawnVariants: {
+    'grassland:population.grassland:spawn.grassland.meadow-fox:candidate:0':
+      'creature.meadow_fox.cornered',
+    'removed:spawn': 'removed.variant'
+  },
+  memories: {
+    spawnId: {
+      'grassland:fox:0': {
+        relation: 'hostile',
+        expiresAtWorldTime: 480,
+        profileId: 'spawn.grassland.meadow-fox',
+        reason: 'engagement'
+      },
+      'grassland:expired': {
+        relation: 'hostile',
+        expiresAtWorldTime: 299,
+        profileId: 'spawn.grassland.meadow-fox'
+      },
+      'grassland:removed-profile': {
+        relation: 'hostile',
+        expiresAtWorldTime: 480,
+        profileId: 'spawn.removed'
+      }
+    },
+    socialGroupId: {
+      'social.grassland-wildlife': {
+        relation: 'hostile',
+        expiresAtWorldTime: 480,
+        profileId: 'spawn.grassland.meadow-fox'
+      }
+    },
+    factionId: {
+      wildlife: { reputation: -5, expiresAtWorldTime: null },
+      removed_faction: { reputation: -99, expiresAtWorldTime: null }
+    }
+  }
+};
+const socialBoot = boot(socialSave);
+socialBoot.Game.save.applyLoaded(socialSave);
+assert.equal(
+  socialBoot.Game.state.roster.actors['meadow-fox-npc'].variantId,
+  'creature.meadow_fox.cornered'
+);
+assert.deepEqual(
+  Object.keys(socialBoot.Game.state.world.social.spawnVariants),
+  []
+);
+assert.deepEqual(
+  Object.keys(socialBoot.Game.state.world.social.memories.spawnId),
+  ['grassland:fox:0']
+);
+assert.deepEqual(
+  Object.keys(socialBoot.Game.state.world.social.memories.socialGroupId),
+  ['social.grassland-wildlife']
+);
+assert.deepEqual(
+  Object.keys(socialBoot.Game.state.world.social.memories.factionId),
+  ['wildlife']
+);
+assert.equal(
+  socialBoot.Game.save.serialize().world.social.memories.spawnId['grassland:fox:0'].relation,
+  'hostile'
+);
+
+console.log('V2 save tests passed: v1/v11/v13→v14 migration, social pruning, route plan, transient boundary.');

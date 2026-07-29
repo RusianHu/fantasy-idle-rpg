@@ -36,7 +36,7 @@
         targetId: targetId,
         dedupeKey: 'enemy:' + targetId
       });
-      if (target && target.kind === 'monster') {
+      if (target && target.components && target.components.transform && target.kind !== 'hero') {
         bubbles.show(target, 'alert', {
           targetId: targetId,
           dedupeKey: 'alert:' + targetId

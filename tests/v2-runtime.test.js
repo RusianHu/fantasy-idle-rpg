@@ -35,9 +35,8 @@ function load(file) { vm.runInContext(read(file), sandbox, { filename: file }); 
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
   'js/sprites/props.js', 'js/sprites/exploration_v3.js',
-  'js/data/packs/manifest.js'
+  'js/core/content/support.js', 'js/data/content/content.generated.js'
 ].forEach(load);
-sandbox.Game.CONTENT_PACK_FILES.forEach(load);
 const Game = sandbox.Game;
 Game.content.registerPack({
   id: 'fixture.runtime-actions', version: '1.0.0', schemaVersion: 1,
@@ -100,12 +99,13 @@ const audit = Game.content.finalize({ strict: true });
 assert.equal(audit.ok, true);
 assert.equal(audit.counts.class, 5);
 assert.equal(audit.counts.talent, 30);
-assert.equal(audit.counts.actorArchetype, 28);
+assert.equal(audit.counts.actorArchetype, 29);
 assert.equal(audit.counts.encounterProfile, 16);
 
 [
   'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
-  'js/systems/actors/actors.js', 'js/systems/encounters.js',
+  'js/systems/actors/actors.js', 'js/systems/world_population.js',
+  'js/systems/encounters.js', 'js/systems/engagement.js',
   'js/systems/combat_ai.js', 'js/systems/combat.js',
   'js/systems/combat_estimator.js'
 ].forEach(load);
@@ -405,6 +405,80 @@ for (let index = 0; index < regions.length; index++) {
   Game.actors.despawn(player.id, 'test');
   Game.actors.despawn(boss.id, 'test');
   Game.encounters.remove(bossEncounter.id);
+}
+
+// All 16 production profiles preserve the legacy two-team termination projection.
+const compatibilityProfiles = Game.content.all('encounterProfile');
+assert.equal(compatibilityProfiles.length, 16);
+for (let profileIndex = 0; profileIndex < compatibilityProfiles.length; profileIndex++) {
+  const profile = compatibilityProfiles[profileIndex];
+  const compatibility = Game.encounters.start(profile.id, {
+    id: `test:termination:${profile.id}`,
+    seed: 700 + profileIndex,
+    silent: true
+  });
+  const compatibilityHero = Game.actors.spawn({
+    instanceId: `test:termination:hero:${profile.id}`,
+    archetypeId: 'adventurer',
+    classId: 'fighter',
+    tier: profileIndex % 8 + 1,
+    level: 40,
+    factionId: 'adventurers',
+    statValues: party('fighter', profileIndex % 8 + 1)[0].statValues,
+    transform: { x: 100, y: 100 },
+    spawnSource: { kind: 'test', sourceId: profile.id, sequence: 1 }
+  });
+  Game.encounters.join(compatibility.id, compatibilityHero.id, 'party');
+  const compatibilityPack = Game.content.get('encounterPack', profile.encounterPackIds[0]);
+  const compatibilityEnemies = compatibilityPack.members.map((member, memberIndex) => {
+    const actor = Game.actors.spawn({
+      instanceId: `test:termination:enemy:${profile.id}:${member.slotId}`,
+      archetypeId: member.archetypeId,
+      variantId: member.variantId || null,
+      tier: profileIndex % 8 + 1,
+      level: 40,
+      transform: { x: 118 + memberIndex * 8, y: 100 + memberIndex * 8 },
+      spawnSource: {
+        kind: 'test',
+        sourceId: profile.id,
+        sequence: 100 + memberIndex
+      }
+    });
+    Game.encounters.join(compatibility.id, actor.id, 'enemy');
+    return actor;
+  });
+  const ongoing = Game.encounters.evaluateObjectives(compatibility.id);
+  assert.equal(ongoing.done, false, `${profile.id} starts ongoing`);
+  compatibility.tick = 37;
+  const expectedRewardIds = Array.from(compatibilityEnemies)
+    .filter((actor) => actor.encounterRewardAuthorized)
+    .map((actor) => actor.id)
+    .sort();
+  compatibilityEnemies.forEach((actor) => Game.units.defeat(actor, { commit: false }));
+  const legacyLivingTeams = ['party', 'enemy'].filter((teamId) =>
+    compatibility.teams[teamId].members.some((actorId) => {
+      const actor = Game.actors.get(actorId);
+      return actor && actor.components.vitals.hp > 0;
+    })
+  );
+  const legacyResult = {
+    done: legacyLivingTeams.length <= 1,
+    winnerTeamId: legacyLivingTeams.length === 1 ? legacyLivingTeams[0] : null,
+    tick: compatibility.tick
+  };
+  const objectiveResult = Game.encounters.evaluateObjectives(compatibility.id);
+  assert.equal(objectiveResult.done, legacyResult.done, `${profile.id} termination`);
+  assert.equal(objectiveResult.winnerTeamId, legacyResult.winnerTeamId,
+    `${profile.id} winner projection`);
+  assert.equal(compatibility.tick, legacyResult.tick, `${profile.id} ending tick`);
+  assert.deepEqual(
+    Array.from(objectiveResult.rewardAuthorizedActorIds),
+    expectedRewardIds,
+    `${profile.id} reward authorization`
+  );
+  Game.actors.despawn(compatibilityHero.id, 'test');
+  compatibilityEnemies.forEach((actor) => Game.actors.despawn(actor.id, 'test'));
+  Game.encounters.remove(compatibility.id);
 }
 
 // Formal 4+8 Lab budget: active combat step P95 <= 2ms.

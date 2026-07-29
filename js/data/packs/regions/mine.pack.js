@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  Game.content.registerPack(Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  Game.content.registerPack(Game.contentAuthoring.factory('region.pack')({
     regionId: 'mine', factionId: 'mine_denizens',
-    sourceFile: 'js/data/packs/regions/mine.js',
+    sourceFile: 'js/data/packs/regions/mine.pack.js',
     statuses: [
       {
         id: 'mine.disoriented', stacking: 'refresh', durationTicks: 100,

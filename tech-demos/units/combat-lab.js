@@ -1,6 +1,51 @@
 (function () {
   'use strict';
   var Game = window.Game;
+  Game.content.registerPack({
+    id: 'lab.ecosystem-scenarios', version: '1.0.0', schemaVersion: 1,
+    requires: [{ id: 'core.combat', range: '^2.0.0' }],
+    definitions: {
+      encounterProfile: [
+        {
+          id: 'lab.encounter.three-team',
+          regionId: 'grassland',
+          rulesProfileId: 'core.rules.standard-v1',
+          teamSlots: [
+            { id: 'team-allies', role: 'combatant', coalitionId: 'allies', countsForCompletion: true, rewardEligible: false },
+            { id: 'team-enemies', role: 'combatant', coalitionId: 'enemies', countsForCompletion: true, rewardEligible: true },
+            { id: 'team-rivals', role: 'combatant', coalitionId: 'rivals', countsForCompletion: true, rewardEligible: true },
+            { id: 'team-observers', role: 'observer', coalitionId: 'neutral', countsForCompletion: false, rewardEligible: false }
+          ],
+          relationMatrix: {
+            'team-allies': { 'team-enemies': 'hostile', 'team-rivals': 'hostile' },
+            'team-enemies': { 'team-allies': 'hostile', 'team-rivals': 'hostile' },
+            'team-rivals': { 'team-allies': 'hostile', 'team-enemies': 'hostile' }
+          },
+          objectives: [
+            { id: 'eliminate-enemies', type: 'eliminate', teamId: 'team-enemies', required: true },
+            { id: 'eliminate-rivals', type: 'eliminate', teamId: 'team-rivals', required: true },
+            { id: 'allies-survive', type: 'survive', teamId: 'team-allies', required: true, minimum: 1 }
+          ]
+        },
+        {
+          id: 'lab.encounter.surrender',
+          regionId: 'grassland',
+          rulesProfileId: 'core.rules.standard-v1',
+          teamSlots: [
+            { id: 'team-allies', role: 'combatant', coalitionId: 'allies', countsForCompletion: true, rewardEligible: false },
+            { id: 'team-enemies', role: 'combatant', coalitionId: 'enemies', countsForCompletion: true, rewardEligible: true }
+          ],
+          relationMatrix: {
+            'team-allies': { 'team-enemies': 'hostile' },
+            'team-enemies': { 'team-allies': 'hostile' }
+          },
+          objectives: [
+            { id: 'enemy-surrenders', type: 'surrender', teamId: 'team-enemies', required: true }
+          ]
+        }
+      ]
+    }
+  });
   var $ = function (id) { return document.getElementById(id); };
   var encounter = null;
   var paused = false;
@@ -15,6 +60,8 @@
   var presentationCursor = 0;
   var movementTrace = [];
   var movementSignatures = {};
+  var allyTeamId = 'party';
+  var enemyTeamId = 'enemy';
   var canvas = $('stage');
   var ctx = canvas.getContext('2d');
 
@@ -32,7 +79,9 @@
       movementTrace: '位移 / 接敌追踪', impact: '运行至下一次命中',
       catalog: '生产内容目录', catalogType: '类型',
       portraits: '双方肖像槽 QA', allyPortrait: '友方肖像', enemyPortrait: '敌方肖像',
-      portraitReady: '生产渲染器 · 双方非空', portraitPartial: '等待双方战斗 Actor'
+      portraitReady: '生产渲染器 · 双方非空', portraitPartial: '等待双方战斗 Actor',
+      ecosystem: 'Population / Engagement / Objective / Variant',
+      provoke: '中立群体挑衅', surrenderAction: '目标投降', forgive: '赎罪 / 清除记忆'
     },
     en: {
       title: 'Actor / Deterministic Combat Lab', language: 'Language', hub: 'Demo hub', game: 'Production game',
@@ -47,7 +96,9 @@
       movementTrace: 'Movement / Contact Trace', impact: 'Run to next impact',
       catalog: 'Production content catalog', catalogType: 'Type',
       portraits: 'Combat portrait slots QA', allyPortrait: 'Ally portrait', enemyPortrait: 'Enemy portrait',
-      portraitReady: 'Production renderer · both populated', portraitPartial: 'Waiting for both combat Actors'
+      portraitReady: 'Production renderer · both populated', portraitPartial: 'Waiting for both combat Actors',
+      ecosystem: 'Population / Engagement / Objective / Variant',
+      provoke: 'Provoke neutral group', surrenderAction: 'Target surrenders', forgive: 'Atone / clear memory'
     }
   };
   var scenarioLabels = {
@@ -63,7 +114,10 @@
     aoe: ['AOE 友伤过滤', 'AOE friendly-fire filter'],
     charm: ['魅惑与易主', 'Charm / team change'],
     summon: ['召唤与继承', 'Summon / inheritance'],
-    boss: ['Boss 50% phase', 'Boss 50% phase']
+    boss: ['Boss 50% phase', 'Boss 50% phase'],
+    engagement: ['中立群体 / 外部命令', 'Neutral group / external command'],
+    threeTeam: ['三阵营与中立观察者', 'Three teams and neutral observer'],
+    surrender: ['投降目标', 'Surrender objective']
   };
   var classStats = {
     fighter: [240, 32, 16, 1.03, 26], rogue: [172, 40, 10, 1.18, 26],
@@ -149,6 +203,14 @@
     var ids = ['grassland', 'forest', 'mine', 'graveyard', 'snowpass', 'lavacave', 'skyruins', 'darkcastle'];
     return Math.max(1, ids.indexOf(profile.regionId) + 1);
   }
+  function configureTeamIds(profile) {
+    var slots = profile.teamSlots || [];
+    var combatants = slots.filter(function (slot) { return slot.role === 'combatant'; });
+    allyTeamId = slots.some(function (slot) { return slot.id === 'party'; })
+      ? 'party' : (combatants[0] && combatants[0].id || 'party');
+    enemyTeamId = slots.some(function (slot) { return slot.id === 'enemy'; })
+      ? 'enemy' : (combatants.filter(function (slot) { return slot.id !== allyTeamId; })[0] || {}).id || 'enemy';
+  }
   function spawnAlly(index, archetypeId, classId, tier) {
     var archetype = Game.content.get('actorArchetype', archetypeId);
     var spec = {
@@ -164,7 +226,7 @@
     var actor = Game.actors.spawn(spec);
     if (archetype.category === 'player') actor.sprite = 'hero_' + classId;
     actor.tacticsProfileId = $('strategy').value;
-    if (actor.components.actionState) Game.encounters.join(encounter.id, actor.id, 'team-allies');
+    if (actor.components.actionState) Game.encounters.join(encounter.id, actor.id, allyTeamId);
     return actor;
   }
   function enemyPool(profile) {
@@ -191,7 +253,7 @@
       controllerId: 'ai:monster',
       spawnSource: { kind: 'lab', sourceId: $('scenario').value, sequence: 100 + index }
     });
-    Game.encounters.join(encounter.id, actor.id, 'team-enemies');
+    Game.encounters.join(encounter.id, actor.id, enemyTeamId);
     return actor;
   }
   function addNeutral() {
@@ -215,18 +277,63 @@
       aoe: { classId: 'mage', allies: 4, enemies: 8 },
       charm: { classId: 'rogue', allies: 2, enemies: 3 },
       summon: { classId: 'mage', allies: 2, enemies: 4 },
-      boss: { classId: 'fighter', allies: 4, enemies: 1, boss: true }
+      boss: { classId: 'fighter', allies: 4, enemies: 1, boss: true },
+      engagement: { classId: 'fighter', allies: 1, enemies: 1, engagement: true },
+      threeTeam: { classId: 'fighter', allies: 2, enemies: 4, encounterId: 'lab.encounter.three-team' },
+      surrender: { classId: 'cleric', allies: 2, enemies: 2, encounterId: 'lab.encounter.surrender' }
     }[id];
     if (!preset) return;
     $('class').value = preset.classId;
     $('allies').value = preset.allies;
     $('enemies').value = preset.enemies;
+    if (preset.encounterId) $('encounter').value = preset.encounterId;
     if (preset.boss && !/\.boss$/.test($('encounter').value)) $('encounter').value += '.boss';
+  }
+  function resetEngagementScenario(tier) {
+    Game.population.reset('grassland');
+    var hero = Game.actors.spawn({
+      instanceId: 'lab:ally:0',
+      archetypeId: 'adventurer',
+      classId: $('class').value,
+      level: Number($('level').value) || 20,
+      tier: tier,
+      factionId: 'adventurers',
+      controllerId: 'player:manual',
+      statValues: stats($('class').value, tier),
+      transform: { x: 260, y: 240, direction: 'r' },
+      spawnSource: { kind: 'lab', sourceId: 'engagement', sequence: 1 }
+    });
+    hero.actorRecordId = 'lab-primary';
+    hero.sprite = 'hero_' + $('class').value;
+    Game.parties.addMember('lab-party', hero.id);
+    var foxes = ['lab-fox-a', 'lab-fox-b'].map(function (slotKey, index) {
+      return Game.population.materialize('spawn.grassland.meadow-fox', {
+        regionId: 'grassland',
+        populationId: 'population.grassland',
+        layoutSlotKey: slotKey,
+        spawnRequestKey: 'lab:' + slotKey,
+        x: 655 + index * 54,
+        y: 210 + index * 58,
+        tier: 1
+      }).primary;
+    });
+    Game.engagement.enqueue({
+      commandId: 'lab-neutral-provocation',
+      requestedTick: 1,
+      sourceKey: { actorRecordId: hero.actorRecordId },
+      targetKey: Game.population.stableKey(foxes[0]),
+      kind: 'attack'
+    });
+    var result = Game.engagement.processCommands(1)[0];
+    encounter = result && result.ok ? Game.encounters.get(result.encounterId) : null;
   }
   function reset() {
     updateUrl();
     scenarioPreset($('scenario').value);
+    Game.engagement.reset();
     Game.encounters.reset();
+    Game.relations.reset();
+    Game.population.reset(null);
     Game.parties.reset();
     Game.actors.reset();
     Game.combat.resetClock();
@@ -238,13 +345,37 @@
     charmOverride = null;
     var profile = Game.content.get('encounterProfile', $('encounter').value) ||
       Game.content.get('encounterProfile', 'encounter.grassland');
+    configureTeamIds(profile);
     var tier = Number($('tier').value) || tierFor(profile);
     $('tier').value = tier;
-    encounter = Game.encounters.start(profile.id, {
-      id: 'lab:encounter', seed: Number($('seed').value) >>> 0,
-      fullLog: true, silent: true, lab: true
-    });
+    Game.state = {
+      world: {
+        region: profile.regionId,
+        worldSeed: Number($('seed').value) >>> 0,
+        worldTime: 300,
+        social: {
+          spawnVariants: {},
+          memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
+        }
+      },
+      player: { level: Number($('level').value) || 20 }
+    };
     Game.parties.create({ id: 'lab-party', maxMembers: 4 });
+    if ($('scenario').value === 'engagement') {
+      resetEngagementScenario(tier);
+    } else {
+      encounter = Game.encounters.start(profile.id, {
+        id: 'lab:encounter', seed: Number($('seed').value) >>> 0,
+        fullLog: true, silent: true, lab: true
+      });
+    }
+    if ($('scenario').value === 'engagement') {
+      pumpPresentation();
+      traceMovement(true);
+      refreshRuntimeSelects();
+      updateUi(true);
+      return;
+    }
     var allyCount = Math.max(1, Math.min(4, Number($('allies').value) || 1));
     var classes = Game.content.all('class').map(function (def) { return def.id; });
     for (var ai = 0; ai < allyCount; ai++) {
@@ -256,6 +387,16 @@
     var enemyCount = Math.max(1, Math.min(8, Number($('enemies').value) || 1));
     for (var ei = 0; ei < enemyCount; ei++) spawnEnemy(ei, pool[ei % pool.length], tier);
     if ($('scenario').value === 'neutral') addNeutral();
+    if ($('scenario').value === 'threeTeam') {
+      Game.actors.query({ teamId: enemyTeamId }).filter(function (_, index) {
+        return index % 2 === 1;
+      }).forEach(function (actor) {
+        Game.encounters.leave(encounter.id, actor.id, 'lab-reteam');
+        Game.encounters.join(encounter.id, actor.id, 'team-rivals');
+      });
+      var observer = addNeutral();
+      Game.encounters.join(encounter.id, observer.id, 'team-observers');
+    }
     applyScenario($('scenario').value);
     pumpPresentation();
     traceMovement(true);
@@ -263,8 +404,8 @@
     updateUi(true);
   }
   function applyScenario(id) {
-    var allies = Game.actors.query({ teamId: 'team-allies' });
-    var enemies = Game.actors.query({ teamId: 'team-enemies' });
+    var allies = Game.actors.query({ teamId: allyTeamId });
+    var enemies = Game.actors.query({ teamId: enemyTeamId });
     if (id === 'boss' && enemies[0]) enemies[0].hp = enemies[0].maxHp * .49;
     if (id === 'healing' && allies[1]) allies[1].hp *= .32;
     if (id === 'charm' && enemies[0]) {
@@ -319,7 +460,7 @@
   function doSummon() {
     if (!encounter || Game.actors.get('lab:summon')) return;
     var source = Game.actors.get($('tool-source').value) ||
-      Game.actors.query({ teamId: 'team-allies' })[0];
+      Game.actors.query({ teamId: allyTeamId })[0];
     if (!source) return;
     var actor = Game.actors.spawn({
       instanceId: 'lab:summon', archetypeId: 'summon.shadow_wisp',
@@ -333,10 +474,10 @@
   }
   function bubbleAnchors() {
     return {
-      hero: Game.actors.query({ teamId: 'team-allies' }).filter(function (actor) {
+      hero: Game.actors.query({ teamId: allyTeamId }).filter(function (actor) {
         return actor.components.vitals;
       })[0] || null,
-      enemy: Game.actors.query({ teamId: 'team-enemies' }).filter(function (actor) {
+      enemy: Game.actors.query({ teamId: enemyTeamId }).filter(function (actor) {
         return actor.components.vitals;
       })[0] || null
     };
@@ -455,8 +596,8 @@
     });
     var badges = {};
     [
-      ['team-allies', 'A'],
-      ['team-enemies', 'E']
+      [allyTeamId, 'A'],
+      [enemyTeamId, 'E']
     ].forEach(function (entry) {
       Game.actors.query({ teamId: entry[0] })
         .sort(function (a, b) { return a.id.localeCompare(b.id); })
@@ -468,8 +609,8 @@
       .forEach(function (actor, index) { badges[actor.id] = 'N' + (index + 1); });
     stageActors.forEach(function (actor) {
       var combat = actor.components.vitals;
-      var relation = encounter && actor.teamId === 'team-allies' ? 'ally'
-        : encounter && actor.teamId === 'team-enemies' ? 'enemy' : 'neutral';
+      var relation = encounter && actor.teamId === allyTeamId ? 'ally'
+        : encounter && actor.teamId === enemyTeamId ? 'enemy' : 'neutral';
       ctx.save();
       ctx.strokeStyle = relation === 'ally' ? '#68aee7' : relation === 'enemy' ? '#ef7569' : '#e7c45b';
       ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(actor.x, actor.y + 4, 24, 10, 0, 0, Math.PI * 2); ctx.stroke();
@@ -733,7 +874,7 @@
       var actors = ids.map(Game.actors.get).filter(Boolean);
       return actors.length ? actors : Game.actors.query({ teamId: teamId });
     }
-    var allies = teamActors('team-allies').filter(function (actor) {
+    var allies = teamActors(allyTeamId).filter(function (actor) {
       return actor.components.vitals;
     }).sort(function (a, b) {
       return Number(a.dead) - Number(b.dead) || a.id.localeCompare(b.id);
@@ -741,7 +882,7 @@
     var ally = allies.filter(function (actor) { return actor.id === 'lab:ally:0'; })[0] || allies[0];
     var targetId = ally && ally.components.targeting &&
       (ally.components.targeting.priorityTargetId || ally.components.targeting.currentTargetId);
-    var enemies = teamActors('team-enemies').filter(function (actor) {
+    var enemies = teamActors(enemyTeamId).filter(function (actor) {
       return actor.components.vitals;
     }).sort(function (a, b) {
       if (a.dead !== b.dead) return Number(a.dead) - Number(b.dead);
@@ -823,6 +964,20 @@
     $('presentation-events').textContent = JSON.stringify(
       Game.combatPresentation.snapshot().records.slice(-35), null, 2);
     $('movement-trace').textContent = JSON.stringify(movementTrace.slice(-35), null, 2);
+    $('ecosystem').textContent = JSON.stringify({
+      population: Game.content.populationView('population.' + (encounter.profile.regionId || 'grassland')),
+      leases: Game.population.leases(),
+      externalCommand: Game.engagement.snapshot(),
+      objectiveEvaluation: {
+        objectives: encounter.profile.objectives,
+        participantStates: encounter.participantStates,
+        result: encounter.result
+      },
+      variantCleanup: encounter.scheduler.filter(function (item) {
+        return item.kind === 'variantTransition';
+      }),
+      social: Game.state && Game.state.world && Game.state.world.social
+    }, null, 2);
     updatePortraitQa();
     updateInspector();
     if (force) refreshRuntimeSelects();
@@ -889,6 +1044,29 @@
         updateUi(true);
       }],
       ['summon', doSummon]
+      ,['lab-provoke', function () {
+        $('scenario').value = 'engagement';
+        reset();
+      }]
+      ,['lab-surrender', function () {
+        var target = Game.actors.get($('tool-target').value);
+        if (target && target.encounterId) {
+          var encounterId = target.encounterId;
+          Game.encounters.leave(encounterId, target.id, 'surrender');
+          Game.encounters.evaluateObjectives(encounterId);
+        }
+        updateUi(true);
+      }]
+      ,['lab-forgive', function () {
+        var target = Game.actors.get($('tool-target').value) ||
+          Game.actors.query().filter(function (actor) { return actor.spawnId; })[0];
+        if (target) Game.engagement.forgive({
+          spawnId: target.spawnId,
+          socialGroupId: target.socialGroupId,
+          factionId: target.factionId
+        });
+        updateUi(true);
+      }]
     ].forEach(function (entry) { $(entry[0]).addEventListener('click', entry[1]); });
     $('locale').addEventListener('change', function () { translate(); updateUrl(); });
     $('tool-source').addEventListener('change', refreshAbilities);

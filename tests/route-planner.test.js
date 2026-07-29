@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadProductionContent } = require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 global.window = global;
@@ -12,10 +13,8 @@ function load(file) {
   vm.runInThisContext(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file });
 }
 
-load('js/core/utils.js');
-load('js/core/registry.js');
+loadProductionContent(load, global);
 Game.assets = { sprite: () => ({ w: 16, h: 16, frames: {} }) };
-load('js/data/regions.js');
 load('js/data/routes.js');
 load('js/systems/routes.js');
 

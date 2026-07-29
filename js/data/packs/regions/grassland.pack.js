@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  var pack = Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  var pack = Game.contentAuthoring.factory('region.pack')({
     regionId: 'grassland', factionId: 'wild',
-    sourceFile: 'js/data/packs/regions/grassland.js',
+    sourceFile: 'js/data/packs/regions/grassland.pack.js',
     statuses: [
       {
         id: 'grassland.corroded', stacking: 'stack', maxStacks: 3, durationTicks: 140,

@@ -4,12 +4,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadProductionContent } = require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 const TRADE_SOURCE = fs.readFileSync(path.join(ROOT, 'js/systems/trade.js'), 'utf8');
 const SHOP_SOURCE = fs.readFileSync(path.join(ROOT, 'js/systems/shop.js'), 'utf8');
-const REGION_SOURCE = fs.readFileSync(path.join(ROOT, 'js/data/regions.js'), 'utf8');
 const INDEX_SOURCE = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
 function makeHarness() {
   const events = [];
@@ -212,17 +213,14 @@ assert.equal(
   'context events only fire when the access signature changes'
 );
 
-const registeredRegions = [];
-const RegionGame = {
-  register(type, def) {
-    if (type === 'region') registeredRegions.push(def);
-  }
-};
-vm.runInContext(
-  REGION_SOURCE,
-  vm.createContext({ window: { Game: RegionGame }, console }),
-  { filename: 'js/data/regions.js' }
+const regionSandbox = { console };
+regionSandbox.window = regionSandbox;
+vm.createContext(regionSandbox);
+loadProductionContent(
+  (file) => vm.runInContext(read(file), regionSandbox, { filename: file }),
+  regionSandbox
 );
+const registeredRegions = regionSandbox.Game.reg.all('region');
 assert.equal(registeredRegions.length, 8);
 for (const region of registeredRegions) {
   const camp = region.tradeAreas.find((area) => area.id === 'camp-supply');

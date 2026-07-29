@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  Game.content.registerPack(Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  Game.content.registerPack(Game.contentAuthoring.factory('region.pack')({
     regionId: 'darkcastle', factionId: 'demon_army',
-    sourceFile: 'js/data/packs/regions/darkcastle.js',
+    sourceFile: 'js/data/packs/regions/darkcastle.pack.js',
     statuses: [
       {
         id: 'darkcastle.cursed', stacking: 'refresh', durationTicks: 150,

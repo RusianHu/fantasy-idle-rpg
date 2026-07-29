@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { loadProductionContent } = require('./helpers/production-content');
 
 const ROOT = path.resolve(__dirname, '..');
 global.window = global;
@@ -13,16 +14,13 @@ function load(file) {
   vm.runInThisContext(source, { filename: file });
 }
 
-load('js/core/utils.js');
-load('js/core/eventbus.js');
-load('js/core/registry.js');
+loadProductionContent(load, global);
 Game.assets = {
   sprite(id) {
     const large = /oak|tree|pine|pillar|rocks_big|crystal_big|obsidian|beam|banner|spikes/.test(id);
     return { w: large ? 20 : 10, h: large ? 24 : 10, frames: /tree|oak|pine/.test(id) ? { idle1: true } : {} };
   }
 };
-load('js/data/regions.js');
 load('js/data/routes.js');
 load('js/systems/routes.js');
 load('js/systems/terrain.js');
@@ -181,8 +179,7 @@ function runV1CompatibilitySnapshots() {
 }
 
 function runSubseedIsolation() {
-  const region = Game.reg.get('region', 'grassland');
-  const originalTufts = region.terrain.tufts;
+  const region = JSON.parse(JSON.stringify(Game.reg.get('region', 'grassland')));
   const before = Game.terrain.build(region, 0x12345678, 2);
   const criticalBefore = JSON.stringify({
     camp: before.camp,
@@ -191,9 +188,8 @@ function runSubseedIsolation() {
     grid: before.grid,
     props: before.props.map((p) => [p.sprite, p.x, p.y, p.flipX])
   });
-  region.terrain.tufts = originalTufts + 7;
+  region.terrain.tufts += 7;
   const after = Game.terrain.build(region, 0x12345678, 2);
-  region.terrain.tufts = originalTufts;
   const criticalAfter = JSON.stringify({
     camp: after.camp,
     boss: after.bossPoint,

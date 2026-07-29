@@ -9,7 +9,6 @@ const { spawn } = require('node:child_process');
 const CHROME = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const BASE = process.env.FIRPG_URL || 'http://127.0.0.1:4176/';
 const BUILD_ID = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')).buildId;
-const port = 9300 + Math.floor(Math.random() * 400);
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'firpg-cdp-'));
 
 function delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -24,6 +23,19 @@ async function waitJson(url, attempts = 80) {
     await delay(50);
   }
   throw last || new Error('Chrome debugging endpoint did not start');
+}
+
+async function waitDevToolsPort(attempts = 100) {
+  const activePort = path.join(profile, 'DevToolsActivePort');
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const port = Number(fs.readFileSync(activePort, 'utf8').split(/\r?\n/)[0]);
+      if (Number.isInteger(port) && port > 0) return port;
+    } catch (error) { last = error; }
+    await delay(50);
+  }
+  throw last || new Error('Chrome did not publish DevToolsActivePort');
 }
 
 class Cdp {
@@ -103,13 +115,14 @@ class Cdp {
 async function run() {
   const chrome = spawn(CHROME, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--disable-default-apps',
-    '--remote-allow-origins=*', '--remote-debugging-port=' + port,
+    '--remote-allow-origins=*', '--remote-debugging-port=0',
     '--user-data-dir=' + profile, 'about:blank'
   ], { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true });
   let stderr = '';
   chrome.stderr.on('data', (chunk) => { stderr += String(chunk); });
 
   try {
+    const port = await waitDevToolsPort();
     const targets = await waitJson('http://127.0.0.1:' + port + '/json/list');
     const page = targets.find((target) => target.type === 'page');
     assert.ok(page, 'Chrome page target exists');
@@ -3333,6 +3346,7 @@ async function run() {
       const explorationIds = Object.keys(Game.EXPLORATION_SPRITES?.assets || {});
       const region = Game.world.region;
       const layout = Game.world.layout;
+      const mountPlan = Game.population.mountPlan();
       const inspectorCount = (kind) => document.querySelectorAll('[data-inspector-kind="' + kind + '"]').length;
       for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4)) {
         colors.add(pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2]);
@@ -3369,6 +3383,9 @@ async function run() {
           guardian: inspectorCount('guardian') === 1,
           decorations: inspectorCount('decoration') === region.terrain.deco.length,
           combat: inspectorCount('monster') === region.monsters.length && inspectorCount('boss') === 1,
+          mountPlan: !!mountPlan && mountPlan.regionId === region.id &&
+            inspectorCount('population-mount-plan') === 1 &&
+            inspectorCount('population-reservation') === mountPlan.reservations.length,
           allDecorInstanced: region.terrain.deco.every((def) =>
             layout.props.some((prop) => !prop.campProp && prop.sprite === def.sprite)),
           noMissingInspectorKey: !document.getElementById('inspector').textContent.includes('map.inspector.'),
@@ -3484,10 +3501,10 @@ async function run() {
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.catalog.complete, true);
-    assert.equal(unitsBubbleDemo.catalog.actorCount, 28);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 29);
     assert.equal(unitsBubbleDemo.catalog.classCount, 5);
     assert.equal(unitsBubbleDemo.catalog.monsterCount, 24);
-    assert.equal(unitsBubbleDemo.catalog.encounterCount, 16);
+    assert.equal(unitsBubbleDemo.catalog.encounterCount, 18);
     assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.equal(unitsBubbleDemo.snapshot.length, 2,
       'units QA must expose both anchors: ' + JSON.stringify(unitsBubbleDemo));

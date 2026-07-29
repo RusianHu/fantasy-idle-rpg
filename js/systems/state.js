@@ -142,6 +142,7 @@
             'player-main': {
               id: 'player-main',
               archetypeId: 'adventurer',
+              variantId: null,
               classId: null,
               level: 1, exp: 0, skillPoints: 0,
               talentRanks: {},
@@ -172,6 +173,10 @@
           regionProg: {},
           nodeCooldowns: {},
           exploration: {},
+          social: {
+            spawnVariants: {},
+            memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
+          },
           finalRegionLocked: false,
           deathsRow: 0
         },
@@ -470,7 +475,10 @@
       var d = Player.derived();
       var cls = Player.classDef();
       var tier = State.regionTier(Game.state.world.region);
-      var mDef = F.monsterStats(tier, {}, false).def;
+      var population = Game.population && Game.population.offlineSummary(
+        Game.state.world.region, tier
+      );
+      var mDef = population ? population.armor : 0;
       var hit = d.atk * d.atk / (d.atk + mDef);
       var critMult = 1 + d.crit * (d.critDmg - 1);
       var aps = 1 / F.atkInterval(d.spd);

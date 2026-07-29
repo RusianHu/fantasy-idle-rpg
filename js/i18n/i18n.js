@@ -39,6 +39,10 @@
       return !!(packs[locale] && packs[locale][key] !== undefined);
     },
 
+    raw: function (locale, key) {
+      return packs[locale] && packs[locale][key];
+    },
+
     locales: function () { return Object.keys(packs).sort(); },
 
     setLocale: function (locale) {

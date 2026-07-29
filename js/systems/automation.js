@@ -29,25 +29,16 @@
     var order = Game.State.regionOrder();
     var region = reg.get('region', rid) || reg.get('region', order[0]);
     var tier = Game.State.regionTier(region.id);
-    var normalDef = 0, normalCount = 0;
-    for (var i = 0; i < region.monsters.length; i++) {
-      var m = reg.get('monster', region.monsters[i]);
-      if (!m) continue;
-      normalDef += F.monsterStats(tier, m.mods, false).def;
-      normalCount++;
-    }
-    if (!normalCount) {
-      normalDef = F.monsterStats(tier, {}, false).def;
-      normalCount = 1;
-    }
-    var bossDef = reg.get('monster', region.boss);
-    var boss = F.monsterStats(tier, bossDef ? bossDef.mods : {}, true);
+    var normal = Game.population.offlineSummary(region.id, tier);
+    var bossProfileId = Game.population.channelProfiles(region.id, 'boss')[0];
+    var bossSpawn = bossProfileId && Game.content.get('worldSpawnProfile', bossProfileId);
+    var boss = bossSpawn && Game.population.summarizePack(bossSpawn.encounterPackId, tier);
     return {
       rid: region.id,
       tier: tier,
-      normalDef: normalDef / normalCount,
-      bossAtk: boss.atk,
-      bossSpd: boss.spd
+      normalDef: normal ? normal.armor : 0,
+      bossAtk: boss ? boss.power : 1,
+      bossSpd: boss ? 10 + Math.max(0, boss.speed - 1) / 0.018 : 10
     };
   }
 

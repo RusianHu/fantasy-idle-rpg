@@ -39,10 +39,9 @@ function load(file) {
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
   'js/sprites/props.js', 'js/sprites/exploration_v3.js',
   'js/data/formulas.js', 'js/data/affixes.js', 'js/data/items.js',
-  'js/data/classes.js', 'js/data/skills.js', 'js/data/monsters.js',
-  'js/data/regions.js', 'js/data/routes.js', 'js/data/packs/manifest.js'
+  'js/data/classes.js', 'js/data/skills.js', 'js/data/routes.js',
+  'js/core/content/support.js', 'js/data/content/content.generated.js'
 ].forEach(load);
-sandbox.Game.CONTENT_PACK_FILES.forEach(load);
 sandbox.Game.content.finalize({ strict: true });
 [
   'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',

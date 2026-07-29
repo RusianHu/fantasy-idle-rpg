@@ -21,6 +21,12 @@
     if (!Game.content.has('actorArchetype', spec.archetypeId)) {
       throw new Error('[Roster] unknown archetype: ' + spec.archetypeId);
     }
+    if (spec.variantId) {
+      var variant = Game.content.get('actorVariant', spec.variantId);
+      if (!variant || variant.archetypeId !== spec.archetypeId) {
+        throw new Error('[Roster] invalid variant: ' + spec.variantId);
+      }
+    }
     if (spec.classId && !Game.content.has('class', spec.classId)) {
       throw new Error('[Roster] unknown class: ' + spec.classId);
     }
@@ -46,6 +52,7 @@
       var record = {
         id: spec.id,
         archetypeId: spec.archetypeId,
+        variantId: spec.variantId || null,
         classId: spec.classId || null,
         level: Math.max(1, spec.level | 0 || 1),
         exp: Math.max(0, Number(spec.exp) || 0),

@@ -38,6 +38,8 @@
     autoCampSuppressedUntil: 0,
     settledPacks: {},
     encounterSequence: 1,
+    encounterOrdinals: {},
+    compatSpawnSequence: 1,
 
     heroMoveSpeed: function () {
       if (!W.layout || W.layout.version < 3 || !Game.expedition) return HERO_SPEED;
@@ -88,9 +90,11 @@
       if (!W.isWithinEncounterLeash(hero, target)) return null;
       var boss = target.rank === 'boss' || target.boss;
       var profileId = 'encounter.' + W.region.id + (boss ? '.boss' : '');
+      var stableSpawn = target.spawnId || target.packAnchorId || target.id;
+      var ordinal = (W.encounterOrdinals[stableSpawn] || 0) + 1;
       var encounter = Game.encounters.start(profileId, {
         id: 'world:' + W.region.id + ':' + W.encounterSequence++,
-        seed: U.strSeed(W.region.id + '|' + (target.packAnchorId || target.id) + '|' + Math.floor(Game.state.world.worldTime)),
+        seed: U.strSeed([Game.state.world.worldSeed, W.region.id, stableSpawn, ordinal, profileId].join('|')),
         rewardBudget: target.rewardScale || (boss ? 4 : 1),
         packId: target.packId || null,
         leashActorId: hero.id,
@@ -100,12 +104,13 @@
         leashRadius: target.packLeashRadius || 0,
         world: true
       });
-      Game.encounters.join(encounter.id, hero.id, 'team-player');
+      W.encounterOrdinals[stableSpawn] = ordinal;
+      Game.encounters.join(encounter.id, hero.id, 'party');
       var ids = boss ? [target.id] : (target.packMemberIds || [target.id]);
       ids.map(Game.actors.get).filter(function (actor) {
         return actor && !actor.dead && actor.hp > 0;
       }).sort(function (a, b) { return a.id.localeCompare(b.id); }).forEach(function (actor) {
-        Game.encounters.join(encounter.id, actor.id, 'team-enemy');
+        Game.encounters.join(encounter.id, actor.id, 'enemy');
       });
       Game.combatAI.strategy(hero.id, Game.state.settings.combatStrategy || 'balanced');
       hero.tactics = Object.assign({}, Game.state.settings.combatTactics || {});
@@ -123,7 +128,10 @@
       W.bindControls();
       W.endEncounter('region-change');
       if (W.hero && Game.units) Game.units.commit(W.hero);
+      if (Game.population) Game.population.reset(rid);
       Game.encounters.reset();
+      if (Game.engagement) Game.engagement.reset();
+      if (Game.relations && Game.relations.reset) Game.relations.reset();
       Game.parties.reset();
       Game.actors.reset();
       if (W.groundLoot.length) W.flushGroundLoot('region');
@@ -144,6 +152,8 @@
       W.autoCampCycle = false;
       W.settledPacks = {};
       W.encounterSequence = 1;
+      W.encounterOrdinals = {};
+      W.compatSpawnSequence = 1;
 
       W.layout = Game.terrain.build(
         region,
@@ -167,15 +177,52 @@
       hero.y = W.layout.camp.y + 26;
       W.entities.push(hero);
 
+      var populationOptions = {
+        tier: Game.State.regionTier(rid),
+        worldSeed: Game.state.world.worldSeed,
+        expeditionIndex: Game.state.world.expedition && Game.state.world.expedition.index || 0,
+        affixFor: function (slot) {
+          return slot.threat && (Game.expedition ? Game.expedition.threatAffix(slot.threat.id) : slot.threat.affix);
+        }
+      };
+      var regionModifier = W.layout.version >= 3 && Game.expedition
+        ? Game.expedition.currentModifier() : { danger: 1, exp: 1 };
+      if (regionModifier.danger !== 1) {
+        populationOptions.modifiers = [
+          { stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: regionModifier.danger },
+          { stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(regionModifier.danger) },
+          { stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(regionModifier.danger) }
+        ];
+      }
+      populationOptions.rewardMultiplier = regionModifier.exp || 1;
+      var mountPlan = Game.population.prepareRegion(rid, W.layout, Object.assign({}, populationOptions, {
+        channelLimits: {
+          regular: W.layout.version >= 3
+            ? (W.layout.threats || []).length
+            : Math.min(POPULATION, (W.layout.spawnCandidates || []).length),
+          npc: Math.min(2, (W.layout.spawnCandidates || []).length),
+          guardian: W.layout.version >= 3 ? 1 : 0
+        }
+      }));
+      if (!mountPlan.ok) {
+        throw new Error('[World] population mount failed: ' + JSON.stringify(mountPlan.failures));
+      }
       if (W.layout.version >= 3) {
         if (Game.expedition) Game.expedition.start(rid);
         if (Game.expeditionAI) Game.expeditionAI.reset();
-        for (var ti = 0; ti < W.layout.threats.length; ti++) W.spawnMonster(true, W.layout.threats[ti]);
+        Game.population.mountChannel(rid, 'regular', W.layout, populationOptions).forEach(function (result) {
+          Array.prototype.push.apply(W.entities, result.actors);
+        });
         W.spawnGuardian();
         if (Game.exploration) Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: rid });
       } else {
-        for (var i = 0; i < POPULATION; i++) W.spawnMonster(true);
+        Game.population.mountChannel(rid, 'regular', W.layout, populationOptions).forEach(function (result) {
+          Array.prototype.push.apply(W.entities, result.actors);
+        });
       }
+      Game.population.mountChannel(rid, 'npc', W.layout, populationOptions).forEach(function (result) {
+        Array.prototype.push.apply(W.entities, result.actors);
+      });
 
       if (Game.state.world.mode === 'rest') {
         hero.state = 'goCamp';
@@ -235,16 +282,6 @@
     /* ---------------- 刷怪 ---------------- */
     spawnMonster: function (initial, threat) {
       var region = W.region;
-      var encounterProfile = Game.content.get('encounterProfile', 'encounter.' + region.id);
-      var packs = encounterProfile && encounterProfile.packs || [];
-      var seed = U.strSeed(region.id + '|' + (threat && threat.id || U.randomSeed()));
-      var totalWeight = packs.reduce(function (sum, pack) { return sum + (pack.weight || 1); }, 0);
-      var roll = totalWeight ? seed % totalWeight : 0;
-      var pack = packs[0] || { id: region.id + '.fallback', members: [threat && threat.monster || U.choice(region.monsters)], rewardBudget: 1 };
-      for (var pi = 0; pi < packs.length; pi++) {
-        roll -= packs[pi].weight || 1;
-        if (roll < 0) { pack = packs[pi]; break; }
-      }
       var candidates = threat ? [{ x: threat.x, y: threat.y, threatId: threat.id }] : W.layout.spawnCandidates;
       var fallback = W.layout.corridorCandidates;
       var point = null;
@@ -262,107 +299,87 @@
         }
       }
       if (!point) point = { x: W.layout.camp.x + W.layout.campSafeRadius + 36, y: W.layout.camp.y };
-      var members = [];
-      var memberIds = pack.members || [];
       var expeditionMod = threat && Game.expedition
         ? Game.expedition.currentModifier() : { danger: 1, exp: 1 };
       var affix = threat && (Game.expedition ? Game.expedition.threatAffix(threat.id) : threat.affix);
-      memberIds.forEach(function (entry, index) {
-        var mid = typeof entry === 'string' ? entry : entry.archetypeId;
-        var modifiers = [];
-        if (expeditionMod.danger !== 1) {
-          modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: expeditionMod.danger });
-          modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
-          modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
-        }
-        if (affix === 'sturdy') {
-          modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: 1.3 });
-          modifiers.push({ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.18 });
-        } else if (affix === 'swift') {
-          modifiers.push({ stat: 'gcdSpeed', phase: 'otherFlat', operation: 'add', value: 0.18 });
-        } else if (affix === 'miasma') {
-          modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
-          modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
-        }
-        var ent = W.makeMonster(mid, false, { modifiers: modifiers });
-        var angle = memberIds.length === 1 ? 0 : Math.PI * 2 * index / memberIds.length;
-        var spacing = pack.spacing || 24;
-        ent.x = point.x + Math.cos(angle) * (index ? spacing : 0);
-        ent.y = point.y + Math.sin(angle) * (index ? spacing * 0.65 : 0);
-        ent.spawnX = ent.x; ent.spawnY = ent.y;
-        ent.packAnchorId = threat && threat.id || pack.id + ':' + seed;
-        ent.packId = pack.id;
-        ent.packAnchorX = point.x;
-        ent.packAnchorY = point.y;
-        ent.packLeashRadius = pack.leashRadius || 120;
-        ent.packPrimary = index === 0;
-        ent.rewardScale = (pack.rewardBudget || 1) / Math.max(1, memberIds.length);
-        ent.exp = Math.round(ent.exp * (expeditionMod.exp || 1) * ent.rewardScale);
-        ent.gold = Math.round(ent.gold * ent.rewardScale);
-        ent.threatId = threat && threat.id || null;
-        ent.territory = threat || null;
-        ent.affix = affix || null;
+      var modifiers = [];
+      if (expeditionMod.danger !== 1) {
+        modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: expeditionMod.danger });
+        modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
+        modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: Math.sqrt(expeditionMod.danger) });
+      }
+      if (affix === 'sturdy') {
+        modifiers.push({ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: 1.3 });
+        modifiers.push({ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.18 });
+      } else if (affix === 'swift') {
+        modifiers.push({ stat: 'gcdSpeed', phase: 'otherFlat', operation: 'add', value: 0.18 });
+      } else if (affix === 'miasma') {
+        modifiers.push({ stat: 'physicalPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
+        modifiers.push({ stat: 'magicPower', phase: 'multiply', operation: 'multiply', value: 1.18 });
+      }
+      var view = Game.content.populationView('population.' + region.id);
+      var slotKey = threat && threat.id || 'candidate:respawn:' + W.compatSpawnSequence++;
+      var profileIds = Game.population.allocate(region.id, 'regular', 1, {
+        tier: Game.State.regionTier(region.id), worldSeed: Game.state.world.worldSeed,
+        layoutVersion: W.layout.version
+      });
+      var result = profileIds[0] && Game.population.materialize(profileIds[0], {
+        regionId: region.id, populationId: view.id, layoutSlotKey: slotKey,
+        spawnRequestKey: [region.id, view.id, slotKey].join(':'),
+        x: point.x, y: point.y, threat: threat || null,
+        tier: Game.State.regionTier(region.id), modifiers: modifiers, affix: affix || null
+      });
+      if (!result || !result.ok) return null;
+      result.actors.forEach(function (ent) {
+        ent.exp = Math.round(ent.exp * (expeditionMod.exp || 1));
         W.entities.push(ent);
-        members.push(ent);
       });
-      members.forEach(function (member) {
-        member.packMemberIds = members.map(function (other) { return other.id; });
-      });
-      return members[0] || null;
+      return result.primary;
     },
 
     spawnGuardian: function () {
       if (!W.layout || W.layout.version < 3 || !W.layout.guardian || !Game.exploration) return null;
       var state = Game.exploration.regionState(W.region.id);
       if (state.discovered.guardian) return null;
-      var def = W.layout.guardian;
-      var ent = W.makeMonster(def.monster, false);
-      ent.x = def.x; ent.y = def.y;
-      ent.spawnX = ent.x; ent.spawnY = ent.y;
+      var results = Game.population.mountChannel(W.region.id, 'guardian', W.layout, {
+        tier: Game.State.regionTier(W.region.id), worldSeed: Game.state.world.worldSeed
+      });
+      var ent = results[0] && results[0].primary;
+      if (!ent) return null;
       ent.guardian = true;
-      Game.units.setModifierSource(ent, 'world:guardian', [{
-        stat: 'maxHp',
-        phase: 'multiply',
-        operation: 'multiply',
-        value: 4.2
-      }], { hpPolicy: 'full', commit: false });
-      ent.atk = Math.round(ent.atk * 1.55);
-      ent.def = Math.round(ent.def * 1.45);
       ent.exp = Math.round(ent.exp * 6);
       ent.gold = Math.round(ent.gold * 4);
-      ent.territory = { id: def.id, x: def.x, y: def.y, radius: def.radius || 120 };
-      W.entities.push(ent);
+      ent.territory = W.layout.guardian;
+      Array.prototype.push.apply(W.entities, results[0].actors);
       return ent;
     },
 
     makeMonster: function (mid, isBossFight, opts) {
       opts = opts || {};
-      var def = reg.get('monster', mid);
       var tier = Game.State.regionTier(W.region && W.region.id);
-      var st = F.monsterStats(tier, def.mods, def.boss);
-      var sp = Game.assets.sprite(def.sprite);
       var ent = Game.actors.spawn({
+        instanceId: 'compat:' + mid + ':' + W.compatSpawnSequence++,
         archetypeId: mid,
+        variantId: opts.variantId || null,
         level: Math.max(1, Game.state.player.level),
         tier: tier,
         factionId: Game.content.get('actorArchetype', mid).defaultFactionId,
         controllerId: 'ai:monster',
         modifiers: opts.modifiers || [],
         transform: { x: 0, y: 0, direction: 'l' },
-        spawnSource: { kind: 'world', sourceId: W.region && W.region.id || 'region', sequence: U.randomSeed() }
+        spawnSource: { kind: 'compat', sourceId: W.region && W.region.id || 'region', sequence: W.compatSpawnSequence }
       });
       var reward = Game.content.get('rewardProfile', ent.blueprint.resolvedProfiles.rewardProfileId);
       function rewardValue(value) {
         if (typeof value === 'number') return value;
         return (Number(value && value.base) || 0) * Math.pow(Number(value && value.tierScale) || 1, tier - 1);
       }
-      ent.sprite = def.sprite;
       ent.state = 'wander';
-      ent.atk = st.atk; ent.def = st.def; ent.spd = st.spd;
       ent.crit = 0.03; ent.critDmg = 1.5;
-      ent.exp = Math.round(rewardValue(reward && reward.exp) || st.exp);
-      ent.gold = Math.round(rewardValue(reward && reward.gold) || st.gold);
-      ent.spriteH = sp.h;
+      ent.exp = Math.round(rewardValue(reward && reward.exp));
+      ent.gold = Math.round(rewardValue(reward && reward.gold));
+      ent.rewardAuthorized = !!(Game.content.get('engagementPolicy', ent.blueprint.resolvedProfiles.engagementPolicyId) || {}).rewardEligible;
+      ent.spriteH = Game.assets.sprite(ent.sprite).h;
       ent.animT = U.rand(0, 0.3);
       ent.wanderT = U.rand(0.5, 2);
       return ent;
@@ -413,19 +430,13 @@
         }
       }
 
-      var ent = W.makeMonster(region.boss, true);
-      ent.x = W.layout.bossPoint.x;
-      ent.y = W.layout.bossPoint.y;
-      ent.spawnX = ent.x; ent.spawnY = ent.y;
-      var bossProfile = Game.content.get('encounterProfile', 'encounter.' + region.id + '.boss');
-      var bossPack = bossProfile && bossProfile.packs[0];
-      ent.packId = bossPack && bossPack.id || region.id + '.boss';
-      ent.packAnchorId = 'boss-lair:' + region.id;
-      ent.packAnchorX = ent.x;
-      ent.packAnchorY = ent.y;
-      ent.packLeashRadius = bossPack && bossPack.leashRadius || 170;
+      var bossResults = Game.population.mountChannel(region.id, 'boss', W.layout, {
+        tier: Game.State.regionTier(region.id), worldSeed: Game.state.world.worldSeed
+      });
+      var ent = bossResults[0] && bossResults[0].primary;
+      if (!ent) return false;
       ent.state = 'fight';
-      W.entities.push(ent);
+      Array.prototype.push.apply(W.entities, bossResults[0].actors);
       W.bossEnt = ent;
 
       // 登场演出：镜头拉近 + 震屏，双方短暂僵持
@@ -470,9 +481,15 @@
       }
       if (W.bossEnt) {
         if (W.bossEnt.encounterId) W.endEncounter('boss-failed');
-        var i = W.entities.indexOf(W.bossEnt);
-        if (i >= 0) W.entities.splice(i, 1);
-        if (Game.actors) Game.actors.despawn(W.bossEnt.id, 'boss-failed');
+        var failedSpawnId = W.bossEnt.spawnId;
+        W.entities = W.entities.filter(function (entity) {
+          return !failedSpawnId || entity.spawnId !== failedSpawnId;
+        });
+        if (failedSpawnId && Game.population) {
+          Game.population.close(failedSpawnId, 'boss-failed', { despawn: true });
+        } else if (Game.actors) {
+          Game.actors.despawn(W.bossEnt.id, 'boss-failed');
+        }
         W.bossEnt = null;
       }
       W.cinematic = null;
@@ -704,52 +721,54 @@
 
     /* ---------------- 击杀结算 ---------------- */
     onEntityKilled: function (ent, killer) {
-      if ((ent.category === 'monster' || ent.category === 'summon') && !ent.rewardSettled) {
+      if ((ent.worldSpawnProfileId || ent.category === 'monster' || ent.category === 'summon') && !ent.rewardSettled) {
         ent.rewardSettled = true;
         ent.dead = true;
         ent.deathT = 0.5;
         ent.state = 'dying';
+        var rewardAuthorized = ent.encounterRewardAuthorized !== undefined
+          ? ent.encounterRewardAuthorized
+          : ent.rewardAuthorized;
 
-        Game.player.addExp(ent.exp);
-        Game.player.addGold(ent.gold);
-        if (Game.fx && U.motionEnabled()) Game.fx.goldBurst(ent.x, ent.y - 8);
-        var expeditionDrop = W.layout.version >= 3 && Game.expedition
-          ? Game.expedition.currentModifier().drop : 1;
-        Game.inv.rollDrops(ent.tier, ent.boss, {
-          source: ent.boss ? 'boss' : 'combat',
-          x: ent.x,
-          y: ent.y,
-          luck: Math.max(0, (expeditionDrop - 1) * 2)
-        });
-        Game.state.meta.stats.kills++;
+        if (rewardAuthorized) {
+          Game.player.addExp(ent.exp);
+          Game.player.addGold(ent.gold);
+          if (Game.fx && U.motionEnabled()) Game.fx.goldBurst(ent.x, ent.y - 8);
+          var expeditionDrop = W.layout.version >= 3 && Game.expedition
+            ? Game.expedition.currentModifier().drop : 1;
+          Game.inv.rollDrops(ent.tier, ent.boss, {
+            source: ent.boss ? 'boss' : 'combat',
+            x: ent.x,
+            y: ent.y,
+            luck: Math.max(0, (expeditionDrop - 1) * 2)
+          });
+          Game.state.meta.stats.kills++;
+        }
+
+        var closedLease = Game.population && Game.population.onActorDefeated(ent);
 
         if (!ent.boss) {
           var prog = Game.State.regionProg(W.region.id);
-          if (W.layout.version < 3 && !W.bossEnt) prog.kills = Math.min(prog.kills + 1, W.region.killTarget);
+          if (rewardAuthorized && W.layout.version < 3 && !W.bossEnt) {
+            prog.kills = Math.min(prog.kills + 1, W.region.killTarget);
+          }
           if (ent.guardian && Game.collection) {
             Game.collection.record('guardian', 'guardian', { rid: W.region.id, entity: ent });
-          } else if (W.layout.version >= 3 && ent.territory) {
+          } else if (closedLease && W.layout.version >= 3 && ent.territory) {
             var cooldown = ent.territory.respawn || 240;
-            var packDone = (ent.packMemberIds || [ent.id]).every(function (id) {
-              var member = Game.actors.get(id);
-              return !member || member.dead || member.hp <= 0;
-            });
-            if (packDone && !W.settledPacks[ent.packAnchorId]) {
+            if (!W.settledPacks[ent.packAnchorId]) {
               W.settledPacks[ent.packAnchorId] = true;
               Game.exploration.regionState(W.region.id).threatCooldowns[ent.threatId] =
                 Game.state.world.worldTime + cooldown;
-              W.pendingRespawn.push({ t: cooldown, threat: ent.territory });
             }
-          } else {
-            W.pendingRespawn.push(RESPAWN_T);
           }
-          Game.state.world.deathsRow = 0; // 击杀成功重置连败
+          if (rewardAuthorized) Game.state.world.deathsRow = 0;
         }
-        if (Game.fx) {
+        if (Game.fx && rewardAuthorized) {
           Game.fx.poof(ent.x, ent.y - ent.spriteH * 0.4);
           Game.fx.floatText(ent.x, ent.y - ent.spriteH - 6, '+' + Game.i18n.fmtNum(ent.exp) + ' EXP', { color: '#8ad0ff', small: true });
         }
-        bus.emit('monster:killed', { mid: ent.mid, boss: ent.boss, x: ent.x, y: ent.y });
+        if (rewardAuthorized) bus.emit('monster:killed', { mid: ent.mid, boss: ent.boss, x: ent.x, y: ent.y });
 
         if (W.hero.target === ent) W.hero.target = null;
         if (ent.boss) W.onBossDefeated(ent);
@@ -879,11 +898,11 @@
         return;
       }
 
-      // 怪物命中检测（以脚点与身体中心综合判定）
+      // Actor 命中检测（以脚点与身体中心综合判定）。
       var best = null, bestD = 1e9;
       for (var i = 0; i < W.entities.length; i++) {
         var e = W.entities[i];
-        if (!W.isHostileActor(hero, e)) continue;
+        if (!e || e === hero || e.dead || e.lifecycle !== 'active') continue;
         var d = Math.min(
           U.dist(wx, wy, e.x, e.y),
           U.dist(wx, wy, e.x, e.y - e.spriteH * 0.5)
@@ -892,6 +911,34 @@
         if (d < r && d < bestD) { bestD = d; best = e; }
       }
       if (best) {
+        if (!W.isHostileActor(hero, best)) {
+          var interactionId = best.blueprint &&
+            best.blueprint.resolvedProfiles.interactionProfileId;
+          var interaction = interactionId &&
+            Game.content.get('interactionProfile', interactionId);
+          if (interaction && interaction.actions && interaction.actions.length &&
+              Game.ui && Game.ui.modals && Game.ui.modals.actorActions) {
+            Game.ui.modals.actorActions(best, {
+              attack: function (target) {
+                var sourceKey = hero.actorRecordId
+                  ? { actorRecordId: hero.actorRecordId }
+                  : null;
+                var targetKey = Game.population && Game.population.stableKey(target);
+                if (!sourceKey || !targetKey || !Game.actors.get(target.id)) {
+                  Game.ui.modals.toast(Game.i18n.t('ui.actorTargetUnavailable'), 'warn');
+                  return;
+                }
+                Game.engagement.enqueue({
+                  sourceKey: sourceKey,
+                  targetKey: targetKey,
+                  kind: 'attack'
+                });
+                Game.ui.modals.toast(Game.i18n.t('ui.actorAttackQueued'));
+              }
+            });
+          }
+          return;
+        }
         if (sw.mode === 'rest') W.setMode('battle');
         W.cancelInteraction('combat');
         hero.target = best;
@@ -1007,7 +1054,7 @@
         var actor = id && Game.actors.get(id);
         if (!actor) return;
         if (actor.actorRecordId === Game.state.roster.primaryActorId) W.onHeroDeath();
-        else if (actor.category === 'monster') {
+        else if (actor.worldSpawnProfileId || actor.category === 'monster' || actor.category === 'summon') {
           W.onEntityKilled(actor, event.sourceActorId && Game.actors.get(event.sourceActorId));
         }
       });
@@ -1221,7 +1268,7 @@
       // 怪物
       for (var i = W.entities.length - 1; i >= 0; i--) {
         var e = W.entities[i];
-        if (e.kind !== 'monster') continue;
+        if (e === hero || !e.components || !e.components.transform) continue;
         if (e.dead) {
           e.deathT -= dt;
           if (e.deathT <= 0) {
@@ -1238,7 +1285,13 @@
         else Game.state.player.hp = hero.hp;
       }
 
-      // 重生队列
+      var populationUpdate = Game.population.update(dt, sw.worldTime);
+      populationUpdate.spawned.forEach(function (result) {
+        delete W.settledPacks[result.lease.groupId];
+        Array.prototype.push.apply(W.entities, result.actors);
+      });
+
+      // Legacy ad-hoc respawns remain for non-Population callers.
       for (var r = W.pendingRespawn.length - 1; r >= 0; r--) {
         var pending = W.pendingRespawn[r];
         if (typeof pending === 'number') W.pendingRespawn[r] -= dt;
@@ -1246,7 +1299,9 @@
         if ((typeof W.pendingRespawn[r] === 'number' && W.pendingRespawn[r] <= 0) ||
             (typeof W.pendingRespawn[r] === 'object' && W.pendingRespawn[r].t <= 0)) {
           var respawn = W.pendingRespawn.splice(r, 1)[0];
-          W.spawnMonster(false, respawn && respawn.threat);
+          if (!respawn || !respawn.lease) {
+            W.spawnMonster(false, respawn && respawn.threat);
+          }
         }
       }
 
@@ -1544,8 +1599,8 @@
       var d = U.dist(ent.x, ent.y, ent.wx, ent.wy);
       if (d > 5) {
         W.moveToward(ent, ent.wx, ent.wy, speed, dt, 'wander:' + ent.wanderKey);
-        if (ent.kind === 'monster') ent.state = 'walk';
-      } else if (ent.kind === 'monster') {
+        if (ent.kind !== 'hero') ent.state = 'walk';
+      } else if (ent.kind !== 'hero') {
         ent.state = 'wander';
       }
     },

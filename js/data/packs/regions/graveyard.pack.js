@@ -1,9 +1,9 @@
 (function () {
   'use strict';
-  var Game = window.Game, D = Game.v2Content.damage;
-  Game.content.registerPack(Game.v2Content.regionPack({
+  var Game = window.Game, D = Game.contentAuthoring.factory('effect.damage');
+  Game.content.registerPack(Game.contentAuthoring.factory('region.pack')({
     regionId: 'graveyard', factionId: 'undead',
-    sourceFile: 'js/data/packs/regions/graveyard.js',
+    sourceFile: 'js/data/packs/regions/graveyard.pack.js',
     statuses: [
       {
         id: 'graveyard.staggered', stacking: 'refresh', durationTicks: 20,

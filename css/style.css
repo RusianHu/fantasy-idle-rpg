@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260729.8') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260729.10') format('woff2');
   font-display: swap;
 }
 
@@ -1654,6 +1654,33 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
 .modal .modal-body { font-size: 12px; line-height: 1.7; }
 .modal .modal-btns { display: flex; gap: 8px; margin-top: 14px; }
 .modal .modal-btns .btn { flex: 1; }
+.actor-action-description {
+  color: var(--ink-dim);
+  text-align: center;
+}
+.actor-action-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.actor-action-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.actor-action-icon {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  flex: 0 0 18px;
+}
+.actor-action-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 
 /* 序章对话框 */
 .prologue-mask {

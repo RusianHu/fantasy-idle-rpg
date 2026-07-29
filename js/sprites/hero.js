@@ -594,6 +594,37 @@
     }
   });
 
+  /* ---------------- 内容作者通用占位 Actor ---------------- */
+  D({
+    id: 'actor_placeholder',
+    pal: {
+      a: '#d8c58a', b: '#9f8957', c: '#5f533b',
+      m: '#8792a3', M: '#4f5969', e: '#f4e7b1'
+    },
+    anchor: { x: 7, y: 15 },
+    frames: {
+      idle0: [
+        '......cc......',
+        '.....cbbc.....',
+        '....cbaabc....',
+        '....caeeac....',
+        '.....cccc.....',
+        '....mMMMMm....',
+        '...mMMaaMMm...',
+        '...MMaaaaMM...',
+        '...MMaaaaMM...',
+        '....MaaaaM....',
+        '....MaaaaM....',
+        '....MM..MM....',
+        '....MM..MM....',
+        '...cMM..MMc...',
+        '...ccc..ccc...',
+        '..............'
+      ]
+    },
+    derive: { idle1: { from: 'idle0', op: 'squash' } }
+  });
+
   /* ---------------- 兼容别名（旧引用回退到战士） ---------------- */
   D({ id: 'hero', variantOf: 'hero_fighter' });
   D({ id: 'hero_face', variantOf: 'face_fighter' });
