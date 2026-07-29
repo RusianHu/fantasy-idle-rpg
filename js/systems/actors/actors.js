@@ -701,7 +701,8 @@
         traits: blueprint.resolvedTraits.slice(),
         // Presentation compatibility only. Combat and relation code never read it.
         kind: archetype.category === 'player' ? 'hero' : (archetype.category === 'monster' || archetype.category === 'summon' ? 'monster' : 'actor'),
-        mid: archetype.category === 'monster' ? archetype.id : null,
+        mid: archetype.category === 'monster' || archetype.category === 'summon'
+          ? archetype.id : null,
         boss: archetype.rank === 'boss',
         spriteH: 20,
         dead: false,

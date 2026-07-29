@@ -1316,10 +1316,14 @@ async function run() {
               firstGoalDistance = Game.util.dist(hero.x, hero.y, order.x, order.y);
             }
             if (activeOrder && activeOrder.id !== order.id &&
+                !activeOrder.hazardEscapeId && !order.hazardEscapeId &&
                 Game.util.dist(hero.x, hero.y, activeOrder.x, activeOrder.y) > 7) {
               prematureSwitches++;
             }
-            activeOrder = { id: order.id, x: order.x, y: order.y };
+            activeOrder = {
+              id: order.id, x: order.x, y: order.y,
+              hazardEscapeId: order.hazardEscapeId || null
+            };
           } else {
             activeOrder = null;
           }
@@ -3501,9 +3505,10 @@ async function run() {
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.catalog.complete, true);
-    assert.equal(unitsBubbleDemo.catalog.actorCount, 29);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 53);
     assert.equal(unitsBubbleDemo.catalog.classCount, 5);
-    assert.equal(unitsBubbleDemo.catalog.monsterCount, 24);
+    assert.equal(unitsBubbleDemo.catalog.monsterCount, 40);
+    assert.equal(unitsBubbleDemo.catalog.summonCount, 9);
     assert.equal(unitsBubbleDemo.catalog.encounterCount, 18);
     assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.equal(unitsBubbleDemo.snapshot.length, 2,

@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "da38f485076d01f0ce396dfefb2435abea11431ff54ea3922b5c5851b81436fc",
+  "sourceSetHash": "06f2fdd5692703424c30ebb55a6bbfd4d41e89c79d69455913def0f568e6c042",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -38,52 +38,52 @@
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
       "kind": "pack",
-      "sha256": "0f645a692ba58bef35ff35ef1a4ee7e06cf68d99d085d5ddcb0a21b4a555d420"
+      "sha256": "12b20d3dc6c6062f9572af8bd6cbfcfd22efebe558d7b32db1c9939d1571bce4"
     },
     {
       "path": "js/data/packs/regions/factory.support.js",
       "kind": "support",
-      "sha256": "9575f6f11784a79acbb4550ca5ea9d78073ea2c92adabfae42c8b968dd87399a"
+      "sha256": "acaa0af0309079c8b8fcba0d94d0423c7a054e02136be47f1aee745721e0a62b"
     },
     {
       "path": "js/data/packs/regions/forest.pack.js",
       "kind": "pack",
-      "sha256": "8c9b33da890f6d053c56b1af22f053033507fdfe9de04739e8b79876fcb50115"
+      "sha256": "99cd4095687cb6016efc5bcfcbca486c7a6ba01e201ff5a36e1b74f62862d20e"
     },
     {
       "path": "js/data/packs/regions/grassland.pack.js",
       "kind": "pack",
-      "sha256": "b7e5bcb2f025907c288125621eeef6606a4d8f0a040c2c1f0eae8823be9e33fd"
+      "sha256": "93abbf7374d6b1749ff8ed713af1abbae6890579841e4cbab4ec3c003accd6b6"
     },
     {
       "path": "js/data/packs/regions/graveyard.pack.js",
       "kind": "pack",
-      "sha256": "5605d38860e7d2b72a119935a315a0cc3f5aba8ebb247723b88f17523aece9e2"
+      "sha256": "645b87978c4758bbba9eca8a7fe91ab3a32e95b3697003f2bdf3621272e68ca7"
     },
     {
       "path": "js/data/packs/regions/lavacave.pack.js",
       "kind": "pack",
-      "sha256": "0274d3b350aa1a78c6963c1fd5fd42bb8c14165722eba4f2e74625b59e45bbbd"
+      "sha256": "49969f1594bf436d072e19648b84618f3d714d005437916c0efbe703a1e3b181"
     },
     {
       "path": "js/data/packs/regions/mine.pack.js",
       "kind": "pack",
-      "sha256": "54c2ee307c083ab9aaf28779b55afc7274283b598dce88481b9847d9189dfe6e"
+      "sha256": "637072fc76131232aafc055aae083a911bd5e66ea7f97eb2f69171b8e4b88f50"
     },
     {
       "path": "js/data/packs/regions/skyruins.pack.js",
       "kind": "pack",
-      "sha256": "dd65dd03ba9ea2b773c9e366f3d4867d80dd299d250839b0e149ff5c6346f9dd"
+      "sha256": "d56a088591d2fd97582d5978d185999bde3f1df2e74162d213fa98f27e932d65"
     },
     {
       "path": "js/data/packs/regions/snowpass.pack.js",
       "kind": "pack",
-      "sha256": "007be057330419db8396a6673ae001c75fd455a30c98f742d5dab2c2ba669431"
+      "sha256": "9af2c98fc50ed97ec623e36d283435505b65c3584639b6a2585b881da4825c9a"
     },
     {
       "path": "js/data/packs/rules/combat-formulas.support.js",
       "kind": "support",
-      "sha256": "73113e26f38c97a9edad9c2eb10ebe6c09b2e214103b12f74bec484b09c0f64b"
+      "sha256": "4c369f104b7008ffea518a81aa918c6657cdaf0de9ad1598eeacff7e98c92eed"
     },
     {
       "path": "js/data/packs/rules/core.pack.js",
@@ -155,7 +155,7 @@
     {
       "kind": "factory",
       "id": "region.pack",
-      "version": 1
+      "version": 2
     },
     {
       "kind": "value",
@@ -195,35 +195,35 @@
     },
     {
       "id": "region.darkcastle",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.forest",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.grassland",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.graveyard",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.lavacave",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.mine",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.skyruins",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.snowpass",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "world.actors",
@@ -234,7 +234,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "859940e6"
+  "contentFingerprint": "904621b0"
 });
 })();
 /* source: js/data/packs/regions/catalog.support.js */
@@ -822,7 +822,8 @@
         magicPower: { base: power, tierScale: balance.monster.powerTierScale },
         accuracy: 0.91, gcdSpeed: speed, castSpeed: speed,
         autoAttackSpeed: speed, cooldownRate: 1,
-        moveSpeed: boss ? 44 : 38, range: 24,
+        moveSpeed: mods.moveSpeed !== undefined ? mods.moveSpeed : (boss ? 44 : 38),
+        range: mods.range !== undefined ? mods.range : 24,
         critChance: boss ? 0.07 : 0.03, critMultiplier: 1.5,
         dodgeChance: Math.max(0, (mods.spd || 0) * 0.004),
         healingPower: { base: power, tierScale: balance.monster.powerTierScale },
@@ -867,9 +868,11 @@
       presentation: { nameKey: 'combat.trait.' + monster.id + '.name', icon: monster.traitIcon || 'icon_skill_guard' }
     };
   }
-  function archetype(spec, monster, rank) {
+  function archetype(spec, monster, rank, category) {
+    category = category || 'monster';
+    var isSummon = category === 'summon';
     return {
-      id: monster.id, category: 'monster', rank: rank || 'normal',
+      id: monster.id, category: category, rank: rank || 'normal',
       identity: {
         nameKey: 'monster.' + monster.id + '.name',
         descKey: 'monster.' + monster.id + '.desc',
@@ -878,14 +881,14 @@
       presentation: {
         spriteId: monster.id, portraitId: monster.portraitId || monster.id,
         scale: monster.scale || 1,
-        renderProfileId: 'render.actor.standard'
+        renderProfileId: isSummon ? 'render.actor.object' : 'render.actor.standard'
       },
       body: {
-        size: rank === 'boss' ? 'large' : 'medium',
-        collisionRadius: rank === 'boss' ? 14 : 8,
+        size: rank === 'boss' ? 'large' : (monster.size || (isSummon ? 'small' : 'medium')),
+        collisionRadius: rank === 'boss' ? 14 : (monster.collisionRadius || (isSummon ? 7 : 8)),
         movementTypes: monster.movementTypes || ['ground']
       },
-      tags: (monster.tags || []).concat([rank === 'boss' ? 'boss' : 'normal']),
+      tags: (monster.tags || []).concat([isSummon ? 'summon' : (rank === 'boss' ? 'boss' : 'normal')]),
       defaultFactionId: spec.factionId,
       statProfileId: 'stats.' + monster.id,
       resourceProfileIds: rank === 'boss' ? ['resources.boss'] : [],
@@ -893,7 +896,7 @@
       traitIds: [monster.id + '.trait'],
       resistanceProfileId: rank === 'boss' ? 'resist.boss' : 'resist.standard',
       aiProfileId: rank === 'boss' ? 'ai.boss.standard' : 'ai.monster.standard',
-      rewardProfileId: 'reward.' + monster.id,
+      rewardProfileId: isSummon ? 'reward.none' : 'reward.' + monster.id,
       interactionProfileId: 'interaction.hostile',
       engagementPolicyId: 'engagement.hostile',
       legacy: {
@@ -912,42 +915,67 @@
   }
 
   function regionPack(spec) {
-    var normals = spec.normals;
+    var normals = spec.normals || [];
+    var summons = spec.summons || [];
+    var hazards = spec.hazards || [];
     var boss = spec.boss;
-    var all = normals.concat([boss]);
-    var region = regionById(spec.regionId);
-    if (!region) throw new Error('[RegionFactory] missing catalog region: ' + spec.regionId);
-    spec.tier = region.tier;
+    var combatants = normals.concat(summons, [boss]);
+    var rewarded = normals.concat([boss]);
+    var catalogRegion = regionById(spec.regionId);
+    if (!catalogRegion) throw new Error('[RegionFactory] missing catalog region: ' + spec.regionId);
+    if (normals.length < 2) throw new Error('[RegionFactory] at least two normal actors required: ' + spec.regionId);
+    spec.tier = catalogRegion.tier;
     var abilities = [];
     var traits = [];
-    all.forEach(function (monster) {
+    combatants.forEach(function (monster) {
+      monster.abilityIds = monster.abilityIds || [];
+      monster.abilities = monster.abilities || [];
       abilities.push(basicAbility(monster, monster === boss));
       abilities = abilities.concat(monster.abilities);
       traits.push(trait(monster));
     });
-    var normalPackMembers = [
-      { id: spec.regionId + '.solo-a', members: [normals[0].id], weight: 30, spacing: 22, leashRadius: 120, rewardBudget: 1 },
-      { id: spec.regionId + '.solo-b', members: [normals[1].id], weight: 28, spacing: 22, leashRadius: 120, rewardBudget: 1 },
-      { id: spec.regionId + '.duo', members: [normals[0].id, normals[1].id], weight: 26, spacing: 28, leashRadius: 132, rewardBudget: 1.25 },
-      { id: spec.regionId + '.trio', members: [normals[0].id, normals[1].id, normals[0].id], weight: 16, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    var normalPackMembers = spec.encounterRecipes || [
+      { id: 'solo-a', members: [normals[0].id], weight: 30, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: [normals[1].id], weight: 28, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'duo', members: [normals[0].id, normals[1].id], weight: 26, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: [normals[0].id, normals[1].id, normals[0].id], weight: 16, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
     ];
+    normalPackMembers = normalPackMembers.map(function (recipe) {
+      var copy = JSON.parse(JSON.stringify(recipe));
+      if (copy.id.indexOf(spec.regionId + '.') !== 0) copy.id = spec.regionId + '.' + copy.id;
+      copy.spacing = copy.spacing || 22;
+      copy.leashRadius = copy.leashRadius || 120;
+      copy.rewardBudget = copy.rewardBudget || 1;
+      return copy;
+    });
     function stableMembers(pack) {
       return pack.members.map(function (member, index) {
-        return { slotId: 'member-' + (index + 1), archetypeId: member };
+        var ref = typeof member === 'string' ? { archetypeId: member } : member;
+        return {
+          slotId: ref.slotId || 'member-' + (index + 1),
+          archetypeId: ref.archetypeId,
+          variantId: ref.variantId
+        };
       });
     }
     var encounterPacks = normalPackMembers.map(function (pack) {
       return {
         id: pack.id, members: stableMembers(pack),
         formation: { spacing: pack.spacing }, leashRadius: pack.leashRadius,
-        rewardBudget: pack.rewardBudget, groupAlert: true
+        rewardBudget: pack.rewardBudget, groupAlert: true,
+        ambushEligible: pack.ambushEligible === true,
+        containsSummoner: pack.containsSummoner === true
       };
     });
+    var guardianBase = normals.filter(function (monster) {
+      return monster.id === (spec.guardianBaseId || normals[1].id);
+    })[0];
+    if (!guardianBase) throw new Error('[RegionFactory] guardianBaseId is not a normal actor: ' + spec.guardianBaseId);
     encounterPacks.push({
       id: spec.regionId + '.guardian',
       members: [{
-        slotId: 'guardian', archetypeId: normals[1].id,
-        variantId: normals[1].id + '.guardian'
+        slotId: 'guardian', archetypeId: guardianBase.id,
+        variantId: guardianBase.id + '.guardian'
       }],
       formation: { spacing: 0 }, leashRadius: 150, rewardBudget: 2.2, groupAlert: true
     });
@@ -983,10 +1011,62 @@
     });
     spawnProfiles.push(spawnFor({ id: spec.regionId + '.guardian' }, 'guardian', 'required'));
     spawnProfiles.push(spawnFor({ id: spec.regionId + '.boss' }, 'boss', 'required'));
-    var baseNormalProfile = profile(normals[1].id, normals[1].mods, false);
-    var guardianProfile = scaledProfile('stats.' + normals[1].id + '.guardian', baseNormalProfile, {
+    summons.forEach(function (summon) {
+      spawnProfiles.push({
+        id: 'spawn.' + summon.id,
+        actorRef: { archetypeId: summon.id },
+        mountTo: [], summonOnly: true,
+        identity: { scope: 'ephemeral' },
+        placement: {
+          selector: 'anchor', source: 'summoner', required: true,
+          onFailure: 'abortGroup', occupancyRadius: summon.collisionRadius || 7
+        },
+        lifecycle: {
+          activation: 'scripted', unload: 'despawn', onDefeat: 'closeLease',
+          onEscape: 'closeLease', respawn: { mode: 'none', resetVariant: true }
+        },
+        offlineEligible: false
+      });
+    });
+    var baseNormalProfile = profile(guardianBase.id, guardianBase.mods, false);
+    var guardianProfile = scaledProfile('stats.' + guardianBase.id + '.guardian', baseNormalProfile, {
       maxHp: 4.2, armor: 1.45, ward: 1.45, physicalPower: 1.55,
       magicPower: 1.55, healingPower: 1.55, shieldPower: 4.2
+    });
+    var hazardProfiles = hazards.map(function (hazard) {
+      var copy = JSON.parse(JSON.stringify(hazard));
+      delete copy.visual;
+      copy.visualProfileId = copy.visualProfileId || copy.id + '.visual';
+      return copy;
+    });
+    var hazardVisualProfiles = hazards.map(function (hazard) {
+      var visual = JSON.parse(JSON.stringify(hazard.visual || {}));
+      visual.id = hazard.visualProfileId || hazard.id + '.visual';
+      visual.shape = visual.shape || hazard.trigger.shape;
+      visual.states = visual.states || {
+        concealed: { token: 'clue' },
+        dormant: { token: 'revealed' },
+        warning: { token: 'telegraph' },
+        active: { token: 'impact' },
+        cooldown: { token: 'residue' }
+      };
+      return visual;
+    });
+    var regionProjection = JSON.parse(JSON.stringify(catalogRegion));
+    regionProjection.monsters = normals.map(function (monster) { return monster.id; });
+    regionProjection.summons = summons.map(function (summon) { return summon.id; });
+    regionProjection.hazards = hazards.map(function (hazard) { return hazard.id; });
+    if (regionProjection.exploration && regionProjection.exploration.guardian) {
+      regionProjection.exploration.guardian.monster = guardianBase.id;
+    }
+    var offline = JSON.parse(JSON.stringify(spec.offlineRepresentative || {
+      encounterPackId: normalPackMembers[0].id,
+      secondaryEncounterPackId: normalPackMembers[1].id
+    }));
+    ['encounterPackId', 'secondaryEncounterPackId'].forEach(function (field) {
+      if (offline[field] && offline[field].indexOf(spec.regionId + '.') !== 0) {
+        offline[field] = spec.regionId + '.' + offline[field];
+      }
     });
     var standardTeams = [
       { id: 'party', role: 'combatant', coalitionId: 'party', countsForCompletion: true, rewardEligible: false },
@@ -997,22 +1077,23 @@
       { id: 'party-survives', type: 'survive', teamId: 'party', required: true, minimum: 1 }
     ];
     return {
-      id: 'region.' + spec.regionId, version: '2.0.0', schemaVersion: 1,
+      id: 'region.' + spec.regionId, version: spec.version || '2.1.0', schemaVersion: 1,
       sourceFile: spec.sourceFile,
       requires: [{ id: 'core.combat', range: '^2.0.0' }, { id: 'world.actors', range: '^2.0.0' }],
+      locales: spec.locales,
       definitions: {
-        statProfile: all.map(function (monster) { return profile(monster.id, monster.mods, monster === boss); }).concat([guardianProfile]),
-        status: spec.statuses,
+        statProfile: combatants.map(function (monster) { return profile(monster.id, monster.mods, monster === boss); }).concat([guardianProfile]),
+        status: spec.statuses || [],
         ability: abilities,
         trait: traits,
-        rewardProfile: all.map(function (monster) { return reward(monster, monster === boss); }),
-        actorArchetype: [
-          archetype(spec, normals[0], 'normal'),
-          archetype(spec, normals[1], 'normal'),
-          archetype(spec, boss, 'boss')
-        ],
+        rewardProfile: rewarded.map(function (monster) { return reward(monster, monster === boss); }),
+        actorArchetype: normals.map(function (monster) {
+          return archetype(spec, monster, 'normal', 'monster');
+        }).concat(summons.map(function (summon) {
+          return archetype(spec, summon, 'normal', 'summon');
+        }), [archetype(spec, boss, 'boss', 'monster')]),
         actorVariant: [{
-          id: normals[1].id + '.guardian', archetypeId: normals[1].id,
+          id: guardianBase.id + '.guardian', archetypeId: guardianBase.id,
           overrides: { statProfileId: guardianProfile.id, tags: ['guardian', 'elite'] },
           transitions: []
         }],
@@ -1028,16 +1109,16 @@
             boss: { capacity: 1, selection: 'required' }
           },
           offlineEligible: true,
-          offlineRepresentative: {
-            encounterPackId: normalPackMembers[0].id,
-            secondaryEncounterPackId: normalPackMembers[1].id
-          }
+          offlineRepresentative: offline
         }],
         regionProfile: [{
-          id: spec.regionId, tier: region.tier,
+          id: spec.regionId, tier: catalogRegion.tier,
           populationProfileId: 'population.' + spec.regionId,
-          projection: region
+          hazardProfileIds: hazardProfiles.map(function (hazard) { return hazard.id; }),
+          projection: regionProjection
         }],
+        hazardProfile: hazardProfiles,
+        hazardVisualProfile: hazardVisualProfiles,
         encounterProfile: [
           {
             id: 'encounter.' + spec.regionId,
@@ -1078,7 +1159,7 @@
     };
   }
       capabilities.authoring.provideFactory({
-        id: 'region.pack', version: 1, fn: regionPack
+        id: 'region.pack', version: 2, fn: regionPack
       });
       capabilities.authoring.provideFactory({
         id: 'effect.damage', version: 1, fn: damageEffect
@@ -1126,6 +1207,18 @@
           var source = ctx.sourceStats || {};
           var power = Number(source[params.powerStat || 'healingPower']) || 0;
           return power * (Number(params.coefficient) || 1) + (Number(params.flat) || 0);
+        }
+      });
+      capabilities.rules.registerFormula({
+        id: 'combat.hazard_damage_v1',
+        version: 1, deterministic: true,
+        access: ['target.statBlock', 'region.tier'],
+        fn: function (ctx, params) {
+          var target = ctx.targetStats || {};
+          var maxHp = Math.max(1, Number(target.maxHp) || 1);
+          var tier = Math.max(1, Number(ctx.regionTier) || 1);
+          var tierScale = 1 + Math.max(0, tier - 1) * (Number(params.tierCoefficient) || 0);
+          return maxHp * Math.max(0, Number(params.maxHpCoefficient) || 0) * tierScale;
         }
       });
     }
@@ -1883,6 +1976,11 @@ window.Game.contentSupport.installAll();
         presentation: { nameKey: 'combat.status.petrified.name', icon: 'icon_skill_guard' }
       },
       {
+        id: 'darkcastle.shackled', stacking: 'refresh', durationTicks: 40,
+        modifiers: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.25 }],
+        presentation: { nameKey: 'combat.status.darkcastle_shackled.name', icon: 'icon_skill_guard' }
+      },
+      {
         id: 'demon_lord.bulwark', stacking: 'refresh', durationTicks: 140,
         modifiers: [
           { stat: 'armor', phase: 'status', operation: 'multiply', value: 1.42 },
@@ -1926,8 +2024,99 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 70 }, presentation: { nameKey: 'combat.ability.petrifying_gaze.name', icon: 'icon_skill_guard' }
         }],
         traitModifiers: [{ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.22 }]
+      },
+      {
+        id: 'hound_abyssal', mods: { hp: 1.05, atk: 1.15, def: 1.1, spd: 2.5 }, damageType: 'necrotic',
+        abilityIds: ['hound_abyssal.void_pounce'],
+        abilities: [{
+          id: 'hound_abyssal.void_pounce', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 10, animationLockTicks: 11, cooldownTicks: 120, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 46 },
+          effects: [{ type: 'movement', distance: 18 }, D('necrotic', 1.1), { type: 'applyStatus', statusId: 'darkcastle.cursed' }],
+          aiHints: { priority: 72 },
+          presentation: { nameKey: 'combat.ability.hound_abyssal_void_pounce.name', icon: 'icon_skill_poison' }
+        }]
+      },
+      {
+        id: 'gaoler_demon', mods: { hp: 1.12, atk: 1.02, def: 1.2, spd: -1 }, damageType: 'necrotic', range: 64,
+        abilityIds: ['gaoler_demon.lock_soul_cage'],
+        abilities: [{
+          id: 'gaoler_demon.lock_soul_cage', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 24, animationLockTicks: 11, cooldownTicks: 300, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 64 },
+          effects: [{ type: 'summon', archetypeId: 'summon.soul_cage', count: 1, maxActive: 1 }],
+          aiHints: { priority: 100 },
+          presentation: { nameKey: 'combat.ability.gaoler_demon_lock_soul_cage.name', icon: 'icon_skill_poison' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.soul_cage', mods: { hp: 0.5, atk: 0.55, moveSpeed: 0, range: 34 },
+      movementTypes: [], range: 34, damageType: 'necrotic', basicCoefficient: 0.2,
+      abilityIds: ['summon.soul_cage.binding_pulse'],
+      abilities: [{
+        id: 'summon.soul_cage.binding_pulse', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 14, animationLockTicks: 8, cooldownTicks: 100, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 34, radius: 34, maxTargets: 4 },
+        telegraph: { shape: 'circle', radius: 34, expectedDamagePct: 0.08 },
+        effects: [D('necrotic', 0.5), { type: 'applyStatus', statusId: 'darkcastle.shackled' }],
+        aiHints: { priority: 118 },
+        presentation: { nameKey: 'combat.ability.summon_soul_cage_binding_pulse.name', icon: 'icon_skill_poison' }
+      }]
+    }],
+    guardianBaseId: 'demon_soldier',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['demon_soldier'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['gargoyle'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['hound_abyssal'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['gaoler_demon'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['demon_soldier', 'gargoyle'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['hound_abyssal', 'gaoler_demon'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['demon_soldier', 'hound_abyssal'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['demon_soldier', 'gargoyle', 'hound_abyssal'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.darkcastle.wall_lances', regionId: 'darkcastle', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'rect', width: 52, height: 16, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 82, revealRadius: 52 }, lifecycle: { revealTicks: 8, warningTicks: 16, activeTicks: 4, cooldownTicks: 520 },
+        outcome: { type: 'applyEffects', pulses: 1, effects: [
+          { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.1 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'darkcastle.cursed', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 56, minSpacing: 108, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.darkcastle.wall_lances.name', descKey: 'hazard.darkcastle.wall_lances.desc', warningKey: 'hazard.darkcastle.wall_lances.warning', hitKey: 'hazard.darkcastle.wall_lances.hit' },
+        visual: { glyph: 'lances', palette: { element: '#d8c6bf', clue: '#5b4352' } }
+      },
+      {
+        id: 'hazard.darkcastle.gate_ambush', regionId: 'darkcastle', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 88, revealRadius: 54 }, lifecycle: { revealTicks: 6, warningTicks: 18, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['darkcastle.solo-a', 'darkcastle.solo-b', 'darkcastle.solo-c', 'darkcastle.duo', 'darkcastle.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 56, minSpacing: 108, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.darkcastle.gate_ambush.name', descKey: 'hazard.darkcastle.gate_ambush.desc', warningKey: 'hazard.darkcastle.gate_ambush.warning', hitKey: 'hazard.darkcastle.gate_ambush.hit', ambushKey: 'hazard.darkcastle.gate_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#b77ad9', clue: '#583850' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.hound_abyssal.name': '深渊魔犬', 'monster.hound_abyssal.desc': '披覆黑紫重甲的高速魔犬。', 'combat.lore.hound_abyssal': '暗红裂隙像呼吸一样在装甲下明灭。', 'combat.ability.hound_abyssal_basic.name': '深渊利爪', 'combat.ability.hound_abyssal_void_pounce.name': '虚空扑袭', 'combat.trait.hound_abyssal.name': '深渊猎性',
+        'monster.gaoler_demon.name': '魔狱看守', 'monster.gaoler_demon.desc': '以锁链钩杖部署囚魂笼的重甲狱卒。', 'combat.lore.gaoler_demon': '它的每条锁链都刻着一位囚徒的编号。', 'combat.ability.gaoler_demon_basic.name': '钩杖抽击', 'combat.ability.gaoler_demon_lock_soul_cage.name': '锁下囚魂笼', 'combat.trait.gaoler_demon.name': '魔狱戒律',
+        'monster.summon.soul_cage.name': '囚魂笼', 'monster.summon.soul_cage.desc': '周期释放拘束魂光的黑铁法器。', 'combat.lore.summon.soul_cage': '骨白符石在每次脉冲前依次转亮。', 'combat.ability.summon.soul_cage_basic.name': '魂光点射', 'combat.ability.summon_soul_cage_binding_pulse.name': '拘魂脉冲', 'combat.trait.summon.soul_cage.name': '固定魂器',
+        'combat.status.darkcastle_shackled.name': '魂链拘束',
+        'hazard.darkcastle.wall_lances.name': '穿墙魔枪', 'hazard.darkcastle.wall_lances.desc': '枪孔与链轮会驱动一排穿墙长枪。', 'hazard.darkcastle.wall_lances.warning': '墙内链轮开始高速转动。', 'hazard.darkcastle.wall_lances.hit': '穿墙魔枪刺中了队伍。',
+        'hazard.darkcastle.gate_ambush.name': '闸门合围', 'hazard.darkcastle.gate_ambush.desc': '轻摆锁链与门缝紫光暴露了合围。', 'hazard.darkcastle.gate_ambush.warning': '前后门廊同时传来金属声。', 'hazard.darkcastle.gate_ambush.hit': '闸门后的敌人已经现身。', 'hazard.darkcastle.gate_ambush.ambush': '魔王城守军从前后门廊合围。'
+      },
+      en: {
+        'monster.hound_abyssal.name': 'Abyssal Hound', 'monster.hound_abyssal.desc': 'A swift war hound clad in heavy black-violet armor.', 'combat.lore.hound_abyssal': 'Dark red fissures breathe beneath its armor.', 'combat.ability.hound_abyssal_basic.name': 'Abyssal Claw', 'combat.ability.hound_abyssal_void_pounce.name': 'Void Pounce', 'combat.trait.hound_abyssal.name': 'Abyssal Hunter',
+        'monster.gaoler_demon.name': 'Demon Gaoler', 'monster.gaoler_demon.desc': 'A heavy jailer that deploys soul cages with a hooked staff.', 'combat.lore.gaoler_demon': 'Every chain bears the number of a former prisoner.', 'combat.ability.gaoler_demon_basic.name': 'Hooked Lash', 'combat.ability.gaoler_demon_lock_soul_cage.name': 'Lock Soul Cage', 'combat.trait.gaoler_demon.name': 'Infernal Discipline',
+        'monster.summon.soul_cage.name': 'Soul Cage', 'monster.summon.soul_cage.desc': 'A black iron focus that releases binding soul pulses.', 'combat.lore.summon.soul_cage': 'Bone-white runes brighten in sequence before each pulse.', 'combat.ability.summon.soul_cage_basic.name': 'Soul Bolt', 'combat.ability.summon_soul_cage_binding_pulse.name': 'Binding Pulse', 'combat.trait.summon.soul_cage.name': 'Fixed Soul Focus',
+        'combat.status.darkcastle_shackled.name': 'Soul Shackled',
+        'hazard.darkcastle.wall_lances.name': 'Wall Lances', 'hazard.darkcastle.wall_lances.desc': 'Murder holes and chain wheels drive a row of lances.', 'hazard.darkcastle.wall_lances.warning': 'Chain wheels begin turning inside the wall.', 'hazard.darkcastle.wall_lances.hit': 'The wall lances struck the party.',
+        'hazard.darkcastle.gate_ambush.name': 'Gate Ambush', 'hazard.darkcastle.gate_ambush.desc': 'Swaying chains and violet gate light betray the encirclement.', 'hazard.darkcastle.gate_ambush.warning': 'Metal sounds from the corridors ahead and behind.', 'hazard.darkcastle.gate_ambush.hit': 'The enemies behind the gates are exposed.', 'hazard.darkcastle.gate_ambush.ambush': 'Castle guards close in from both gate corridors.'
+      }
+    },
     boss: {
       id: 'demon_lord', mods: { hp: 1.3, atk: 1.15 }, damageType: 'necrotic', range: 72, scale: 1.35,
       abilityIds: ['demon_lord.abyssal_blade', 'demon_lord.dark_edict', 'demon_lord.bulwark_action'],
@@ -2025,8 +2214,91 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 62 }, presentation: { nameKey: 'combat.ability.grasping_roots.name', icon: 'icon_skill_guard' }
         }],
         traitModifiers: [{ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.18 }]
+      },
+      {
+        id: 'beetle_mossback', mods: { hp: 1.22, atk: 0.95, def: 1.35, spd: -1 }, damageType: 'blunt',
+        abilityIds: ['beetle_mossback.shell_ram'], abilities: [{
+          id: 'beetle_mossback.shell_ram', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 10, animationLockTicks: 10, cooldownTicks: 140, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 34 },
+          effects: [D('blunt', 1), { type: 'applyStatus', statusId: 'forest.rooted' }],
+          aiHints: { priority: 68 }, presentation: { nameKey: 'combat.ability.beetle_mossback_shell_ram.name', icon: 'icon_skill_guard' }
+        }], traitModifiers: [{ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.08 }]
+      },
+      {
+        id: 'shaman_mosscap', mods: { hp: 0.9, atk: 0.9, def: 1.05, spd: -0.5, range: 62 }, range: 62,
+        damageType: 'poison', abilityIds: ['shaman_mosscap.plant_spore_pod'], abilities: [{
+          id: 'shaman_mosscap.plant_spore_pod', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 22, animationLockTicks: 10, cooldownTicks: 260, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 62 },
+          effects: [{ type: 'summon', archetypeId: 'summon.spore_pod', count: 1, maxActive: 1 }],
+          aiHints: { priority: 94 }, presentation: { nameKey: 'combat.ability.shaman_mosscap_plant_spore_pod.name', icon: 'icon_skill_poison' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.spore_pod', mods: { hp: 0.42, atk: 0.4, moveSpeed: 0, range: 34 },
+      movementTypes: [], range: 34, damageType: 'poison', basicCoefficient: 0.18,
+      abilityIds: ['summon.spore_pod.spore_burst'], abilities: [{
+        id: 'summon.spore_pod.spore_burst', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 18, animationLockTicks: 8, cooldownTicks: 90, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 34, radius: 34, maxTargets: 4 },
+        telegraph: { shape: 'circle', radius: 34, expectedDamagePct: 0.05 },
+        effects: [D('poison', 0.42), { type: 'applyStatus', statusId: 'forest.poisoned' }],
+        aiHints: { priority: 110 }, presentation: { nameKey: 'combat.ability.summon_spore_pod_spore_burst.name', icon: 'icon_skill_poison' }
+      }]
+    }],
+    guardianBaseId: 'treant_sapling',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['mushroom_toxic'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['treant_sapling'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['beetle_mossback'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['shaman_mosscap'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, ambushEligible: true, containsSummoner: true },
+      { id: 'duo', members: ['mushroom_toxic', 'treant_sapling'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['beetle_mossback', 'shaman_mosscap'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, ambushEligible: true, containsSummoner: true },
+      { id: 'duo-mixed', members: ['mushroom_toxic', 'beetle_mossback'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['mushroom_toxic', 'treant_sapling', 'beetle_mossback'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.forest.venom_darts', regionId: 'forest', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'rect', width: 42, height: 14, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 82, revealRadius: 54 }, lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 12, cooldownTicks: 480 },
+        outcome: { type: 'applyEffects', pulses: 2, intervalTicks: 6, effects: [
+          { type: 'damage', damageTypeId: 'poison', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'forest.poisoned', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.forest.venom_darts.name', descKey: 'hazard.forest.venom_darts.desc', warningKey: 'hazard.forest.venom_darts.warning', hitKey: 'hazard.forest.venom_darts.hit' },
+        visual: { glyph: 'darts', palette: { element: '#b6dd55', clue: '#456638' } }
+      },
+      {
+        id: 'hazard.forest.thicket_ambush', regionId: 'forest', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 18, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['forest.solo-a', 'forest.solo-b', 'forest.solo-c', 'forest.solo-d', 'forest.duo', 'forest.duo-summoner', 'forest.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.forest.thicket_ambush.name', descKey: 'hazard.forest.thicket_ambush.desc', warningKey: 'hazard.forest.thicket_ambush.warning', hitKey: 'hazard.forest.thicket_ambush.hit', ambushKey: 'hazard.forest.thicket_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#9ed873', clue: '#315f3c' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.beetle_mossback.name': '苔甲巨甲虫', 'monster.beetle_mossback.desc': '覆盖湿苔的重甲林地甲虫。', 'combat.lore.beetle_mossback': '它把古树根须当作自己的巢墙。', 'combat.ability.beetle_mossback_basic.name': '甲角撞击', 'combat.ability.beetle_mossback_shell_ram.name': '苔甲冲撞', 'combat.trait.beetle_mossback.name': '苔壳',
+        'monster.shaman_mosscap.name': '苔冠萨满', 'monster.shaman_mosscap.desc': '培育危险孢子囊的菌帽施法者。', 'combat.lore.shaman_mosscap': '它听得懂每一片腐叶下的低语。', 'combat.ability.shaman_mosscap_basic.name': '孢子弹', 'combat.ability.shaman_mosscap_plant_spore_pod.name': '种下孢子囊', 'combat.trait.shaman_mosscap.name': '菌林共生',
+        'monster.summon.spore_pod.name': '孢子囊', 'monster.summon.spore_pod.desc': '周期张开的有毒种荚。', 'combat.lore.summon.spore_pod': '根须会在部署后立刻扎入湿土。', 'combat.ability.summon.spore_pod_basic.name': '毒液点射', 'combat.ability.summon_spore_pod_spore_burst.name': '孢子爆裂', 'combat.trait.summon.spore_pod.name': '扎根装置',
+        'hazard.forest.venom_darts.name': '毒藤飞刺', 'hazard.forest.venom_darts.desc': '藤墙孔洞会连续射出毒刺。', 'hazard.forest.venom_darts.warning': '藤瘤正对准前方通道。', 'hazard.forest.venom_darts.hit': '毒刺穿过了队伍。',
+        'hazard.forest.thicket_ambush.name': '雾丛围猎', 'hazard.forest.thicket_ambush.desc': '雾中灌木隐藏着围猎者。', 'hazard.forest.thicket_ambush.warning': '叶片逆向落下。', 'hazard.forest.thicket_ambush.hit': '围猎者已经现身。', 'hazard.forest.thicket_ambush.ambush': '雾丛中的围猎开始了。'
+      },
+      en: {
+        'monster.beetle_mossback.name': 'Mossback Beetle', 'monster.beetle_mossback.desc': 'A heavily armored beetle coated in wet moss.', 'combat.lore.beetle_mossback': 'It treats the roots of ancient trees as nest walls.', 'combat.ability.beetle_mossback_basic.name': 'Horn Jab', 'combat.ability.beetle_mossback_shell_ram.name': 'Shell Ram', 'combat.trait.beetle_mossback.name': 'Moss Shell',
+        'monster.shaman_mosscap.name': 'Moss-Cap Shaman', 'monster.shaman_mosscap.desc': 'A fungal caster that cultivates dangerous spore pods.', 'combat.lore.shaman_mosscap': 'It hears whispers beneath every layer of rotting leaves.', 'combat.ability.shaman_mosscap_basic.name': 'Spore Bolt', 'combat.ability.shaman_mosscap_plant_spore_pod.name': 'Plant Spore Pod', 'combat.trait.shaman_mosscap.name': 'Fungal Symbiosis',
+        'monster.summon.spore_pod.name': 'Spore Pod', 'monster.summon.spore_pod.desc': 'A poisonous seed pod that opens in cycles.', 'combat.lore.summon.spore_pod': 'Its roots take hold the moment it touches wet soil.', 'combat.ability.summon.spore_pod_basic.name': 'Venom Spit', 'combat.ability.summon_spore_pod_spore_burst.name': 'Spore Burst', 'combat.trait.summon.spore_pod.name': 'Rooted Device',
+        'hazard.forest.venom_darts.name': 'Venom Dart Vines', 'hazard.forest.venom_darts.desc': 'Holes in the vine wall fire paired venom darts.', 'hazard.forest.venom_darts.warning': 'The vine bulbs are taking aim.', 'hazard.forest.venom_darts.hit': 'Venom darts cut through the party.',
+        'hazard.forest.thicket_ambush.name': 'Thicket Ambush', 'hazard.forest.thicket_ambush.desc': 'Hunters wait behind brush hardened by the fog.', 'hazard.forest.thicket_ambush.warning': 'Leaves begin falling against the wind.', 'hazard.forest.thicket_ambush.hit': 'The hunters are exposed.', 'hazard.forest.thicket_ambush.ambush': 'The thicket hunt begins.'
+      }
+    },
     boss: {
       id: 'elder_treant', mods: { hp: 1.08, atk: 1 }, damageType: 'blunt', scale: 1.3,
       abilityIds: ['elder_treant.root_circle', 'elder_treant.branch_sweep', 'elder_treant.rejuvenate'],
@@ -2081,6 +2353,11 @@ window.Game.contentSupport.installAll();
         presentation: { nameKey: 'combat.status.bleeding.name', icon: 'icon_skill_strike' }
       },
       {
+        id: 'grassland.snared', stacking: 'refresh', durationTicks: 30,
+        modifiers: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.25 }],
+        presentation: { nameKey: 'combat.status.grassland_snared.name', icon: 'icon_skill_guard' }
+      },
+      {
         id: 'slime_king.regenerating', stacking: 'refresh', durationTicks: 100,
         periodicIntervalTicks: 20,
         periodic: [{ type: 'heal', coefficient: 0.38, target: { relation: 'self', shape: 'single' } }],
@@ -2121,8 +2398,107 @@ window.Game.contentSupport.installAll();
           presentation: { nameKey: 'combat.ability.wolf_pounce.name', icon: 'icon_skill_strike' }
         }],
         traitModifiers: [{ stat: 'moveSpeed', phase: 'multiply', operation: 'multiply', value: 1.12 }]
+      },
+      {
+        id: 'boar_thornback', mods: { hp: 1.15, atk: 1.05, spd: 0.5 },
+        damageType: 'blunt', abilityIds: ['boar_thornback.tusk_charge'],
+        abilities: [{
+          id: 'boar_thornback.tusk_charge', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 12, animationLockTicks: 10, cooldownTicks: 130, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 46 },
+          effects: [{ type: 'movement', distance: 18 }, D('blunt', 1.12), { type: 'applyStatus', statusId: 'grassland.bleeding' }],
+          aiHints: { priority: 68 },
+          presentation: { nameKey: 'combat.ability.boar_thornback_tusk_charge.name', icon: 'icon_skill_strike' }
+        }]
+      },
+      {
+        id: 'goblin_trapper', mods: { hp: 0.88, atk: 0.92, spd: 1.5, range: 58 }, range: 58,
+        damageType: 'piercing', abilityIds: ['goblin_trapper.set_snare'],
+        abilities: [{
+          id: 'goblin_trapper.set_snare', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 20, animationLockTicks: 10, cooldownTicks: 240, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 58 },
+          effects: [{ type: 'summon', archetypeId: 'summon.snare_trap', count: 1, maxActive: 1 }],
+          aiHints: { priority: 92 },
+          presentation: { nameKey: 'combat.ability.goblin_trapper_set_snare.name', icon: 'icon_skill_guard' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.snare_trap', mods: { hp: 0.38, atk: 0.45, moveSpeed: 0, range: 26 },
+      movementTypes: [], range: 26, damageType: 'piercing', basicCoefficient: 0.2,
+      abilityIds: ['summon.snare_trap.snap'],
+      abilities: [{
+        id: 'summon.snare_trap.snap', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 12, animationLockTicks: 8, cooldownTicks: 80, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 26, radius: 20, maxTargets: 1 },
+        telegraph: { shape: 'circle', radius: 20, expectedDamagePct: 0.06 },
+        effects: [D('piercing', 0.48), { type: 'applyStatus', statusId: 'grassland.snared' }, { type: 'selfDestruct' }],
+        aiHints: { priority: 120 },
+        presentation: { nameKey: 'combat.ability.summon_snare_trap_snap.name', icon: 'icon_skill_guard' }
+      }]
+    }],
+    guardianBaseId: 'wolf_gray',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['slime_green'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['wolf_gray'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['boar_thornback'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['goblin_trapper'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['slime_green', 'wolf_gray'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['boar_thornback', 'goblin_trapper'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['slime_green', 'boar_thornback'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['slime_green', 'wolf_gray', 'boar_thornback'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.grassland.thorn_stakes', regionId: 'grassland', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'circle', radius: 16, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 72, revealRadius: 48 },
+        lifecycle: { revealTicks: 8, warningTicks: 20, activeTicks: 4, cooldownTicks: 600 },
+        outcome: { type: 'applyEffects', pulses: 1, effects: [
+          { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.06 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'grassland.bleeding', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.grassland.thorn_stakes.name', descKey: 'hazard.grassland.thorn_stakes.desc', warningKey: 'hazard.grassland.thorn_stakes.warning', hitKey: 'hazard.grassland.thorn_stakes.hit' },
+        visual: { glyph: 'spikes', palette: { element: '#d5c28a', clue: '#67583d' } }
+      },
+      {
+        id: 'hazard.grassland.roadside_ambush', regionId: 'grassland', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 52 },
+        lifecycle: { revealTicks: 6, warningTicks: 16, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['grassland.solo-a', 'grassland.solo-b', 'grassland.solo-c', 'grassland.duo', 'grassland.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.grassland.roadside_ambush.name', descKey: 'hazard.grassland.roadside_ambush.desc', warningKey: 'hazard.grassland.roadside_ambush.warning', hitKey: 'hazard.grassland.roadside_ambush.hit', ambushKey: 'hazard.grassland.roadside_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#a9d06e', clue: '#3f6a35' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.boar_thornback.name': '荆背野猪', 'monster.boar_thornback.desc': '披着硬鬃的草原冲锋兽。', 'combat.lore.boar_thornback': '旧猎道边的灌木为它磨亮了獠牙。',
+        'combat.ability.boar_thornback_basic.name': '獠牙顶撞', 'combat.ability.boar_thornback_tusk_charge.name': '荆鬃冲锋', 'combat.trait.boar_thornback.name': '厚重野性',
+        'monster.goblin_trapper.name': '草原地精猎手', 'monster.goblin_trapper.desc': '携带绳套与短弩的伏击手。', 'combat.lore.goblin_trapper': '它会先封住退路，再呼来同伴。',
+        'combat.ability.goblin_trapper_basic.name': '短弩射击', 'combat.ability.goblin_trapper_set_snare.name': '布设套索', 'combat.trait.goblin_trapper.name': '猎道经验',
+        'monster.summon.snare_trap.name': '套索陷阱', 'monster.summon.snare_trap.desc': '可被提前摧毁的单次绳套。', 'combat.lore.summon.snare_trap': '粗绳与木桩构成的简陋机关。',
+        'combat.ability.summon.snare_trap_basic.name': '绳结抽击', 'combat.ability.summon_snare_trap_snap.name': '套索咬合', 'combat.trait.summon.snare_trap.name': '固定装置',
+        'combat.status.grassland_snared.name': '套索束缚',
+        'hazard.grassland.thorn_stakes.name': '荆棘暗桩', 'hazard.grassland.thorn_stakes.desc': '藏在枯草下的短木刺。', 'hazard.grassland.thorn_stakes.warning': '地面木刺正在弹起。', 'hazard.grassland.thorn_stakes.hit': '荆棘暗桩刺中了队伍。',
+        'hazard.grassland.roadside_ambush.name': '路旁伏兵', 'hazard.grassland.roadside_ambush.desc': '高草中的反向草浪暴露了伏兵。', 'hazard.grassland.roadside_ambush.warning': '道路两侧传来异动。', 'hazard.grassland.roadside_ambush.hit': '伏兵已经现身。', 'hazard.grassland.roadside_ambush.ambush': '路旁伏兵合围。'
+      },
+      en: {
+        'monster.boar_thornback.name': 'Thornback Boar', 'monster.boar_thornback.desc': 'A charging grazer clad in rigid bristles.', 'combat.lore.boar_thornback': 'Roadside brush has polished its tusks to a pale shine.',
+        'combat.ability.boar_thornback_basic.name': 'Tusk Jab', 'combat.ability.boar_thornback_tusk_charge.name': 'Bristle Charge', 'combat.trait.boar_thornback.name': 'Heavy Wildness',
+        'monster.goblin_trapper.name': 'Grassland Goblin Trapper', 'monster.goblin_trapper.desc': 'An ambusher carrying snares and a short crossbow.', 'combat.lore.goblin_trapper': 'It closes the escape route before calling its pack.',
+        'combat.ability.goblin_trapper_basic.name': 'Crossbow Shot', 'combat.ability.goblin_trapper_set_snare.name': 'Set Snare', 'combat.trait.goblin_trapper.name': 'Trailcraft',
+        'monster.summon.snare_trap.name': 'Snare Trap', 'monster.summon.snare_trap.desc': 'A single-use rope trap that can be destroyed early.', 'combat.lore.summon.snare_trap': 'A crude mechanism of rope, stakes, and a biting plate.',
+        'combat.ability.summon.snare_trap_basic.name': 'Rope Lash', 'combat.ability.summon_snare_trap_snap.name': 'Snare Snap', 'combat.trait.summon.snare_trap.name': 'Fixed Device',
+        'combat.status.grassland_snared.name': 'Snared',
+        'hazard.grassland.thorn_stakes.name': 'Thorn Stakes', 'hazard.grassland.thorn_stakes.desc': 'Short stakes hidden beneath dry grass.', 'hazard.grassland.thorn_stakes.warning': 'Wooden spikes are rising from the trail.', 'hazard.grassland.thorn_stakes.hit': 'The thorn stakes struck the party.',
+        'hazard.grassland.roadside_ambush.name': 'Roadside Ambush', 'hazard.grassland.roadside_ambush.desc': 'A backward ripple in the grass gives the ambush away.', 'hazard.grassland.roadside_ambush.warning': 'Movement stirs on both sides of the road.', 'hazard.grassland.roadside_ambush.hit': 'The hidden attackers are exposed.', 'hazard.grassland.roadside_ambush.ambush': 'Roadside attackers close in.'
+      }
+    },
     boss: {
       id: 'slime_king', mods: { hp: 1, atk: 1 }, damageType: 'blunt', scale: 1.25,
       abilityIds: ['slime_king.crushing_drop', 'slime_king.slime_wave', 'slime_king.regenerate'],
@@ -2184,6 +2560,11 @@ window.Game.contentSupport.installAll();
         presentation: { nameKey: 'combat.status.withered.name', icon: 'icon_skill_poison' }
       },
       {
+        id: 'graveyard.clutched', stacking: 'refresh', durationTicks: 36,
+        modifiers: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.3 }],
+        presentation: { nameKey: 'combat.status.graveyard_clutched.name', icon: 'icon_skill_guard' }
+      },
+      {
         id: 'necromancer.bone_barrier', stacking: 'refresh', durationTicks: 140,
         modifiers: [{ stat: 'ward', phase: 'status', operation: 'multiply', value: 1.3 }],
         presentation: { nameKey: 'combat.status.bone_barrier.name', icon: 'icon_skill_guard' }
@@ -2221,8 +2602,98 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 68 }, presentation: { nameKey: 'combat.ability.life_drain.name', icon: 'icon_skill_poison' }
         }],
         traitModifiers: [{ stat: 'dodgeChance', phase: 'otherFlat', operation: 'add', value: 0.05 }]
+      },
+      {
+        id: 'hound_grave', mods: { hp: 0.95, atk: 1.12, spd: 2.5 }, damageType: 'necrotic',
+        abilityIds: ['hound_grave.withering_bite'],
+        abilities: [{
+          id: 'hound_grave.withering_bite', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 8, animationLockTicks: 10, cooldownTicks: 120, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 34 },
+          effects: [D('necrotic', 1.02), { type: 'applyStatus', statusId: 'graveyard.withered' }],
+          aiHints: { priority: 68 },
+          presentation: { nameKey: 'combat.ability.hound_grave_withering_bite.name', icon: 'icon_skill_poison' }
+        }]
+      },
+      {
+        id: 'ghoul_gravedigger', mods: { hp: 1.08, atk: 0.95, spd: -1 }, damageType: 'blunt',
+        abilityIds: ['ghoul_gravedigger.unearthed_grasp'],
+        abilities: [{
+          id: 'ghoul_gravedigger.unearthed_grasp', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 24, animationLockTicks: 11, cooldownTicks: 280, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 52 },
+          effects: [{ type: 'summon', archetypeId: 'summon.crawling_hand', count: 1, maxActive: 1 }],
+          aiHints: { priority: 96 },
+          presentation: { nameKey: 'combat.ability.ghoul_gravedigger_unearthed_grasp.name', icon: 'icon_skill_poison' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.crawling_hand', mods: { hp: 0.35, atk: 0.38, spd: 1.5 },
+      damageType: 'necrotic', basicCoefficient: 0.22,
+      abilityIds: ['summon.crawling_hand.ankle_grab'],
+      abilities: [{
+        id: 'summon.crawling_hand.ankle_grab', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 8, animationLockTicks: 8, cooldownTicks: 90, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'single', range: 26 },
+        effects: [D('necrotic', 0.4), { type: 'applyStatus', statusId: 'graveyard.clutched' }],
+        aiHints: { priority: 110 },
+        presentation: { nameKey: 'combat.ability.summon_crawling_hand_ankle_grab.name', icon: 'icon_skill_guard' }
+      }]
+    }],
+    guardianBaseId: 'skeleton_soldier',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['skeleton_soldier'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['ghost_wisp'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['hound_grave'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['ghoul_gravedigger'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['skeleton_soldier', 'ghost_wisp'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['hound_grave', 'ghoul_gravedigger'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['skeleton_soldier', 'hound_grave'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['skeleton_soldier', 'ghost_wisp', 'hound_grave'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.graveyard.soul_seal', regionId: 'graveyard', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'circle', radius: 22, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 76, revealRadius: 50 }, lifecycle: { revealTicks: 8, warningTicks: 22, activeTicks: 17, cooldownTicks: 640 },
+        outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 8, effects: [
+          { type: 'damage', damageTypeId: 'necrotic', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.025 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'graveyard.withered', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.graveyard.soul_seal.name', descKey: 'hazard.graveyard.soul_seal.desc', warningKey: 'hazard.graveyard.soul_seal.warning', hitKey: 'hazard.graveyard.soul_seal.hit' },
+        visual: { glyph: 'seal', palette: { element: '#c7a8ee', clue: '#655878' } }
+      },
+      {
+        id: 'hazard.graveyard.grave_ambush', regionId: 'graveyard', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 20, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['graveyard.solo-a', 'graveyard.solo-b', 'graveyard.solo-c', 'graveyard.duo', 'graveyard.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.graveyard.grave_ambush.name', descKey: 'hazard.graveyard.grave_ambush.desc', warningKey: 'hazard.graveyard.grave_ambush.warning', hitKey: 'hazard.graveyard.grave_ambush.hit', ambushKey: 'hazard.graveyard.grave_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#d9d6c7', clue: '#635c67' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.hound_grave.name': '墓穴猎犬', 'monster.hound_grave.desc': '披覆骨甲、追逐生者气息的猎犬。', 'combat.lore.hound_grave': '暗紫魂火在它的骨甲缝隙间游走。', 'combat.ability.hound_grave_basic.name': '骨牙撕咬', 'combat.ability.hound_grave_withering_bite.name': '衰败之咬', 'combat.trait.hound_grave.name': '墓园猎性',
+        'monster.ghoul_gravedigger.name': '食尸掘墓者', 'monster.ghoul_gravedigger.desc': '用旧铁锹唤醒地下残骸的食尸鬼。', 'combat.lore.ghoul_gravedigger': '它记得每一块松动墓土下埋着什么。', 'combat.ability.ghoul_gravedigger_basic.name': '铁锹横扫', 'combat.ability.ghoul_gravedigger_unearthed_grasp.name': '掘地之握', 'combat.trait.ghoul_gravedigger.name': '墓土劳作',
+        'monster.summon.crawling_hand.name': '爬行断手', 'monster.summon.crawling_hand.desc': '拖着石棺锁链的骸骨仆从。', 'combat.lore.summon.crawling_hand': '锁链与枯骨都没有锋利断面。', 'combat.ability.summon.crawling_hand_basic.name': '骨指抓挠', 'combat.ability.summon_crawling_hand_ankle_grab.name': '踝部抓缚', 'combat.trait.summon.crawling_hand.name': '低伏追猎',
+        'combat.status.graveyard_clutched.name': '骸手抓缚',
+        'hazard.graveyard.soul_seal.name': '噬魂墓印', 'hazard.graveyard.soul_seal.desc': '墓碑环中的石印会持续抽离生命。', 'hazard.graveyard.soul_seal.warning': '墓印的紫色刻痕依次亮起。', 'hazard.graveyard.soul_seal.hit': '噬魂墓印正在侵蚀队伍。',
+        'hazard.graveyard.grave_ambush.name': '墓土苏醒', 'hazard.graveyard.grave_ambush.desc': '土缝与倾倒烛火暴露了埋伏。', 'hazard.graveyard.grave_ambush.warning': '墓碑后的骨白反光正在靠近。', 'hazard.graveyard.grave_ambush.hit': '墓地伏兵已经现身。', 'hazard.graveyard.grave_ambush.ambush': '沉睡在墓土中的敌人苏醒了。'
+      },
+      en: {
+        'monster.hound_grave.name': 'Grave Hound', 'monster.hound_grave.desc': 'A bone-armored hound that tracks the breath of the living.', 'combat.lore.hound_grave': 'Violet soul fire runs between the plates of its armor.', 'combat.ability.hound_grave_basic.name': 'Bone Fang', 'combat.ability.hound_grave_withering_bite.name': 'Withering Bite', 'combat.trait.hound_grave.name': 'Graveyard Hunter',
+        'monster.ghoul_gravedigger.name': 'Ghoul Gravedigger', 'monster.ghoul_gravedigger.desc': 'A ghoul that wakes buried remains with an old shovel.', 'combat.lore.ghoul_gravedigger': 'It remembers what lies beneath every patch of loose soil.', 'combat.ability.ghoul_gravedigger_basic.name': 'Shovel Sweep', 'combat.ability.ghoul_gravedigger_unearthed_grasp.name': 'Unearthed Grasp', 'combat.trait.ghoul_gravedigger.name': 'Grave Labor',
+        'monster.summon.crawling_hand.name': 'Crawling Hand', 'monster.summon.crawling_hand.desc': 'A skeletal servant dragging a length of coffin chain.', 'combat.lore.summon.crawling_hand': 'Neither chain nor bone bears a gruesome edge.', 'combat.ability.summon.crawling_hand_basic.name': 'Bone Scratch', 'combat.ability.summon_crawling_hand_ankle_grab.name': 'Ankle Grab', 'combat.trait.summon.crawling_hand.name': 'Low Pursuit',
+        'combat.status.graveyard_clutched.name': 'Clutched',
+        'hazard.graveyard.soul_seal.name': 'Soul-Devouring Seal', 'hazard.graveyard.soul_seal.desc': 'A grave-ring seal drains life in repeated pulses.', 'hazard.graveyard.soul_seal.warning': 'Violet marks ignite around the seal.', 'hazard.graveyard.soul_seal.hit': 'The soul seal is draining the party.',
+        'hazard.graveyard.grave_ambush.name': 'Grave Ambush', 'hazard.graveyard.grave_ambush.desc': 'Cracked soil and fallen candles betray the ambush.', 'hazard.graveyard.grave_ambush.warning': 'Bone-white glints move behind the headstones.', 'hazard.graveyard.grave_ambush.hit': 'The graveyard attackers are exposed.', 'hazard.graveyard.grave_ambush.ambush': 'Enemies rise from the grave soil.'
+      }
+    },
     boss: {
       id: 'necromancer', mods: { hp: 1, atk: 1.08 }, damageType: 'necrotic', range: 78, scale: 1.2,
       abilityIds: ['necromancer.shadow_bolt', 'necromancer.withering_curse', 'necromancer.bone_barrier_action'],
@@ -2319,8 +2790,97 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 64 }, presentation: { nameKey: 'combat.ability.searing_bite.name', icon: 'icon_skill_strike' }
         }],
         traitModifiers: [{ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.16 }]
+      },
+      {
+        id: 'slug_magma', mods: { hp: 1.2, atk: 1, def: 1.15, spd: -2 }, damageType: 'fire', range: 58,
+        abilityIds: ['slug_magma.cinder_spit'],
+        abilities: [{
+          id: 'slug_magma.cinder_spit', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 16, animationLockTicks: 10, cooldownTicks: 130, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 58 },
+          effects: [D('fire', 0.88), { type: 'applyStatus', statusId: 'lavacave.burning' }],
+          aiHints: { priority: 66 },
+          presentation: { nameKey: 'combat.ability.slug_magma_cinder_spit.name', icon: 'icon_skill_fire' }
+        }]
+      },
+      {
+        id: 'cultist_cinder', mods: { hp: 0.9, atk: 1.08, spd: 0 }, damageType: 'fire', range: 66,
+        abilityIds: ['cultist_cinder.raise_ember_totem'],
+        abilities: [{
+          id: 'cultist_cinder.raise_ember_totem', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 24, animationLockTicks: 11, cooldownTicks: 280, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 66 },
+          effects: [{ type: 'summon', archetypeId: 'summon.ember_totem', count: 1, maxActive: 1 }],
+          aiHints: { priority: 96 },
+          presentation: { nameKey: 'combat.ability.cultist_cinder_raise_ember_totem.name', icon: 'icon_skill_fire' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.ember_totem', mods: { hp: 0.46, atk: 0.52, moveSpeed: 0, range: 36 },
+      movementTypes: [], range: 36, damageType: 'fire', basicCoefficient: 0.2,
+      abilityIds: ['summon.ember_totem.heat_pulse'],
+      abilities: [{
+        id: 'summon.ember_totem.heat_pulse', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 14, animationLockTicks: 8, cooldownTicks: 100, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 36, radius: 36, maxTargets: 4 },
+        telegraph: { shape: 'circle', radius: 36, expectedDamagePct: 0.07 },
+        effects: [D('fire', 0.5), { type: 'applyStatus', statusId: 'lavacave.burning' }],
+        aiHints: { priority: 115 },
+        presentation: { nameKey: 'combat.ability.summon_ember_totem_heat_pulse.name', icon: 'icon_skill_fire' }
+      }]
+    }],
+    guardianBaseId: 'lava_lizard',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['fire_imp'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['lava_lizard'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['slug_magma'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['cultist_cinder'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['fire_imp', 'lava_lizard'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['slug_magma', 'cultist_cinder'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['fire_imp', 'slug_magma'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['fire_imp', 'lava_lizard', 'slug_magma'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.lavacave.flame_vent', regionId: 'lavacave', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'cone', length: 36, angleDeg: 54, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 78, revealRadius: 50 }, lifecycle: { revealTicks: 8, warningTicks: 18, activeTicks: 11, cooldownTicks: 440 },
+        outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 5, effects: [
+          { type: 'damage', damageTypeId: 'fire', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'lavacave.burning', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.lavacave.flame_vent.name', descKey: 'hazard.lavacave.flame_vent.desc', warningKey: 'hazard.lavacave.flame_vent.warning', hitKey: 'hazard.lavacave.flame_vent.hit' },
+        visual: { glyph: 'flame', palette: { element: '#ffb247', clue: '#6e352a' } }
+      },
+      {
+        id: 'hazard.lavacave.cinder_ambush', regionId: 'lavacave', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 18, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['lavacave.solo-a', 'lavacave.solo-b', 'lavacave.solo-c', 'lavacave.duo', 'lavacave.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.lavacave.cinder_ambush.name', descKey: 'hazard.lavacave.cinder_ambush.desc', warningKey: 'hazard.lavacave.cinder_ambush.warning', hitKey: 'hazard.lavacave.cinder_ambush.hit', ambushKey: 'hazard.lavacave.cinder_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#f27a38', clue: '#6b3f36' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.slug_magma.name': '熔核岩蛞蝓', 'monster.slug_magma.desc': '覆有黑色岩壳的迟缓熔核兽。', 'combat.lore.slug_magma': '橙黄裂隙随着体内热流缓慢明灭。', 'combat.ability.slug_magma_basic.name': '熔岩撞击', 'combat.ability.slug_magma_cinder_spit.name': '烬火喷吐', 'combat.trait.slug_magma.name': '熔核岩壳',
+        'monster.cultist_cinder.name': '烬火教徒', 'monster.cultist_cinder.desc': '在废弃祭坛升起余烬图腾的施法者。', 'combat.lore.cultist_cinder': '红铜护符里封存着一粒永燃火种。', 'combat.ability.cultist_cinder_basic.name': '焦杖火星', 'combat.ability.cultist_cinder_raise_ember_totem.name': '升起余烬图腾', 'combat.trait.cultist_cinder.name': '烬火仪式',
+        'monster.summon.ember_totem.name': '余烬图腾', 'monster.summon.ember_totem.desc': '周期释放热浪的黑曜石装置。', 'combat.lore.summon.ember_totem': '三道橙红裂纹组成了简短的燃烧祷文。', 'combat.ability.summon.ember_totem_basic.name': '余火弹', 'combat.ability.summon_ember_totem_heat_pulse.name': '热浪脉冲', 'combat.trait.summon.ember_totem.name': '固定图腾',
+        'hazard.lavacave.flame_vent.name': '地火喷口', 'hazard.lavacave.flame_vent.desc': '黑曜石裂缝会向固定方向喷发。', 'hazard.lavacave.flame_vent.warning': '裂缝中的火光正在急剧变亮。', 'hazard.lavacave.flame_vent.hit': '地火喷口灼烧了队伍。',
+        'hazard.lavacave.cinder_ambush.name': '烬幕突袭', 'hazard.lavacave.cinder_ambush.desc': '逆流火星与黑烟缝暴露了伏兵。', 'hazard.lavacave.cinder_ambush.warning': '熔岩光被短暂遮断。', 'hazard.lavacave.cinder_ambush.hit': '烬幕后的袭击者已经现身。', 'hazard.lavacave.cinder_ambush.ambush': '伏兵从岩柱后的烬幕中冲出。'
+      },
+      en: {
+        'monster.slug_magma.name': 'Magma Slug', 'monster.slug_magma.desc': 'A slow core beast covered in black volcanic shell.', 'combat.lore.slug_magma': 'Orange cracks pulse with the heat moving inside it.', 'combat.ability.slug_magma_basic.name': 'Magma Slam', 'combat.ability.slug_magma_cinder_spit.name': 'Cinder Spit', 'combat.trait.slug_magma.name': 'Magma Shell',
+        'monster.cultist_cinder.name': 'Cinder Cultist', 'monster.cultist_cinder.desc': 'A caster that raises ember totems at ruined altars.', 'combat.lore.cultist_cinder': 'Its copper charm holds a single undying coal.', 'combat.ability.cultist_cinder_basic.name': 'Charred Spark', 'combat.ability.cultist_cinder_raise_ember_totem.name': 'Raise Ember Totem', 'combat.trait.cultist_cinder.name': 'Cinder Rite',
+        'monster.summon.ember_totem.name': 'Ember Totem', 'monster.summon.ember_totem.desc': 'An obsidian device that releases waves of heat.', 'combat.lore.summon.ember_totem': 'Three orange fissures form a short prayer to flame.', 'combat.ability.summon.ember_totem_basic.name': 'Ember Bolt', 'combat.ability.summon_ember_totem_heat_pulse.name': 'Heat Pulse', 'combat.trait.summon.ember_totem.name': 'Fixed Totem',
+        'hazard.lavacave.flame_vent.name': 'Flame Vent', 'hazard.lavacave.flame_vent.desc': 'An obsidian fissure erupts in one fixed direction.', 'hazard.lavacave.flame_vent.warning': 'The glow inside the fissure rapidly intensifies.', 'hazard.lavacave.flame_vent.hit': 'The flame vent scorched the party.',
+        'hazard.lavacave.cinder_ambush.name': 'Cinder Ambush', 'hazard.lavacave.cinder_ambush.desc': 'Reversing sparks and a seam of smoke betray attackers.', 'hazard.lavacave.cinder_ambush.warning': 'The glow from the lava is briefly obscured.', 'hazard.lavacave.cinder_ambush.hit': 'The attackers behind the cinders are exposed.', 'hazard.lavacave.cinder_ambush.ambush': 'Enemies charge from behind the cinder veil.'
+      }
+    },
     boss: {
       id: 'flame_demon', mods: { hp: 1.05, atk: 1.12 }, damageType: 'fire', scale: 1.25,
       abilityIds: ['flame_demon.infernal_slash', 'flame_demon.fire_shield_action', 'flame_demon.eruption_chain'],
@@ -2417,8 +2977,98 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 62 }, presentation: { nameKey: 'combat.ability.armor_break.name', icon: 'icon_skill_strike' }
         }],
         traitModifiers: [{ stat: 'armor', phase: 'multiply', operation: 'multiply', value: 1.08 }]
+      },
+      {
+        id: 'crawler_crystalback', mods: { hp: 1, atk: 1.08, def: 1.2, spd: 1 }, damageType: 'arcane', range: 64,
+        abilityIds: ['crawler_crystalback.prismatic_shard'],
+        abilities: [{
+          id: 'crawler_crystalback.prismatic_shard', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 14, animationLockTicks: 10, cooldownTicks: 130, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 64 },
+          effects: [D('arcane', 0.92), { type: 'applyStatus', statusId: 'mine.disoriented' }],
+          aiHints: { priority: 66 },
+          presentation: { nameKey: 'combat.ability.crawler_crystalback_prismatic_shard.name', icon: 'icon_skill_fire' }
+        }]
+      },
+      {
+        id: 'kobold_sapper', mods: { hp: 0.9, atk: 1, spd: 1 }, damageType: 'piercing', range: 54,
+        abilityIds: ['kobold_sapper.roll_keg'],
+        abilities: [{
+          id: 'kobold_sapper.roll_keg', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 18, animationLockTicks: 10, cooldownTicks: 260, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 54 },
+          effects: [{ type: 'summon', archetypeId: 'summon.powder_keg', count: 1, maxActive: 1 }],
+          aiHints: { priority: 94 },
+          presentation: { nameKey: 'combat.ability.kobold_sapper_roll_keg.name', icon: 'icon_skill_fire' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.powder_keg', mods: { hp: 0.32, atk: 0.75, moveSpeed: 0, range: 40 },
+      movementTypes: [], range: 40, damageType: 'fire', basicCoefficient: 0.15,
+      abilityIds: ['summon.powder_keg.fuse_burst'],
+      abilities: [{
+        id: 'summon.powder_keg.fuse_burst', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 28, animationLockTicks: 8, cooldownTicks: 100, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 40, radius: 40, maxTargets: 4 },
+        telegraph: { shape: 'circle', radius: 40, expectedDamagePct: 0.15 },
+        effects: [D('fire', 1.18), { type: 'selfDestruct' }],
+        aiHints: { priority: 125 },
+        presentation: { nameKey: 'combat.ability.summon_powder_keg_fuse_burst.name', icon: 'icon_skill_fire' }
+      }]
+    }],
+    guardianBaseId: 'kobold_miner',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['cave_bat'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['kobold_miner'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['crawler_crystalback'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['kobold_sapper'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['cave_bat', 'kobold_miner'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['crawler_crystalback', 'kobold_sapper'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['cave_bat', 'crawler_crystalback'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['cave_bat', 'kobold_miner', 'crawler_crystalback'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.mine.rockfall_plate', regionId: 'mine', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'circle', radius: 24, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 78, revealRadius: 50 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 4, cooldownTicks: 720 },
+        outcome: { type: 'applyEffects', pulses: 1, effects: [
+          { type: 'damage', damageTypeId: 'blunt', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'knockback', distance: 12 },
+          { type: 'applyStatus', statusId: 'mine.disoriented', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 100, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.mine.rockfall_plate.name', descKey: 'hazard.mine.rockfall_plate.desc', warningKey: 'hazard.mine.rockfall_plate.warning', hitKey: 'hazard.mine.rockfall_plate.hit' },
+        visual: { glyph: 'rocks', palette: { element: '#aab4bd', clue: '#665b4d' } }
+      },
+      {
+        id: 'hazard.mine.tunnel_ambush', regionId: 'mine', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 20, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['mine.solo-a', 'mine.solo-b', 'mine.solo-c', 'mine.duo', 'mine.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.mine.tunnel_ambush.name', descKey: 'hazard.mine.tunnel_ambush.desc', warningKey: 'hazard.mine.tunnel_ambush.warning', hitKey: 'hazard.mine.tunnel_ambush.hit', ambushKey: 'hazard.mine.tunnel_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#e6c96a', clue: '#5f533d' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.crawler_crystalback.name': '晶背穴兽', 'monster.crawler_crystalback.desc': '背负青蓝晶簇的矿坑猎兽。', 'combat.lore.crawler_crystalback': '它沿着最明亮的矿脉筑巢。', 'combat.ability.crawler_crystalback_basic.name': '晶爪', 'combat.ability.crawler_crystalback_prismatic_shard.name': '棱晶碎片', 'combat.trait.crawler_crystalback.name': '晶背甲壳',
+        'monster.kobold_sapper.name': '狗头人爆破手', 'monster.kobold_sapper.desc': '携带火药桶和火绳的矿坑爆破手。', 'combat.lore.kobold_sapper': '每根废弃木梁在它眼中都是可利用的引线。', 'combat.ability.kobold_sapper_basic.name': '火绳投射', 'combat.ability.kobold_sapper_roll_keg.name': '滚放火药桶', 'combat.trait.kobold_sapper.name': '爆破经验',
+        'monster.summon.powder_keg.name': '火药桶', 'monster.summon.powder_keg.desc': '可被提前击毁的短引线火药桶。', 'combat.lore.summon.powder_keg': '桶箍已经被爆炸的热量熏黑。', 'combat.ability.summon.powder_keg_basic.name': '火星迸射', 'combat.ability.summon_powder_keg_fuse_burst.name': '引线爆破', 'combat.trait.summon.powder_keg.name': '固定爆炸物',
+        'hazard.mine.rockfall_plate.name': '塌顶落石', 'hazard.mine.rockfall_plate.desc': '松动压板连接着头顶破损木梁。', 'hazard.mine.rockfall_plate.warning': '碎石正从顶板落下。', 'hazard.mine.rockfall_plate.hit': '塌顶落石砸中了队伍。',
+        'hazard.mine.tunnel_ambush.name': '矿道夹击', 'hazard.mine.tunnel_ambush.desc': '轨道震动暴露了侧洞中的伏兵。', 'hazard.mine.tunnel_ambush.warning': '前后矿灯同时熄灭。', 'hazard.mine.tunnel_ambush.hit': '矿道伏兵已经现身。', 'hazard.mine.tunnel_ambush.ambush': '侧洞中的敌人发起夹击。'
+      },
+      en: {
+        'monster.crawler_crystalback.name': 'Crystalback Crawler', 'monster.crawler_crystalback.desc': 'A mine predator carrying blue crystal clusters.', 'combat.lore.crawler_crystalback': 'It nests along the brightest mineral veins.', 'combat.ability.crawler_crystalback_basic.name': 'Crystal Claw', 'combat.ability.crawler_crystalback_prismatic_shard.name': 'Prismatic Shard', 'combat.trait.crawler_crystalback.name': 'Crystal Carapace',
+        'monster.kobold_sapper.name': 'Kobold Sapper', 'monster.kobold_sapper.desc': 'A demolitionist laden with powder kegs and fuse cord.', 'combat.lore.kobold_sapper': 'Every abandoned support beam looks like a fuse to it.', 'combat.ability.kobold_sapper_basic.name': 'Fuse Dart', 'combat.ability.kobold_sapper_roll_keg.name': 'Roll Powder Keg', 'combat.trait.kobold_sapper.name': 'Demolition Craft',
+        'monster.summon.powder_keg.name': 'Powder Keg', 'monster.summon.powder_keg.desc': 'A short-fused keg that can be destroyed before it bursts.', 'combat.lore.summon.powder_keg': 'Its iron hoops are blackened by repeated blasts.', 'combat.ability.summon.powder_keg_basic.name': 'Spark Spit', 'combat.ability.summon_powder_keg_fuse_burst.name': 'Fuse Burst', 'combat.trait.summon.powder_keg.name': 'Fixed Explosive',
+        'hazard.mine.rockfall_plate.name': 'Rockfall Plate', 'hazard.mine.rockfall_plate.desc': 'A loose plate is wired to damaged beams overhead.', 'hazard.mine.rockfall_plate.warning': 'Loose stones are falling from the ceiling.', 'hazard.mine.rockfall_plate.hit': 'The rockfall struck the party.',
+        'hazard.mine.tunnel_ambush.name': 'Tunnel Ambush', 'hazard.mine.tunnel_ambush.desc': 'Shaking rails betray attackers in the side tunnels.', 'hazard.mine.tunnel_ambush.warning': 'Lamps ahead and behind go dark.', 'hazard.mine.tunnel_ambush.hit': 'The tunnel attackers are exposed.', 'hazard.mine.tunnel_ambush.ambush': 'Enemies charge from the side tunnels.'
+      }
+    },
     boss: {
       id: 'stone_golem', mods: { hp: 1.12, atk: 1.05, spd: -2 }, damageType: 'blunt', scale: 1.3,
       abilityIds: ['stone_golem.quake_ring', 'stone_golem.rock_shield_action', 'stone_golem.crushing_fist'],
@@ -2521,8 +3171,97 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 68 }, presentation: { nameKey: 'combat.ability.sonic_dive.name', icon: 'icon_skill_swift' }
         }],
         traitModifiers: [{ stat: 'dodgeChance', phase: 'otherFlat', operation: 'add', value: 0.07 }]
+      },
+      {
+        id: 'manta_aether', mods: { hp: 0.94, atk: 1.1, def: 1.1, spd: 2.5 }, movementTypes: ['flying'],
+        damageType: 'arcane', range: 68, abilityIds: ['manta_aether.arc_shear'],
+        abilities: [{
+          id: 'manta_aether.arc_shear', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 12, animationLockTicks: 10, cooldownTicks: 125, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 68 },
+          effects: [D('arcane', 0.94), { type: 'applyStatus', statusId: 'skyruins.suppressed' }],
+          aiHints: { priority: 70 },
+          presentation: { nameKey: 'combat.ability.manta_aether_arc_shear.name', icon: 'icon_skill_fire' }
+        }]
+      },
+      {
+        id: 'artificer_ruin', mods: { hp: 1, atk: 0.98, def: 1.25, spd: -0.5 }, damageType: 'arcane', range: 70,
+        abilityIds: ['artificer_ruin.deploy_storm_pylon'],
+        abilities: [{
+          id: 'artificer_ruin.deploy_storm_pylon', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 22, animationLockTicks: 10, cooldownTicks: 280, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 70 },
+          effects: [{ type: 'summon', archetypeId: 'summon.storm_pylon', count: 1, maxActive: 1 }],
+          aiHints: { priority: 98 },
+          presentation: { nameKey: 'combat.ability.artificer_ruin_deploy_storm_pylon.name', icon: 'icon_skill_fire' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.storm_pylon', mods: { hp: 0.44, atk: 0.55, moveSpeed: 0, range: 38 },
+      movementTypes: [], range: 38, damageType: 'lightning', basicCoefficient: 0.2,
+      abilityIds: ['summon.storm_pylon.lightning_pulse'],
+      abilities: [{
+        id: 'summon.storm_pylon.lightning_pulse', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 12, animationLockTicks: 8, cooldownTicks: 90, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 38, radius: 38, maxTargets: 4 },
+        telegraph: { shape: 'circle', radius: 38, expectedDamagePct: 0.07 },
+        effects: [D('lightning', 0.54), { type: 'applyStatus', statusId: 'skyruins.suppressed' }],
+        aiHints: { priority: 116 },
+        presentation: { nameKey: 'combat.ability.summon_storm_pylon_lightning_pulse.name', icon: 'icon_skill_fire' }
+      }]
+    }],
+    guardianBaseId: 'guardian_orb',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['guardian_orb'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['harpy'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['manta_aether'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['artificer_ruin'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['guardian_orb', 'harpy'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['manta_aether', 'artificer_ruin'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['guardian_orb', 'manta_aether'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['guardian_orb', 'harpy', 'manta_aether'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.skyruins.arc_grid', regionId: 'skyruins', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'rect', width: 44, height: 18, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 86, revealRadius: 56 }, lifecycle: { revealTicks: 8, warningTicks: 26, activeTicks: 4, cooldownTicks: 600 },
+        outcome: { type: 'applyEffects', pulses: 1, effects: [
+          { type: 'damage', damageTypeId: 'lightning', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'skyruins.suppressed', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 54, minSpacing: 104, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.skyruins.arc_grid.name', descKey: 'hazard.skyruins.arc_grid.desc', warningKey: 'hazard.skyruins.arc_grid.warning', hitKey: 'hazard.skyruins.arc_grid.hit' },
+        visual: { glyph: 'arc', palette: { element: '#77e8ff', clue: '#69718d' } }
+      },
+      {
+        id: 'hazard.skyruins.rift_ambush', regionId: 'skyruins', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 88, revealRadius: 56 }, lifecycle: { revealTicks: 6, warningTicks: 22, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['skyruins.solo-a', 'skyruins.solo-b', 'skyruins.solo-c', 'skyruins.duo', 'skyruins.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 54, minSpacing: 104, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.skyruins.rift_ambush.name', descKey: 'hazard.skyruins.rift_ambush.desc', warningKey: 'hazard.skyruins.rift_ambush.warning', hitKey: 'hazard.skyruins.rift_ambush.hit', ambushKey: 'hazard.skyruins.rift_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#8ff5e4', clue: '#586e89' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.manta_aether.name': '以太天鳐', 'monster.manta_aether.desc': '沿浮岛边缘滑翔的石质天鳐。', 'combat.lore.manta_aether': '青色能量槽让它在无风处也能转向。', 'combat.ability.manta_aether_basic.name': '石翼切击', 'combat.ability.manta_aether_arc_shear.name': '以太弧切', 'combat.trait.manta_aether.name': '浮空关节',
+        'monster.artificer_ruin.name': '遗迹构装师', 'monster.artificer_ruin.desc': '部署风暴棱塔的小型古代构装体。', 'combat.lore.artificer_ruin': '多节工具臂仍在执行失落时代的维护指令。', 'combat.ability.artificer_ruin_basic.name': '符文射线', 'combat.ability.artificer_ruin_deploy_storm_pylon.name': '部署风暴棱塔', 'combat.trait.artificer_ruin.name': '遗迹工艺',
+        'monster.summon.storm_pylon.name': '风暴棱塔', 'monster.summon.storm_pylon.desc': '以悬浮环积蓄雷光的三棱石塔。', 'combat.lore.summon.storm_pylon': '每一道硬边电弧都沿古代刻槽运行。', 'combat.ability.summon.storm_pylon_basic.name': '电弧点射', 'combat.ability.summon_storm_pylon_lightning_pulse.name': '雷击脉冲', 'combat.trait.summon.storm_pylon.name': '固定棱塔',
+        'hazard.skyruins.arc_grid.name': '导雷矩阵', 'hazard.skyruins.arc_grid.desc': '破损导体之间会形成危险电弧。', 'hazard.skyruins.arc_grid.warning': '两端导体正在依次充能。', 'hazard.skyruins.arc_grid.hit': '导雷矩阵击中了队伍。',
+        'hazard.skyruins.rift_ambush.name': '裂隙投送', 'hazard.skyruins.rift_ambush.desc': '错亮符文与收束碎片暴露了传送点。', 'hazard.skyruins.rift_ambush.warning': '方形符文落点正在成形。', 'hazard.skyruins.rift_ambush.hit': '裂隙中的袭击者已经现身。', 'hazard.skyruins.rift_ambush.ambush': '敌人从预告的裂隙落点投送。'
+      },
+      en: {
+        'monster.manta_aether.name': 'Aether Manta', 'monster.manta_aether.desc': 'A stone-winged glider that patrols the island edges.', 'combat.lore.manta_aether': 'Cyan channels let it turn even where no wind blows.', 'combat.ability.manta_aether_basic.name': 'Stone Wing', 'combat.ability.manta_aether_arc_shear.name': 'Arc Shear', 'combat.trait.manta_aether.name': 'Aether Joints',
+        'monster.artificer_ruin.name': 'Ruin Artificer', 'monster.artificer_ruin.desc': 'A small ancient construct that deploys storm pylons.', 'combat.lore.artificer_ruin': 'Its many tool arms still follow a lost maintenance order.', 'combat.ability.artificer_ruin_basic.name': 'Rune Ray', 'combat.ability.artificer_ruin_deploy_storm_pylon.name': 'Deploy Storm Pylon', 'combat.trait.artificer_ruin.name': 'Ruin Craft',
+        'monster.summon.storm_pylon.name': 'Storm Pylon', 'monster.summon.storm_pylon.desc': 'A triangular stone tower charged by a floating ring.', 'combat.lore.summon.storm_pylon': 'Every hard-edged arc follows an ancient groove.', 'combat.ability.summon.storm_pylon_basic.name': 'Arc Bolt', 'combat.ability.summon_storm_pylon_lightning_pulse.name': 'Lightning Pulse', 'combat.trait.summon.storm_pylon.name': 'Fixed Pylon',
+        'hazard.skyruins.arc_grid.name': 'Arc Grid', 'hazard.skyruins.arc_grid.desc': 'Broken conductors form a dangerous electrical line.', 'hazard.skyruins.arc_grid.warning': 'The two conductors are charging in sequence.', 'hazard.skyruins.arc_grid.hit': 'The arc grid struck the party.',
+        'hazard.skyruins.rift_ambush.name': 'Rift Ambush', 'hazard.skyruins.rift_ambush.desc': 'Misfiring runes and converging debris betray a rift.', 'hazard.skyruins.rift_ambush.warning': 'A square rune landing zone is taking shape.', 'hazard.skyruins.rift_ambush.hit': 'The attackers in the rift are exposed.', 'hazard.skyruins.rift_ambush.ambush': 'Enemies arrive at the marked rift point.'
+      }
+    },
     boss: {
       id: 'ruin_guardian', mods: { hp: 1.06, atk: 1.08, def: 1.2 }, damageType: 'arcane', range: 84, scale: 1.3,
       abilityIds: ['ruin_guardian.arcane_ray', 'ruin_guardian.gravity_well', 'ruin_guardian.recalibrate'],
@@ -2623,8 +3362,97 @@ window.Game.contentSupport.installAll();
           aiHints: { priority: 68 }, presentation: { nameKey: 'combat.ability.yeti_smash.name', icon: 'icon_skill_strike' }
         }],
         traitModifiers: [{ stat: 'maxHp', phase: 'multiply', operation: 'multiply', value: 1.08 }]
+      },
+      {
+        id: 'goat_frosthorn', mods: { hp: 1.08, atk: 1.05, def: 1.1, spd: 2 }, damageType: 'blunt',
+        abilityIds: ['goat_frosthorn.ridge_charge'],
+        abilities: [{
+          id: 'goat_frosthorn.ridge_charge', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 14, animationLockTicks: 11, cooldownTicks: 140, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 46 },
+          effects: [{ type: 'movement', distance: 20 }, D('blunt', 1.05), { type: 'knockback', distance: 14 }, { type: 'applyStatus', statusId: 'snowpass.chilled' }],
+          aiHints: { priority: 70 },
+          presentation: { nameKey: 'combat.ability.goat_frosthorn_ridge_charge.name', icon: 'icon_skill_strike' }
+        }]
+      },
+      {
+        id: 'gnoll_rime_trapper', mods: { hp: 0.96, atk: 1.02, spd: 1 }, damageType: 'piercing', range: 60,
+        abilityIds: ['gnoll_rime_trapper.set_rimejaw'],
+        abilities: [{
+          id: 'gnoll_rime_trapper.set_rimejaw', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 20, animationLockTicks: 10, cooldownTicks: 260, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 60 },
+          effects: [{ type: 'summon', archetypeId: 'summon.rimejaw_trap', count: 1, maxActive: 1 }],
+          aiHints: { priority: 94 },
+          presentation: { nameKey: 'combat.ability.gnoll_rime_trapper_set_rimejaw.name', icon: 'icon_skill_guard' }
+        }]
       }
     ],
+    summons: [{
+      id: 'summon.rimejaw_trap', mods: { hp: 0.4, atk: 0.5, moveSpeed: 0, range: 26 },
+      movementTypes: [], range: 26, damageType: 'frost', basicCoefficient: 0.18,
+      abilityIds: ['summon.rimejaw_trap.snap'],
+      abilities: [{
+        id: 'summon.rimejaw_trap.snap', kind: 'action', actionType: 'gcd',
+        timing: { castTicks: 12, animationLockTicks: 8, cooldownTicks: 80, queueable: true, interruptible: true },
+        target: { relation: 'hostile', shape: 'circle', range: 26, radius: 20, maxTargets: 1 },
+        telegraph: { shape: 'circle', radius: 20, expectedDamagePct: 0.07 },
+        effects: [D('frost', 0.52), { type: 'applyStatus', statusId: 'snowpass.exposed' }, { type: 'applyStatus', statusId: 'snowpass.chilled' }, { type: 'selfDestruct' }],
+        aiHints: { priority: 120 },
+        presentation: { nameKey: 'combat.ability.summon_rimejaw_trap_snap.name', icon: 'icon_skill_guard' }
+      }]
+    }],
+    guardianBaseId: 'yeti_small',
+    encounterRecipes: [
+      { id: 'solo-a', members: ['ice_wolf'], weight: 18, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-b', members: ['yeti_small'], weight: 17, spacing: 22, leashRadius: 120, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-c', members: ['goat_frosthorn'], weight: 13, spacing: 22, leashRadius: 124, rewardBudget: 1, ambushEligible: true },
+      { id: 'solo-d', members: ['gnoll_rime_trapper'], weight: 10, spacing: 22, leashRadius: 126, rewardBudget: 1.05, containsSummoner: true },
+      { id: 'duo', members: ['ice_wolf', 'yeti_small'], weight: 16, spacing: 28, leashRadius: 132, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'duo-summoner', members: ['goat_frosthorn', 'gnoll_rime_trapper'], weight: 12, spacing: 28, leashRadius: 136, rewardBudget: 1.3, containsSummoner: true },
+      { id: 'duo-mixed', members: ['ice_wolf', 'goat_frosthorn'], weight: 9, spacing: 28, leashRadius: 134, rewardBudget: 1.25, ambushEligible: true },
+      { id: 'trio', members: ['ice_wolf', 'yeti_small', 'goat_frosthorn'], weight: 5, spacing: 30, leashRadius: 144, rewardBudget: 1.45 }
+    ],
+    offlineRepresentative: { encounterPackId: 'solo-c', secondaryEncounterPackId: 'solo-d' },
+    hazards: [
+      {
+        id: 'hazard.snowpass.icicle_fall', regionId: 'snowpass', category: 'damageTrap',
+        trigger: { mode: 'enter', shape: 'rect', width: 18, height: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 84, revealRadius: 54 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 4, cooldownTicks: 680 },
+        outcome: { type: 'applyEffects', pulses: 1, effects: [
+          { type: 'damage', damageTypeId: 'frost', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.07 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
+          { type: 'applyStatus', statusId: 'snowpass.chilled', stacks: 1, firstPulseOnly: true }
+        ] },
+        placement: { source: 'hazardAnchor', count: [4, 7], minCampDistance: 180, minLandmarkDistance: 52, minSpacing: 100, requireWalkableEscape: true },
+        presentation: { nameKey: 'hazard.snowpass.icicle_fall.name', descKey: 'hazard.snowpass.icicle_fall.desc', warningKey: 'hazard.snowpass.icicle_fall.warning', hitKey: 'hazard.snowpass.icicle_fall.hit' },
+        visual: { glyph: 'icicle', palette: { element: '#c4f0f5', clue: '#738b9d' } }
+      },
+      {
+        id: 'hazard.snowpass.whiteout_ambush', regionId: 'snowpass', category: 'ambushTrigger',
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 88, revealRadius: 54 }, lifecycle: { revealTicks: 6, warningTicks: 22, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        outcome: { type: 'startEncounter', encounterPackIds: ['snowpass.solo-a', 'snowpass.solo-b', 'snowpass.solo-c', 'snowpass.duo', 'snowpass.duo-mixed'] },
+        placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 52, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
+        presentation: { nameKey: 'hazard.snowpass.whiteout_ambush.name', descKey: 'hazard.snowpass.whiteout_ambush.desc', warningKey: 'hazard.snowpass.whiteout_ambush.warning', hitKey: 'hazard.snowpass.whiteout_ambush.hit', ambushKey: 'hazard.snowpass.whiteout_ambush.ambush' },
+        visual: { glyph: 'ambush', palette: { element: '#e7f4f3', clue: '#7790a0' } }
+      }
+    ],
+    locales: {
+      'zh-CN': {
+        'monster.goat_frosthorn.name': '霜角岩羊', 'monster.goat_frosthorn.desc': '用盘角撞开积雪山道的岩羊。', 'combat.lore.goat_frosthorn': '冰蓝盘角记录着无数次山脊冲锋。', 'combat.ability.goat_frosthorn_basic.name': '霜蹄顶撞', 'combat.ability.goat_frosthorn_ridge_charge.name': '山脊冲锋', 'combat.trait.goat_frosthorn.name': '稳固蹄步',
+        'monster.gnoll_rime_trapper.name': '霜原豺狼人猎手', 'monster.gnoll_rime_trapper.desc': '携带骨弩和冰霜夹具的雪原猎手。', 'combat.lore.gnoll_rime_trapper': '它能从风吹雪中看出最新的脚印。', 'combat.ability.gnoll_rime_trapper_basic.name': '骨弩射击', 'combat.ability.gnoll_rime_trapper_set_rimejaw.name': '布设霜牙夹', 'combat.trait.gnoll_rime_trapper.name': '雪猎经验',
+        'monster.summon.rimejaw_trap.name': '霜牙夹', 'monster.summon.rimejaw_trap.desc': '带有冰霜符纹的单次咬合装置。', 'combat.lore.summon.rimejaw_trap': '骨齿内侧凝着永不融化的霜。', 'combat.ability.summon.rimejaw_trap_basic.name': '霜齿轻咬', 'combat.ability.summon_rimejaw_trap_snap.name': '霜牙咬合', 'combat.trait.summon.rimejaw_trap.name': '固定装置',
+        'hazard.snowpass.icicle_fall.name': '悬冰坠刺', 'hazard.snowpass.icicle_fall.desc': '崖壁上的冰柱会沿狭长区域坠落。', 'hazard.snowpass.icicle_fall.warning': '细雪正从头顶簌簌落下。', 'hazard.snowpass.icicle_fall.hit': '坠落冰刺击中了队伍。',
+        'hazard.snowpass.whiteout_ambush.name': '白障袭猎', 'hazard.snowpass.whiteout_ambush.desc': '新脚印与横扫雪粉暴露了猎手。', 'hazard.snowpass.whiteout_ambush.warning': '上风侧掠过短促黑影。', 'hazard.snowpass.whiteout_ambush.hit': '雪障中的袭击者已经现身。', 'hazard.snowpass.whiteout_ambush.ambush': '猎手从白障中扑出。'
+      },
+      en: {
+        'monster.goat_frosthorn.name': 'Frosthorn Ibex', 'monster.goat_frosthorn.desc': 'An ibex that clears snowy paths with its curled horns.', 'combat.lore.goat_frosthorn': 'Its blue horns record countless ridge charges.', 'combat.ability.goat_frosthorn_basic.name': 'Frost Hoof', 'combat.ability.goat_frosthorn_ridge_charge.name': 'Ridge Charge', 'combat.trait.goat_frosthorn.name': 'Sure Footing',
+        'monster.gnoll_rime_trapper.name': 'Rime Gnoll Trapper', 'monster.gnoll_rime_trapper.desc': 'A snow hunter carrying a bone crossbow and frost traps.', 'combat.lore.gnoll_rime_trapper': 'It can read fresh tracks through blowing snow.', 'combat.ability.gnoll_rime_trapper_basic.name': 'Bone Bolt', 'combat.ability.gnoll_rime_trapper_set_rimejaw.name': 'Set Rimejaw', 'combat.trait.gnoll_rime_trapper.name': 'Snowcraft',
+        'monster.summon.rimejaw_trap.name': 'Rimejaw Trap', 'monster.summon.rimejaw_trap.desc': 'A single-use jaw trap marked with frost runes.', 'combat.lore.summon.rimejaw_trap': 'Unmelting frost clings to the inner bone teeth.', 'combat.ability.summon.rimejaw_trap_basic.name': 'Frost Nip', 'combat.ability.summon_rimejaw_trap_snap.name': 'Rimejaw Snap', 'combat.trait.summon.rimejaw_trap.name': 'Fixed Device',
+        'hazard.snowpass.icicle_fall.name': 'Falling Icicles', 'hazard.snowpass.icicle_fall.desc': 'Cliff icicles fall across a narrow strip of ground.', 'hazard.snowpass.icicle_fall.warning': 'Fine snow sifts down from overhead.', 'hazard.snowpass.icicle_fall.hit': 'Falling icicles struck the party.',
+        'hazard.snowpass.whiteout_ambush.name': 'Whiteout Ambush', 'hazard.snowpass.whiteout_ambush.desc': 'Fresh tracks and sweeping powder betray the hunters.', 'hazard.snowpass.whiteout_ambush.warning': 'A short shadow crosses the upwind side.', 'hazard.snowpass.whiteout_ambush.hit': 'The attackers in the whiteout are exposed.', 'hazard.snowpass.whiteout_ambush.ambush': 'Hunters charge through the whiteout.'
+      }
+    },
     boss: {
       id: 'frost_giant', mods: { hp: 1.08, atk: 1.05, spd: -1.5 }, damageType: 'blunt', scale: 1.35,
       abilityIds: ['frost_giant.ice_lance', 'frost_giant.avalanche', 'frost_giant.glacial_armor_action'],

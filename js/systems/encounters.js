@@ -400,6 +400,7 @@
       encounter.scheduler.length = 0;
       log(encounter, { type: 'encounter:ended', payload: encounter.result });
       temporaryActors.forEach(function (actorId) {
+        if (Game.world && Game.world.detachActor) Game.world.detachActor(actorId, 'encounterEnd');
         Game.actors.despawn(actorId, 'encounterEnd');
       });
       return encounter.result;

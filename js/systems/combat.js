@@ -625,7 +625,23 @@
             ownerActorId: source.id, sequence: sequence
           }
         });
+        summoned.rewardAuthorized = false;
+        summoned.encounterRewardAuthorized = false;
+        summoned.exp = 0;
+        summoned.gold = 0;
         Game.encounters.join(encounter.id, summoned.id, effect.inheritTeam !== false ? source.teamId : effect.teamId);
+        if (encounter.context.world && Game.world && Game.world.attachActor) {
+          Game.world.attachActor(summoned, 'summon');
+        }
+      }
+    } else if (effect.type === 'selfDestruct') {
+      if (source.category === 'summon') {
+        Game.combat.defeat(source.id, {
+          encounterId: encounter.id,
+          sourceActorId: source.id,
+          abilityId: abilityDef.id,
+          reason: 'selfDestruct'
+        });
       }
     } else if (effect.type === 'changeTeam') {
       targets.forEach(function (target) {
@@ -774,6 +790,21 @@
     }).forEach(function (status) {
       var def = Game.content.get('status', status.statusId);
       if (!def || !status.nextPeriodicTick || status.nextPeriodicTick > encounter.tick) return;
+      if (status.externalSource && Game.effects) {
+        for (var externalStack = 0; externalStack < Math.max(1, status.stacks || 1); externalStack++) {
+          Game.effects.resolveExternal({
+            source: status.externalSource,
+            targetIds: [actor.id],
+            effects: status.periodicSnapshot || def.periodic || [],
+            encounterId: encounter.id,
+            tick: encounter.tick,
+            regionTier: actor.tier || 1,
+            periodic: true
+          });
+        }
+        status.nextPeriodicTick += status.periodicIntervalTicks || def.periodicIntervalTicks;
+        return;
+      }
       var source = Game.actors.get(status.sourceActorId) || actor;
       for (var stackIndex = 0; stackIndex < Math.max(1, status.stacks || 1); stackIndex++) {
         applyEffects(encounter, source, actor, {
@@ -1253,6 +1284,202 @@
     resetClock: function () { accumulatorMs = 0; },
     combatClockTick: function () {
       return Game.engagement ? Game.engagement.clockTick() : 0;
+    }
+  };
+
+  function externalLog(context, type, target, payload) {
+    var event = {
+      type: type,
+      phase: 'commit',
+      source: Game.contentCompiler.clone(context.source || { kind: 'external' }),
+      sourceActorId: null,
+      targetActorIds: [target.id],
+      tick: Number(context.tick) || 0,
+      payload: payload || {}
+    };
+    var encounter = context.encounterId && Game.encounters.get(context.encounterId);
+    if (encounter && encounter.lifecycle === 'active') {
+      event = Game.encounters.log(encounter.id, event);
+    }
+    Game.bus.emit(type, event);
+    return event;
+  }
+
+  function externalDamage(context, target, effect) {
+    var type = Game.content.get('damageType', effect.damageTypeId || 'true');
+    if (!type || !alive(target)) return null;
+    var targetStats = target.components.statBlock.snapshot().values;
+    var raw = effect.formulaId
+      ? Game.rules.evaluate(effect.formulaId, {
+          sourceStats: { statusPotency: 1 },
+          targetStats: targetStats,
+          regionTier: Math.max(1, Number(context.regionTier) || target.tier || 1)
+        }, effect.params || {})
+      : Number(effect.amount) || 0;
+    var afterDefense = raw;
+    if (effect.defenseMode !== 'resistanceOnly') {
+      if (type.category === 'physical') {
+        var armor = Math.max(0, stat(target, 'armor'));
+        afterDefense = raw * raw / Math.max(1, raw + armor);
+      } else if (type.category === 'magic') {
+        var ward = Math.max(0, stat(target, 'ward'));
+        afterDefense = raw * raw / Math.max(1, raw + ward);
+      }
+    }
+    var resist = type.category === 'true' ? 0 :
+      Game.util.clamp(resistance(target, type.id), -0.75, 0.85);
+    var remaining = Math.max(1, Math.round(afterDefense * (1 - resist)));
+    var absorbed = 0;
+    var shields = target.components.vitals.shields || [];
+    shields.sort(function (a, b) { return b.priority - a.priority || a.id.localeCompare(b.id); });
+    for (var si = shields.length - 1; si >= 0 && remaining > 0; si--) {
+      var shieldState = shields[si];
+      if (shieldState.damageTypes && shieldState.damageTypes.indexOf(type.id) < 0) continue;
+      var blocked = Math.min(shieldState.amount, remaining);
+      shieldState.amount -= blocked;
+      remaining -= blocked;
+      absorbed += blocked;
+      if (shieldState.amount <= 0) shields.splice(si, 1);
+    }
+    var result = Game.units.damage(target, remaining, { source: 'hazard' });
+    var amount = result ? result.amount : remaining;
+    target.components.presentation.flash = 0.14;
+    var event = externalLog(context, 'external:hit', target, {
+      raw: raw, afterDefense: afterDefense, resistance: resist,
+      absorbed: absorbed, amount: amount, damageTypeId: type.id
+    });
+    if (target.hp <= 0) {
+      var encounter = context.encounterId && Game.encounters.get(context.encounterId);
+      if (encounter) {
+        Game.combat.defeat(target.id, {
+          encounterId: encounter.id,
+          sourceActorId: null,
+          abilityId: context.source && context.source.profileId || 'hazard'
+        });
+      } else {
+        Game.units.defeat(target, { source: 'hazard', deathT: 0.5 });
+        Game.bus.emit('actor:defeated', {
+          type: 'actor:defeated', sourceActorId: null,
+          targetActorIds: [target.id],
+          payload: { category: target.category, rank: target.rank, source: context.source }
+        });
+      }
+    }
+    return event;
+  }
+
+  function externalStatus(context, target, effect) {
+    var def = Game.content.get('status', effect.statusId);
+    if (!def || !alive(target)) return null;
+    var encounter = context.encounterId && Game.encounters.get(context.encounterId);
+    var potency = 1;
+    var tenacity = Math.max(0, stat(target, 'tenacity'));
+    var duration = Math.max(1, Math.round((effect.durationTicks || def.durationTicks || 1) *
+      Math.max(0.2, potency / Math.max(0.1, 1 + tenacity))));
+    var source = Game.contentCompiler.clone(context.source || { kind: 'external' });
+    var key = 'external:' + (source.instanceId || source.profileId || 'source') + ':' + def.id;
+    var found = (target.components.statuses || []).filter(function (status) {
+      return status.key === key;
+    })[0];
+    var nowWorldTick = Number(context.worldTick) || 0;
+    if (!found) {
+      found = {
+        id: key,
+        key: key,
+        statusId: def.id,
+        sourceActorId: null,
+        sourceAbilityId: source.profileId || 'hazard',
+        externalSource: source,
+        appliedTick: encounter ? encounter.tick : nowWorldTick,
+        expiresTick: encounter ? encounter.tick + duration : Number.MAX_SAFE_INTEGER,
+        externalExpiresWorldTick: encounter ? 0 : nowWorldTick + duration,
+        nextPeriodicTick: encounter && def.periodicIntervalTicks
+          ? encounter.tick + def.periodicIntervalTicks : 0,
+        externalNextPeriodicWorldTick: !encounter && def.periodicIntervalTicks
+          ? nowWorldTick + def.periodicIntervalTicks : 0,
+        stacks: Math.min(def.maxStacks || 1, Math.max(1, effect.stacks || 1)),
+        potencySnapshot: potency,
+        modifierSnapshot: Game.contentCompiler.clone(def.modifiers || []),
+        periodicSnapshot: Game.contentCompiler.clone(def.periodic || []),
+        periodicIntervalTicks: Number(def.periodicIntervalTicks) || 0,
+        shieldState: null
+      };
+      target.components.statuses.push(found);
+    } else {
+      found.stacks = def.stacking === 'stack'
+        ? Math.min(def.maxStacks || 1, found.stacks + (effect.stacks || 1)) : 1;
+      found.expiresTick = encounter ? encounter.tick + duration : Number.MAX_SAFE_INTEGER;
+      found.externalExpiresWorldTick = encounter ? 0 : nowWorldTick + duration;
+      if (!encounter && def.periodicIntervalTicks && !found.externalNextPeriodicWorldTick) {
+        found.externalNextPeriodicWorldTick = nowWorldTick + def.periodicIntervalTicks;
+      }
+    }
+    Game.units.setModifierSource(target, found.id,
+      (found.modifierSnapshot || []).map(function (modifier) {
+        return Game.units.stackModifier(modifier, found.stacks);
+      }), { hpPolicy: 'preserveRatio' });
+    return externalLog(context, 'external:statusApplied', target, {
+      statusId: def.id, stacks: found.stacks, durationTicks: duration
+    });
+  }
+
+  Game.effects = {
+    resolveExternal: function (context) {
+      context = context || {};
+      var targets = (context.targetIds || []).map(Game.actors.get).filter(alive);
+      var events = [];
+      (context.effects || []).forEach(function (effect) {
+        if (effect.firstPulseOnly && (context.pulse || 0) > 0) return;
+        targets.forEach(function (target) {
+          if (effect.type === 'damage') events.push(externalDamage(context, target, effect));
+          else if (effect.type === 'applyStatus') events.push(externalStatus(context, target, effect));
+          else if (effect.type === 'knockback' || effect.type === 'pull') {
+            var origin = context.position || { x: target.x, y: target.y };
+            var dx = effect.type === 'pull' ? origin.x - target.x : target.x - origin.x;
+            var dy = effect.type === 'pull' ? origin.y - target.y : target.y - origin.y;
+            var length = Math.sqrt(dx * dx + dy * dy) || 1;
+            var distance = Math.max(0, Number(effect.distance) || 0);
+            var moved = Game.terrain && Game.terrain.sweepMove
+              ? Game.terrain.sweepMove(target.x, target.y, dx / length * distance,
+                dy / length * distance, collisionRadius(target))
+              : { x: target.x + dx / length * distance, y: target.y + dy / length * distance };
+            target.x = moved.x;
+            target.y = moved.y;
+            events.push(externalLog(context, 'external:displaced', target, {
+              type: effect.type, distance: distance
+            }));
+          }
+        });
+      });
+      return events.filter(Boolean);
+    },
+
+    cleanupExternal: function (worldTick) {
+      Game.actors.query({ hasComponent: 'statuses' }).forEach(function (actor) {
+        var statuses = actor.components.statuses || [];
+        for (var i = statuses.length - 1; i >= 0; i--) {
+          var status = statuses[i];
+          if (status.externalSource && status.externalNextPeriodicWorldTick &&
+              status.externalNextPeriodicWorldTick <= worldTick &&
+              status.externalExpiresWorldTick >= worldTick) {
+            for (var stackIndex = 0; stackIndex < Math.max(1, status.stacks || 1); stackIndex++) {
+              Game.effects.resolveExternal({
+                source: status.externalSource,
+                targetIds: [actor.id],
+                effects: status.periodicSnapshot || [],
+                worldTick: worldTick,
+                tick: worldTick,
+                regionTier: actor.tier || 1,
+                periodic: true
+              });
+            }
+            status.externalNextPeriodicWorldTick += Math.max(1, status.periodicIntervalTicks || 1);
+          }
+          if (!status.externalExpiresWorldTick || status.externalExpiresWorldTick > worldTick) continue;
+          statuses.splice(i, 1);
+          Game.units.removeModifierSource(actor, status.id, { hpPolicy: 'preserveRatio' });
+        }
+      });
     }
   };
 })();

@@ -106,7 +106,14 @@
       finder.enableSync();
       for (var y = 0; y < layout.nav.h; y++) {
         for (var x = 0; x < layout.nav.w; x++) {
-          finder.setAdditionalPointCost(x, y, layout.nav.costs[y][x]);
+          var hazardCost = Game.hazards && Game.hazards.navigationCost
+            ? Game.hazards.navigationCost(
+                x * layout.nav.cell + layout.nav.cell / 2,
+                y * layout.nav.cell + layout.nav.cell / 2,
+                N.strategy()
+              )
+            : 0;
+          finder.setAdditionalPointCost(x, y, layout.nav.costs[y][x] + hazardCost);
         }
       }
       N.finder = finder;

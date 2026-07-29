@@ -18,7 +18,7 @@
   var CELL = 8;
   var BOUND_TOP = 68;
   var CHUNK = 512;
-  var STREAMS = ['macro', 'field', 'blockers', 'landmarks', 'resources', 'curios', 'threats', 'details'];
+  var STREAMS = ['macro', 'field', 'blockers', 'landmarks', 'resources', 'curios', 'threats', 'hazards', 'details'];
 
   function seedFor(worldSeed, regionId, stream, attempt) {
     return U.strSeed((worldSeed >>> 0) + ':' + regionId + ':3:' + stream + ':' + (attempt || 0));
@@ -530,6 +530,40 @@
     };
   }
 
+  function hazardAnchorsFor(region, worldSeed, attempt, macro, nav, content) {
+    var rng = U.seededRng(seedFor(worldSeed, region.id, 'hazards', attempt));
+    var anchors = [];
+    var protectedPoints = [content.camp, content.bossPoint]
+      .concat(content.landmarks || [], content.nodes || [], content.curios || []);
+    function clear(point) {
+      if (!point || U.dist(point.x, point.y, content.camp.x, content.camp.y) < 180) return false;
+      if (U.dist(point.x, point.y, content.bossPoint.x, content.bossPoint.y) < 120) return false;
+      for (var pi = 0; pi < protectedPoints.length; pi++) {
+        var protectedPoint = protectedPoints[pi];
+        if (!protectedPoint) continue;
+        var spacing = protectedPoint.kind === 'gatherNode' ? 48 : 64;
+        if (U.dist(point.x, point.y, protectedPoint.x, protectedPoint.y) < spacing) return false;
+      }
+      for (var ai = 0; ai < anchors.length; ai++) {
+        if (U.dist(point.x, point.y, anchors[ai].x, anchors[ai].y) < 104) return false;
+      }
+      return true;
+    }
+    var targetCount = 8 + Math.floor(rng() * 3);
+    for (var tries = 0; tries < 360 && anchors.length < targetCount; tries++) {
+      var center = macro.centers[2 + (tries % Math.max(1, macro.centers.length - 2))];
+      var point = pointNearCenter(nav, center, rng, 115, 3);
+      if (!clear(point)) continue;
+      anchors.push({
+        kind: 'hazardAnchor',
+        id: region.id + ':hazard-anchor:' + anchors.length,
+        x: point.x, y: point.y,
+        clearance: nav.distance[point.gy][point.gx] * nav.cell
+      });
+    }
+    return anchors;
+  }
+
   function legacySurface(region, worldSeed, attempt, macro, nav, content) {
     var gw = Math.ceil(WORLD_W / CELL), gh = Math.ceil(WORLD_H / CELL);
     var grid = new Array(gw * gh), colors = new Array(gw * gh);
@@ -761,6 +795,7 @@
     var macro = makeMacro(region, worldSeed, attempt);
     var nav = rasterField(region, worldSeed, attempt, macro);
     var content = contentFor(region, worldSeed, attempt, macro, nav);
+    var hazardAnchors = hazardAnchorsFor(region, worldSeed, attempt, macro, nav, content);
     var surface = legacySurface(region, worldSeed, attempt, macro, nav, content);
     var corridor = shortestMacroPath(macro);
     var chunks = [];
@@ -795,6 +830,7 @@
       curios: content.curios,
       ecology: content.ecology,
       threats: content.threats,
+      hazardAnchors: hazardAnchors,
       guardian: content.guardian,
       chunks: chunks,
       chunkSize: CHUNK,
@@ -1100,6 +1136,7 @@
         curios: layout.curios.map(function (x) { return [x.defId, x.x, x.y]; }),
         ecology: layout.ecology.map(function (x) { return [x.defId, x.x, x.y]; }),
         threats: layout.threats.map(function (x) { return [x.defId, x.x, x.y, x.affix]; }),
+        hazards: (layout.hazardAnchors || []).map(function (x) { return [x.x, x.y, x.clearance]; }),
         guardian: [layout.guardian.x, layout.guardian.y]
       },
       metrics: layout.generation.metrics

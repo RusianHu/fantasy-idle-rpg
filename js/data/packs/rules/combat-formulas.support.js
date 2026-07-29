@@ -38,6 +38,18 @@
           return power * (Number(params.coefficient) || 1) + (Number(params.flat) || 0);
         }
       });
+      capabilities.rules.registerFormula({
+        id: 'combat.hazard_damage_v1',
+        version: 1, deterministic: true,
+        access: ['target.statBlock', 'region.tier'],
+        fn: function (ctx, params) {
+          var target = ctx.targetStats || {};
+          var maxHp = Math.max(1, Number(target.maxHp) || 1);
+          var tier = Math.max(1, Number(ctx.regionTier) || 1);
+          var tierScale = 1 + Math.max(0, tier - 1) * (Number(params.tierCoefficient) || 0);
+          return maxHp * Math.max(0, Number(params.maxHpCoefficient) || 0) * tierScale;
+        }
+      });
     }
   });
 })();

@@ -42,6 +42,7 @@ const bootstrap = [
   'js/sprites/hero.js',
   'js/sprites/monsters_a.js',
   'js/sprites/monsters_b.js',
+  'js/sprites/monsters_expansion.js',
   'js/sprites/props.js',
   'js/sprites/exploration_v3.js',
   'js/data/content/content.generated.js'

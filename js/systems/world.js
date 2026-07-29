@@ -41,6 +41,33 @@
     encounterOrdinals: {},
     compatSpawnSequence: 1,
 
+    attachActor: function (actor, reason) {
+      if (!actor || !actor.components || !actor.components.transform) return false;
+      if (W.entities.some(function (entity) { return entity.id === actor.id; })) return false;
+      actor.animT = Number(actor.animT) || 0;
+      actor.wanderT = Number(actor.wanderT) || 1;
+      actor.rewardAuthorized = actor.spawnSource && actor.spawnSource.kind === 'summon'
+        ? false : actor.rewardAuthorized;
+      W.entities.push(actor);
+      bus.emit('actor:worldAttached', { actorId: actor.id, reason: reason || 'runtime' });
+      return true;
+    },
+
+    detachActor: function (actorId, reason) {
+      var removed = false;
+      W.entities = W.entities.filter(function (entity) {
+        if (!entity || entity.id !== actorId) return true;
+        removed = true;
+        return false;
+      });
+      if (removed && W.hero && W.hero.target && W.hero.target.id === actorId) {
+        W.hero.target = null;
+        W.hero.manualTarget = false;
+      }
+      if (removed) bus.emit('actor:worldDetached', { actorId: actorId, reason: reason || 'runtime' });
+      return removed;
+    },
+
     heroMoveSpeed: function () {
       if (!W.layout || W.layout.version < 3 || !Game.expedition) return HERO_SPEED;
       return HERO_SPEED * Game.expedition.currentModifier().move;
@@ -48,6 +75,7 @@
 
     isHostileActor: function (source, target) {
       return !!(source && target && target.components && target.components.vitals &&
+        !target.hazardConcealed &&
         target.hp > 0 && !target.dead &&
         Game.relations.resolve(source.id, target.id, source.encounterId || null) === 'hostile');
     },
@@ -127,6 +155,7 @@
     init: function (rid) {
       W.bindControls();
       W.endEncounter('region-change');
+      if (Game.hazards) Game.hazards.reset();
       if (W.hero && Game.units) Game.units.commit(W.hero);
       if (Game.population) Game.population.reset(rid);
       Game.encounters.reset();
@@ -223,6 +252,7 @@
       Game.population.mountChannel(rid, 'npc', W.layout, populationOptions).forEach(function (result) {
         Array.prototype.push.apply(W.entities, result.actors);
       });
+      if (Game.hazards && W.layout.version >= 3) Game.hazards.initRegion(rid, W.layout);
 
       if (Game.state.world.mode === 'rest') {
         hero.state = 'goCamp';
@@ -902,7 +932,7 @@
       var best = null, bestD = 1e9;
       for (var i = 0; i < W.entities.length; i++) {
         var e = W.entities[i];
-        if (!e || e === hero || e.dead || e.lifecycle !== 'active') continue;
+        if (!e || e === hero || e.dead || e.hazardConcealed || e.lifecycle !== 'active') continue;
         var d = Math.min(
           U.dist(wx, wy, e.x, e.y),
           U.dist(wx, wy, e.x, e.y - e.spriteH * 0.5)
@@ -1264,6 +1294,7 @@
       }
 
       W.updateHero(hero, dt);
+      if (Game.hazards) Game.hazards.update(dt);
 
       // 怪物
       for (var i = W.entities.length - 1; i >= 0; i--) {
@@ -1272,7 +1303,7 @@
         if (e.dead) {
           e.deathT -= dt;
           if (e.deathT <= 0) {
-            W.entities.splice(i, 1);
+            W.detachActor(e.id, 'defeated');
             if (Game.actors) Game.actors.despawn(e.id, 'defeated');
           }
           continue;
@@ -1498,6 +1529,11 @@
       e.flash = Math.max(0, e.flash - dt);
       e.lungeT = Math.max(0, e.lungeT - dt);
       e.animT += dt;
+      if (e.hazardConcealed) {
+        e.moving = false;
+        e.state = 'idle';
+        return;
+      }
       var hero = W.hero;
       var heroTargetable = hero && hero.state !== 'dead' && hero.state !== 'recover' &&
         Game.state.world.mode === 'battle' && Game.player.hasClass();

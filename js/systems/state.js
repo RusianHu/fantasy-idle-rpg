@@ -173,6 +173,7 @@
           regionProg: {},
           nodeCooldowns: {},
           exploration: {},
+          hazards: { layoutVersion: 3, regions: {} },
           social: {
             spawnVariants: {},
             memories: { spawnId: {}, socialGroupId: {}, factionId: {} }

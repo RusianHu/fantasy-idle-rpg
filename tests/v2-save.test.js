@@ -40,7 +40,7 @@ function boot(saved) {
     'js/i18n/zh-CN.js', 'js/i18n/en.js',
     'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
     'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
-    'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/props.js',
+    'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js', 'js/sprites/props.js',
     'js/sprites/exploration_v3.js',
     'js/data/formulas.js', 'js/data/affixes.js', 'js/data/items.js',
     'js/data/classes.js', 'js/data/skills.js', 'js/data/routes.js',
@@ -83,7 +83,7 @@ function legacy(version) {
 
 const v11 = boot(legacy(11));
 const migrated = v11.Game.save.load();
-assert.equal(migrated.v, 14);
+assert.equal(migrated.v, 15);
 assert.equal(migrated.player, undefined);
 assert.equal(migrated.roster.actors['player-main'].talentRanks.ft_heavy, 3);
 v11.Game.save.applyLoaded(migrated);
@@ -92,7 +92,7 @@ assert.equal(v11.Game.state.player.skills.ft_tough, 2);
 assert.equal(v11.Game.state.inv.lockedSlots.weapon, true);
 assert.equal(Object.prototype.propertyIsEnumerable.call(v11.Game.state, 'player'), false);
 const serialized = v11.Game.save.serialize();
-assert.equal(serialized.v, 14);
+assert.equal(serialized.v, 15);
 assert.equal(serialized.player, undefined);
 assert.ok(serialized.roster && serialized.economy);
 assert.equal(v11.Game.routes.validate(serialized.world.routePlan).length, 0);
@@ -102,6 +102,10 @@ assert.equal(JSON.stringify(serialized).includes('cooldowns'), false);
 assert.deepEqual(
   JSON.parse(JSON.stringify(serialized.world.social)),
   { spawnVariants: {}, memories: { spawnId: {}, socialGroupId: {}, factionId: {} } }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(serialized.world.hazards)),
+  { layoutVersion: 3, regions: {} }
 );
 
 // The serialized roster is a real persistence boundary, not a primary-only view.
@@ -142,7 +146,7 @@ assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);
 // Full migration chain remains executable for the oldest supported save.
 const v1 = boot(legacy(1));
 const oldest = v1.Game.save.load();
-assert.equal(oldest.v, 14);
+assert.equal(oldest.v, 15);
 v1.Game.save.applyLoaded(oldest);
 assert.equal(v1.Game.state.roster.primaryActorId, 'player-main');
 assert.ok(v1.Game.State.normalizeRegionOrder(v1.Game.state.world.regionOrder).length >= 8);
@@ -153,13 +157,70 @@ v13Save.v = 13;
 v13Save.roster.actors['player-main'].variantId = 'removed.variant';
 delete v13Save.world.social;
 const v13 = boot(v13Save);
-const upgradedV14 = v13.Game.save.load();
-assert.equal(upgradedV14.v, 14);
-v13.Game.save.applyLoaded(upgradedV14);
+const upgradedV15 = v13.Game.save.load();
+assert.equal(upgradedV15.v, 15);
+v13.Game.save.applyLoaded(upgradedV15);
 assert.equal(v13.Game.state.roster.actors['player-main'].variantId, null);
 assert.deepEqual(
   JSON.parse(JSON.stringify(v13.Game.state.world.social)),
   { spawnVariants: {}, memories: { spawnId: {}, socialGroupId: {}, factionId: {} } }
+);
+
+// v14 adds an empty Hazard boundary; v15 data keeps only stable current-layout
+// discovery and future absolute cooldowns for known regions.
+const v14Save = JSON.parse(JSON.stringify(serialized));
+v14Save.v = 14;
+delete v14Save.world.hazards;
+const v14 = boot(v14Save);
+const hazardMigrated = v14.Game.save.load();
+assert.equal(hazardMigrated.v, 15);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(hazardMigrated.world.hazards)),
+  { layoutVersion: 3, regions: {} }
+);
+
+const hazardSave = JSON.parse(JSON.stringify(serialized));
+hazardSave.world.worldTime = 300;
+hazardSave.world.hazards = {
+  layoutVersion: 3,
+  regions: {
+    grassland: {
+      discoveredHazardIds: [
+        'hz:3:grassland:deadbeef:0',
+        'hz:3:grassland:deadbeef:0',
+        'hz:3:forest:deadbeef:0',
+        'invalid'
+      ],
+      hazardCooldowns: {
+        'hz:3:grassland:deadbeef:0': 360,
+        'hz:3:grassland:expired00:1': 299,
+        'hz:3:forest:deadbeef:0': 360
+      }
+    },
+    removed_region: {
+      discoveredHazardIds: ['hz:3:removed_region:deadbeef:0'],
+      hazardCooldowns: {}
+    }
+  }
+};
+const hazardBoot = boot(hazardSave);
+hazardBoot.Game.save.applyLoaded(hazardSave);
+assert.deepEqual(
+  Array.from(hazardBoot.Game.state.world.hazards.regions.grassland.discoveredHazardIds),
+  ['hz:3:grassland:deadbeef:0']
+);
+assert.deepEqual(
+  Object.keys(hazardBoot.Game.state.world.hazards.regions.grassland.hazardCooldowns),
+  ['hz:3:grassland:deadbeef:0']
+);
+assert.equal(hazardBoot.Game.state.world.hazards.regions.removed_region, undefined);
+
+const staleLayoutSave = JSON.parse(JSON.stringify(hazardSave));
+staleLayoutSave.world.hazards.layoutVersion = 2;
+hazardBoot.Game.save.applyLoaded(staleLayoutSave);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(hazardBoot.Game.state.world.hazards)),
+  { layoutVersion: 3, regions: {} }
 );
 
 const socialSave = JSON.parse(JSON.stringify(serialized));
@@ -244,4 +305,4 @@ assert.equal(
   'hostile'
 );
 
-console.log('V2 save tests passed: v1/v11/v13→v14 migration, social pruning, route plan, transient boundary.');
+console.log('V2 save tests passed: v1/v11/v13/v14 to v15 migration, Hazard/social pruning, route plan, transient boundary.');

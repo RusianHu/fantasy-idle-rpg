@@ -352,6 +352,8 @@
 
 ## ImageGen 提示词使用规则
 
+本轮先使用 `js/sprites/monsters_expansion.js` 中按稳定 `spriteId` 注册的简单手绘像素精灵完成技术与渲染验收，不调用 ImageGen。以下提示词只作为未来逐单位替换美术母版时的参考；替换不得改变内容 ID、碰撞体、逻辑尺寸或运行时合同。
+
 以下提示词依据项目安装的 `imagegen` skill 编写：
 
 - 分类统一使用真实 taxonomy：`Use case: stylized-concept`。
@@ -815,7 +817,7 @@ Pack-local `locales` 必须同时包含 `zh-CN` 与 `en`，不得只往全局语
 3. **Hazard 基础**：增加 `HazardProfile/HazardVisualProfile` schema、引用与数值审计，完成确定性 placement、swept trigger、fixed-tick 状态机、外部 EffectSource、持久发现/冷却和 PresentationEvent 桥接。
 4. **双 Lab 技术验证**：先在 `tech-demos/units` 注册草原三单位，验证 summon、定身、寻路、点击目标、死亡与 Estimator；在 `tech-demos/map-effects` 注册草原荆棘暗桩与伏击，验证触发、绕行、存读档、关闭特效和减少动态效果。
 5. **八区内容**：按区域逐一添加 Actor、damage Hazard、ambush Hazard 与 Pack-local i18n，每完成一区即运行严格 bundle/audit。
-6. **精灵与 FX 制作**：使用本文件 24 份 prompts 制作 Actor，人工制作 8 套 Hazard 机制图集，并按 HazardVisualProfile 落地 telegraph、粒子、命中与残留。
+6. **精灵与 FX 制作**：本轮以可替换的代码手绘像素精灵覆盖 24 个 Actor，并按 HazardVisualProfile 以像素图元落地 8 套 Hazard 的 telegraph、粒子、命中与残留；24 份 prompts 留作未来逐资产换图，不是本轮发布依赖。
 7. **平衡回归**：更新 Encounter 权重与离线代表 Pack，跑五职业固定 seed；另以三种远征策略跑八区 Hazard 路径种子，检查首通时间、死亡率、平均战斗时长、召唤物存活占比、陷阱触发率和 30 秒承伤预算。
 8. **文档归一**：实施验收后，把主规划的“24 怪物”旧合同更新为 32 个常驻普通怪、8 个 Boss、8 个召唤 Actor，并登记 8 个 damage Hazard + 8 个 ambush Hazard；同步精简更新 README，不把本文件当更新日志并存两套正式口径。
 9. **地图验收与发布**：确认八区现场、HUD、自动远征和低特效表现；实际发布改动 HTML/CSS/JS/字体或精灵注册脚本时，再统一提升 `BUILD_ID` 并执行缓存版本测试。

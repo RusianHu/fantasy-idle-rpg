@@ -234,6 +234,18 @@
         };
         data.v = 14;
       }
+    },
+    {
+      // v14 -> v15: persist only stable Hazard discovery and absolute cooldowns.
+      from: 14,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.hazards = {
+          layoutVersion: data.world.layoutVersion || 3,
+          regions: {}
+        };
+        data.v = 15;
+      }
     }
   ];
 
@@ -319,6 +331,35 @@
     return out;
   }
 
+  function normalizeHazards(saved, currentWorldTime, layoutVersion) {
+    saved = saved && typeof saved === 'object' ? saved : {};
+    var out = { layoutVersion: layoutVersion || 3, regions: {} };
+    if ((saved.layoutVersion | 0) !== (layoutVersion | 0)) return out;
+    Object.keys(saved.regions || {}).sort().forEach(function (rid) {
+      if (!Game.content || !Game.content.has('regionProfile', rid)) return;
+      var source = saved.regions[rid] || {};
+      var prefix = 'hz:' + layoutVersion + ':' + rid + ':';
+      var discovered = Array.isArray(source.discoveredHazardIds)
+        ? source.discoveredHazardIds : [];
+      var clean = {
+        discoveredHazardIds: discovered.filter(function (id, index) {
+          return typeof id === 'string' && id.indexOf(prefix) === 0 &&
+            /^hz:[0-9]+:[a-z][A-Za-z0-9_.:-]*:[0-9a-f]{8}:[0-9]+$/.test(id) &&
+            discovered.indexOf(id) === index;
+        }).sort(),
+        hazardCooldowns: {}
+      };
+      Object.keys(source.hazardCooldowns || {}).sort().forEach(function (id) {
+        var until = Number(source.hazardCooldowns[id]);
+        if (id.indexOf(prefix) !== 0 || !Number.isFinite(until) ||
+            until <= currentWorldTime || until > currentWorldTime + 86400) return;
+        clean.hazardCooldowns[id] = until;
+      });
+      out.regions[rid] = clean;
+    });
+    return out;
+  }
+
   var S = Game.save = {
     lastTs: function () { return lastLoadedTs; },
 
@@ -359,6 +400,7 @@
           regionProg: st.world.regionProg,
           nodeCooldowns: st.world.nodeCooldowns,
           exploration: st.world.exploration,
+          hazards: st.world.hazards,
           social: st.world.social,
           finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
@@ -498,6 +540,11 @@
       st.world.layoutVersion = 3;
       st.world.exploration = data.world && data.world.exploration &&
         typeof data.world.exploration === 'object' ? data.world.exploration : {};
+      st.world.hazards = normalizeHazards(
+        data.world && data.world.hazards,
+        Math.max(0, Number(st.world.worldTime) || 0),
+        st.world.layoutVersion
+      );
       st.world.social = normalizeSocial(
         data.world && data.world.social,
         Math.max(0, Number(st.world.worldTime) || 0)

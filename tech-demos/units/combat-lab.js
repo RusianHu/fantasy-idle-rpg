@@ -60,6 +60,8 @@
   var presentationCursor = 0;
   var movementTrace = [];
   var movementSignatures = {};
+  var lastSummonSnapshot = null;
+  var lastSelfDestructResult = null;
   var allyTeamId = 'party';
   var enemyTeamId = 'enemy';
   var canvas = $('stage');
@@ -73,7 +75,8 @@
       seed: '种子', scenario: '场景', reset: '重建', pause: '暂停', resume: '继续',
       step: '单步 50ms', speed: '速度', inspector: '深度检查', inspectActor: '运行时 Actor',
       tools: '运行时工具', forceAction: '指定 Action', applyStatus: '施加状态', dispel: '驱散',
-      interrupt: '打断', move: '移动目标', charm: '魅惑/恢复', summon: '召唤',
+      interrupt: '打断', move: '移动目标', charm: '魅惑/恢复', summonUnit: '召唤物',
+      summon: '召唤', selfDestruct: '触发自毁',
       participants: 'Actor / Party / Relation', scheduler: 'Scheduler / Telegraph',
       threat: 'Threat / Resources', events: 'CombatEvent', presentationEvents: '攻击表现日志',
       movementTrace: '位移 / 接敌追踪', impact: '运行至下一次命中',
@@ -90,7 +93,8 @@
       seed: 'Seed', scenario: 'Scenario', reset: 'Rebuild', pause: 'Pause', resume: 'Resume',
       step: 'Single 50ms tick', speed: 'Speed', inspector: 'Deep inspector', inspectActor: 'Runtime Actor',
       tools: 'Runtime tools', forceAction: 'Request Action', applyStatus: 'Apply status', dispel: 'Dispel',
-      interrupt: 'Interrupt', move: 'Move target', charm: 'Charm / restore', summon: 'Summon',
+      interrupt: 'Interrupt', move: 'Move target', charm: 'Charm / restore', summonUnit: 'Summon unit',
+      summon: 'Summon', selfDestruct: 'Trigger self-destruct',
       participants: 'Actor / Party / Relation', scheduler: 'Scheduler / Telegraph',
       threat: 'Threat / Resources', events: 'CombatEvent', presentationEvents: 'Attack Presentation Log',
       movementTrace: 'Movement / Contact Trace', impact: 'Run to next impact',
@@ -134,6 +138,7 @@
       node.textContent = tr(node.getAttribute('data-lab'));
     });
     $('pause').textContent = paused ? tr('resume') : tr('pause');
+    refreshLocalizedDefinitionSelects();
     fillScenarios($('scenario').value);
     updateCatalog();
     updateUi(true);
@@ -158,6 +163,23 @@
     var values = Object.keys(scenarioLabels);
     fillSelect($('scenario'), values, selected || 'default', function (id) {
       return scenarioLabels[id][locale() === 'en' ? 1 : 0];
+    });
+  }
+  function refreshLocalizedDefinitionSelects() {
+    [
+      ['encounter', 'encounterProfile'],
+      ['actor', 'actorArchetype'],
+      ['tool-status', 'status'],
+      ['summon-archetype', 'actorArchetype', function (def) { return def.category === 'summon'; }]
+    ].forEach(function (entry) {
+      var select = $(entry[0]);
+      if (!select) return;
+      var selected = select.value;
+      var definitions = Game.content.all(entry[1]);
+      if (entry[2]) definitions = definitions.filter(entry[2]);
+      fillSelect(select, definitions, selected || definitions[0] && definitions[0].id, function (def) {
+        return labelFor(entry[1], def);
+      });
     });
   }
   function params() {
@@ -342,6 +364,8 @@
     presentationCursor = 0;
     movementTrace = [];
     movementSignatures = {};
+    lastSummonSnapshot = null;
+    lastSelfDestructResult = null;
     charmOverride = null;
     var profile = Game.content.get('encounterProfile', $('encounter').value) ||
       Game.content.get('encounterProfile', 'encounter.grassland');
@@ -412,7 +436,30 @@
       charmOverride = Game.relations.setOverride('actor', allies[0].id, enemies[0].id, 'ally',
         { encounterId: encounter.id, symmetric: true });
     }
-    if (id === 'summon') doSummon();
+    if (id === 'summon') {
+      var summonRequest = doSummon();
+      if (summonRequest && summonRequest.ok && summonRequest.mode === 'action') {
+        var controllers = {};
+        Game.actors.query().forEach(function (actor) {
+          controllers[actor.id] = actor.controllerId;
+          if (actor.id !== summonRequest.sourceActorId) actor.controllerId = 'scripted';
+        });
+        for (var summonTick = 0; summonTick < 80 && encounter.lifecycle === 'active' &&
+            !Game.actors.query({ category: 'summon' }).some(function (actor) {
+              return !actor.dead && actor.blueprint.archetypeId === $('summon-archetype').value;
+            }); summonTick++) stepCombat();
+        var summonedActor = Game.actors.query({ category: 'summon' }).filter(function (actor) {
+          return !actor.dead && actor.blueprint.archetypeId === $('summon-archetype').value;
+        })[0];
+        if (summonedActor) {
+          lastSummonSnapshot = compactActor(summonedActor);
+          paused = true;
+        }
+        Game.actors.query().forEach(function (actor) {
+          if (controllers[actor.id]) actor.controllerId = controllers[actor.id];
+        });
+      }
+    }
     if ((id === 'interrupt' || id === 'overlap') && enemies.length) {
       enemies.slice(0, id === 'overlap' ? 3 : 1).forEach(function (enemy) {
         enemy.x = allies[0].x + 22;
@@ -457,20 +504,116 @@
     }, effect);
     updateUi(true);
   }
+
+  function abilityWithEffect(actor, type, archetypeId) {
+    if (!actor) return null;
+    return (actor.abilities || []).map(function (id) { return Game.content.get('ability', id); })
+      .filter(function (def) {
+        return def && def.kind === 'action' && (def.effects || []).some(function (effect) {
+          return effect.type === type && (!archetypeId || effect.archetypeId === archetypeId);
+        });
+      })[0] || null;
+  }
+
+  function hostileTarget(source, abilityDef) {
+    var relation = abilityDef && abilityDef.target && abilityDef.target.relation || 'hostile';
+    if (relation === 'self') return source;
+    return encounter.participants.map(Game.actors.get).filter(function (actor) {
+      return actor && !actor.dead && actor.id !== source.id &&
+        Game.relations.resolve(source.id, actor.id, encounter.id) === relation;
+    })[0] || null;
+  }
+
   function doSummon() {
-    if (!encounter || Game.actors.get('lab:summon')) return;
-    var source = Game.actors.get($('tool-source').value) ||
-      Game.actors.query({ teamId: allyTeamId })[0];
-    if (!source) return;
+    if (!encounter) return { ok: false, reason: 'encounter' };
+    var archetypeId = $('summon-archetype').value;
+    var existing = Game.actors.query({ category: 'summon' }).filter(function (actor) {
+      return !actor.dead && actor.blueprint.archetypeId === archetypeId;
+    })[0];
+    if (existing) return { ok: false, reason: 'maxActive', actorId: existing.id };
+    var actors = encounter.participants.map(Game.actors.get).filter(Boolean);
+    var source = actors.filter(function (actor) {
+      return abilityWithEffect(actor, 'summon', archetypeId);
+    })[0];
+    if (source) {
+      var summonAbility = abilityWithEffect(source, 'summon', archetypeId);
+      var target = hostileTarget(source, summonAbility);
+      if (target) {
+        var range = summonAbility.target.range || 48;
+        source.x = target.x + Math.max(8, range - 4) * (source.x <= target.x ? -1 : 1);
+        source.y = target.y;
+      }
+      var request = Game.combat.requestAction({
+        actorId: source.id,
+        targetId: target && target.id || source.id,
+        abilityId: summonAbility.id
+      });
+      updateUi(true);
+      return Object.assign({ mode: 'action', abilityId: summonAbility.id, sourceActorId: source.id }, request);
+    }
+    source = Game.actors.get($('tool-source').value) || Game.actors.query({ teamId: allyTeamId })[0];
+    if (!source) return { ok: false, reason: 'source' };
+    var sequence = encounter.nextSpawnSequence++;
     var actor = Game.actors.spawn({
-      instanceId: 'lab:summon', archetypeId: 'summon.shadow_wisp',
+      instanceId: encounter.id + ':lab-summon:' + sequence, archetypeId: archetypeId,
       level: source.level, tier: source.tier, factionId: source.factionId,
       controllerId: source.controllerId,
       transform: { x: source.x + 34, y: source.y + 28 },
-      spawnSource: { kind: 'summon', sourceId: 'lab', sequence: 400 }
+      encounterId: encounter.id,
+      spawnSource: {
+        kind: 'summon', sourceId: 'lab.manual-summon',
+        ownerActorId: source.id, sequence: sequence
+      }
     });
     Game.encounters.join(encounter.id, actor.id, source.teamId);
+    actor.rewardAuthorized = false;
+    actor.encounterRewardAuthorized = false;
+    actor.exp = 0;
+    actor.gold = 0;
+    lastSummonSnapshot = compactActor(actor);
     refreshRuntimeSelects();
+    updateUi(true);
+    return { ok: true, mode: 'manual-fallback', actorId: actor.id, sourceActorId: source.id };
+  }
+
+  function triggerSelfDestruct() {
+    if (!encounter) return { ok: false, reason: 'encounter' };
+    var selectedId = $('summon-archetype').value;
+    var summon = Game.actors.query({ category: 'summon' }).filter(function (actor) {
+      return !actor.dead && actor.blueprint.archetypeId === selectedId && abilityWithEffect(actor, 'selfDestruct');
+    })[0] || Game.actors.query({ category: 'summon' }).filter(function (actor) {
+      return !actor.dead && abilityWithEffect(actor, 'selfDestruct');
+    })[0];
+    if (!summon) return { ok: false, reason: 'selfDestructSummon' };
+    var abilityDef = abilityWithEffect(summon, 'selfDestruct');
+    var target = hostileTarget(summon, abilityDef);
+    if (!target) return { ok: false, reason: 'target' };
+    summon.x = target.x + Math.max(8, (abilityDef.target.range || 36) - 4);
+    summon.y = target.y;
+    var controllers = {};
+    Game.actors.query().forEach(function (actor) {
+      controllers[actor.id] = actor.controllerId;
+      if (actor.id !== summon.id) actor.controllerId = 'scripted';
+    });
+    var request = Game.combat.requestAction({
+      actorId: summon.id, targetId: target.id, abilityId: abilityDef.id
+    });
+    for (var tick = 0; request.ok && tick < 60 && Game.actors.get(summon.id) &&
+        !Game.actors.get(summon.id).dead; tick++) stepCombat();
+    Game.actors.query().forEach(function (actor) {
+      if (controllers[actor.id]) actor.controllerId = controllers[actor.id];
+    });
+    lastSelfDestructResult = {
+      actorId: summon.id,
+      abilityId: abilityDef.id,
+      request: request,
+      removed: !Game.actors.get(summon.id),
+      defeated: !!(Game.actors.get(summon.id) && Game.actors.get(summon.id).dead),
+      tick: encounter.tick
+    };
+    paused = true;
+    updateUi(true);
+    return lastSelfDestructResult;
   }
   function bubbleAnchors() {
     return {
@@ -823,7 +966,9 @@
       if (records.some(function (record) {
         return record.visual === 'melee-impact' ||
           record.visual === 'projectile-impact' ||
-          record.visual === 'miss';
+          record.visual === 'miss' ||
+          record.visual === 'heal' ||
+          record.visual === 'shield';
       })) break;
     }
     draw();
@@ -844,7 +989,14 @@
       },
       resources: actor.components.resources,
       combo: actor.components.comboState,
-      statuses: actor.components.statuses
+      statuses: actor.components.statuses,
+      spawnSource: actor.spawnSource || null,
+      rewards: {
+        authorized: actor.rewardAuthorized !== false,
+        encounterAuthorized: actor.encounterRewardAuthorized !== false,
+        exp: Number(actor.exp) || 0,
+        gold: Number(actor.gold) || 0
+      }
     };
   }
   function updateInspector() {
@@ -976,7 +1128,15 @@
       variantCleanup: encounter.scheduler.filter(function (item) {
         return item.kind === 'variantTransition';
       }),
-      social: Game.state && Game.state.world && Game.state.world.social
+      social: Game.state && Game.state.world && Game.state.world.social,
+      summonDiagnostics: {
+        selectedArchetypeId: $('summon-archetype').value,
+        lastSpawn: lastSummonSnapshot,
+        lastSelfDestruct: lastSelfDestructResult,
+        live: Game.actors.query({ category: 'summon' }).filter(function (actor) {
+          return !actor.dead;
+        }).map(compactActor)
+      }
     }, null, 2);
     updatePortraitQa();
     updateInspector();
@@ -1012,6 +1172,13 @@
     fillScenarios(initial.scenario);
     $('seed').value = initial.seed;
     fillSelect($('tool-status'), Game.content.all('status'), null, function (def) { return labelFor('status', def); });
+    var summons = Game.content.all('actorArchetype').filter(function (def) { return def.category === 'summon'; });
+    var initialEncounter = Game.content.get('encounterProfile', $('encounter').value);
+    var regionProfile = initialEncounter && Game.content.get('regionProfile', initialEncounter.regionId);
+    var defaultSummon = regionProfile && regionProfile.projection.summons[0];
+    fillSelect($('summon-archetype'), summons, defaultSummon || summons[0] && summons[0].id, function (def) {
+      return labelFor('actorArchetype', def);
+    });
     fillSelect($('catalog-type'), Game.contentSchemas.definitionTypes, 'actorArchetype');
     $('catalog-counts').innerHTML = Game.contentSchemas.definitionTypes.map(function (type) {
       return '<span>' + type + ' ' + Game.content.all(type).length + '</span>';
@@ -1043,7 +1210,8 @@
         }
         updateUi(true);
       }],
-      ['summon', doSummon]
+      ['summon', doSummon],
+      ['self-destruct', triggerSelfDestruct]
       ,['lab-provoke', function () {
         $('scenario').value = 'engagement';
         reset();
@@ -1102,6 +1270,18 @@
       stepUntilImpact: runToImpact,
       presentation: presentationDiagnostics,
       portraits: updatePortraitQa,
+      summon: doSummon,
+      selfDestruct: triggerSelfDestruct,
+      summons: function () {
+        return {
+          selectedArchetypeId: $('summon-archetype').value,
+          lastSpawn: lastSummonSnapshot,
+          lastSelfDestruct: lastSelfDestructResult,
+          live: Game.actors.query({ category: 'summon' }).filter(function (actor) {
+            return !actor.dead;
+          }).map(compactActor)
+        };
+      },
       catalog: function () {
         return {
           complete: true,
@@ -1109,6 +1289,9 @@
           classCount: Game.content.all('class').length,
           monsterCount: Game.content.all('actorArchetype').filter(function (def) {
             return def.category === 'monster';
+          }).length,
+          summonCount: Game.content.all('actorArchetype').filter(function (def) {
+            return def.category === 'summon';
           }).length,
           encounterCount: Game.content.all('encounterProfile').length,
           fingerprint: Game.content.fingerprint()

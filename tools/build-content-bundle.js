@@ -66,7 +66,7 @@ const BOOTSTRAP = [
   'js/i18n/i18n.js', 'js/i18n/zh-CN.js', 'js/i18n/en.js',
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
-  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
+  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js',
   'js/sprites/props.js', 'js/sprites/exploration_v3.js'
 ];
 

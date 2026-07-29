@@ -668,6 +668,7 @@
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
       if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB);
+      if (Game.hazardRender) Game.hazardRender.draw(ctx, viewL, viewT, viewR, viewB);
 
       // 5) y 排序绘制（装饰 + 实体）
       var drawables = [];
@@ -686,7 +687,9 @@
         ? Game.terrain.spatialQuery(viewL - 30, viewT - 60, viewR + 30, viewB + 30, true)
         : W.entities.concat(W.groundLoot);
       visibleDynamic = visibleDynamic || W.entities.concat(W.groundLoot);
-      for (j = 0; j < visibleDynamic.length; j++) drawables.push(visibleDynamic[j]);
+      for (j = 0; j < visibleDynamic.length; j++) {
+        if (!visibleDynamic[j].hazardConcealed) drawables.push(visibleDynamic[j]);
+      }
       if (Game.environment) {
         var sceneChests = Game.environment.chests();
         for (j = 0; j < sceneChests.length; j++) drawables.push(sceneChests[j]);

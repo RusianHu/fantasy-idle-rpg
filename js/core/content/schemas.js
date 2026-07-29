@@ -11,7 +11,7 @@
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
     'actorVariant', 'encounterPack', 'worldSpawnProfile',
     'worldPopulationProfile', 'regionProfile', 'engagementPolicy',
-    'interactionProfile'
+    'interactionProfile', 'hazardProfile', 'hazardVisualProfile'
   ];
 
   var required = {
@@ -36,7 +36,12 @@
     worldPopulationProfile: ['id', 'regionId', 'channels'],
     regionProfile: ['id', 'tier', 'populationProfileId'],
     engagementPolicy: ['id', 'manualAttack', 'autoAggro'],
-    interactionProfile: ['id', 'actions']
+    interactionProfile: ['id', 'actions'],
+    hazardProfile: [
+      'id', 'regionId', 'category', 'trigger', 'detection', 'lifecycle',
+      'outcome', 'placement', 'visualProfileId', 'presentation'
+    ],
+    hazardVisualProfile: ['id', 'shape', 'states']
   };
 
   var references = {
@@ -64,7 +69,13 @@
     encounterProfile: { rulesProfileId: 'combatRules', bossEncounterId: 'encounterProfile' },
     actorVariant: { archetypeId: 'actorArchetype' },
     worldPopulationProfile: { regionId: 'regionProfile' },
-    regionProfile: { populationProfileId: 'worldPopulationProfile' }
+    regionProfile: {
+      populationProfileId: 'worldPopulationProfile',
+      hazardProfileIds: 'hazardProfile'
+    },
+    hazardProfile: {
+      regionId: 'regionProfile', visualProfileId: 'hazardVisualProfile'
+    }
   };
 
   var defaults = {
@@ -124,7 +135,28 @@
       schemaVersion: 1, manualAttack: false, autoAggro: false,
       groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
     },
-    interactionProfile: { schemaVersion: 1, actions: [] }
+    interactionProfile: { schemaVersion: 1, actions: [] },
+    hazardProfile: {
+      schemaVersion: 1,
+      trigger: {
+        mode: 'enter', shape: 'circle', radius: 16,
+        movementTypes: ['ground'], actorFilter: 'playerParty',
+        sweep: true, retrigger: 'afterExit'
+      },
+      detection: { clueRadius: 72, revealRadius: 48 },
+      lifecycle: {
+        revealTicks: 8, warningTicks: 20, activeTicks: 1,
+        cooldownTicks: 600
+      },
+      placement: {
+        source: 'hazardAnchor', count: [1, 1], minCampDistance: 180,
+        minLandmarkDistance: 48, minSpacing: 96,
+        requireWalkableEscape: true
+      }
+    },
+    hazardVisualProfile: {
+      schemaVersion: 1, shape: 'circle', states: {}
+    }
   };
 
   Game.contentSchemas = {

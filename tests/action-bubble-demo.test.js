@@ -134,7 +134,7 @@ async function run() {
           diagnostics = api.stepUntilImpact(700);
           primaryImpacts = diagnostics.adapter.records.filter((record) =>
             record.sourceActorId === 'lab:ally:0' &&
-            ['melee-impact', 'projectile-impact', 'miss'].includes(record.visual));
+            ['melee-impact', 'projectile-impact', 'miss', 'heal', 'shield'].includes(record.visual));
         }
         return {
           scenario,
@@ -178,9 +178,10 @@ async function run() {
     })()`);
 
     assert.equal(diagnostics.catalog.complete, true);
-    assert.equal(diagnostics.catalog.actorCount, 29);
+    assert.equal(diagnostics.catalog.actorCount, 53);
     assert.equal(diagnostics.catalog.classCount, 5);
-    assert.equal(diagnostics.catalog.monsterCount, 24);
+    assert.equal(diagnostics.catalog.monsterCount, 40);
+    assert.equal(diagnostics.catalog.summonCount, 9);
     assert.equal(diagnostics.catalog.encounterCount, 18);
     assert.match(diagnostics.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.ok(diagnostics.combatPresentation.adapter.records.some((record) =>

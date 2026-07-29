@@ -284,6 +284,116 @@
         if (!Number.isInteger(capacity) || capacity < 0) issue(issues, 'population-capacity', { type: type, id: def.id, path: 'channels.' + channel + '.capacity' });
       });
     }
+    if (type === 'hazardProfile') {
+      var hazardTrigger = def.trigger || {};
+      var hazardDetection = def.detection || {};
+      var hazardLifecycle = def.lifecycle || {};
+      var hazardOutcome = def.outcome || {};
+      var hazardPlacement = def.placement || {};
+      if (['damageTrap', 'ambushTrigger'].indexOf(def.category) < 0) {
+        issue(issues, 'hazard-category', { type: type, id: def.id, path: 'category', ref: def.category });
+      }
+      unexpectedFields(hazardTrigger, [
+        'mode', 'shape', 'radius', 'width', 'height', 'length', 'angleDeg',
+        'movementTypes', 'actorFilter', 'sweep', 'retrigger'
+      ], type, def, 'trigger', issues);
+      if (hazardTrigger.mode !== 'enter' ||
+          ['circle', 'rect', 'line', 'cone'].indexOf(hazardTrigger.shape) < 0 ||
+          hazardTrigger.actorFilter !== 'playerParty' || hazardTrigger.sweep !== true ||
+          hazardTrigger.retrigger !== 'afterExit') {
+        issue(issues, 'hazard-trigger', { type: type, id: def.id, path: 'trigger' });
+      }
+      if (!Array.isArray(hazardTrigger.movementTypes) || !hazardTrigger.movementTypes.length ||
+          hazardTrigger.movementTypes.some(function (movement) {
+            return ['ground', 'flying', 'hover'].indexOf(movement) < 0;
+          })) {
+        issue(issues, 'hazard-movement-types', { type: type, id: def.id, path: 'trigger.movementTypes' });
+      }
+      ['radius', 'width', 'height', 'length', 'angleDeg'].forEach(function (field) {
+        if (hazardTrigger[field] !== undefined &&
+            (!Number.isFinite(hazardTrigger[field]) || hazardTrigger[field] <= 0)) {
+          issue(issues, 'hazard-number', { type: type, id: def.id, path: 'trigger.' + field });
+        }
+      });
+      unexpectedFields(hazardDetection, ['clueRadius', 'revealRadius'], type, def, 'detection', issues);
+      if (!Number.isFinite(hazardDetection.clueRadius) || !Number.isFinite(hazardDetection.revealRadius) ||
+          hazardDetection.clueRadius < hazardDetection.revealRadius || hazardDetection.revealRadius <= 0) {
+        issue(issues, 'hazard-detection', { type: type, id: def.id, path: 'detection' });
+      }
+      unexpectedFields(hazardLifecycle, [
+        'revealTicks', 'warningTicks', 'activeTicks', 'cooldownTicks', 'ambushLock'
+      ], type, def, 'lifecycle', issues);
+      ['revealTicks', 'warningTicks', 'activeTicks', 'cooldownTicks'].forEach(function (field) {
+        if (!Number.isInteger(hazardLifecycle[field]) || hazardLifecycle[field] < (field === 'revealTicks' ? 0 : 1)) {
+          issue(issues, 'hazard-lifecycle', { type: type, id: def.id, path: 'lifecycle.' + field });
+        }
+      });
+      if ((def.category === 'damageTrap' && hazardOutcome.type !== 'applyEffects') ||
+          (def.category === 'ambushTrigger' && hazardOutcome.type !== 'startEncounter')) {
+        issue(issues, 'hazard-outcome', { type: type, id: def.id, path: 'outcome.type' });
+      }
+      if (hazardOutcome.type === 'applyEffects') {
+        if (!Array.isArray(hazardOutcome.effects) || !hazardOutcome.effects.length ||
+            hazardOutcome.effects.some(function (effect) {
+              return !effect || ['damage', 'applyStatus', 'knockback', 'pull'].indexOf(effect.type) < 0;
+            })) {
+          issue(issues, 'hazard-effect-whitelist', { type: type, id: def.id, path: 'outcome.effects' });
+        }
+        if (hazardOutcome.pulses !== undefined &&
+            (!Number.isInteger(hazardOutcome.pulses) || hazardOutcome.pulses < 1 || hazardOutcome.pulses > 8)) {
+          issue(issues, 'hazard-pulses', { type: type, id: def.id, path: 'outcome.pulses' });
+        }
+        if ((hazardOutcome.pulses || 1) > 1 &&
+            (!Number.isInteger(hazardOutcome.intervalTicks) || hazardOutcome.intervalTicks < 1)) {
+          issue(issues, 'hazard-pulse-interval', { type: type, id: def.id, path: 'outcome.intervalTicks' });
+        }
+      }
+      if (hazardOutcome.type === 'startEncounter' &&
+          (!Array.isArray(hazardOutcome.encounterPackIds) || !hazardOutcome.encounterPackIds.length)) {
+        issue(issues, 'hazard-encounter-packs', { type: type, id: def.id, path: 'outcome.encounterPackIds' });
+      }
+      unexpectedFields(hazardPlacement, [
+        'source', 'count', 'minCampDistance', 'minLandmarkDistance', 'minSpacing',
+        'minDamageHazardDistance', 'requireWalkableEscape', 'maxPerTerritory'
+      ], type, def, 'placement', issues);
+      if (['hazardAnchor', 'threatTerritory'].indexOf(hazardPlacement.source) < 0 ||
+          !positiveCount(hazardPlacement.count) || hazardPlacement.requireWalkableEscape !== true) {
+        issue(issues, 'hazard-placement', { type: type, id: def.id, path: 'placement' });
+      }
+      ['minCampDistance', 'minLandmarkDistance', 'minSpacing', 'minDamageHazardDistance'].forEach(function (field) {
+        if (hazardPlacement[field] !== undefined &&
+            (!Number.isFinite(hazardPlacement[field]) || hazardPlacement[field] < 0)) {
+          issue(issues, 'hazard-number', { type: type, id: def.id, path: 'placement.' + field });
+        }
+      });
+      ['warningKey', 'hitKey', 'ambushKey'].forEach(function (field) {
+        var localeKey = def.presentation && def.presentation[field];
+        if (field === 'ambushKey' && def.category !== 'ambushTrigger') return;
+        if (!localeKey) {
+          issue(issues, 'required-field', { type: type, id: def.id, path: 'presentation.' + field });
+          return;
+        }
+        ['zh-CN', 'en'].forEach(function (locale) {
+          if (Game.i18n && typeof Game.i18n.has === 'function' && !Game.i18n.has(locale, localeKey)) {
+            issue(issues, 'missing-i18n', {
+              type: type, id: def.id, path: 'presentation.' + field,
+              ref: localeKey, locale: locale,
+              sourcePackId: def.sourcePackId, sourceFile: def.sourceFile
+            });
+          }
+        });
+      });
+    }
+    if (type === 'hazardVisualProfile') {
+      if (['circle', 'rect', 'line', 'cone'].indexOf(def.shape) < 0) {
+        issue(issues, 'hazard-visual-shape', { type: type, id: def.id, path: 'shape' });
+      }
+      ['concealed', 'dormant', 'warning', 'active', 'cooldown'].forEach(function (state) {
+        if (!def.states || !def.states[state] || typeof def.states[state] !== 'object') {
+          issue(issues, 'hazard-visual-state', { type: type, id: def.id, path: 'states.' + state });
+        }
+      });
+    }
     if (type === 'engagementPolicy') {
       if (typeof def.manualAttack !== 'boolean' || typeof def.autoAggro !== 'boolean') issue(issues, 'engagement-policy-flags', { type: type, id: def.id });
     }
@@ -309,7 +419,7 @@
     'modifyResource', 'modifyCooldown', 'modifyThreat', 'movement',
     'knockback', 'pull', 'summon', 'changeTeam', 'conditional',
     'sequence', 'repeat', 'triggerAbility', 'setCombo', 'markTarget',
-    'interrupt'
+    'interrupt', 'selfDestruct'
   ];
 
   function collectEffectRefs(type, def, effect, path, definitions, issues) {
@@ -322,6 +432,19 @@
     if (effect.formulaId && !Game.rules.formula(effect.formulaId)) {
       issue(issues, 'missing-formula', {
         type: type, id: def.id, path: path + '.formulaId', ref: effect.formulaId
+      });
+    }
+    if (effect.type === 'summon') {
+      var summonedArchetype = definitions.actorArchetype && definitions.actorArchetype[effect.archetypeId];
+      if (summonedArchetype && summonedArchetype.category !== 'summon') {
+        issue(issues, 'summon-archetype-category', {
+          type: type, id: def.id, path: path + '.archetypeId', ref: effect.archetypeId
+        });
+      }
+      ['count', 'maxActive'].forEach(function (field) {
+        if (!Number.isInteger(effect[field]) || effect[field] < 1 || effect[field] > 8) {
+          issue(issues, 'summon-count', { type: type, id: def.id, path: path + '.' + field });
+        }
       });
     }
     [
@@ -420,6 +543,23 @@
     if (type === 'status') {
       (def.periodic || []).forEach(function (effect, index) {
         collectEffectRefs(type, def, effect, 'periodic.' + index, definitions, issues);
+      });
+    }
+    if (type === 'hazardProfile') {
+      var outcome = def.outcome || {};
+      (outcome.effects || []).forEach(function (effect, index) {
+        collectEffectRefs(type, def, effect, 'outcome.effects.' + index, definitions, issues);
+      });
+      (outcome.encounterPackIds || []).forEach(function (packId, index) {
+        if (refExists(definitions, 'encounterPack', packId, type, def,
+            'outcome.encounterPackIds.' + index, issues)) {
+          var pack = definitions.encounterPack[packId];
+          if (!pack.ambushEligible || (pack.members || []).length > 2) {
+            issue(issues, 'hazard-ambush-pack', {
+              type: type, id: def.id, path: 'outcome.encounterPackIds.' + index, ref: packId
+            });
+          }
+        }
       });
     }
   }
@@ -614,6 +754,8 @@
     if (type === 'worldPopulationProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'engagementPolicy') validateAdvanced(type, def, definitions, issues);
     if (type === 'interactionProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'hazardProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'hazardVisualProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'damageType' && ['physical', 'magic', 'true'].indexOf(def.category) < 0) {
       issue(issues, 'damage-category', { type: type, id: def.id, path: 'category' });
     }
@@ -867,6 +1009,31 @@
         ordered[type].forEach(function (id) {
           collectRefs(type, compiled[type][id], compiled, issues);
         });
+      });
+      var grantedAbilities = {};
+      ordered.actorArchetype.forEach(function (actorId) {
+        (compiled.actorArchetype[actorId].abilityGrantIds || []).forEach(function (abilityId) {
+          (grantedAbilities[abilityId] || (grantedAbilities[abilityId] = [])).push(actorId);
+        });
+      });
+      function containsEffect(effect, effectType) {
+        if (!effect) return false;
+        if (effect.type === effectType) return true;
+        return (effect.effects || []).some(function (nested) { return containsEffect(nested, effectType); }) ||
+          (effect.then || []).some(function (nested) { return containsEffect(nested, effectType); }) ||
+          (effect.else || []).some(function (nested) { return containsEffect(nested, effectType); });
+      }
+      ordered.ability.forEach(function (abilityId) {
+        var abilityDef = compiled.ability[abilityId];
+        if (!(abilityDef.effects || []).some(function (effect) { return containsEffect(effect, 'selfDestruct'); })) return;
+        var users = grantedAbilities[abilityId] || [];
+        if (!users.length || users.some(function (actorId) {
+          return compiled.actorArchetype[actorId].category !== 'summon';
+        })) {
+          issue(issues, 'self-destruct-summon-only', {
+            type: 'ability', id: abilityId, path: 'effects', ref: users.join(',')
+          });
+        }
       });
       populationViews = buildPopulationViews(sorted, compiled, issues);
       reverseReferences = buildReverseReferences(compiled, populationViews);

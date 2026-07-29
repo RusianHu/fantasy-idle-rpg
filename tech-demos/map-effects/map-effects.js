@@ -12,6 +12,7 @@
   var lastRuntimeUpdate = 0;
   var qaRestoreAuto = false;
   var explorationMessage = '';
+  var hazardMessage = '';
 
   function tr(key, vars) { return D.t('map.inspector.' + key, vars); }
 
@@ -355,6 +356,135 @@
     document.getElementById('exploration-event').textContent = message;
   }
 
+  function hazardName(instance) {
+    if (!instance || !instance.profile) return '—';
+    return translatedGameValue(instance.profile.presentation.nameKey, instance.profileId);
+  }
+
+  function selectedHazard() {
+    var select = document.getElementById('hazard-select');
+    return select ? Game.hazards.get(select.value) : null;
+  }
+
+  function hazardShape(instance) {
+    if (!instance) return '—';
+    var trigger = instance.profile.trigger;
+    var size = trigger.shape === 'circle'
+      ? 'r' + trigger.radius
+      : [trigger.width || trigger.length || 0, trigger.height || trigger.radius || 0].join('x');
+    var degrees = Math.round(((instance.orientation * 180 / Math.PI) % 360 + 360) % 360);
+    return trigger.shape + ' ' + size + ' / ' + degrees + '°';
+  }
+
+  function hazardDiagnostics() {
+    return Game.hazards.all().map(function (instance) {
+      var snapshot = Game.hazards.snapshot().filter(function (item) { return item.id === instance.id; })[0];
+      return Object.assign({}, snapshot, {
+        category: instance.profile.category,
+        name: hazardName(instance),
+        trigger: instance.profile.trigger,
+        lifecycle: instance.profile.lifecycle,
+        navigationCost: {
+          safe: Game.hazards.navigationCost(instance.x, instance.y, 'safe'),
+          balanced: Game.hazards.navigationCost(instance.x, instance.y, 'balanced'),
+          loot: Game.hazards.navigationCost(instance.x, instance.y, 'loot')
+        }
+      });
+    });
+  }
+
+  function refreshHazardSelect() {
+    var select = document.getElementById('hazard-select');
+    if (!select) return;
+    var previous = select.value;
+    var hazards = Game.hazards.all();
+    select.innerHTML = '';
+    hazards.forEach(function (instance, index) {
+      var option = document.createElement('option');
+      option.value = instance.id;
+      option.textContent = hazardName(instance) + ' · ' + instance.profile.category + ' · ' + (index + 1);
+      select.appendChild(option);
+    });
+    if (hazards.some(function (instance) { return instance.id === previous; })) select.value = previous;
+  }
+
+  function setHazardEvent(message) {
+    hazardMessage = message;
+    document.getElementById('hazard-event').textContent = message;
+  }
+
+  function updateHazardRuntime() {
+    var instance = selectedHazard();
+    if (!instance) {
+      ['hazard-state', 'hazard-shape', 'hazard-cooldown', 'hazard-costs'].forEach(function (id) {
+        document.getElementById(id).textContent = '—';
+      });
+      document.getElementById('hazard-events').textContent = '[]';
+      return;
+    }
+    document.getElementById('hazard-state').textContent = instance.awareness + ' / ' + instance.phase;
+    document.getElementById('hazard-shape').textContent = hazardShape(instance);
+    document.getElementById('hazard-cooldown').textContent = instance.phase === 'cooldown'
+      ? Math.max(0, instance.cooldownUntilWorldTime - Game.state.world.worldTime).toFixed(1) + 's'
+      : '—';
+    document.getElementById('hazard-costs').textContent = ['safe', 'balanced', 'loot'].map(function (strategy) {
+      return strategy.charAt(0).toUpperCase() + ':' + Game.hazards.navigationCost(instance.x, instance.y, strategy);
+    }).join(' / ');
+    document.getElementById('hazard-events').textContent = JSON.stringify(
+      Game.hazards.events().filter(function (event) { return event.instanceId === instance.id; }).slice(-8), null, 2);
+    if (!hazardMessage) setHazardEvent(hazardName(instance) + ' · ' + instance.profile.category);
+  }
+
+  function focusHazard() {
+    var instance = selectedHazard();
+    if (!instance) return false;
+    prepareQaTarget();
+    setHeroPosition(instance.x, instance.y);
+    Game.hazards.update(.05);
+    setHazardEvent(D.t('map.hazardFocused') + ' · ' + hazardName(instance));
+    updateHazardRuntime();
+    return true;
+  }
+
+  function triggerHazard() {
+    var instance = selectedHazard();
+    if (!instance) return false;
+    if (instance.phase !== 'dormant') {
+      setHeroPosition(Game.world.layout.camp.x + 24, Game.world.layout.camp.y + 18);
+      Game.hazards.update(.05);
+      if (!Game.hazards.resetInstance(instance.id)) {
+        setHazardEvent(D.t('map.hazardLocked'));
+        return false;
+      }
+    }
+    prepareQaTarget();
+    setHeroPosition(instance.x, instance.y);
+    Game.hazards.update(.05);
+    var triggered = instance.phase === 'warning' || Game.hazards.forceTrigger(instance.id, Game.world.hero.id);
+    setHazardEvent((triggered ? D.t('map.hazardTriggered') : D.t('map.hazardLocked')) + ' · ' + hazardName(instance));
+    updateHazardRuntime();
+    return triggered;
+  }
+
+  function stepHazard() {
+    paused = true;
+    syncPauseUi();
+    var steps = Game.hazards.update(.05);
+    updateHazardRuntime();
+    return steps;
+  }
+
+  function resetHazard() {
+    var instance = selectedHazard();
+    if (!instance) return false;
+    setHeroPosition(Game.world.layout.camp.x + 24, Game.world.layout.camp.y + 18);
+    Game.hazards.update(.05);
+    var reset = Game.hazards.resetInstance(instance.id);
+    setHazardEvent((reset ? D.t('map.hazardReset') : D.t('map.hazardLocked')) + ' · ' + hazardName(instance));
+    updateHazardRuntime();
+    return reset;
+  }
+
   function prepareQaTarget() {
     var hero = Game.world.hero;
     if (!hero) return;
@@ -467,6 +597,7 @@
     setInspectorRuntime('coverage', (readiness.coverage * 100).toFixed(1) + '%');
     setInspectorRuntime('readiness', readiness.total.toFixed(0) + ' / 100');
     setInspectorRuntime('complete', Game.exploration.isComplete(Game.world.region.id) ? tr('yes') : tr('no'));
+    updateHazardRuntime();
   }
 
   function bindEvents() {
@@ -506,6 +637,8 @@
     setExplorationEvent(regionName(region) + ' · ' + tr('regionReady') + ' · ' + Game.world.layout.nodes.length + ' ' + tr('resources'));
     renderTabs();
     renderInspector(region);
+    hazardMessage = '';
+    refreshHazardSelect();
     updateRuntime(true);
   }
 
@@ -520,6 +653,14 @@
     });
   }
 
+  function syncPauseUi() {
+    var button = document.getElementById('toggle-play');
+    button.textContent = paused ? '\u25b6' : '\u2161';
+    button.title = paused ? D.t('common.resume') : D.t('common.pause');
+    button.setAttribute('aria-label', button.title);
+    document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('map.runtime');
+  }
+
   function bindControls() {
     document.getElementById('region-tabs').addEventListener('click', function (event) {
       var button = event.target.closest('[data-region-index]');
@@ -529,10 +670,7 @@
     document.getElementById('next-region').addEventListener('click', function () { activateRegion(currentIndex + 1); });
     document.getElementById('toggle-play').addEventListener('click', function () {
       paused = !paused;
-      this.textContent = paused ? '\u25b6' : '\u2161';
-      this.title = paused ? D.t('common.resume') : D.t('common.pause');
-      this.setAttribute('aria-label', this.title);
-      document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('map.runtime');
+      syncPauseUi();
     });
     document.getElementById('effects-toggle').addEventListener('change', function () { Game.particles.setEnabled(this.checked); });
     document.getElementById('spawn-dynamic-trade').addEventListener('click', function () {
@@ -551,6 +689,14 @@
     document.getElementById('reset-gather').addEventListener('click', revealAllResources);
     document.getElementById('spawn-common-chest').addEventListener('click', function () { spawnQaChest(false); });
     document.getElementById('spawn-rare-chest').addEventListener('click', function () { spawnQaChest(true); });
+    document.getElementById('hazard-select').addEventListener('change', function () {
+      hazardMessage = '';
+      updateHazardRuntime();
+    });
+    document.getElementById('focus-hazard').addEventListener('click', focusHazard);
+    document.getElementById('trigger-hazard').addEventListener('click', triggerHazard);
+    document.getElementById('step-hazard').addEventListener('click', stepHazard);
+    document.getElementById('reset-hazard').addEventListener('click', resetHazard);
     document.getElementById('seed-form').addEventListener('submit', function (event) {
       event.preventDefault();
       var input = document.getElementById('seed-input');
@@ -636,11 +782,26 @@
   var initialId = params.get('region') || location.hash.slice(1);
   var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
   activateRegion(initialIndex >= 0 ? initialIndex : 0);
+  window.MapEffectsLab = {
+    hazards: hazardDiagnostics,
+    select: function (id) {
+      document.getElementById('hazard-select').value = id;
+      updateHazardRuntime();
+      return selectedHazard() && selectedHazard().id === id;
+    },
+    focus: focusHazard,
+    trigger: triggerHazard,
+    step: stepHazard,
+    reset: resetHazard,
+    events: function () { return Game.hazards.events(); }
+  };
   window.addEventListener('demo:locale', function () {
     renderTabs();
     document.getElementById('stage-region-name').textContent = regionName(Game.world.region);
     renderInspector(Game.world.region);
     setExplorationEvent(Game.world.region.id + ' · ' + tr('regionReady'));
+    hazardMessage = '';
+    refreshHazardSelect();
     updateRuntime(true);
   });
   requestAnimationFrame(frame);

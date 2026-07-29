@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "da38f485076d01f0ce396dfefb2435abea11431ff54ea3922b5c5851b81436fc",
+  "sourceSetHash": "06f2fdd5692703424c30ebb55a6bbfd4d41e89c79d69455913def0f568e6c042",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -38,52 +38,52 @@
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
       "kind": "pack",
-      "sha256": "0f645a692ba58bef35ff35ef1a4ee7e06cf68d99d085d5ddcb0a21b4a555d420"
+      "sha256": "12b20d3dc6c6062f9572af8bd6cbfcfd22efebe558d7b32db1c9939d1571bce4"
     },
     {
       "path": "js/data/packs/regions/factory.support.js",
       "kind": "support",
-      "sha256": "9575f6f11784a79acbb4550ca5ea9d78073ea2c92adabfae42c8b968dd87399a"
+      "sha256": "acaa0af0309079c8b8fcba0d94d0423c7a054e02136be47f1aee745721e0a62b"
     },
     {
       "path": "js/data/packs/regions/forest.pack.js",
       "kind": "pack",
-      "sha256": "8c9b33da890f6d053c56b1af22f053033507fdfe9de04739e8b79876fcb50115"
+      "sha256": "99cd4095687cb6016efc5bcfcbca486c7a6ba01e201ff5a36e1b74f62862d20e"
     },
     {
       "path": "js/data/packs/regions/grassland.pack.js",
       "kind": "pack",
-      "sha256": "b7e5bcb2f025907c288125621eeef6606a4d8f0a040c2c1f0eae8823be9e33fd"
+      "sha256": "93abbf7374d6b1749ff8ed713af1abbae6890579841e4cbab4ec3c003accd6b6"
     },
     {
       "path": "js/data/packs/regions/graveyard.pack.js",
       "kind": "pack",
-      "sha256": "5605d38860e7d2b72a119935a315a0cc3f5aba8ebb247723b88f17523aece9e2"
+      "sha256": "645b87978c4758bbba9eca8a7fe91ab3a32e95b3697003f2bdf3621272e68ca7"
     },
     {
       "path": "js/data/packs/regions/lavacave.pack.js",
       "kind": "pack",
-      "sha256": "0274d3b350aa1a78c6963c1fd5fd42bb8c14165722eba4f2e74625b59e45bbbd"
+      "sha256": "49969f1594bf436d072e19648b84618f3d714d005437916c0efbe703a1e3b181"
     },
     {
       "path": "js/data/packs/regions/mine.pack.js",
       "kind": "pack",
-      "sha256": "54c2ee307c083ab9aaf28779b55afc7274283b598dce88481b9847d9189dfe6e"
+      "sha256": "637072fc76131232aafc055aae083a911bd5e66ea7f97eb2f69171b8e4b88f50"
     },
     {
       "path": "js/data/packs/regions/skyruins.pack.js",
       "kind": "pack",
-      "sha256": "dd65dd03ba9ea2b773c9e366f3d4867d80dd299d250839b0e149ff5c6346f9dd"
+      "sha256": "d56a088591d2fd97582d5978d185999bde3f1df2e74162d213fa98f27e932d65"
     },
     {
       "path": "js/data/packs/regions/snowpass.pack.js",
       "kind": "pack",
-      "sha256": "007be057330419db8396a6673ae001c75fd455a30c98f742d5dab2c2ba669431"
+      "sha256": "9af2c98fc50ed97ec623e36d283435505b65c3584639b6a2585b881da4825c9a"
     },
     {
       "path": "js/data/packs/rules/combat-formulas.support.js",
       "kind": "support",
-      "sha256": "73113e26f38c97a9edad9c2eb10ebe6c09b2e214103b12f74bec484b09c0f64b"
+      "sha256": "4c369f104b7008ffea518a81aa918c6657cdaf0de9ad1598eeacff7e98c92eed"
     },
     {
       "path": "js/data/packs/rules/core.pack.js",
@@ -155,7 +155,7 @@
     {
       "kind": "factory",
       "id": "region.pack",
-      "version": 1
+      "version": 2
     },
     {
       "kind": "value",
@@ -195,35 +195,35 @@
     },
     {
       "id": "region.darkcastle",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.forest",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.grassland",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.graveyard",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.lavacave",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.mine",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.skyruins",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "region.snowpass",
-      "version": "2.0.0"
+      "version": "2.1.0"
     },
     {
       "id": "world.actors",
@@ -234,6 +234,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "859940e6"
+  "contentFingerprint": "904621b0"
 });
 })();
