@@ -3276,9 +3276,13 @@ async function run() {
         layoutVersion: report.layoutVersion,
         resources: report.metrics.resources,
         chunks: report.metrics.chunks,
+        routeReached: report.navigation.reached,
+        routeLegs: report.navigation.legs.length,
+        routeRecoveries: report.navigation.recoveries,
         valid: report.metrics.walkableRatio >= 0.6 && report.metrics.walkableRatio <= 0.7,
         metricCount: document.querySelectorAll('#metrics .metric').length,
         chunkToggle: !!document.getElementById('show-chunks'),
+        routeToggle: document.getElementById('show-route')?.checked === true,
         iconCount: iconCanvases.length,
         iconsPainted: iconCanvases.every((icon) => {
           const data = icon.getContext('2d').getImageData(0, 0, icon.width, icon.height).data;
@@ -3297,8 +3301,12 @@ async function run() {
     assert.ok(generatorDemo.resources >= 16 && generatorDemo.resources <= 22);
     assert.equal(generatorDemo.chunks, 15);
     assert.equal(generatorDemo.valid, true);
-    assert.equal(generatorDemo.metricCount, 8);
+    assert.equal(generatorDemo.routeReached, true);
+    assert.ok(generatorDemo.routeLegs >= 2);
+    assert.ok(generatorDemo.routeRecoveries >= 0);
+    assert.equal(generatorDemo.metricCount, 12);
     assert.equal(generatorDemo.chunkToggle, true);
+    assert.equal(generatorDemo.routeToggle, true);
     assert.equal(generatorDemo.iconCount, 9);
     assert.equal(generatorDemo.iconsPainted, true);
     assert.ok(generatorDemo.visible > 1000, 'v3 generator canvas is nonblank');

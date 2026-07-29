@@ -9,9 +9,11 @@
   var auditStatus = document.getElementById('audit-status');
   var D = DemoI18n;
   var latest = null;
+  var latestRoute = null;
 
   D.init();
   Game.i18n.setLocale(D.locale());
+  Game.state = { settings: { expeditionStrategy: 'balanced' } };
 
   function regionName(region) {
     return Game.i18n.t('region.' + region.id + '.name');
@@ -94,6 +96,28 @@
       });
     }
 
+    if (document.getElementById('show-route').checked && latestRoute) {
+      ctx.save();
+      ctx.strokeStyle = latestRoute.reached ? '#7ee0c2' : '#ef705e';
+      ctx.lineWidth = Math.max(2, Math.round(3 * canvas.width /
+        Math.max(1, canvas.getBoundingClientRect().width)));
+      ctx.setLineDash([10, 6]);
+      ctx.beginPath();
+      latestRoute.samples.forEach(function (point, index) {
+        if (index) ctx.lineTo(point.x * sx, point.y * sy);
+        else ctx.moveTo(point.x * sx, point.y * sy);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      latestRoute.legs.forEach(function (point, index) {
+        ctx.fillStyle = index === latestRoute.legs.length - 1 ? '#ef705e' : '#f0cf6d';
+        ctx.beginPath();
+        ctx.arc(point.x * sx, point.y * sy, index === latestRoute.legs.length - 1 ? 5 : 3, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    }
+
     if (document.getElementById('show-content').checked) {
       marks([layout.camp], 'camp', sx, sy);
       marks(layout.landmarks, function (point) { return point.bossLair ? 'lair' : 'landmark'; }, sx, sy);
@@ -122,7 +146,11 @@
   function renderMetrics(values) {
     var root = document.getElementById('metrics');
     root.innerHTML = '';
-    ['valid', 'generateMs', 'walkableRatio', 'macroCenters', 'loopRank', 'resources', 'threats', 'chunks'].forEach(function (key) {
+    [
+      'valid', 'route', 'routeSeconds', 'routeLegs', 'navigationMs',
+      'generateMs', 'walkableRatio', 'macroCenters', 'loopRank',
+      'resources', 'threats', 'chunks'
+    ].forEach(function (key) {
       var element = document.createElement('div');
       element.className = 'metric';
       element.innerHTML = '<span>' + key + '</span><strong>' + values[key] + '</strong>';
@@ -136,6 +164,57 @@
     return seed >>> 0;
   }
 
+  function simulateLongRoute(layout) {
+    Game.terrain.layout = layout;
+    Game.nav.useLayout(layout);
+    var hero = { x: layout.camp.x, y: layout.camp.y, navRoute: null };
+    var target = layout.bossPoint;
+    var samples = [{ x: hero.x, y: hero.y }];
+    var legs = [];
+    var remaining = Game.util.dist(hero.x, hero.y, target.x, target.y);
+    var started = performance.now();
+
+    function directMove(ent, tx, ty, speed, dt) {
+      var dx = tx - ent.x, dy = ty - ent.y;
+      var distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 0.5) return 0;
+      var step = Math.min(distance, speed * Math.min(dt, 0.25));
+      var swept = Game.terrain.sweepMove(
+        ent.x, ent.y, dx / distance * step, dy / distance * step, 7
+      );
+      ent.x = swept.x;
+      ent.y = swept.y;
+      return distance - swept.moved;
+    }
+
+    var tick = 0;
+    for (; tick < 3600; tick++) {
+      Game.nav.update(2);
+      remaining = Game.nav.step(
+        hero, target.x, target.y, 56, 0.05, 'audit:camp-to-lair', directMove
+      );
+      if (!legs.length && hero.navRoute) {
+        legs = hero.navRoute.legs.map(function (point) {
+          return { id: point.id, x: point.x, y: point.y };
+        });
+      }
+      if (tick % 5 === 0) samples.push({ x: hero.x, y: hero.y });
+      if (remaining < 5) break;
+    }
+    samples.push({ x: hero.x, y: hero.y });
+    return {
+      reached: remaining < 5,
+      travelSeconds: +(tick * 0.05).toFixed(2),
+      navigationMs: +(performance.now() - started).toFixed(2),
+      remaining: +remaining.toFixed(2),
+      legs: legs,
+      macroIds: hero.navRoute ? hero.navRoute.macroIds.slice() : [],
+      recoveries: hero.navRoute ? hero.navRoute.recoveries : 0,
+      peakSolveMs: +Game.nav.diagnostics.peakMs.toFixed(3),
+      samples: samples
+    };
+  }
+
   function generate() {
     var seed = normalizedSeed();
     seedInput.value = Game.util.hex32(seed);
@@ -144,7 +223,15 @@
     latest = Game.terrain.generate(region, seed, 3);
     var report = Game.terrain.validate(latest, region);
     var elapsed = performance.now() - started;
-    renderMetrics(Object.assign({ generateMs: elapsed.toFixed(1), valid: report.valid }, report.metrics));
+    latestRoute = simulateLongRoute(latest);
+    renderMetrics(Object.assign({
+      generateMs: elapsed.toFixed(1),
+      valid: report.valid,
+      route: D.t(latestRoute.reached ? 'explore.routePass' : 'explore.routeFail'),
+      routeSeconds: latestRoute.travelSeconds.toFixed(1),
+      routeLegs: latestRoute.legs.length,
+      navigationMs: latestRoute.navigationMs.toFixed(1)
+    }, report.metrics));
     document.getElementById('report').textContent = JSON.stringify({
       seed: Game.util.hex32(seed),
       region: region.id,
@@ -156,6 +243,16 @@
       fallback: latest.generation.fallback,
       failures: report.failures,
       metrics: report.metrics,
+      navigation: {
+        reached: latestRoute.reached,
+        travelSeconds: latestRoute.travelSeconds,
+        navigationMs: latestRoute.navigationMs,
+        remaining: latestRoute.remaining,
+        macroIds: latestRoute.macroIds,
+        legs: latestRoute.legs,
+        recoveries: latestRoute.recoveries,
+        peakSolveMs: latestRoute.peakSolveMs
+      },
       contentIds: {
         landmarks: latest.landmarks.map(function (item) { return item.defId; }),
         resources: Array.from(new Set(latest.nodes.map(function (item) { return item.defId; }))),
@@ -183,8 +280,10 @@
         var base = normalizedSeed();
         var region = Game.reg.get('region', regionSelect.value);
         var failures = [];
+        var routeFailures = [];
         var totalMs = 0;
         var maxMs = 0;
+        var maxRouteSeconds = 0;
         try {
           for (var i = 0; i < 32; i++) {
             var seed = (base + Math.imul(i + 1, 0x9e3779b1)) >>> 0;
@@ -195,12 +294,37 @@
             totalMs += elapsed;
             maxMs = Math.max(maxMs, elapsed);
             if (!report.valid) failures.push({ seed: Game.util.hex32(seed), failures: report.failures });
+            var route = simulateLongRoute(layout);
+            maxRouteSeconds = Math.max(maxRouteSeconds, route.travelSeconds);
+            if (!route.reached) {
+              routeFailures.push({
+                seed: Game.util.hex32(seed),
+                remaining: route.remaining,
+                macroIds: route.macroIds
+              });
+            }
           }
-          auditStatus.textContent = failures.length
-            ? D.t('explore.auditFailed', { count: failures.length })
-            : D.t('explore.auditDone', { max: maxMs.toFixed(1), avg: (totalMs / 32).toFixed(1) });
-          if (failures.length) document.getElementById('report').textContent = JSON.stringify(failures, null, 2);
+          auditStatus.textContent = failures.length || routeFailures.length
+            ? D.t('explore.auditFailed', {
+              count: failures.length,
+              routes: routeFailures.length
+            })
+            : D.t('explore.auditDone', {
+              max: maxMs.toFixed(1),
+              avg: (totalMs / 32).toFixed(1),
+              routeMax: maxRouteSeconds.toFixed(1)
+            });
+          if (failures.length || routeFailures.length) {
+            document.getElementById('report').textContent = JSON.stringify({
+              layouts: failures,
+              routes: routeFailures
+            }, null, 2);
+          }
         } finally {
+          if (latest) {
+            Game.terrain.layout = latest;
+            Game.nav.useLayout(latest);
+          }
           auditButton.disabled = false;
         }
       }, 20);
@@ -211,7 +335,7 @@
   auditButton.addEventListener('click', auditSeeds);
   regionSelect.addEventListener('change', generate);
   seedInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') generate(); });
-  ['show-distance', 'show-graph', 'show-content', 'show-chunks'].forEach(function (id) {
+  ['show-distance', 'show-graph', 'show-route', 'show-content', 'show-chunks'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', draw);
   });
   window.addEventListener('demo:locale', function () {

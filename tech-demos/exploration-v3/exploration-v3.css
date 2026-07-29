@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.5") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260729.6") format("woff2");
   font-display: swap;
 }
 :root {
@@ -28,7 +28,7 @@ button:disabled { color: #777d74; border-color: #454b45; cursor: wait; }
 .controls { display: grid; grid-template-columns: minmax(150px, 1fr) 130px auto auto minmax(220px, 1.4fr); gap: 8px; align-items: end; padding: 14px 0 10px; }
 .controls label { display: grid; gap: 4px; color: #a5aba2; font-size: 10px; }
 .controls output { min-height: 44px; display: flex; align-items: center; padding: 8px 10px; border-left: 2px solid #4f8d84; color: #aebdb8; background: #151b19; font-size: 10px; line-height: 1.5; }
-.metrics { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; margin-bottom: 8px; }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; margin-bottom: 8px; }
 .metric { min-width: 0; padding: 8px; background: #151a16; border: 1px solid #3e463e; }
 .metric span { display: block; overflow: hidden; color: #838c82; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
 .metric strong { display: block; margin-top: 3px; color: #e5c66c; font-size: 12px; font-weight: normal; }

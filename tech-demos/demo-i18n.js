@@ -291,10 +291,14 @@
       'map.inspector.parallax.islands': '浮岛',
       'explore.pageTitle': '开放探索 v3 生成器审计 · 幻境远征',
       'explore.title': '开放探索 v3 生成器审计',
-      'explore.subtitle': '宏观图、硬阻挡、距离场、内容角色与结构验证',
+      'explore.subtitle': '宏观图、硬阻挡、分段长途寻路、内容角色与结构验证',
       'explore.audit': '批量审计 32 种子',
       'explore.distance': '距离场',
       'explore.graph': '宏观拓扑',
+      'explore.route': '营地—巢穴长途路径',
+      'explore.routePass': '抵达',
+      'explore.routeFail': '停滞',
+      'explore.legendAria': '地图标识',
       'explore.content': '内容角色',
       'explore.chunks': '区块边界',
       'explore.camp': '营地',
@@ -306,10 +310,10 @@
       'explore.threat': '威胁',
       'explore.guardian': '守门精英',
       'explore.hero': '冒险者',
-      'explore.auditIdle': '可对当前区域连续验证 32 个确定性种子。',
-      'explore.auditRunning': '正在审计…',
-      'explore.auditDone': '32 / 32 通过 · 最慢 {max}ms · 平均 {avg}ms',
-      'explore.auditFailed': '{count} 个布局未通过验证'
+      'explore.auditIdle': '可连续验证 32 个确定性布局及营地—巢穴长途路径。',
+      'explore.auditRunning': '正在审计布局与长途路径…',
+      'explore.auditDone': '32 / 32 布局与路径通过 · 最慢路程 {routeMax}s · 生成 {max}ms / {avg}ms',
+      'explore.auditFailed': '{count} 个布局、{routes} 条长途路径未通过'
     },
     en: {
       'common.demoHub': 'Demo Hub',
@@ -597,10 +601,14 @@
       'map.inspector.parallax.islands': 'Floating islands',
       'explore.pageTitle': 'Open Exploration v3 Generator Audit · Fantasy Expedition',
       'explore.title': 'Open Exploration v3 Generator Audit',
-      'explore.subtitle': 'Macro graph, hard blockers, distance field, content roles and validation',
+      'explore.subtitle': 'Macro graph, hard blockers, segmented long routes, content roles and validation',
       'explore.audit': 'Audit 32 seeds',
       'explore.distance': 'Distance field',
       'explore.graph': 'Macro topology',
+      'explore.route': 'Camp-to-lair long route',
+      'explore.routePass': 'Reached',
+      'explore.routeFail': 'Stalled',
+      'explore.legendAria': 'Map legend',
       'explore.content': 'Content roles',
       'explore.chunks': 'Chunk bounds',
       'explore.camp': 'Camp',
@@ -612,10 +620,10 @@
       'explore.threat': 'Threat',
       'explore.guardian': 'Guardian',
       'explore.hero': 'Adventurer',
-      'explore.auditIdle': 'Validate 32 deterministic seeds for the selected region.',
-      'explore.auditRunning': 'Auditing…',
-      'explore.auditDone': '32 / 32 passed · slowest {max}ms · average {avg}ms',
-      'explore.auditFailed': '{count} layouts failed validation'
+      'explore.auditIdle': 'Validate 32 deterministic layouts and camp-to-lair long routes.',
+      'explore.auditRunning': 'Auditing layouts and long routes…',
+      'explore.auditDone': '32 / 32 layouts and routes passed · longest trip {routeMax}s · generation {max}ms / {avg}ms',
+      'explore.auditFailed': '{count} layouts and {routes} long routes failed'
     }
   };
 
