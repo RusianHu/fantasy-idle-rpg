@@ -75,7 +75,7 @@ js/
   data/packs/         战斗规则、五职业、世界 Actor 与八区纵向内容包
   data/               区域、路线模板、物品、词条与成就数据
   sprites/            像素素材（字符网格+调色板；含 v3 资源/地标/奇物/生态/守门精英与 manifest）
-  systems/actors/     ActorInstance / ActorRecord / Party / Relation
+  systems/actors/     ActorInstance / ActorRecord / Unit State / Party / Relation
   systems/            encounters / combat / combat_ai / combat_estimator / world / terrain_v3 / exploration / expedition / offline 等
   render/             renderer(镜头/视差/合成) / terrain / exploration(分块与迷雾) / particles / daynight / effects
   ui/                 正式战斗 HUD / 六 Tab 面板 / trade / transitions / ending / 弹窗
@@ -106,6 +106,7 @@ js/
 - 当前产品层为单个逻辑角色槽位 `expedition-1`，UI、回调与存储均按稳定槽位 ID 数组渲染以预留多档；选档前不启动主循环、不自动存档、不结算离线收益、不推进世界时间。这里的“双槽”指同一角色档案的主写入与容灾备份，不是两个可选角色。
 - 每 15 秒自动保存 + 关键事件（升级/Boss/穿戴/购买等）即时保存 + 页面隐藏/关闭时将短过场结算到安全状态后保存。
 - 当前存档 v13，采用逐版本迁移流水线。持久层只保存 Roster/ActorRecord、经济、背包、世界（含 `RoutePlan`）、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v12 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
+- 单位状态由 `Game.units` 统一投影和修改：ActorRecord 持久化 HP，ActorInstance 保存实时 HP，StatBlock 独占运行时 `maxHp` 派生；HUD、战斗、物品、过场、离线与存档不得各自拼接或直接写入另一套上限。
 - 过场与状态机：`Game.transitions` 统一 `startRegion / startDeath / cancel / update / isActive / blocksWorld / cameraTarget / settleBeforeSave`；玩家可见换区走 `Game.prog.requestRegion(rid,{source})`，`gotoRegion` 仅供遮罩中点、启动和导入等原子操作。事件 `region:travelStart / travelCancelled / arrived`、`player:reviveStart / revived` 仅在对应阶段触发，`region:changed` 只在真实世界重建时触发一次。
 - 导出/导入：Base64 串（末尾附 FNV-1a 校验和，截断/篡改会被拒绝）与 `.json` 文件下载/导入并存；重置需二次确认。
 - 检测到存档时间戳在未来（回调系统时间）时离线收益按 0 处理。
@@ -155,6 +156,7 @@ node tests\v2-authoring.test.js
 node tests\v2-content-entrypoints.test.js
 node tests\v2-save.test.js
 node tests\v2-runtime.test.js
+node tests\unit-state.test.js
 node tests\world-encounter.test.js
 node tests\v2-presentation.test.js
 node tests\combat-portraits.test.js
@@ -166,7 +168,7 @@ node tests\cache-version.test.js
 
 除 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容 schema/引用/i18n/资产/fingerprint、v1→v13 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容 schema/引用/i18n/资产/fingerprint、v1→v13 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、单位 HP 单一派生与持久化同步、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
 
 ---
 

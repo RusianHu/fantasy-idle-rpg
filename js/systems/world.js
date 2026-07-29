@@ -75,10 +75,7 @@
       active.forEach(function (encounter) {
         Game.encounters.end(encounter.id, reason || 'world-safe-exit');
       });
-      if (W.hero && W.hero.components && W.hero.components.vitals) {
-        var record = Game.roster && Game.roster.primaryActor();
-        if (record) record.persistentResources.hp = W.hero.hp;
-      }
+      if (W.hero && Game.units) Game.units.commit(W.hero);
       return active.length;
     },
 
@@ -125,10 +122,7 @@
     init: function (rid) {
       W.bindControls();
       W.endEncounter('region-change');
-      if (W.hero && W.hero.actorRecordId && W.hero.components.vitals) {
-        var oldRecord = Game.roster.getRecord(W.hero.actorRecordId);
-        if (oldRecord) oldRecord.persistentResources.hp = W.hero.hp;
-      }
+      if (W.hero && Game.units) Game.units.commit(W.hero);
       Game.encounters.reset();
       Game.parties.reset();
       Game.actors.reset();
@@ -227,7 +221,6 @@
           critAdd += m.crit || 0; spdPct += m.spdPct || 0;
         }
       }
-      h.maxHp = h.components.vitals.maxHp;
       h.atk = Math.round(d.atk * (1 + atkPct));
       h.def = Math.round(d.def * (1 + defPct));
       h.spd = +(d.spd * (1 + spdPct)).toFixed(2);
@@ -325,7 +318,15 @@
       ent.x = def.x; ent.y = def.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
       ent.guardian = true;
-      ent.hp = ent.maxHp = Math.round(ent.maxHp * 4.2);
+      ent.components.modifierLedger.add({
+        sourceId: 'world:guardian',
+        stat: 'maxHp',
+        phase: 'multiply',
+        operation: 'multiply',
+        value: 4.2
+      });
+      if (Game.units) Game.units.reconcile(ent, { hpPolicy: 'full', commit: false });
+      else ent.hp = ent.maxHp = ent.components.statBlock.value('maxHp');
       ent.atk = Math.round(ent.atk * 1.55);
       ent.def = Math.round(ent.def * 1.45);
       ent.exp = Math.round(ent.exp * 6);
@@ -1013,7 +1014,8 @@
       });
       bus.on('encounter:ended', function () {
         if (!W.hero || !W.hero.components.vitals) return;
-        Game.state.player.hp = W.hero.hp;
+        if (Game.units) Game.units.commit(W.hero);
+        else Game.state.player.hp = W.hero.hp;
         W.hero.target = null;
       });
     },
@@ -1232,7 +1234,10 @@
         W.updateMonster(e, dt);
       }
       Game.combat.update(dt);
-      if (hero.components.vitals) Game.state.player.hp = hero.hp;
+      if (hero.components.vitals) {
+        if (Game.units) Game.units.commit(hero);
+        else Game.state.player.hp = hero.hp;
+      }
 
       // 重生队列
       for (var r = W.pendingRespawn.length - 1; r >= 0; r--) {
@@ -1293,7 +1298,8 @@
         hero.recoverT -= dt;
         Game.player.heal(hero.maxHp * dt / RECOVER_T, { raw: true });
         if (hero.recoverT <= 0) {
-          Game.state.player.hp = hero.maxHp;
+          if (Game.units) Game.units.restore(hero, { source: 'recover' });
+          else Game.state.player.hp = hero.maxHp;
           hero.state = sw.mode === 'rest' ? 'goCamp' : 'idle';
         }
         return;

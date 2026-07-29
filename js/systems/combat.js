@@ -338,23 +338,25 @@
       absorbed += amount;
       if (shield.amount <= 0) shields.splice(si, 1);
     }
-    target.components.vitals.hp = Math.max(0, target.components.vitals.hp - remaining);
+    var damageResult = Game.units.damage(target, remaining, { source: 'combat' });
+    var appliedDamage = damageResult ? damageResult.amount : remaining;
     target.components.presentation.flash = 0.14;
-    encounter.metrics.damage[source.id] = (encounter.metrics.damage[source.id] || 0) + remaining;
+    encounter.metrics.damage[source.id] = (encounter.metrics.damage[source.id] || 0) + appliedDamage;
     var table = encounter.threatTables[target.id] || (encounter.threatTables[target.id] = {});
-    table[source.id] = (table[source.id] || 0) + remaining * Math.max(0, stat(source, 'threatMultiplier') || 1);
+    table[source.id] = (table[source.id] || 0) +
+      appliedDamage * Math.max(0, stat(source, 'threatMultiplier') || 1);
     var event = emit(encounter, 'combat:hit', {
       phase: 'commit', sourceActorId: source.id, targetActorIds: [target.id],
       abilityId: abilityDef.id, effectIndex: effectIndex,
       tags: (abilityDef.tags || []).concat([type.id]),
       payload: {
         raw: raw, afterDefense: afterDefense, resistance: resist,
-        absorbed: absorbed, amount: remaining, crit: crit, damageTypeId: type.id
+        absorbed: absorbed, amount: appliedDamage, crit: crit, damageTypeId: type.id
       }
     });
     var lifesteal = Game.util.clamp(stat(source, 'lifesteal') || 0, 0, 1);
-    if (lifesteal > 0 && remaining > 0) heal(encounter, source, source, abilityDef, {
-      amount: remaining * lifesteal, threatScale: 0
+    if (lifesteal > 0 && appliedDamage > 0) heal(encounter, source, source, abilityDef, {
+      amount: appliedDamage * lifesteal, threatScale: 0
     }, effectIndex);
     triggerReactions(encounter, event);
     if (target.components.vitals.hp <= 0) Game.combat.defeat(target.id, {
@@ -372,9 +374,8 @@
         }, effect.params || {})
       : Number(effect.amount) || stat(source, 'healingPower') * (Number(effect.coefficient) || 1);
     amount = Math.max(0, Math.round(amount));
-    var before = target.components.vitals.hp;
-    target.components.vitals.hp = Math.min(target.components.vitals.maxHp, before + amount);
-    var effective = target.components.vitals.hp - before;
+    var healResult = Game.units.heal(target, amount, { source: 'combat' });
+    var effective = healResult ? healResult.delta : 0;
     encounter.metrics.healing[source.id] = (encounter.metrics.healing[source.id] || 0) + effective;
     Object.keys(encounter.threatTables).forEach(function (observerId) {
       var observer = Game.actors.get(observerId);
@@ -443,12 +444,16 @@
         shieldState: null
       };
       target.components.statuses.push(found);
-      (def.modifiers || []).forEach(function (modifier) {
-        target.components.modifierLedger.add(Object.assign({}, modifier, {
-          sourceId: id,
-          value: Number(modifier.value) * found.stacks
-        }));
-      });
+    }
+    target.components.modifierLedger.removeSource(found.id);
+    (def.modifiers || []).forEach(function (modifier) {
+      target.components.modifierLedger.add(Object.assign({}, modifier, {
+        sourceId: found.id,
+        value: Number(modifier.value) * found.stacks
+      }));
+    });
+    if ((def.modifiers || []).some(function (modifier) { return modifier.stat === 'maxHp'; })) {
+      Game.units.reconcile(target, { hpPolicy: 'preserveRatio' });
     }
     var event = emit(encounter, 'status:applied', {
       sourceActorId: source.id, targetActorIds: [target.id], abilityId: abilityDef.id,
@@ -466,6 +471,9 @@
       if (!predicate(status, def)) continue;
       target.components.statuses.splice(i, 1);
       target.components.modifierLedger.removeSource(status.id);
+      if (def && (def.modifiers || []).some(function (modifier) { return modifier.stat === 'maxHp'; })) {
+        Game.units.reconcile(target, { hpPolicy: 'preserveRatio' });
+      }
       removed.push(status);
       emit(encounter, 'status:removed', {
         targetActorIds: [target.id], payload: { statusId: status.statusId, reason: reason }
@@ -1182,7 +1190,7 @@
       var actor = Game.actors.get(actorId);
       var encounter = Game.encounters.get(context.encounterId || actor && actor.encounterId);
       if (!actor || !encounter || actor.components.actionState.state === 'defeated') return false;
-      actor.components.vitals.hp = 0;
+      Game.units.setHp(actor, 0, { source: 'defeat' });
       actor.components.actionState.state = 'defeated';
       actor.components.actionState.abilityId = null;
       actor.components.movement.intent = null;

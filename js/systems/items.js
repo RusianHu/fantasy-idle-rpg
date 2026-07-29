@@ -30,7 +30,8 @@
 
   function disabledReason(h) {
     if (!Game.state || !Game.state.player || !h) return 'not-ready';
-    if (Game.state.player.hp <= 0 || h.state === 'dead') return 'dead';
+    var snapshot = Game.units && Game.units.snapshot(h);
+    if ((snapshot ? !snapshot.alive : Game.state.player.hp <= 0) || h.state === 'dead') return 'dead';
     if (Game.entryState !== undefined && Game.entryState !== 'active') return 'busy';
     if (Game.transitions && Game.transitions.isActive()) return 'busy';
     if (Game.ending && Game.ending.isActive && Game.ending.isActive()) return 'busy';
@@ -43,17 +44,20 @@
 
   function healHandler(def) {
     var d = Game.player.derived();
-    if (Game.state.player.hp >= d.maxHp - 0.001) return { ok: false, reason: 'full' };
+    var snapshot = Game.units && Game.units.playerSnapshot();
+    var hp = snapshot ? snapshot.hp : Game.state.player.hp;
+    var maxHp = snapshot ? snapshot.maxHp : d.maxHp;
+    if (hp >= maxHp - 0.001) return { ok: false, reason: 'full' };
     var pct = F.potionHeal[def.ref || def.id];
     if (!(pct > 0)) return { ok: false, reason: 'unsupported' };
-    var before = Game.state.player.hp;
-    var planned = Math.round(d.maxHp * pct * (d.healPow || 1));
-    Game.player.heal(planned, { raw: true });
+    var before = hp;
+    var planned = Math.round(maxHp * pct * (d.healPow || 1));
+    var healed = Game.player.heal(planned, { raw: true, source: 'item' });
     return {
       ok: true,
       effect: {
         kind: 'heal',
-        amount: Math.max(0, Math.round(Game.state.player.hp - before)),
+        amount: Math.max(0, Math.round(healed - before)),
         requested: planned
       }
     };

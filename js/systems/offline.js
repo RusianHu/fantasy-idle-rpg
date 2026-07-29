@@ -146,7 +146,9 @@
       if (Game.environment) Game.environment.restoreOffline(sum.seconds);
 
       if (sum.type === 'rest') {
-        s.player.hp = Game.player.derived().maxHp;
+        var hero = Game.units && Game.units.primary();
+        if (hero) Game.units.restore(hero, { source: 'offline-rest' });
+        else s.player.hp = Game.player.derived().maxHp;
         s.world.restBuffT = F.BAL.restBuffCap;
         s.meta.stats.restSec += sum.seconds;
         bus.emit('offline:settled', { summary: sum });

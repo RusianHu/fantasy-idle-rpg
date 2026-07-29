@@ -166,9 +166,10 @@
 
     if (charSub === 'attr') {
       var d = Game.player.derived();
+      var vitals = Game.units.playerSnapshot();
       var need = Game.F.expNeed(p.level);
       var rows = [
-        [t('stat.hp'), fmt(Math.ceil(p.hp)) + ' / ' + fmt(d.maxHp)],
+        [t('stat.hp'), fmt(Math.ceil(vitals.hp)) + ' / ' + fmt(Math.ceil(vitals.maxHp))],
         [t('stat.atk'), fmt(d.atk)],
         [t('stat.def'), fmt(d.def)],
         [t('stat.spd'), d.spd.toFixed(1)],

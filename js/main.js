@@ -83,7 +83,8 @@
           Game.inv.addItem(starter, { silent: true, skipAuto: true, source: 'starter' });
           Game.inv.equip(starter.uid);
         }
-        Game.state.player.hp = Game.state.derived.maxHp;
+        if (Game.units.primary()) Game.units.restore(Game.units.primary(), { source: 'class' });
+        else Game.state.player.hp = Game.state.derived.maxHp;
         Game.world.syncHeroStats();
         Game.ui.hud.update(true);
         Game.save.save('class');

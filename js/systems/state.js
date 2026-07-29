@@ -30,6 +30,13 @@
             return value;
           },
           set: function (next) {
+            if (map[0] === 'hp' && Game.units) {
+              var actor = Game.units.primary();
+              if (actor) {
+                Game.units.setHp(actor, next, { source: 'compat-state' });
+                return;
+              }
+            }
             var value = record;
             for (var i = 0; i < path.length - 1; i++) value = value[path[i]];
             value[path[path.length - 1]] = next;
@@ -211,13 +218,7 @@
       s.player.classId = cid;
       Player.recalc();
       s.player.hp = s.derived.maxHp;
-      if (Game.actors) {
-        var hero = Game.actors.query({ actorRecordId: 'player-main' })[0];
-        if (hero) {
-          Game.actors.refresh(hero.id);
-          hero.components.vitals.hp = s.derived.maxHp;
-        }
-      }
+      if (Game.units && Game.units.primary()) Game.units.restore(Game.units.primary());
       bus.emit('class:chosen', { cid: cid });
       return true;
     },
@@ -320,11 +321,13 @@
       var d = Player.previewDerived();
       s.derived = d;
       if (p.hp > d.maxHp) p.hp = d.maxHp;
-      if (Game.actors) {
-        var actor = Game.actors.query({ actorRecordId: 'player-main' })[0];
+      if (Game.units) {
+        var actor = Game.units.primary();
         if (actor) {
-          Game.actors.refresh(actor.id);
-          actor.components.vitals.hp = p.hp;
+          Game.units.rebuildStats(actor, {
+            hp: p.hp,
+            hpPolicy: 'preserveAbsolute'
+          });
         }
       }
       return d;
@@ -360,8 +363,7 @@
         s.meta.stats.level = p.level;
         Player.recalc();
         p.hp = s.derived.maxHp;
-        var levelActor = Game.actors && Game.actors.query({ actorRecordId: 'player-main' })[0];
-        if (levelActor && levelActor.components.vitals) levelActor.hp = levelActor.maxHp;
+        if (Game.units && Game.units.primary()) Game.units.restore(Game.units.primary());
         bus.emit('player:levelup', { level: p.level, ups: ups });
       }
       bus.emit('exp:gained', { amount: gain });
@@ -392,16 +394,21 @@
       var s = Game.state, p = s.player;
       var d = Player.derived();
       if (n > 0 && !(opts && opts.raw)) n *= d.healPow;
-      p.hp = U.clamp(p.hp + n, 0, d.maxHp);
-      if (Game.actors) {
-        var actor = Game.actors.query({ actorRecordId: 'player-main' })[0];
-        if (actor && actor.components.vitals) actor.components.vitals.hp = p.hp;
+      if (Game.units) {
+        var actor = Game.units.primary();
+        if (actor) {
+          var result = Game.units.heal(actor, n, { source: opts && opts.source || 'player' });
+          return result ? result.hp : p.hp;
+        }
       }
+      p.hp = U.clamp(p.hp + n, 0, d.maxHp);
       return p.hp;
     },
 
     hpPct: function () {
-      return Game.state.player.hp / Math.max(1, Player.derived().maxHp);
+      var snapshot = Game.units && Game.units.playerSnapshot();
+      return snapshot ? snapshot.hpPct
+        : Game.state.player.hp / Math.max(1, Player.derived().maxHp);
     },
 
     upgradeSkill: function (sid) {

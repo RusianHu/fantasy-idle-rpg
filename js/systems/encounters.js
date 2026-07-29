@@ -60,10 +60,18 @@
         else if (policy === 'min') resource.value = def.min;
       });
     }
+    var maxHpChanged = false;
     (actor.components.statuses || []).forEach(function (status) {
+      var def = Game.content.get('status', status.statusId);
+      if (def && (def.modifiers || []).some(function (modifier) {
+        return modifier.stat === 'maxHp';
+      })) maxHpChanged = true;
       actor.components.modifierLedger.removeSource(status.id);
     });
     if (actor.components.statuses) actor.components.statuses.length = 0;
+    if (maxHpChanged && Game.units) {
+      Game.units.reconcile(actor, { hpPolicy: 'preserveRatio' });
+    }
     if (actor.components.vitals) actor.components.vitals.shields.length = 0;
     if (actor.components.cooldowns) {
       actor.components.cooldowns.abilities = {};

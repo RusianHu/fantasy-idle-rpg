@@ -252,9 +252,8 @@
     serialize: function () {
       var st = Game.state;
       var record = st.roster.actors[st.roster.primaryActorId];
-      if (record && Game.world && Game.world.hero && Game.world.hero.components &&
-          Game.world.hero.components.vitals) {
-        record.persistentResources.hp = Game.world.hero.components.vitals.hp;
+      if (record && Game.world && Game.world.hero && Game.units) {
+        Game.units.commit(Game.world.hero);
       }
       return {
         v: Game.SAVE_VERSION,

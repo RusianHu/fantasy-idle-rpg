@@ -176,7 +176,9 @@
     a.landed = true;
     var oldMode = Game.state.world.mode;
     if (a.fallbackRid && Game.state.world.region !== a.fallbackRid) {
-      Game.state.player.hp = 0;
+      var fallbackHero = currentHero();
+      if (fallbackHero && Game.units) Game.units.setHp(fallbackHero, 0, { source: 'death-fallback' });
+      else Game.state.player.hp = 0;
       Game.state.world.mode = 'rest';
       Game.prog.gotoRegion(a.fallbackRid);
       a.fallbackCommitted = true;
@@ -229,7 +231,8 @@
     } else if (name === 'rise') {
       setPhase('rise', DEATH_TIME.rise);
       hero = currentHero();
-      Game.state.player.hp = hero ? hero.maxHp : Game.player.derived().maxHp;
+      if (hero && Game.units) Game.units.restore(hero, { source: 'death-rise' });
+      else Game.state.player.hp = Game.player.derived().maxHp;
       if (hero) {
         hero.state = 'revive';
         hero.recoverT = 0;
@@ -246,7 +249,8 @@
     var hero = currentHero();
     var finalMode = a.arrivalMode;
     var oldMode = Game.state.world.mode;
-    Game.state.player.hp = hero ? hero.maxHp : Game.player.derived().maxHp;
+    if (hero && Game.units) Game.units.restore(hero, { source: 'death-finish' });
+    else Game.state.player.hp = Game.player.derived().maxHp;
     Game.state.world.mode = finalMode;
     if (hero) {
       var rest = Game.world.campRestPoint();
@@ -302,7 +306,8 @@
     var hero = currentHero();
     if (!hero) return;
     var pct = U.clamp(a.elapsed / Math.max(0.01, a.duration), 0, 1);
-    Game.state.player.hp = hero.maxHp * pct;
+    if (Game.units) Game.units.setHp(hero, hero.maxHp * pct, { source: 'death-recovery' });
+    else Game.state.player.hp = hero.maxHp * pct;
     hero.recoverT = Math.max(0, a.duration - a.elapsed);
     a.healPct = pct;
     var step = Math.min(3, Math.floor(pct * 3 + 0.0001));
@@ -436,7 +441,8 @@
     },
 
     restoreZeroHp: function () {
-      if (!Game.state || Game.state.player.hp > 0 || active) return false;
+      var vitals = Game.units && Game.units.playerSnapshot();
+      if (!Game.state || (vitals ? vitals.hp > 0 : Game.state.player.hp > 0) || active) return false;
       if (Game.ending && Game.ending.isPending && Game.ending.isPending()) return false;
       return T.startDeath({ restored: true });
     },

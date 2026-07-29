@@ -37,8 +37,7 @@
           operation: 'multiply', value: spec.statMultipliers[statId]
         });
       });
-      actor.components.vitals.maxHp = actor.components.statBlock.value('maxHp');
-      actor.components.vitals.hp = actor.components.vitals.maxHp;
+      Game.units.reconcile(actor, { hpPolicy: 'full', commit: false });
     }
     Game.encounters.join(encounter.id, actor.id, teamId);
     return actor;

@@ -44,8 +44,8 @@
       return actor && actor.teamId === hero.teamId;
     }).slice(0, 4);
     els.combatPartyMembers.innerHTML = allies.map(function (actor) {
-      var hp = actor.components.vitals;
-      var pct = U.clamp(hp.hp / Math.max(1, hp.maxHp) * 100, 0, 100);
+      var hp = Game.units.snapshot(actor);
+      var pct = U.clamp(hp.hpPct * 100, 0, 100);
       var name = actorName(actor, t);
       return '<div class="combat-v2-member"><b>' + U.esc(name) + '</b><span>' +
         Math.ceil(hp.hp) + '/' + Math.ceil(hp.maxHp) +
@@ -338,12 +338,13 @@
       if (!s) return;
       var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
       var p = s.player;
-      var d = Game.player.derived();
+      var playerVitals = Game.units.playerSnapshot();
 
       els.level.textContent = p.level;
-      var hpPct = U.clamp(p.hp / d.maxHp * 100, 0, 100);
+      var hpPct = U.clamp(playerVitals.hpPct * 100, 0, 100);
       els.hpFill.style.width = hpPct + '%';
-      els.hpText.textContent = fmt(Math.ceil(p.hp)) + ' / ' + fmt(d.maxHp);
+      els.hpText.textContent = fmt(Math.ceil(playerVitals.hp)) + ' / ' +
+        fmt(Math.ceil(playerVitals.maxHp));
       var need = Game.F.expNeed(p.level);
       els.expFill.style.width = U.clamp(p.exp / need * 100, 0, 100) + '%';
       els.expText.textContent = 'EXP ' + fmt(p.exp) + ' / ' + fmt(need);
@@ -434,11 +435,12 @@
       els.autoBossSwitch.title = t('ui.autoBossHint');
 
       if (boss) {
+        var bossVitals = Game.units.snapshot(boss);
         els.gauge.classList.add('hidden');
         els.gauge.classList.remove('resting', 'full');
         els.bossBar.classList.remove('hidden');
         els.bossName.textContent = t('monster.' + boss.mid + '.name');
-        els.bossFill.style.width = U.clamp(boss.hp / boss.maxHp * 100, 0, 100) + '%';
+        els.bossFill.style.width = U.clamp(bossVitals.hpPct * 100, 0, 100) + '%';
       } else {
         els.gauge.classList.remove('hidden');
         els.bossBar.classList.add('hidden');
@@ -462,7 +464,8 @@
       els.btnCamp.setAttribute('data-action', campAction.id);
       els.btnCamp.classList.toggle('is-warping', campAction.id === 'cancel-warp');
       els.btnCamp.classList.toggle('boss-retreat', campAction.id === 'boss-retreat');
-      var lowHp = mode === 'battle' && p.hp > 0 && hpPct / 100 <= s.settings.potionThreshold;
+      var lowHp = mode === 'battle' && playerVitals.hp > 0 &&
+        playerVitals.hpPct <= s.settings.potionThreshold;
       els.btnCamp.classList.toggle('low-hp', lowHp);
       if (campIcon !== campAction.icon || force) {
         Game.assets.drawToDom(els.campIcon, campAction.icon, 'icon');

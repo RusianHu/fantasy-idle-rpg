@@ -36,10 +36,13 @@
 
   function baseStats(blueprint, spec, record) {
     if (record && Game.player && record.id === 'player-main') {
+      // Record-bound players use the legacy builder only for base/equipment/permanent
+      // values. Talent modifiers are owned by the Actor ledger below and must never
+      // be baked into this base a second time.
       var derived = Game.player.previewDerived({
         classId: record.classId,
         level: record.level,
-        skills: record.talentRanks,
+        skills: {},
         equipped: record.loadout.equipment
       });
       return {
@@ -97,7 +100,7 @@
     var cache = clone(base);
     function recompute() {
       var out = clone(base);
-      var phases = ['equipmentFlat', 'otherFlat', 'addPct', 'multiply', 'status'];
+      var phases = ['equipmentFlat', 'otherFlat', 'addPct', 'multiply', 'status', 'override'];
       phases.forEach(function (phase) {
         entries.filter(function (entry) { return entry.phase === phase; }).sort(function (a, b) {
           return (a.sourceId || '').localeCompare(b.sourceId || '') || a.stat.localeCompare(b.stat);
@@ -112,6 +115,7 @@
       Object.keys(out).forEach(function (id) {
         var def = Game.content.get('stat', id);
         if (def) out[id] = Game.util.clamp(out[id], def.min, def.max);
+        if (id === 'maxHp') out[id] = Math.round(out[id]);
       });
       cache = out;
       dirty = false;
@@ -164,12 +168,22 @@
       hp: {
         enumerable: true,
         get: function () { return c.vitals ? c.vitals.hp : undefined; },
-        set: function (v) { if (c.vitals) c.vitals.hp = v; }
+        set: function (v) {
+          if (!c.vitals) return;
+          if (Game.units) Game.units.setHp(instance, v, { source: 'compat' });
+          else c.vitals.hp = v;
+        }
       },
       maxHp: {
         enumerable: true,
         get: function () { return c.vitals ? c.vitals.maxHp : undefined; },
-        set: function (v) { if (c.vitals) c.vitals.maxHp = Math.max(1, Number(v) || 1); }
+        set: function (v) {
+          if (!c.vitals) return;
+          if (Game.units) Game.units.overrideMaxHp(instance, v, {
+            hpPolicy: 'preserveAbsolute', source: 'compat'
+          });
+          else c.vitals.maxHp = Math.max(1, Number(v) || 1);
+        }
       },
       state: {
         enumerable: true,
@@ -214,6 +228,61 @@
         sourceId: modifier.sourceId || 'spawn:' + index
       }));
     });
+  }
+
+  function applyStatusModifiers(components) {
+    (components.statuses || []).forEach(function (status) {
+      var def = Game.content.get('status', status.statusId);
+      (def && def.modifiers || []).forEach(function (modifier) {
+        components.modifierLedger.add(Object.assign({}, modifier, {
+          sourceId: status.id,
+          value: Number(modifier.value) * Math.max(1, status.stacks || 1)
+        }));
+      });
+    });
+  }
+
+  function actorFrom(ref) {
+    if (!ref) return null;
+    if (typeof ref === 'string') return instances[ref] || null;
+    return ref.components ? ref : null;
+  }
+
+  function primaryActor() {
+    for (var i = 0; i < order.length; i++) {
+      var actor = instances[order[i]];
+      if (actor && actor.actorRecordId === 'player-main') return actor;
+    }
+    return null;
+  }
+
+  function commitPersistentHp(actor) {
+    if (!actor || !actor.actorRecordId || !actor.components.vitals ||
+        !Game.roster || !Game.state) return false;
+    var record = Game.roster.getRecord(actor.actorRecordId);
+    if (!record) return false;
+    record.persistentResources.hp = actor.components.vitals.hp;
+    return true;
+  }
+
+  function reconcileVitals(actor, opts) {
+    opts = opts || {};
+    if (!actor || !actor.components.vitals || !actor.components.statBlock) return null;
+    var vitals = actor.components.vitals;
+    var beforeMax = Math.max(1, Number(opts.beforeMax) || Number(vitals.maxHp) || 1);
+    var beforeHp = Number.isFinite(opts.hp) ? opts.hp
+      : (Number.isFinite(opts.beforeHp) ? opts.beforeHp : Number(vitals.hp) || 0);
+    var nextMax = Math.max(1, actor.components.statBlock.value('maxHp'));
+    var policy = opts.hpPolicy || 'preserveAbsolute';
+    var nextHp;
+    if (policy === 'full') nextHp = nextMax;
+    else if (policy === 'zero') nextHp = 0;
+    else if (policy === 'preserveRatio') nextHp = beforeHp / beforeMax * nextMax;
+    else nextHp = beforeHp;
+    vitals.maxHp = nextMax;
+    vitals.hp = Game.util.clamp(nextHp, 0, nextMax);
+    if (opts.commit !== false) commitPersistentHp(actor);
+    return vitals;
   }
 
   var A = Game.actors = {
@@ -264,8 +333,11 @@
       applyBuildModifiers(components, blueprint, record, spec);
       if (combatCapable) {
         var maxHp = components.statBlock.value('maxHp');
+        var storedHp = record && Number(record.persistentResources.hp);
         components.vitals = {
-          hp: record ? Number(record.persistentResources.hp) || maxHp : maxHp,
+          hp: record && Number.isFinite(storedHp)
+            ? Game.util.clamp(storedHp, 0, maxHp)
+            : maxHp,
           maxHp: maxHp,
           shields: []
         };
@@ -326,12 +398,14 @@
       defineCompatibility(instance);
       instances[id] = instance;
       order.push(id);
+      if (record && components.vitals) commitPersistentHp(instance);
       if (spec.partyId && Game.parties.get(spec.partyId)) Game.parties.addMember(spec.partyId, id);
       return instance;
     },
 
     get: function (id) { return instances[id] || null; },
-    refresh: function (id) {
+    refresh: function (id, opts) {
+      opts = opts || {};
       var actor = instances[id];
       if (!actor) return null;
       var record = actor.actorRecordId && Game.roster.getRecord(actor.actorRecordId);
@@ -346,6 +420,7 @@
         actor.abilities = actor.blueprint.resolvedAbilityGrants.slice();
         actor.traits = actor.blueprint.resolvedTraits.slice();
       }
+      if (record) actor.level = record.level;
       var stats = baseStats(actor.blueprint, {
         level: actor.level,
         tier: actor.tier
@@ -358,6 +433,7 @@
       actor.components.statBlock = modifierLedger(stats);
       actor.components.modifierLedger = actor.components.statBlock;
       applyBuildModifiers(actor.components, actor.blueprint, record, {});
+      applyStatusModifiers(actor.components);
       actor.components.movement.speed = stats.moveSpeed || 0;
       if (!actor.components.actionState && actor.blueprint.resolvedAbilityGrants.length) {
         actor.components.resources = resourceComponents(actor.blueprint);
@@ -374,10 +450,12 @@
         actor.components.resources = resourceComponents(actor.blueprint);
       }
       if (actor.components.vitals) {
-        actor.components.vitals.maxHp = stats.maxHp;
-        actor.components.vitals.hp = beforeMax > 0
-          ? Game.util.clamp(beforeHp / beforeMax * stats.maxHp, 0, stats.maxHp)
-          : stats.maxHp;
+        reconcileVitals(actor, {
+          beforeMax: beforeMax,
+          beforeHp: beforeHp,
+          hp: opts.hp,
+          hpPolicy: opts.hpPolicy || 'preserveAbsolute'
+        });
       }
       return actor;
     },
@@ -442,6 +520,148 @@
       instances = {};
       order = [];
       worldSequence = 1;
+    }
+  };
+
+  /**
+   * Unified runtime unit-state boundary.
+   * ActorRecord owns persistence, ActorInstance owns live state, and StatBlock is
+   * the only source of derived runtime maxima. Callers receive readonly snapshots
+   * and mutate vitals through commands instead of writing component fields.
+   */
+  Game.units = {
+    get: actorFrom,
+    primary: primaryActor,
+
+    snapshot: function (ref) {
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      var vitals = actor.components.vitals;
+      var stats = actor.components.statBlock
+        ? actor.components.statBlock.snapshot().values : {};
+      return Game.contentCompiler.deepFreeze({
+        id: actor.id,
+        actorRecordId: actor.actorRecordId,
+        hp: vitals.hp,
+        maxHp: vitals.maxHp,
+        hpPct: vitals.hp / Math.max(1, vitals.maxHp),
+        alive: vitals.hp > 0 && !actor.dead,
+        lifecycle: actor.lifecycle,
+        stats: clone(stats),
+        resources: clone(actor.components.resources || {}),
+        statuses: clone(actor.components.statuses || [])
+      });
+    },
+
+    playerSnapshot: function () {
+      var actor = primaryActor();
+      if (actor) return Game.units.snapshot(actor);
+      if (!Game.state || !Game.state.player || !Game.player) return null;
+      var d = Game.player.derived();
+      var hp = Game.util.clamp(Number(Game.state.player.hp) || 0, 0, d.maxHp);
+      return Game.contentCompiler.deepFreeze({
+        id: 'player-main',
+        actorRecordId: 'player-main',
+        hp: hp,
+        maxHp: d.maxHp,
+        hpPct: hp / Math.max(1, d.maxHp),
+        alive: hp > 0,
+        lifecycle: 'persistent',
+        stats: clone(d),
+        resources: {},
+        statuses: []
+      });
+    },
+
+    stat: function (ref, id) {
+      var actor = actorFrom(ref);
+      return actor && actor.components.statBlock
+        ? actor.components.statBlock.value(id) : 0;
+    },
+
+    setHp: function (ref, value, opts) {
+      opts = opts || {};
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      var vitals = actor.components.vitals;
+      var before = vitals.hp;
+      vitals.hp = Game.util.clamp(Number(value) || 0, 0, vitals.maxHp);
+      if (opts.commit !== false) commitPersistentHp(actor);
+      return {
+        before: before, hp: vitals.hp, maxHp: vitals.maxHp,
+        delta: vitals.hp - before
+      };
+    },
+
+    heal: function (ref, amount, opts) {
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      return Game.units.setHp(actor, actor.components.vitals.hp + Math.max(0, Number(amount) || 0), opts);
+    },
+
+    damage: function (ref, amount, opts) {
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      var result = Game.units.setHp(
+        actor,
+        actor.components.vitals.hp - Math.max(0, Number(amount) || 0),
+        opts
+      );
+      if (result) result.amount = result.before - result.hp;
+      return result;
+    },
+
+    restore: function (ref, opts) {
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      return Game.units.setHp(actor, actor.components.vitals.maxHp, opts);
+    },
+
+    commit: function (ref) {
+      return commitPersistentHp(actorFrom(ref));
+    },
+
+    reconcile: function (ref, opts) {
+      return reconcileVitals(actorFrom(ref), opts);
+    },
+
+    rebuildStats: function (ref, opts) {
+      var actor = actorFrom(ref);
+      return actor ? A.refresh(actor.id, opts) : null;
+    },
+
+    overrideMaxHp: function (ref, value, opts) {
+      opts = opts || {};
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.statBlock || !actor.components.vitals) return null;
+      var sourceId = 'unit:maxHpOverride:' + (opts.source || 'explicit');
+      actor.components.modifierLedger.removeSource(sourceId);
+      actor.components.modifierLedger.add({
+        sourceId: sourceId,
+        stat: 'maxHp',
+        phase: 'override',
+        operation: 'set',
+        value: Math.max(1, Number(value) || 1)
+      });
+      return reconcileVitals(actor, {
+        beforeMax: actor.components.vitals.maxHp,
+        beforeHp: actor.components.vitals.hp,
+        hpPolicy: opts.hpPolicy || 'preserveAbsolute',
+        commit: opts.commit
+      });
+    },
+
+    assertInvariant: function (ref) {
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals || !actor.components.statBlock) return true;
+      var resolved = actor.components.statBlock.value('maxHp');
+      if (Math.abs(actor.components.vitals.maxHp - resolved) > 0.0001) {
+        throw new Error('[Units] maxHp invariant failed for ' + actor.id);
+      }
+      if (actor.components.vitals.hp < 0 || actor.components.vitals.hp > resolved) {
+        throw new Error('[Units] hp bounds failed for ' + actor.id);
+      }
+      return true;
     }
   };
 })();

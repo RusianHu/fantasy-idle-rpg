@@ -9,6 +9,7 @@
   - `PLAN/20260728-01-plan.md` 的 Actor、内容编译与固定时间轴规范已并入本规划；后文历史版本条目仅说明迁移来源，不得覆盖本节。
   - 正式战斗采用 50ms 整数 tick、Encounter seeded RNG、GCD/oGCD、队列、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、Threat 与 Effect DSL；不存在独立攻速倒计时或按冷却旁路施法。
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
+  - 单位状态边界固定为：`ActorRecord` 持久化 HP，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取只读快照或提交伤害、治疗、恢复与重算，禁止从旧派生值和实时组件拼接同一状态。
   - 正式内容为 5 职业、30 Talent、24 怪物、16 EncounterProfile；普通 pack 1–3 敌人，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v13，只持久化 Roster、经济、背包、世界（含 `RoutePlan`）、设置和战术；Encounter、RNG、威胁、冷却、预警、状态与护盾不入档。离线、自动养成和战力比较复用同内容 fingerprint 下的 `CombatEstimator` 摘要。
   - `tech-demos/units` 为 Actor / Deterministic Combat Lab；正式入口、Lab、地图演示和 Node 审计读取同一 Pack 清单。
