@@ -54,7 +54,10 @@
           id: 'rogue.backstab', kind: 'action', actionType: 'gcd',
           timing: { castTicks: 0, animationLockTicks: 12, cooldownTicks: 60, queueable: true },
           costs: [{ resourceId: 'energy', amount: 42 }], target: enemy,
-          effects: [dmg(1.75), { type: 'modifyResource', resourceId: 'comboPoints', amount: 2, target: self }],
+          effects: [
+            Object.assign(dmg(1.75), { critChanceBonus: 0.25 }),
+            { type: 'modifyResource', resourceId: 'comboPoints', amount: 2, target: self }
+          ],
           aiHints: { priority: 62 }, presentation: { nameKey: 'combat.ability.rogue_backstab.name', icon: 'icon_skill_strike' }
         },
         {
@@ -98,12 +101,41 @@
       }],
       talentTree: [{ id: 'talents.rogue', schemaVersion: 1, talentIds: ['rg_backstab', 'rg_swift', 'rg_poison', 'rg_deadly', 'rg_flurry', 'rg_evasion'] }],
       talent: [
-        { id: 'rg_backstab', classId: 'rogue', unlockLevel: 1, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'rogue.backstab' }, presentation: { nameKey: 'skill.rg_backstab.name', descKey: 'skill.rg_backstab.desc' } },
-        { id: 'rg_swift', classId: 'rogue', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'gcdSpeed', perRank: 0.025 }], presentation: { nameKey: 'skill.rg_swift.name', descKey: 'skill.rg_swift.desc' } },
-        { id: 'rg_poison', classId: 'rogue', unlockLevel: 3, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'rogue.poison_blade' }, presentation: { nameKey: 'skill.rg_poison.name', descKey: 'skill.rg_poison.desc' } },
-        { id: 'rg_deadly', classId: 'rogue', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'critChance', perRank: 0.012 }], presentation: { nameKey: 'skill.rg_deadly.name', descKey: 'skill.rg_deadly.desc' } },
-        { id: 'rg_flurry', classId: 'rogue', unlockLevel: 5, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'rogue.fan_of_knives' }, presentation: { nameKey: 'skill.rg_flurry.name', descKey: 'skill.rg_flurry.desc' } },
-        { id: 'rg_evasion', classId: 'rogue', unlockLevel: 6, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'rogue.evasion_action' }, presentation: { nameKey: 'skill.rg_evasion.name', descKey: 'skill.rg_evasion.desc' } }
+        {
+          id: 'rg_backstab', classId: 'rogue', unlockLevel: 1, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'rogue.backstab', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.9, perRank: 0.13 }
+          ] },
+          presentation: { nameKey: 'skill.rg_backstab.name', descKey: 'skill.rg_backstab.desc' }
+        },
+        { id: 'rg_swift', classId: 'rogue', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'gcdSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.025 },
+          { stat: 'castSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.025 },
+          { stat: 'autoAttackSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.025 }
+        ], presentation: { nameKey: 'skill.rg_swift.name', descKey: 'skill.rg_swift.desc' } },
+        {
+          id: 'rg_poison', classId: 'rogue', unlockLevel: 3, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'rogue.poison_blade', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.2, perRank: 0.08 },
+            { target: 'status', id: 'rogue.poison', path: 'durationTicks', baseValue: 80, perRank: 0 },
+            { target: 'status', id: 'rogue.poison', path: 'periodic.0.params.coefficient', baseValue: 0.2, perRank: 0.02 }
+          ] },
+          presentation: { nameKey: 'skill.rg_poison.name', descKey: 'skill.rg_poison.desc' }
+        },
+        { id: 'rg_deadly', classId: 'rogue', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'critChance', phase: 'otherFlat', operation: 'add', perRank: 0.012 },
+          { stat: 'critMultiplier', phase: 'otherFlat', operation: 'add', perRank: 0.05 }
+        ], presentation: { nameKey: 'skill.rg_deadly.name', descKey: 'skill.rg_deadly.desc' } },
+        {
+          id: 'rg_flurry', classId: 'rogue', unlockLevel: 5, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'rogue.fan_of_knives', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.3, perRank: 0.08 }
+          ] },
+          presentation: { nameKey: 'skill.rg_flurry.name', descKey: 'skill.rg_flurry.desc' }
+        },
+        { id: 'rg_evasion', classId: 'rogue', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'dodgeChance', phase: 'otherFlat', operation: 'add', perRank: 0.015 }
+        ], presentation: { nameKey: 'skill.rg_evasion.name', descKey: 'skill.rg_evasion.desc' } }
       ]
     }
   });

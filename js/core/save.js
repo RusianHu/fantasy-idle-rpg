@@ -354,22 +354,54 @@
       st.settings.autoBoss = st.settings.autoBoss !== false;
       var loadedRoster = data.roster || {};
       var loadedPrimaryId = loadedRoster.primaryActorId || 'player-main';
-      var loadedRecord = loadedRoster.actors && loadedRoster.actors[loadedPrimaryId] || {};
-      var record = st.roster.actors['player-main'];
-      record.classId = loadedRecord.classId || null;
-      record.level = Math.max(1, loadedRecord.level | 0 || 1);
-      record.exp = Math.max(0, Number(loadedRecord.exp) || 0);
-      record.skillPoints = Math.max(0, loadedRecord.skillPoints | 0);
-      record.talentRanks = Object.assign({}, loadedRecord.talentRanks || {});
-      record.permanentUpgrades = Object.assign({}, loadedRecord.permanentUpgrades || {});
-      record.persistentResources = Object.assign({ hp: 1 }, loadedRecord.persistentResources || {});
-      record.loadout = {
-        equipment: Object.assign({ weapon: null, armor: null, ring: null },
-          loadedRecord.loadout && loadedRecord.loadout.equipment || {}),
-        lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
-          loadedRecord.loadout && loadedRecord.loadout.lockedSlots || {})
-      };
-      st.roster.activeParty = ['player-main'];
+      var loadedActors = loadedRoster.actors || {};
+      var normalizedActors = {};
+      Object.keys(loadedActors).sort().forEach(function (actorRecordId) {
+        var stableId = Game.contentSchemas && Game.contentSchemas.stableId ||
+          /^[a-z][A-Za-z0-9_.:-]*$/;
+        if (!stableId.test(actorRecordId)) return;
+        var loadedRecord = loadedActors[actorRecordId] || {};
+        var archetypeId = loadedRecord.archetypeId ||
+          (actorRecordId === loadedPrimaryId ? 'adventurer' : null);
+        if (!archetypeId || (Game.content &&
+            !Game.content.has('actorArchetype', archetypeId))) return;
+        var loadedHp = loadedRecord.persistentResources &&
+          loadedRecord.persistentResources.hp;
+        normalizedActors[actorRecordId] = {
+          id: actorRecordId,
+          archetypeId: archetypeId,
+          classId: loadedRecord.classId || null,
+          level: Math.max(1, loadedRecord.level | 0 || 1),
+          exp: Math.max(0, Number(loadedRecord.exp) || 0),
+          skillPoints: Math.max(0, loadedRecord.skillPoints | 0),
+          talentRanks: Object.assign({}, loadedRecord.talentRanks || {}),
+          permanentUpgrades: Object.assign({}, loadedRecord.permanentUpgrades || {}),
+          persistentResources: Number.isFinite(loadedHp)
+            ? { hp: Math.max(0, loadedHp) } : {},
+          loadout: {
+            equipment: Object.assign({ weapon: null, armor: null, ring: null },
+              loadedRecord.loadout && loadedRecord.loadout.equipment || {}),
+            lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
+              loadedRecord.loadout && loadedRecord.loadout.lockedSlots || {})
+          }
+        };
+      });
+      if (!normalizedActors[loadedPrimaryId]) {
+        normalizedActors['player-main'] = st.roster.actors['player-main'];
+        loadedPrimaryId = 'player-main';
+      }
+      st.roster.actors = normalizedActors;
+      st.roster.primaryActorId = loadedPrimaryId;
+      var loadedParty = Array.isArray(loadedRoster.activeParty)
+        ? loadedRoster.activeParty : [loadedPrimaryId];
+      st.roster.activeParty = loadedParty.filter(function (actorRecordId, index) {
+        return normalizedActors[actorRecordId] &&
+          loadedParty.indexOf(actorRecordId) === index;
+      }).slice(0, 4);
+      if (st.roster.activeParty.indexOf(loadedPrimaryId) < 0) {
+        st.roster.activeParty.unshift(loadedPrimaryId);
+        st.roster.activeParty = st.roster.activeParty.slice(0, 4);
+      }
       U.merge(st.economy, data.economy || {});
       st.economy.gold = Math.max(0, Number(st.economy.gold) || 0);
       st.economy.crystal = Math.max(0, Number(st.economy.crystal) || 0);
@@ -404,23 +436,45 @@
         : null;
       st.meta.endingLine = Math.max(0, Math.min(5, Number(st.meta.endingLine) || 0));
 
-      // 内容缺失时从合法脱战状态降级：无效职业清空，Talent 全额退款。
-      if (record.classId && (!Game.content.has('class', record.classId) ||
-          !Game.reg.has('class', record.classId))) {
-        record.classId = null;
-      }
-      Object.keys(record.talentRanks).forEach(function (talentId) {
-        var rank = Math.max(0, record.talentRanks[talentId] | 0);
-        var talent = Game.content.get('talent', talentId);
-        if (!talent || talent.classId !== record.classId) {
-          record.skillPoints += rank;
-          delete record.talentRanks[talentId];
-        } else {
-          record.talentRanks[talentId] = Math.min(rank, talent.maxRank);
-          record.skillPoints += Math.max(0, rank - talent.maxRank);
+      // 内容缺失时从合法脱战状态降级：逐 ActorRecord 清理职业和 Talent。
+      Object.keys(st.roster.actors).forEach(function (actorRecordId) {
+        var record = st.roster.actors[actorRecordId];
+        if (record.classId && ((Game.content &&
+            !Game.content.has('class', record.classId)) ||
+            !Game.reg.has('class', record.classId))) {
+          record.classId = null;
         }
+        Object.keys(record.talentRanks).forEach(function (talentId) {
+          var rank = Math.max(0, record.talentRanks[talentId] | 0);
+          var talent = Game.content && Game.content.get('talent', talentId);
+          if (!Game.content) {
+            var legacyTalent = Game.reg.get('skill', talentId);
+            if (legacyTalent) talent = {
+              classId: legacyTalent.cls,
+              maxRank: Game.SKILL_MAX_LV || 10,
+              costs: [1]
+            };
+          }
+          if (!talent || talent.classId !== record.classId) {
+            if (!talent) record.skillPoints += rank;
+            else {
+              for (var refundedRank = 0; refundedRank < rank; refundedRank++) {
+                record.skillPoints += talent.costs.length === 1
+                  ? talent.costs[0]
+                  : talent.costs[Math.min(refundedRank, talent.costs.length - 1)];
+              }
+            }
+            delete record.talentRanks[talentId];
+          } else {
+            record.talentRanks[talentId] = Math.min(rank, talent.maxRank);
+            for (var removedRank = talent.maxRank; removedRank < rank; removedRank++) {
+              record.skillPoints += talent.costs.length === 1
+                ? talent.costs[0]
+                : talent.costs[Math.min(removedRank, talent.costs.length - 1)];
+            }
+          }
+        });
       });
-      record.persistentResources.hp = Math.max(0, Number(record.persistentResources.hp) || 0);
 
       // 数据卫生：清除引用已下线内容的装备（折算金币），装备指针失效则置空
       var validItems = [];
@@ -430,13 +484,16 @@
         else st.player.gold += 50;
       }
       st.inv.items = validItems;
-      for (var slot in st.inv.equipped) {
-        var uid = st.inv.equipped[slot];
-        if (uid && !validItems.some(function (x) { return x.uid === uid; })) {
-          st.inv.equipped[slot] = null;
-        }
-        st.inv.lockedSlots[slot] = !!st.inv.lockedSlots[slot];
-      }
+      Object.keys(st.roster.actors).forEach(function (actorRecordId) {
+        var loadout = st.roster.actors[actorRecordId].loadout;
+        Object.keys(loadout.equipment).forEach(function (slot) {
+          var uid = loadout.equipment[slot];
+          if (uid && !validItems.some(function (x) { return x.uid === uid; })) {
+            loadout.equipment[slot] = null;
+          }
+          loadout.lockedSlots[slot] = !!loadout.lockedSlots[slot];
+        });
+      });
       // 区域已下线 → 回退到最近有效区域
       if (!Game.reg.has('region', st.world.region)) {
         st.world.region = st.world.regionOrder[0];

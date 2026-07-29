@@ -30,7 +30,7 @@
 
   function disabledReason(h) {
     if (!Game.state || !Game.state.player || !h) return 'not-ready';
-    var snapshot = Game.units && Game.units.snapshot(h);
+    var snapshot = Game.units && Game.units.vitals(h);
     if ((snapshot ? !snapshot.alive : Game.state.player.hp <= 0) || h.state === 'dead') return 'dead';
     if (Game.entryState !== undefined && Game.entryState !== 'active') return 'busy';
     if (Game.transitions && Game.transitions.isActive()) return 'busy';

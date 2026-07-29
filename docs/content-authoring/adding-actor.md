@@ -3,14 +3,17 @@
 1. 选择所属 Pack；跨 Pack 引用写入 `requires`，版本使用语义化范围。
 2. 先定义 `statProfile`、Ability、Trait、Status 与 Reward，再定义 `actorArchetype`。
 3. `actorArchetype` 只声明稳定身份与引用；运行时属性、队伍、阵营覆盖和出生坐标进入 `SpawnSpec`。
-4. 中英文 `nameKey`、`descKey`、`loreKey` 必须同时存在；`spriteId` 必须已注册。
-5. 将 Pack 文件加入 `js/data/packs/manifest.js`，并同步正式入口、Actor / Combat Lab 与世界现场的顺序脚本标签。
-6. 运行：
+4. Modifier 显式填写已注册 `stat`、合法 `phase`、`operation` 和有限数值；可叠 Status 明确 `stack/maxStacks` 与周期 tick。Talent 主动强化只用已审计 `grants.patches`，不要改全局 Ability/Status。
+5. 中英文 `nameKey`、`descKey`、`loreKey` 必须同时存在；`spriteId` 必须已注册。
+6. 将 Pack 文件加入 `js/data/packs/manifest.js`，并同步正式入口、Actor / Combat Lab 与世界现场的顺序脚本标签。
+7. 运行：
 
 ```powershell
 node tools/audit-content.js
 node tests/v2-content-entrypoints.test.js
 node tests/v2-authoring.test.js
+node tests/v2-content-validation.test.js
+node tests/unit-state.test.js
 node tests/v2-runtime.test.js
 ```
 

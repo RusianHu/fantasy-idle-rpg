@@ -345,38 +345,43 @@
       opts = opts || {};
       var s = Game.state, p = s && s.player;
       if (!s || !s.settings.autoSkillUpgrade || !Game.player.hasClass() || p.sp < 1) {
-        return { count: 0, allocations: [] };
+        return { count: 0, spent: 0, allocations: [] };
       }
       var cls = Game.player.classDef();
       var order = cls.skills || reg.ids('skill');
       var regionId = Auto.frontierRegion();
       var allocations = {};
-      var count = 0, guard = 0;
+      var count = 0, spent = 0, guard = 0;
 
       while (p.sp > 0 && guard++ < 1000) {
         var baseEval = F.evaluateBuild({ skills: p.skills, regionId: regionId });
         var best = null, bestDelta = VALUE_EPS;
         for (var i = 0; i < order.length; i++) {
           var sid = order[i];
-          var def = reg.get('skill', sid);
-          if (!def || def.cls !== p.classId) continue;
+          var legacy = reg.get('skill', sid);
+          var def = Game.content.get('talent', sid);
+          if (!legacy || !def || def.classId !== p.classId) continue;
           var lv = p.skills[sid] || 0;
-          if (lv >= Game.SKILL_MAX_LV || p.level < (def.unlockLv || 1)) continue;
+          var cost = def.costs.length === 1
+            ? def.costs[0]
+            : def.costs[Math.min(lv, def.costs.length - 1)];
+          if (lv >= def.maxRank || p.level < def.unlockLevel || p.sp < cost) continue;
           var trialSkills = copyMap(p.skills);
           trialSkills[sid] = lv + 1;
           var candidate = F.evaluateBuild({ skills: trialSkills, regionId: regionId });
           var delta = candidate.utility - baseEval.utility;
           if (delta > bestDelta) {
             bestDelta = delta;
-            best = { sid: sid, from: lv, to: lv + 1 };
+            best = { sid: sid, from: lv, to: lv + 1, cost: cost };
           }
         }
         if (!best) break;
-        p.sp--;
+        p.sp -= best.cost;
         p.skills[best.sid] = best.to;
         if (!allocations[best.sid]) allocations[best.sid] = { sid: best.sid, from: best.from, to: best.to };
         else allocations[best.sid].to = best.to;
         count++;
+        spent += best.cost;
       }
 
       var list = [];
@@ -395,12 +400,13 @@
         }
         bus.emit('skills:autoAllocated', {
           count: count,
+          spent: spent,
           allocations: list,
           reason: opts.reason || 'auto'
         });
-        recordSummary({ reason: opts.reason || 'auto', skillPoints: count });
+        recordSummary({ reason: opts.reason || 'auto', skillPoints: spent });
       }
-      return { count: count, allocations: list };
+      return { count: count, spent: spent, allocations: list };
     },
 
     /** 旧档/升级等协调：先换装，再加点，最后按新构筑复核换装。 */

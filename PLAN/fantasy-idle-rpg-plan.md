@@ -9,7 +9,7 @@
   - `PLAN/20260728-01-plan.md` 的 Actor、内容编译与固定时间轴规范已并入本规划；后文历史版本条目仅说明迁移来源，不得覆盖本节。
   - 正式战斗采用 50ms 整数 tick、Encounter seeded RNG、GCD/oGCD、队列、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、Threat 与 Effect DSL；不存在独立攻速倒计时或按冷却旁路施法。
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
-  - 单位状态边界固定为：`ActorRecord` 持久化 HP，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取只读快照或提交伤害、治疗、恢复与重算，禁止从旧派生值和实时组件拼接同一状态。
+  - 单位状态边界固定为：`ActorRecord` 持久化 HP 且同一 Record 最多绑定一个存活 `ActorInstance`，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取轻量 Vitals/完整诊断快照，或提交伤害、治疗、死亡/复活、Modifier source 替换与无损重算。刷新保留同 ID 资源、SpawnSpec、Status 与外部 Modifier；禁止从旧派生值和实时组件拼接状态或直接修改 Ledger。
   - 正式内容为 5 职业、30 Talent、24 怪物、16 EncounterProfile；普通 pack 1–3 敌人，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v13，只持久化 Roster、经济、背包、世界（含 `RoutePlan`）、设置和战术；Encounter、RNG、威胁、冷却、预警、状态与护盾不入档。离线、自动养成和战力比较复用同内容 fingerprint 下的 `CombatEstimator` 摘要。
   - `tech-demos/units` 为 Actor / Deterministic Combat Lab；正式入口、Lab、地图演示和 Node 审计读取同一 Pack 清单。
@@ -44,7 +44,7 @@
   支持随时手动回退刷低级区域。**魔王城采用可失守的特殊准入规则**：角色在魔王城内战败并回营时，立即退回本档路线的上一
   区域营地并重新锁定魔王城；玩家须再次击败上一地区 Boss 才能重新解锁。该过程不撤销既有 Boss 首杀、奖励、成就或通关记录，
   重新解锁也不得重复发放首杀奖励。地图面板、自动推进与连续死亡回退必须统一读取本档路线，禁止回退到注册表固定顺序。`RoutePlan` 主线节点必须持有稳定节点 ID、章节、推进阶位、双向链接及插入端口；子任务地图、巢穴和限时事件以锚定主线的 excursion 记录编排，继承锚点阶位并显式声明返回与生命周期，不得污染八区主线阶位或旧档顺序。
-  6. **Action / Talent 系统**：五职业各有基础 Action Kit、独立资源与自动轮转；30 个稳定旧技能 ID 作为可投资 Talent 保留，可授予或强化 Action/Trait。技能点升级仍逐点产生真实收益。
+  6. **Action / Talent 系统**：五职业各有基础 Action Kit、独立资源与自动轮转；30 个稳定旧技能 ID 作为 V2 权威 Talent 保留。被动等级生成显式 phase/operation 的 Stat Modifier，主动等级通过已审计 patch 生成 Actor 私有 Ability/Status，不修改深冻结全局 Card；升级成本、解锁与上限只读 Talent 定义，CombatEstimator 与在线 Actor 共用同一解析。
   7. **商店与货币**：金币 + 稀有货币**魔晶石**，两者均需**产出/消耗闭环**——魔晶石产出：Boss
   首杀固定奖励、成就奖励、分解传说装备；魔晶石消耗：商店永久增益、稀有装备。商店出售药水、装备、永久增益。
   **药水自动使用规则**：战斗中 HP 低于阈值（默认 30%，设置面板可调）时自动消耗背包中的药水，带短冷却防止连喝；
@@ -231,6 +231,7 @@
   - **核心原则：引擎与内容分离，内容即数据**。引擎代码不写死任何具体区域/怪物/装备/技能，只面向「注册表 + 稳定字符串
   ID」编程。
   - **当前内容编译器与注册表**：正式战斗内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义和条目，由编译器统一执行 schema/default、引用图、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。区域、怪物、Action、Talent、Status、Trait、AI、资源、阵营和 EncounterProfile 分层存放于 `js/data/packs/`，`js/data/packs/manifest.js` 是权威文件集合。由于项目支持 `file://` 顺序脚本，新增 Pack 还必须同步正式入口、Actor / Combat Lab 与世界现场的脚本标签；`tests/v2-content-entrypoints.test.js` 保证三者与 manifest 一致。生成器审计只读取区域与 v3 地形模块，不消费战斗 Pack。
+  - **Modifier / Status / Talent 合同**：内容 Modifier 必须显式声明已注册 `stat`、合法 `phase`、`operation` 与有限数值；`add/addPct` 按层线性累加，`multiply` 按层幂次相乘，`set` 不随层放大。`refresh/unique` 只允许一层，`stack` 声明正整数上限，周期效果按实例层数执行。Talent patch 只能指向已注册 Ability/Status 的现有数值路径，非法 stat、phase、operation、成本、层数、周期或 patch 在严格审计时阻止启动。
   - **事件总线（EventBus）**：引擎在关键节点广播事件（`monster:killed`、`player:levelup`、`item:dropped`、
   `boss:defeated`、`region:unlocked`、`save:before` 等）；成就、任务、统计等系统一律实现为事件监听器，与战斗核心解耦；
   - **面向未来**：转生、活动、新货币等尚未实现的新玩法应以监听器/插件形式接入，不侵入既有系统；本条是扩展约束，不代表这些玩法已经排期或上线。

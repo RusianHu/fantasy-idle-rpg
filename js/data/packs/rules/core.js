@@ -7,10 +7,11 @@
     ['physicalPower', 0, 1e12], ['magicPower', 0, 1e12], ['accuracy', 0.05, 1],
     ['gcdSpeed', 0.1, 8], ['castSpeed', 0.1, 8], ['autoAttackSpeed', 0.1, 8],
     ['cooldownRate', 0.1, 8], ['moveSpeed', 0, 1000], ['range', 0, 1000],
-    ['critChance', 0, 0.95], ['critMultiplier', 1, 10], ['dodgeChance', 0, 0.8],
+    ['critChance', 0, 0.95], ['critMultiplier', 1, 10], ['dodgeChance', 0, 0.35],
     ['healingPower', 0, 1e12], ['shieldPower', 0, 1e15], ['lifesteal', 0, 1],
     ['statusPotency', 0, 10], ['tenacity', 0, 10], ['interruptPower', 0, 10],
     ['threatMultiplier', 0, 20], ['resourceRegen', 0, 20],
+    ['healthRegenPct', 0, 1],
     ['expMultiplier', 0, 100], ['goldMultiplier', 0, 100], ['dropMultiplier', 0, 100]
   ].map(function (row) {
     return {
@@ -56,6 +57,7 @@
             critMultiplier: 1.5, dodgeChance: 0.02, healingPower: 10,
             shieldPower: 100, lifesteal: 0, statusPotency: 1, tenacity: 0,
             interruptPower: 1, threatMultiplier: 1, resourceRegen: 1,
+            healthRegenPct: 0,
             expMultiplier: 1, goldMultiplier: 1, dropMultiplier: 1
           }
         },
@@ -72,6 +74,7 @@
             critMultiplier: 1.5, dodgeChance: 0, healingPower: 0,
             shieldPower: 0, lifesteal: 0, statusPotency: 0, tenacity: 1,
             interruptPower: 0, threatMultiplier: 0, resourceRegen: 0,
+            healthRegenPct: 0,
             expMultiplier: 1, goldMultiplier: 1, dropMultiplier: 1
           }
         }

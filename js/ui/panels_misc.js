@@ -40,8 +40,16 @@
 
     list.forEach(function (sk) {
       var lv = p.skills[sk.id] || 0;
-      var locked = p.level < (sk.unlockLv || 1);
-      var maxed = lv >= Game.SKILL_MAX_LV;
+      var talent = Game.content.get('talent', sk.id);
+      var unlockLevel = talent ? talent.unlockLevel : sk.unlockLv || 1;
+      var maxRank = talent ? talent.maxRank : Game.SKILL_MAX_LV;
+      var cost = talent
+        ? (talent.costs.length === 1
+          ? talent.costs[0]
+          : talent.costs[Math.min(lv, talent.costs.length - 1)])
+        : 1;
+      var locked = p.level < unlockLevel;
+      var maxed = lv >= maxRank;
       var descRank = sk.type === 'active' ? lv : Math.max(1, lv);
       var vars = sk.descVars ? sk.descVars(descRank) : {};
       var typeTxt = sk.type === 'active'
@@ -60,12 +68,12 @@
         ' <span class="badge">' + typeTxt + '</span></div>' +
         '<div class="desc">' + t('skill.' + sk.id + '.desc', vars) +
         (lv === 0 && sk.type === 'active' ? '<br>' + t('ui.skillBaseNote') : '') + '</div>' +
-        (locked ? '<div class="desc" style="color:var(--danger)">' + t('ui.needLevel', { lv: sk.unlockLv }) + '</div>' : '') +
+        (locked ? '<div class="desc" style="color:var(--danger)">' + t('ui.needLevel', { lv: unlockLevel }) + '</div>' : '') +
         '</div>' +
         '<button class="btn small up-btn">' + (maxed ? t('ui.maxed') : t('ui.upgrade')) + '</button>' +
         '</div>');
       var btn = card.querySelector('.up-btn');
-      btn.disabled = locked || maxed || p.sp < 1;
+      btn.disabled = locked || maxed || p.sp < cost;
       btn.addEventListener('click', function () {
         if (Game.player.upgradeSkill(sk.id)) {
           Game.ui.modals.toast(t('ui.skillUp', { name: t('skill.' + sk.id + '.name') }));

@@ -35,17 +35,18 @@
   }
 
   function baseStats(blueprint, spec, record) {
-    if (record && Game.player && record.id === 'player-main') {
-      // Record-bound players use the legacy builder only for base/equipment/permanent
-      // values. Talent modifiers are owned by the Actor ledger below and must never
-      // be baked into this base a second time.
+    if (record && record.classId && Game.player) {
+      // Every classed ActorRecord uses the same base/equipment/permanent builder.
+      // Talents are deliberately excluded here: the Actor ledger and ability/status
+      // books below are their sole runtime owners.
       var derived = Game.player.previewDerived({
         classId: record.classId,
         level: record.level,
         skills: {},
-        equipped: record.loadout.equipment
+        equipped: record.loadout.equipment,
+        perms: record.permanentUpgrades
       });
-      return {
+      var recordStats = {
         maxHp: derived.maxHp,
         armor: derived.def,
         ward: Math.max(0, Math.round(derived.def * 0.65)),
@@ -73,6 +74,10 @@
         goldMultiplier: derived.goldMul,
         dropMultiplier: derived.dropMul
       };
+      Object.keys(spec.statValues || {}).forEach(function (id) {
+        if (Number.isFinite(spec.statValues[id])) recordStats[id] = spec.statValues[id];
+      });
+      return recordStats;
     }
     var profile = statProfile(blueprint);
     var level = Math.max(1, spec.level || record && record.level || 1);
@@ -102,14 +107,24 @@
       var out = clone(base);
       var phases = ['equipmentFlat', 'otherFlat', 'addPct', 'multiply', 'status', 'override'];
       phases.forEach(function (phase) {
-        entries.filter(function (entry) { return entry.phase === phase; }).sort(function (a, b) {
+        var phaseEntries = entries.filter(function (entry) {
+          return entry.phase === phase;
+        }).sort(function (a, b) {
           return (a.sourceId || '').localeCompare(b.sourceId || '') || a.stat.localeCompare(b.stat);
-        }).forEach(function (entry) {
+        });
+        var additivePct = {};
+        phaseEntries.forEach(function (entry) {
+          if (entry.operation === 'addPct') {
+            additivePct[entry.stat] = (additivePct[entry.stat] || 0) + entry.value;
+            return;
+          }
           var current = Number(out[entry.stat]) || 0;
           if (entry.operation === 'add') out[entry.stat] = current + entry.value;
           else if (entry.operation === 'multiply') out[entry.stat] = current * entry.value;
-          else if (entry.operation === 'addPct') out[entry.stat] = current * (1 + entry.value);
           else if (entry.operation === 'set') out[entry.stat] = entry.value;
+        });
+        Object.keys(additivePct).sort().forEach(function (statId) {
+          out[statId] = (Number(out[statId]) || 0) * (1 + additivePct[statId]);
         });
       });
       Object.keys(out).forEach(function (id) {
@@ -135,6 +150,9 @@
         entries = entries.filter(function (entry) { return entry.sourceId !== sourceId; });
         dirty = dirty || before !== entries.length;
       },
+      sourceEntries: function (sourceId) {
+        return clone(entries.filter(function (entry) { return entry.sourceId === sourceId; }));
+      },
       value: function (id) { if (dirty) recompute(); return Number(cache[id]) || 0; },
       snapshot: function () {
         if (dirty) recompute();
@@ -157,6 +175,66 @@
       });
     });
     return out;
+  }
+
+  function talentRanks(record, spec) {
+    return record && record.talentRanks || spec && spec.talentRanks || {};
+  }
+
+  function classTalents(blueprint) {
+    var classDef = blueprint.classId && Game.content.get('class', blueprint.classId);
+    var tree = classDef && Game.content.get('talentTree', classDef.talentTreeId);
+    return (tree && tree.talentIds || []).map(function (id) {
+      return Game.content.get('talent', id);
+    }).filter(Boolean);
+  }
+
+  function valueAt(root, path) {
+    var parts = String(path || '').split('.');
+    var value = root;
+    for (var i = 0; i < parts.length; i++) {
+      if (value === undefined || value === null) return undefined;
+      value = value[parts[i]];
+    }
+    return value;
+  }
+
+  function setValueAt(root, path, value) {
+    var parts = String(path || '').split('.');
+    var target = root;
+    for (var i = 0; i < parts.length - 1; i++) target = target[parts[i]];
+    target[parts[parts.length - 1]] = value;
+  }
+
+  function applyTalentPatch(book, talent, patch, rank) {
+    var targetType = patch.target || 'ability';
+    var targetId = patch.id || (talent.grants && talent.grants.modifyAbilityId);
+    var source = targetType === 'status'
+      ? Game.content.get('status', targetId)
+      : Game.content.get('ability', targetId);
+    if (!source) return;
+    var bucket = targetType === 'status' ? book.statuses : book.abilities;
+    var target = bucket[targetId] || (bucket[targetId] = clone(source));
+    var current = Number(valueAt(target, patch.path));
+    if (!Number.isFinite(current)) return;
+    var base = Number.isFinite(patch.baseValue) ? patch.baseValue : current;
+    var perRank = Number(patch.perRank) || 0;
+    var next = patch.operation === 'multiply'
+      ? base * Math.pow(perRank || 1, rank)
+      : base + perRank * rank;
+    setValueAt(target, patch.path, next);
+  }
+
+  function buildRuntimeContent(blueprint, record, spec) {
+    var book = { abilities: {}, statuses: {} };
+    var ranks = talentRanks(record, spec);
+    classTalents(blueprint).forEach(function (talent) {
+      var rank = Game.util.clamp(ranks[talent.id] | 0, 0, talent.maxRank || 0);
+      (talent.grants && talent.grants.patches || []).forEach(function (patch) {
+        applyTalentPatch(book, talent, patch, rank);
+      });
+    });
+    return book;
   }
 
   function defineCompatibility(instance) {
@@ -210,9 +288,11 @@
         }));
       });
     });
-    Object.keys(record && record.talentRanks || {}).sort().forEach(function (talentId) {
+    Object.keys(talentRanks(record, spec)).sort().forEach(function (talentId) {
       var talent = Game.content.get('talent', talentId);
-      var rank = Math.max(0, record.talentRanks[talentId] | 0);
+      var rank = Game.util.clamp(talentRanks(record, spec)[talentId] | 0, 0,
+        talent && talent.maxRank || 0);
+      if (!talent || talent.classId !== blueprint.classId) return;
       (talent && talent.modifiers || []).forEach(function (modifier, index) {
         components.modifierLedger.add({
           sourceId: 'talent:' + talentId + ':' + index,
@@ -230,14 +310,24 @@
     });
   }
 
+  function stackedModifier(modifier, stacks) {
+    var out = Object.assign({}, modifier);
+    var value = Number(modifier.value) || 0;
+    if (modifier.operation === 'multiply') out.value = Math.pow(value, stacks);
+    else if (modifier.operation === 'set') out.value = value;
+    else out.value = value * stacks;
+    return out;
+  }
+
   function applyStatusModifiers(components) {
     (components.statuses || []).forEach(function (status) {
       var def = Game.content.get('status', status.statusId);
-      (def && def.modifiers || []).forEach(function (modifier) {
-        components.modifierLedger.add(Object.assign({}, modifier, {
-          sourceId: status.id,
-          value: Number(modifier.value) * Math.max(1, status.stacks || 1)
-        }));
+      var modifiers = status.modifierSnapshot || def && def.modifiers || [];
+      modifiers.forEach(function (modifier) {
+        components.modifierLedger.add(Object.assign(
+          stackedModifier(modifier, Math.max(1, status.stacks || 1)),
+          { sourceId: status.id }
+        ));
       });
     });
   }
@@ -249,9 +339,11 @@
   }
 
   function primaryActor() {
+    var primaryRecordId = Game.state && Game.state.roster &&
+      Game.state.roster.primaryActorId || 'player-main';
     for (var i = 0; i < order.length; i++) {
       var actor = instances[order[i]];
-      if (actor && actor.actorRecordId === 'player-main') return actor;
+      if (actor && actor.actorRecordId === primaryRecordId) return actor;
     }
     return null;
   }
@@ -290,6 +382,9 @@
       spec = spec || {};
       var record = spec.actorRecordId && Game.roster.getRecord(spec.actorRecordId);
       if (spec.actorRecordId && !record) throw new Error('[Actors] missing record: ' + spec.actorRecordId);
+      if (record && A.query({ actorRecordId: record.id }).length) {
+        throw new Error('[Actors] record already has a live instance: ' + record.id);
+      }
       if (record && spec.archetypeId && record.archetypeId !== spec.archetypeId) {
         throw new Error('[Actors] record/archetype conflict');
       }
@@ -305,7 +400,15 @@
       if (instances[id]) throw new Error('[Actors] duplicate instance: ' + id);
       var archetype = Game.content.get('actorArchetype', blueprint.archetypeId);
       var actorPresentation = presentationFor(archetype, blueprint);
-      var stats = baseStats(blueprint, spec, record);
+      var buildSpec = {
+        archetypeId: archetypeId,
+        classId: record && record.classId || spec.classId || null,
+        variantId: spec.variantId || null,
+        statValues: clone(spec.statValues || {}),
+        modifiers: clone(spec.modifiers || []),
+        talentRanks: clone(spec.talentRanks || {})
+      };
+      var stats = baseStats(blueprint, buildSpec, record);
       var combatCapable = !!blueprint.resolvedProfiles.statProfileId &&
         (blueprint.resolvedAbilityGrants.length > 0 || archetype.category === 'player');
       var components = {
@@ -330,10 +433,11 @@
         }
       };
       components.modifierLedger = components.statBlock;
-      applyBuildModifiers(components, blueprint, record, spec);
+      components.runtimeContent = buildRuntimeContent(blueprint, record, buildSpec);
+      applyBuildModifiers(components, blueprint, record, buildSpec);
       if (combatCapable) {
         var maxHp = components.statBlock.value('maxHp');
-        var storedHp = record && Number(record.persistentResources.hp);
+        var storedHp = record && record.persistentResources.hp;
         components.vitals = {
           hp: record && Number.isFinite(storedHp)
             ? Game.util.clamp(storedHp, 0, maxHp)
@@ -366,6 +470,7 @@
         encounterId: spec.encounterId || null,
         spawnSource: clone(spec.spawnSource || { kind: 'world', sourceId: 'unknown', sequence: worldSequence }),
         lifecycle: 'active',
+        buildSpec: buildSpec,
         category: archetype.category,
         rank: archetype.rank,
         components: components,
@@ -396,6 +501,12 @@
       instance.engaged = false;
       instance.dots = [];
       defineCompatibility(instance);
+      if (components.vitals && components.vitals.hp <= 0) {
+        instance.lifecycle = 'defeated';
+        instance.dead = true;
+        components.actionState.state = 'defeated';
+        components.presentation.state = 'dead';
+      }
       instances[id] = instance;
       order.push(id);
       if (record && components.vitals) commitPersistentHp(instance);
@@ -404,6 +515,19 @@
     },
 
     get: function (id) { return instances[id] || null; },
+    ability: function (ref, abilityId) {
+      var actor = actorFrom(ref);
+      if (!actor) return null;
+      return actor.components.runtimeContent &&
+        actor.components.runtimeContent.abilities[abilityId] ||
+        Game.content.get('ability', abilityId);
+    },
+    status: function (ref, statusId) {
+      var actor = actorFrom(ref);
+      return actor && actor.components.runtimeContent &&
+        actor.components.runtimeContent.statuses[statusId] ||
+        Game.content.get('status', statusId);
+    },
     refresh: function (id, opts) {
       opts = opts || {};
       var actor = instances[id];
@@ -411,20 +535,22 @@
       var record = actor.actorRecordId && Game.roster.getRecord(actor.actorRecordId);
       var beforeMax = actor.components.vitals && actor.components.vitals.maxHp || 0;
       var beforeHp = actor.components.vitals && actor.components.vitals.hp || 0;
-      if (record && actor.blueprint.classId !== record.classId) {
-        actor.blueprint = Game.content.compileBlueprint({
-          archetypeId: record.archetypeId,
-          classId: record.classId
-        });
-        actor.blueprintKey = actor.blueprint.key;
-        actor.abilities = actor.blueprint.resolvedAbilityGrants.slice();
-        actor.traits = actor.blueprint.resolvedTraits.slice();
-      }
+      var previousEntries = actor.components.modifierLedger.snapshot().entries;
+      var previousResources = clone(actor.components.resources || {});
+      var buildSpec = actor.buildSpec || {};
+      actor.blueprint = Game.content.compileBlueprint({
+        archetypeId: record && record.archetypeId || buildSpec.archetypeId ||
+          actor.blueprint.archetypeId,
+        classId: record && record.classId || buildSpec.classId || null,
+        variantId: buildSpec.variantId || null
+      });
+      actor.blueprintKey = actor.blueprint.key;
+      actor.abilities = actor.blueprint.resolvedAbilityGrants.slice();
+      actor.traits = actor.blueprint.resolvedTraits.slice();
       if (record) actor.level = record.level;
-      var stats = baseStats(actor.blueprint, {
-        level: actor.level,
-        tier: actor.tier
-      }, record);
+      var stats = baseStats(actor.blueprint, Object.assign({}, buildSpec, {
+        level: actor.level, tier: actor.tier
+      }), record);
       var archetype = Game.content.get('actorArchetype', actor.blueprint.archetypeId);
       var actorPresentation = presentationFor(archetype, actor.blueprint);
       actor.components.presentation.spriteId = actorPresentation.spriteId;
@@ -432,9 +558,29 @@
       actor.components.presentation.scale = actorPresentation.scale;
       actor.components.statBlock = modifierLedger(stats);
       actor.components.modifierLedger = actor.components.statBlock;
-      applyBuildModifiers(actor.components, actor.blueprint, record, {});
+      actor.components.runtimeContent = buildRuntimeContent(actor.blueprint, record, buildSpec);
+      applyBuildModifiers(actor.components, actor.blueprint, record, buildSpec);
       applyStatusModifiers(actor.components);
-      actor.components.movement.speed = stats.moveSpeed || 0;
+
+      // Refresh owns the sources it can deterministically rebuild. Any remaining
+      // source is an external runtime modifier and must survive the rebuild.
+      var rebuiltSources = {};
+      actor.components.modifierLedger.snapshot().entries.forEach(function (entry) {
+        rebuiltSources[entry.sourceId] = true;
+      });
+      var statusSources = {};
+      (actor.components.statuses || []).forEach(function (status) {
+        statusSources[status.id] = true;
+      });
+      previousEntries.forEach(function (entry) {
+        var managed = /^(trait|talent|spawn):/.test(entry.sourceId) ||
+          statusSources[entry.sourceId];
+        if (!managed && !rebuiltSources[entry.sourceId]) {
+          actor.components.modifierLedger.add(entry);
+        }
+      });
+      actor.components.movement.speed = actor.components.statBlock.value('moveSpeed');
+
       if (!actor.components.actionState && actor.blueprint.resolvedAbilityGrants.length) {
         actor.components.resources = resourceComponents(actor.blueprint);
         actor.components.actionState = {
@@ -447,7 +593,18 @@
         actor.components.statuses = [];
         actor.components.targeting = { currentTargetId: null, priorityTargetId: null };
       } else if (actor.components.resources) {
-        actor.components.resources = resourceComponents(actor.blueprint);
+        var rebuiltResources = resourceComponents(actor.blueprint);
+        Object.keys(rebuiltResources).forEach(function (resourceId) {
+          var previous = previousResources[resourceId];
+          if (!previous) return;
+          rebuiltResources[resourceId].value = Game.util.clamp(
+            previous.value, rebuiltResources[resourceId].min, rebuiltResources[resourceId].max
+          );
+          rebuiltResources[resourceId].reserved = Game.util.clamp(
+            previous.reserved, 0, rebuiltResources[resourceId].value
+          );
+        });
+        actor.components.resources = rebuiltResources;
       }
       if (actor.components.vitals) {
         reconcileVitals(actor, {
@@ -499,6 +656,7 @@
           cooldowns: clone(actor.components.cooldowns),
           comboState: clone(actor.components.comboState),
           statuses: clone(actor.components.statuses),
+          runtimeContent: clone(actor.components.runtimeContent),
           statBlock: actor.components.statBlock.snapshot()
         }
       };
@@ -533,12 +691,10 @@
     get: actorFrom,
     primary: primaryActor,
 
-    snapshot: function (ref) {
+    vitals: function (ref) {
       var actor = actorFrom(ref);
       if (!actor || !actor.components.vitals) return null;
       var vitals = actor.components.vitals;
-      var stats = actor.components.statBlock
-        ? actor.components.statBlock.snapshot().values : {};
       return Game.contentCompiler.deepFreeze({
         id: actor.id,
         actorRecordId: actor.actorRecordId,
@@ -546,22 +702,33 @@
         maxHp: vitals.maxHp,
         hpPct: vitals.hp / Math.max(1, vitals.maxHp),
         alive: vitals.hp > 0 && !actor.dead,
-        lifecycle: actor.lifecycle,
+        lifecycle: actor.lifecycle
+      });
+    },
+
+    snapshot: function (ref) {
+      var actor = actorFrom(ref);
+      var vitalSnapshot = Game.units.vitals(actor);
+      if (!actor || !vitalSnapshot) return null;
+      var stats = actor.components.statBlock
+        ? actor.components.statBlock.snapshot().values : {};
+      return Game.contentCompiler.deepFreeze(Object.assign({}, vitalSnapshot, {
         stats: clone(stats),
         resources: clone(actor.components.resources || {}),
         statuses: clone(actor.components.statuses || [])
-      });
+      }));
     },
 
     playerSnapshot: function () {
       var actor = primaryActor();
-      if (actor) return Game.units.snapshot(actor);
+      if (actor) return Game.units.vitals(actor);
       if (!Game.state || !Game.state.player || !Game.player) return null;
       var d = Game.player.derived();
       var hp = Game.util.clamp(Number(Game.state.player.hp) || 0, 0, d.maxHp);
+      var recordId = Game.state.roster && Game.state.roster.primaryActorId || 'player-main';
       return Game.contentCompiler.deepFreeze({
-        id: 'player-main',
-        actorRecordId: 'player-main',
+        id: recordId,
+        actorRecordId: recordId,
         hp: hp,
         maxHp: d.maxHp,
         hpPct: hp / Math.max(1, d.maxHp),
@@ -579,6 +746,10 @@
         ? actor.components.statBlock.value(id) : 0;
     },
 
+    stackModifier: function (modifier, stacks) {
+      return stackedModifier(modifier, Math.max(1, stacks | 0));
+    },
+
     setHp: function (ref, value, opts) {
       opts = opts || {};
       var actor = actorFrom(ref);
@@ -586,6 +757,9 @@
       var vitals = actor.components.vitals;
       var before = vitals.hp;
       vitals.hp = Game.util.clamp(Number(value) || 0, 0, vitals.maxHp);
+      if (actor.dead && vitals.hp > 0 && actor.lifecycle === 'defeated') {
+        actor.lifecycle = 'reviving';
+      }
       if (opts.commit !== false) commitPersistentHp(actor);
       return {
         before: before, hp: vitals.hp, maxHp: vitals.maxHp,
@@ -614,7 +788,66 @@
     restore: function (ref, opts) {
       var actor = actorFrom(ref);
       if (!actor || !actor.components.vitals) return null;
-      return Game.units.setHp(actor, actor.components.vitals.maxHp, opts);
+      return Game.units.revive(actor, Object.assign({}, opts, { hpPolicy: 'full' }));
+    },
+
+    defeat: function (ref, opts) {
+      opts = opts || {};
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      var result = Game.units.setHp(actor, 0, opts);
+      actor.lifecycle = 'defeated';
+      actor.dead = true;
+      actor.deathT = Number.isFinite(opts.deathT) ? opts.deathT : 0.5;
+      if (actor.components.actionState) {
+        actor.components.actionState.state = 'defeated';
+        actor.components.actionState.actionId = null;
+        actor.components.actionState.abilityId = null;
+        actor.components.actionState.targetIds = [];
+        actor.components.actionState.queued = null;
+        actor.components.actionState.reserved = [];
+        actor.components.actionState.reservedCharge = null;
+      }
+      if (actor.components.movement) {
+        actor.components.movement.intent = null;
+        actor.components.movement.moving = false;
+      }
+      Object.keys(actor.components.resources || {}).forEach(function (resourceId) {
+        actor.components.resources[resourceId].reserved = 0;
+      });
+      if (actor.components.presentation) {
+        actor.components.presentation.state = opts.presentationState || 'dead';
+      }
+      return result;
+    },
+
+    revive: function (ref, opts) {
+      opts = opts || {};
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.vitals) return null;
+      var hp = opts.hpPolicy === 'preserveAbsolute'
+        ? actor.components.vitals.hp
+        : actor.components.vitals.maxHp;
+      var result = Game.units.setHp(actor, hp, opts);
+      actor.lifecycle = 'active';
+      actor.dead = false;
+      actor.deathT = 0;
+      if (actor.components.actionState) {
+        actor.components.actionState.state = 'idle';
+        actor.components.actionState.actionId = null;
+        actor.components.actionState.abilityId = null;
+        actor.components.actionState.targetIds = [];
+        actor.components.actionState.queued = null;
+        actor.components.actionState.reserved = [];
+        actor.components.actionState.reservedCharge = null;
+      }
+      Object.keys(actor.components.resources || {}).forEach(function (resourceId) {
+        actor.components.resources[resourceId].reserved = 0;
+      });
+      if (actor.components.presentation) {
+        actor.components.presentation.state = opts.presentationState || 'idle';
+      }
+      return result;
     },
 
     commit: function (ref) {
@@ -630,25 +863,49 @@
       return actor ? A.refresh(actor.id, opts) : null;
     },
 
+    setModifierSource: function (ref, sourceId, modifiers, opts) {
+      opts = opts || {};
+      var actor = actorFrom(ref);
+      if (!actor || !actor.components.modifierLedger || !sourceId) return null;
+      var beforeMax = actor.components.vitals && actor.components.vitals.maxHp;
+      var beforeHp = actor.components.vitals && actor.components.vitals.hp;
+      actor.components.modifierLedger.removeSource(sourceId);
+      (modifiers || []).forEach(function (modifier) {
+        actor.components.modifierLedger.add(Object.assign({}, modifier, { sourceId: sourceId }));
+      });
+      if (actor.components.movement) {
+        actor.components.movement.speed = actor.components.statBlock.value('moveSpeed');
+      }
+      if (actor.components.vitals) {
+        reconcileVitals(actor, {
+          beforeMax: beforeMax,
+          beforeHp: beforeHp,
+          hpPolicy: opts.hpPolicy || 'preserveAbsolute',
+          commit: opts.commit
+        });
+      }
+      return actor.components.modifierLedger.sourceEntries(sourceId);
+    },
+
+    removeModifierSource: function (ref, sourceId, opts) {
+      return Game.units.setModifierSource(ref, sourceId, [], opts);
+    },
+
     overrideMaxHp: function (ref, value, opts) {
       opts = opts || {};
       var actor = actorFrom(ref);
       if (!actor || !actor.components.statBlock || !actor.components.vitals) return null;
       var sourceId = 'unit:maxHpOverride:' + (opts.source || 'explicit');
-      actor.components.modifierLedger.removeSource(sourceId);
-      actor.components.modifierLedger.add({
-        sourceId: sourceId,
+      Game.units.setModifierSource(actor, sourceId, [{
         stat: 'maxHp',
         phase: 'override',
         operation: 'set',
         value: Math.max(1, Number(value) || 1)
-      });
-      return reconcileVitals(actor, {
-        beforeMax: actor.components.vitals.maxHp,
-        beforeHp: actor.components.vitals.hp,
+      }], {
         hpPolicy: opts.hpPolicy || 'preserveAbsolute',
         commit: opts.commit
       });
+      return actor.components.vitals;
     },
 
     assertInvariant: function (ref) {
@@ -660,6 +917,40 @@
       }
       if (actor.components.vitals.hp < 0 || actor.components.vitals.hp > resolved) {
         throw new Error('[Units] hp bounds failed for ' + actor.id);
+      }
+      var values = actor.components.statBlock.snapshot().values;
+      Object.keys(values).forEach(function (id) {
+        if (!Number.isFinite(values[id])) {
+          throw new Error('[Units] non-finite stat ' + id + ' for ' + actor.id);
+        }
+      });
+      Object.keys(actor.components.resources || {}).forEach(function (id) {
+        var resource = actor.components.resources[id];
+        if (!Number.isFinite(resource.value) || resource.value < resource.min ||
+            resource.value > resource.max || resource.reserved < 0 ||
+            resource.reserved > resource.value) {
+          throw new Error('[Units] resource bounds failed for ' + actor.id + ':' + id);
+        }
+      });
+      var defeatedState = actor.components.actionState &&
+        actor.components.actionState.state === 'defeated';
+      if (actor.dead && (!defeatedState ||
+          ['defeated', 'reviving'].indexOf(actor.lifecycle) < 0)) {
+        throw new Error('[Units] defeated lifecycle mismatch for ' + actor.id);
+      }
+      if (!actor.dead && (actor.components.vitals.hp <= 0 || defeatedState ||
+          actor.lifecycle === 'defeated' || actor.lifecycle === 'reviving')) {
+        throw new Error('[Units] active lifecycle mismatch for ' + actor.id);
+      }
+      if (actor.actorRecordId && A.query({ actorRecordId: actor.actorRecordId }).length !== 1) {
+        throw new Error('[Units] duplicate live record for ' + actor.actorRecordId);
+      }
+      if (actor.actorRecordId && Game.roster) {
+        var record = Game.roster.getRecord(actor.actorRecordId);
+        if (!record || Math.abs(record.persistentResources.hp -
+            actor.components.vitals.hp) > 0.0001) {
+          throw new Error('[Units] record HP mismatch for ' + actor.actorRecordId);
+        }
       }
       return true;
     }

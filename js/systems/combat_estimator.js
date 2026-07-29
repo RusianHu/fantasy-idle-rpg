@@ -26,18 +26,21 @@
       factionId: spec.factionId,
       controllerId: spec.controllerId || (teamId === 'party' ? 'ai:player-auto' : 'ai:monster'),
       statValues: spec.statValues,
+      talentRanks: spec.talentRanks,
       encounterId: encounter.id,
       spawnSource: { kind: 'estimator', sourceId: encounter.profileId, sequence: index + (teamId === 'party' ? 1 : 100) }
     });
     actor.tacticsProfileId = spec.tacticsProfileId;
     if (spec.statMultipliers) {
-      Object.keys(spec.statMultipliers).forEach(function (statId) {
-        actor.components.modifierLedger.add({
-          sourceId: 'estimator-override', stat: statId, phase: 'multiply',
+      var modifiers = Object.keys(spec.statMultipliers).map(function (statId) {
+        return {
+          stat: statId, phase: 'multiply',
           operation: 'multiply', value: spec.statMultipliers[statId]
-        });
+        };
       });
-      Game.units.reconcile(actor, { hpPolicy: 'full', commit: false });
+      Game.units.setModifierSource(actor, 'estimator-override', modifiers, {
+        hpPolicy: 'full', commit: false
+      });
     }
     Game.encounters.join(encounter.id, actor.id, teamId);
     return actor;
@@ -123,12 +126,15 @@
     cacheSize: function () { return Object.keys(cache).length; },
     partySnapshotFromState: function (opts) {
       opts = opts || {};
-      var derived = Game.player.previewDerived(opts);
+      var baseOpts = Object.assign({}, opts, { skills: {} });
+      var derived = Game.player.previewDerived(baseOpts);
       var classId = opts.classId === undefined ? Game.state.player.classId : opts.classId;
+      var ranks = opts.skills || Game.state.player.skills;
       return [{
         archetypeId: 'adventurer',
         classId: classId,
         level: opts.level || Game.state.player.level,
+        talentRanks: Game.contentCompiler.clone(ranks || {}),
         factionId: 'adventurers',
         controllerId: 'ai:player-auto',
         statValues: {

@@ -99,12 +99,39 @@
       }],
       talentTree: [{ id: 'talents.ranger', schemaVersion: 1, talentIds: ['rn_power', 'rn_precision', 'rn_multi', 'rn_survival', 'rn_hawk', 'rn_treasure'] }],
       talent: [
-        { id: 'rn_power', classId: 'ranger', unlockLevel: 1, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'ranger.power_shot' }, presentation: { nameKey: 'skill.rn_power.name', descKey: 'skill.rn_power.desc' } },
-        { id: 'rn_precision', classId: 'ranger', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'critChance', perRank: 0.012 }], presentation: { nameKey: 'skill.rn_precision.name', descKey: 'skill.rn_precision.desc' } },
-        { id: 'rn_multi', classId: 'ranger', unlockLevel: 3, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'ranger.multi_shot' }, presentation: { nameKey: 'skill.rn_multi.name', descKey: 'skill.rn_multi.desc' } },
-        { id: 'rn_survival', classId: 'ranger', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'maxHp', perRank: 0.04 }], presentation: { nameKey: 'skill.rn_survival.name', descKey: 'skill.rn_survival.desc' } },
-        { id: 'rn_hawk', classId: 'ranger', unlockLevel: 5, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'ranger.hawk_eye_action' }, presentation: { nameKey: 'skill.rn_hawk.name', descKey: 'skill.rn_hawk.desc' } },
-        { id: 'rn_treasure', classId: 'ranger', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'dropMultiplier', perRank: 0.02 }, { stat: 'goldMultiplier', perRank: 0.03 }], presentation: { nameKey: 'skill.rn_treasure.name', descKey: 'skill.rn_treasure.desc' } }
+        {
+          id: 'rn_power', classId: 'ranger', unlockLevel: 1, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'ranger.power_shot', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 2.2, perRank: 0.15 }
+          ] },
+          presentation: { nameKey: 'skill.rn_power.name', descKey: 'skill.rn_power.desc' }
+        },
+        { id: 'rn_precision', classId: 'ranger', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'critChance', phase: 'otherFlat', operation: 'add', perRank: 0.012 }], presentation: { nameKey: 'skill.rn_precision.name', descKey: 'skill.rn_precision.desc' } },
+        {
+          id: 'rn_multi', classId: 'ranger', unlockLevel: 3, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'ranger.multi_shot', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.3, perRank: 0.08 }
+          ] },
+          presentation: { nameKey: 'skill.rn_multi.name', descKey: 'skill.rn_multi.desc' }
+        },
+        { id: 'rn_survival', classId: 'ranger', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'maxHp', phase: 'addPct', operation: 'addPct', perRank: 0.04 },
+          { stat: 'gcdSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.02 },
+          { stat: 'castSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.02 },
+          { stat: 'autoAttackSpeed', phase: 'addPct', operation: 'addPct', perRank: 0.02 }
+        ], presentation: { nameKey: 'skill.rn_survival.name', descKey: 'skill.rn_survival.desc' } },
+        {
+          id: 'rn_hawk', classId: 'ranger', unlockLevel: 5, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'ranger.hawk_eye_action', patches: [
+            { target: 'status', id: 'ranger.hawk_eye', path: 'modifiers.0.value', baseValue: 1.1, perRank: 0.015 },
+            { target: 'status', id: 'ranger.hawk_eye', path: 'modifiers.1.value', baseValue: 0.1, perRank: 0.01 }
+          ] },
+          presentation: { nameKey: 'skill.rn_hawk.name', descKey: 'skill.rn_hawk.desc' }
+        },
+        { id: 'rn_treasure', classId: 'ranger', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'dropMultiplier', phase: 'otherFlat', operation: 'add', perRank: 0.02 },
+          { stat: 'goldMultiplier', phase: 'otherFlat', operation: 'add', perRank: 0.03 }
+        ], presentation: { nameKey: 'skill.rn_treasure.name', descKey: 'skill.rn_treasure.desc' } }
       ]
     }
   });

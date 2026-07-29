@@ -31,7 +31,10 @@
           id: 'cleric.smite', kind: 'action', actionType: 'gcd',
           timing: { castTicks: 14, animationLockTicks: 10, cooldownTicks: 0, queueable: true, interruptible: true },
           costs: [{ resourceId: 'mana', amount: 260 }], target: enemy,
-          effects: [dmg(1.08), { type: 'modifyResource', resourceId: 'faith', amount: 12, target: self }],
+          effects: [
+            Object.assign(dmg(1.08), { selfHealRatio: 0.25 }),
+            { type: 'modifyResource', resourceId: 'faith', amount: 12, target: self }
+          ],
           aiHints: { priority: 24 }, presentation: { nameKey: 'combat.ability.cleric_smite.name', icon: 'icon_skill_strike' }
         },
         {
@@ -46,7 +49,7 @@
           timing: { castTicks: 22, animationLockTicks: 12, cooldownTicks: 180, queueable: true, interruptible: true },
           costs: [{ resourceId: 'mana', amount: 900 }],
           target: { relation: 'ally', shape: 'single', range: 80, sort: 'lowestHp' },
-          effects: [{ type: 'heal', coefficient: 2.8 }],
+          effects: [{ type: 'heal', maxHpCoefficient: 0.22 }],
           aiHints: { priority: 180, role: 'heal' },
           presentation: { nameKey: 'combat.ability.cleric_prayer.name', icon: 'icon_skill_heal' }
         },
@@ -57,7 +60,7 @@
           target: { relation: 'hostile', shape: 'selfRadius', radius: 68, maxTargets: 8 },
           effects: [
             dmg(1.38),
-            { type: 'heal', coefficient: 1.1, target: self }
+            { type: 'heal', maxHpCoefficient: 0.08, target: self }
           ],
           aiHints: { priority: 88, minTargets: 2 },
           presentation: { nameKey: 'combat.ability.cleric_nova.name', icon: 'icon_skill_whirl' }
@@ -102,12 +105,33 @@
       }],
       talentTree: [{ id: 'talents.cleric', schemaVersion: 1, talentIds: ['cl_smite', 'cl_faith', 'cl_prayer', 'cl_bless', 'cl_nova', 'cl_radiance'] }],
       talent: [
-        { id: 'cl_smite', classId: 'cleric', unlockLevel: 1, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'cleric.smite' }, presentation: { nameKey: 'skill.cl_smite.name', descKey: 'skill.cl_smite.desc' } },
-        { id: 'cl_faith', classId: 'cleric', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'maxHp', perRank: 0.05 }], presentation: { nameKey: 'skill.cl_faith.name', descKey: 'skill.cl_faith.desc' } },
-        { id: 'cl_prayer', classId: 'cleric', unlockLevel: 3, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'cleric.prayer' }, presentation: { nameKey: 'skill.cl_prayer.name', descKey: 'skill.cl_prayer.desc' } },
-        { id: 'cl_bless', classId: 'cleric', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'healingPower', perRank: 0.06 }], presentation: { nameKey: 'skill.cl_bless.name', descKey: 'skill.cl_bless.desc' } },
-        { id: 'cl_nova', classId: 'cleric', unlockLevel: 5, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'cleric.holy_nova' }, presentation: { nameKey: 'skill.cl_nova.name', descKey: 'skill.cl_nova.desc' } },
-        { id: 'cl_radiance', classId: 'cleric', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'lifesteal', perRank: 0.01 }], presentation: { nameKey: 'skill.cl_radiance.name', descKey: 'skill.cl_radiance.desc' } }
+        {
+          id: 'cl_smite', classId: 'cleric', unlockLevel: 1, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'cleric.smite', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 2.0, perRank: 0.14 }
+          ] },
+          presentation: { nameKey: 'skill.cl_smite.name', descKey: 'skill.cl_smite.desc' }
+        },
+        { id: 'cl_faith', classId: 'cleric', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'maxHp', phase: 'addPct', operation: 'addPct', perRank: 0.05 },
+          { stat: 'armor', phase: 'addPct', operation: 'addPct', perRank: 0.03 }
+        ], presentation: { nameKey: 'skill.cl_faith.name', descKey: 'skill.cl_faith.desc' } },
+        {
+          id: 'cl_prayer', classId: 'cleric', unlockLevel: 3, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'cleric.prayer', patches: [
+            { path: 'effects.0.maxHpCoefficient', baseValue: 0.22, perRank: 0.02 }
+          ] },
+          presentation: { nameKey: 'skill.cl_prayer.name', descKey: 'skill.cl_prayer.desc' }
+        },
+        { id: 'cl_bless', classId: 'cleric', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'healingPower', phase: 'addPct', operation: 'addPct', perRank: 0.06 }], presentation: { nameKey: 'skill.cl_bless.name', descKey: 'skill.cl_bless.desc' } },
+        {
+          id: 'cl_nova', classId: 'cleric', unlockLevel: 5, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'cleric.holy_nova', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.4, perRank: 0.09 }
+          ] },
+          presentation: { nameKey: 'skill.cl_nova.name', descKey: 'skill.cl_nova.desc' }
+        },
+        { id: 'cl_radiance', classId: 'cleric', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'lifesteal', phase: 'otherFlat', operation: 'add', perRank: 0.01 }], presentation: { nameKey: 'skill.cl_radiance.name', descKey: 'skill.cl_radiance.desc' } }
       ]
     }
   });

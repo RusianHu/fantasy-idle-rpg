@@ -33,7 +33,7 @@
 | 区域推进 | 新档按经典八区顺序推进；`RoutePlan` 保存稳定主线拓扑，并为子任务地图、巢穴和限时事件预留带锚点、阶位、返回策略与生命周期的插入记录。揭雾、地标、资源、奇物、生态和守门精英共同构成准备度，达到 70 且发现巢穴后才能在地图实体处挑战 Boss；讨伐条下有自动讨伐开关（默认开启）与委托牌，关闭后满进度停留当前区、手动发起不受当前 v3 的 80% 生命安全线限制。首杀仍解锁下一地区并沿用完整换景；魔王城失守后须重打浮空遗迹 Boss 解锁 |
 | **最终通关** | 路线末区 Boss 首杀触发最终击杀演出与六句逐字后日谈，随后展示通关摘要（职业等级、累计游玩、总讨伐、Boss 击杀、世界种子）；演出期间暂停战斗、刷怪、世界时间、增益与统计，关闭后从已保存的后日谈或摘要恢复，完整结局每档只播放一次；可继续最终区域挂机或确认后重开新档，续玩战败仍适用魔王城失守规则 |
 | 装备 | 武器/护甲/饰品 3 槽；5 档稀有度（灰绿蓝紫橙）；随机词条、职业/区域感知的综合对比、一键出售、传说分解魔晶石；武器按职业呈现（长剑/短匕/法杖/战锤/长弓） |
-| 技能与 Talent | 五职业各有独立基础 Action Kit、资源和自动轮转；原 30 个稳定技能 ID 迁移为可投资 Talent，技能点仍按每级 +1、逐点产生真实收益 |
+| 技能与 Talent | 五职业各有独立基础 Action Kit、资源和自动轮转；原 30 个稳定技能 ID 迁移为 V2 权威 Talent。被动等级进入 StatBlock Modifier，主动等级生成 Actor 私有 Ability/Status 视图，技能点成本、解锁和上限均读取 Talent Card，逐点产生真实收益 |
 | **自动养成** | 自动 Talent 加点与智能换装默认开启：统一调用无渲染 `CombatEstimator` 比较输出、生存与收益；三个装备槽可分别锁定，支持完整手动构筑 |
 | 商店 / 交易 | 世界摊位、交易域 HUD 按钮与背包入口共用统一交易面板；购买能力取决于实时世界坐标，仅当前地图营地安全半径内开放，域外提供「返回当前营地」、浏览中跨出边界即时锁定商品；目录按地点/分区动态生成，含补给、装备、强化、素材兑换与收购；支持临时动态交易域接口 |
 | 返回营地 / 休整 | 按距离步行或四段传送回营，自动换区为 3 秒倒计时 + 0.45 秒传送收束 + 0.18 秒遮罩换图 + 0.85 秒抵达；Boss 战可安全撤离并保留一半讨伐进度；坐下恢复 HP、积累休整增益；可选自动回营在增益耗尽后休整至满并复战，手动拔营抑制 120 秒 |
@@ -105,8 +105,9 @@ js/
 - localStorage 双槽写入（`firpg_save` + `firpg_save_backup`），主档损坏自动回退备份档。
 - 当前产品层为单个逻辑角色槽位 `expedition-1`，UI、回调与存储均按稳定槽位 ID 数组渲染以预留多档；选档前不启动主循环、不自动存档、不结算离线收益、不推进世界时间。这里的“双槽”指同一角色档案的主写入与容灾备份，不是两个可选角色。
 - 每 15 秒自动保存 + 关键事件（升级/Boss/穿戴/购买等）即时保存 + 页面隐藏/关闭时将短过场结算到安全状态后保存。
-- 当前存档 v13，采用逐版本迁移流水线。持久层只保存 Roster/ActorRecord、经济、背包、世界（含 `RoutePlan`）、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v12 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
-- 单位状态由 `Game.units` 统一投影和修改：ActorRecord 持久化 HP，ActorInstance 保存实时 HP，StatBlock 独占运行时 `maxHp` 派生；HUD、战斗、物品、过场、离线与存档不得各自拼接或直接写入另一套上限。
+- 当前存档 v13，采用逐版本迁移流水线。持久层保存完整 Roster/ActorRecord 集合、主控与活动队伍引用、经济、背包、世界（含 `RoutePlan`）、设置和战术；ActorInstance、Encounter、RNG、威胁、施法、冷却、预警、状态与护盾均为瞬态。v1–v12 可完整迁移；无效职业/Talent 自动降级退款，损坏迷雾只重置对应区域。
+- 单位状态由 `Game.units` 统一投影和修改：ActorRecord 持久化 HP 且同一 Record 最多绑定一个存活 ActorInstance，ActorInstance 保存实时状态，StatBlock 独占运行时 `maxHp` 派生。伤害、治疗、死亡/复活、Modifier source 替换、上限协调和属性重建都走该边界；HUD 高频读取使用轻量 `vitals()`，完整诊断才使用 `snapshot()`。
+- Actor 刷新必须无损保留同 ID 资源当前值、SpawnSpec 数值、现存 Status 和外部 Modifier source；状态叠层固定为 `add/addPct` 线性累加、`multiply` 幂次叠乘、`set` 不随层数放大，周期效果按层数结算。禁止业务系统直接改写 ModifierLedger 或自行同步 Vitals。
 - 过场与状态机：`Game.transitions` 统一 `startRegion / startDeath / cancel / update / isActive / blocksWorld / cameraTarget / settleBeforeSave`；玩家可见换区走 `Game.prog.requestRegion(rid,{source})`，`gotoRegion` 仅供遮罩中点、启动和导入等原子操作。事件 `region:travelStart / travelCancelled / arrived`、`player:reviveStart / revived` 仅在对应阶段触发，`region:changed` 只在真实世界重建时触发一次。
 - 导出/导入：Base64 串（末尾附 FNV-1a 校验和，截断/篡改会被拒绝）与 `.json` 文件下载/导入并存；重置需二次确认。
 - 检测到存档时间戳在未来（回调系统时间）时离线收益按 0 处理。
@@ -115,7 +116,7 @@ js/
 
 **成长方案**：二选一中采用「升级自动成长」--挂机游戏应尽量减少强制打断。升级自动提升全属性、回满 HP 并 +1 技能点；自动技能与换装默认开启，玩家可关闭总开关或锁定单个装备槽，随时切回完整手动决策。
 
-**自动评估**：`Game.combatEstimator` 复用正式 Blueprint、Ability、Status、资源、AI、Encounter 与 50ms 规则进行无渲染加速模拟，并以内容 fingerprint、构筑、区域、策略和种子组成缓存键。自动 Talent 以最高已解锁区域评估，装备以当前区域评估；智能换装至少提升 0.1% 才替换，同分保留当前装备。
+**自动评估**：`Game.combatEstimator` 复用正式 Blueprint、Actor 私有 Talent Ability/Status、Modifier、资源、AI、Encounter 与 50ms 规则进行无渲染加速模拟，并以内容 fingerprint、构筑、区域、策略和种子组成缓存键。自动 Talent 以最高已解锁区域评估，装备以当前区域评估；智能换装至少提升 0.1% 才替换，同分保留当前装备。
 
 **职业数值形状**：五职业按「输出 × 有效生命 ≈ 稳定功率预算」设计，通过职业资源、GCD 轮转、治疗/护盾和射程形成差异，不再把旧攻速白嫖或冷却旁路作为平衡基础。
 
@@ -153,6 +154,7 @@ node tests\navigation-long-route.test.js
 node tests\final-region-lock.test.js
 node tools\audit-content.js
 node tests\v2-authoring.test.js
+node tests\v2-content-validation.test.js
 node tests\v2-content-entrypoints.test.js
 node tests\v2-save.test.js
 node tests\v2-runtime.test.js
@@ -166,9 +168,9 @@ node tests\browser-smoke.js
 node tests\cache-version.test.js
 ```
 
-除 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
+除 `action-bubble-demo.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容 schema/引用/i18n/资产/fingerprint、v1→v13 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、单位 HP 单一派生与持久化同步、固定 tick/RNG、Action/Effect/Status/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容 schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v13 与多 ActorRecord 迁移、RoutePlan 默认顺序/可选洗牌/旧档保持/插图恢复、单位上限/生命周期/资源/Record 同步、刷新无损、Status 叠层与周期层数、固定 tick/RNG、Action/Effect/Relation/Threat/Encounter、charge/channel、脚点防重叠、攻击表现桥接、5 个职业各 10 分钟、8 个 Boss 阶段、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例使用本机 Chrome 验证 390×700、390×844、522×1320 与桌面，覆盖正式 Combat HUD 中英文/44px 触控与双方肖像、Actor/Combat Lab 的肖像/位移/数值/表现诊断、地图演示、探索、交易、过场、结局、存档重开和无横向溢出。
 
 ---
 

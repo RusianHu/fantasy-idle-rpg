@@ -1,9 +1,8 @@
 /* ============================================================
  * data/skills.js — 职业技能表（5 职业 × 各 3 主动 + 3 被动）
- * 通用 schema：kind = strike | aoe | heal | buff | shield，
- * 战斗系统提供统一执行器；被动 bonus 为「每级线性」数值。
- * 主动技能 0 点以基础值释放；投入 N 点后：
- * F.skillVal({base, per}, N) = base + per×N，保证每一点都有收益。
+ * 这是稳定旧 ID 的 UI/旧评估投影，不是正式战斗执行定义。
+ * V2 Talent Card 是等级、成本、解锁、Modifier 与 Ability/Status patch
+ * 的权威来源；本表的展示参数由回归测试与 V2 语义保持一致。
  * ============================================================ */
 (function () {
   'use strict';
@@ -21,7 +20,7 @@
     /* ================= 战士 Fighter ================= */
     {
       id: 'ft_heavy', cls: 'fighter', type: 'active', icon: 'icon_skill_strike',
-      unlockLv: 1, cd: 6, kind: 'strike', mult: { base: 2.3, per: 0.15 },
+      unlockLv: 1, cd: 4, kind: 'strike', mult: { base: 2.3, per: 0.15 },
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
     {
@@ -31,7 +30,7 @@
     },
     {
       id: 'ft_whirl', cls: 'fighter', type: 'active', icon: 'icon_skill_whirl',
-      unlockLv: 3, cd: 11, kind: 'aoe', center: 'self', radius: 64,
+      unlockLv: 3, cd: 8, kind: 'aoe', center: 'self', radius: 64,
       mult: { base: 1.5, per: 0.1 },
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
@@ -55,7 +54,7 @@
     /* ================= 盗贼 Rogue ================= */
     {
       id: 'rg_backstab', cls: 'rogue', type: 'active', icon: 'icon_skill_strike',
-      unlockLv: 1, cd: 5, kind: 'strike', mult: { base: 1.9, per: 0.13 }, critBonus: 0.25,
+      unlockLv: 1, cd: 3, kind: 'strike', mult: { base: 1.9, per: 0.13 }, critBonus: 0.25,
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
     {
@@ -65,7 +64,7 @@
     },
     {
       id: 'rg_poison', cls: 'rogue', type: 'active', icon: 'icon_skill_poison',
-      unlockLv: 3, cd: 9, kind: 'strike', mult: { base: 1.2, per: 0.08 },
+      unlockLv: 3, cd: 5, kind: 'strike', mult: { base: 1.2, per: 0.08 },
       dot: { mult: { base: 0.8, per: 0.08 }, dur: 4 },
       descVars: function (lv) { return { v: pct(this.mult, lv), v2: pct(this.dot.mult, lv), s: this.dot.dur }; }
     },
@@ -76,7 +75,7 @@
     },
     {
       id: 'rg_flurry', cls: 'rogue', type: 'active', icon: 'icon_skill_whirl',
-      unlockLv: 5, cd: 12, kind: 'aoe', center: 'self', radius: 60,
+      unlockLv: 5, cd: 7, kind: 'aoe', center: 'self', radius: 60,
       mult: { base: 1.3, per: 0.08 },
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
@@ -89,7 +88,7 @@
     /* ================= 法师 Wizard ================= */
     {
       id: 'mg_fireball', cls: 'mage', type: 'active', icon: 'icon_skill_fire',
-      unlockLv: 1, cd: 7, kind: 'strike', mult: { base: 2.6, per: 0.18 }, projectile: 'fire',
+      unlockLv: 1, cd: 6, kind: 'strike', mult: { base: 2.6, per: 0.18 }, projectile: 'fire',
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
     {
@@ -99,7 +98,7 @@
     },
     {
       id: 'mg_nova', cls: 'mage', type: 'active', icon: 'icon_skill_whirl',
-      unlockLv: 3, cd: 12, kind: 'aoe', center: 'target', radius: 60,
+      unlockLv: 3, cd: 9, kind: 'aoe', center: 'target', radius: 60,
       mult: { base: 1.6, per: 0.1 },
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
@@ -122,7 +121,7 @@
     /* ================= 牧师 Cleric ================= */
     {
       id: 'cl_smite', cls: 'cleric', type: 'active', icon: 'icon_skill_strike',
-      unlockLv: 1, cd: 6, kind: 'strike', mult: { base: 2.0, per: 0.14 }, healOfDmg: 0.25,
+      unlockLv: 1, cd: 0, kind: 'strike', mult: { base: 2.0, per: 0.14 }, healOfDmg: 0.25,
       descVars: function (lv) { return { v: pct(this.mult, lv), v2: 25 }; }
     },
     {
@@ -132,7 +131,7 @@
     },
     {
       id: 'cl_prayer', cls: 'cleric', type: 'active', icon: 'icon_skill_heal',
-      unlockLv: 3, cd: 14, kind: 'heal', healPct: { base: 0.22, per: 0.02 }, healCond: 0.75,
+      unlockLv: 3, cd: 9, kind: 'heal', healPct: { base: 0.22, per: 0.02 }, healCond: 0.75,
       descVars: function (lv) { return { v: pct(this.healPct, lv) }; }
     },
     {
@@ -142,7 +141,7 @@
     },
     {
       id: 'cl_nova', cls: 'cleric', type: 'active', icon: 'icon_skill_whirl',
-      unlockLv: 5, cd: 15, kind: 'aoe', center: 'self', radius: 64,
+      unlockLv: 5, cd: 11, kind: 'aoe', center: 'self', radius: 64,
       mult: { base: 1.4, per: 0.09 }, selfHealPct: { base: 0.08, per: 0 },
       descVars: function (lv) { return { v: pct(this.mult, lv), v2: 8 }; }
     },
@@ -155,7 +154,7 @@
     /* ================= 游侠 Ranger ================= */
     {
       id: 'rn_power', cls: 'ranger', type: 'active', icon: 'icon_skill_strike',
-      unlockLv: 1, cd: 6, kind: 'strike', mult: { base: 2.2, per: 0.15 }, projectile: 'arrow',
+      unlockLv: 1, cd: 5, kind: 'strike', mult: { base: 2.2, per: 0.15 }, projectile: 'arrow',
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },
     {
@@ -165,7 +164,7 @@
     },
     {
       id: 'rn_multi', cls: 'ranger', type: 'active', icon: 'icon_skill_whirl',
-      unlockLv: 3, cd: 10, kind: 'aoe', center: 'target', radius: 70,
+      unlockLv: 3, cd: 8, kind: 'aoe', center: 'target', radius: 70,
       mult: { base: 1.3, per: 0.08 },
       descVars: function (lv) { return { v: pct(this.mult, lv) }; }
     },

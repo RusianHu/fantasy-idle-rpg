@@ -13,11 +13,28 @@
 
   function validateRecord(spec) {
     if (!spec || !spec.id || !spec.archetypeId) throw new Error('[Roster] id and archetypeId required');
+    var stableId = Game.contentSchemas && Game.contentSchemas.stableId ||
+      /^[a-z][A-Za-z0-9_.:-]*$/;
+    if (!stableId.test(spec.id)) {
+      throw new Error('[Roster] invalid record id: ' + spec.id);
+    }
     if (!Game.content.has('actorArchetype', spec.archetypeId)) {
       throw new Error('[Roster] unknown archetype: ' + spec.archetypeId);
     }
     if (spec.classId && !Game.content.has('class', spec.classId)) {
       throw new Error('[Roster] unknown class: ' + spec.classId);
+    }
+    Object.keys(spec.talentRanks || {}).forEach(function (talentId) {
+      var talent = Game.content.get('talent', talentId);
+      var rank = spec.talentRanks[talentId];
+      if (!talent || talent.classId !== spec.classId ||
+          !Number.isInteger(rank) || rank < 0 || rank > talent.maxRank) {
+        throw new Error('[Roster] invalid talent rank: ' + talentId);
+      }
+    });
+    var hp = spec.persistentResources && spec.persistentResources.hp;
+    if (hp !== undefined && (!Number.isFinite(hp) || hp < 0)) {
+      throw new Error('[Roster] invalid persistent HP');
     }
   }
 
@@ -35,7 +52,7 @@
         skillPoints: Math.max(0, spec.skillPoints | 0),
         talentRanks: Object.assign({}, spec.talentRanks || {}),
         permanentUpgrades: Object.assign({}, spec.permanentUpgrades || {}),
-        persistentResources: Object.assign({ hp: 1 }, spec.persistentResources || {}),
+        persistentResources: Object.assign({}, spec.persistentResources || {}),
         loadout: {
           equipment: Object.assign({ weapon: null, armor: null, ring: null },
             spec.loadout && spec.loadout.equipment || {}),

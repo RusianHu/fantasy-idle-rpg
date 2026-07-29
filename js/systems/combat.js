@@ -16,8 +16,8 @@
   }
   function random(encounter) { return Game.encounters.random(encounter.id); }
   function ability(actor, id) {
-    if (actor.abilities.indexOf(id) < 0) return null;
-    return Game.content.get('ability', id);
+    if (!actor || actor.abilities.indexOf(id) < 0) return null;
+    return Game.actors.ability(actor, id);
   }
   function distance(a, b) {
     return Game.util.dist(a.components.transform.x, a.components.transform.y,
@@ -266,7 +266,7 @@
         if (!alive(actor)) return;
         actor.abilities.forEach(function (id) {
           if (encounter.reactionBudget <= 0) return;
-          var reaction = Game.content.get('ability', id);
+          var reaction = Game.actors.ability(actor, id);
           if (!reaction || reaction.kind !== 'reaction' || !reaction.trigger) return;
           if (reaction.trigger.event !== event.type) return;
           if (reaction.trigger.source === 'self' && event.sourceActorId !== actor.id) return;
@@ -313,7 +313,9 @@
           targetStats: target.components.statBlock.snapshot().values
         }, effect.params || {})
       : Number(effect.amount) || 0;
-    var crit = effect.canCrit !== false && random(encounter) < Game.util.clamp(stat(source, 'critChance'), 0, 0.95);
+    var critChance = stat(source, 'critChance') + (Number(effect.critChanceBonus) || 0);
+    var crit = effect.canCrit !== false && random(encounter) <
+      Game.util.clamp(critChance, 0, 0.95);
     if (crit) raw *= Math.max(1, stat(source, 'critMultiplier') || 1.5);
     var afterDefense = raw;
     if (type.category === 'physical') {
@@ -358,6 +360,12 @@
     if (lifesteal > 0 && appliedDamage > 0) heal(encounter, source, source, abilityDef, {
       amount: appliedDamage * lifesteal, threatScale: 0
     }, effectIndex);
+    if (effect.selfHealRatio && appliedDamage > 0) {
+      heal(encounter, source, source, abilityDef, {
+        amount: appliedDamage * Math.max(0, Number(effect.selfHealRatio) || 0),
+        threatScale: 0
+      }, effectIndex);
+    }
     triggerReactions(encounter, event);
     if (target.components.vitals.hp <= 0) Game.combat.defeat(target.id, {
       encounterId: encounter.id, sourceActorId: source.id, abilityId: abilityDef.id
@@ -367,7 +375,9 @@
 
   function heal(encounter, source, target, abilityDef, effect, effectIndex) {
     if (!alive(target)) return null;
-    var amount = effect.formulaId
+    var amount = Number.isFinite(effect.maxHpCoefficient)
+      ? stat(source, 'maxHp') * effect.maxHpCoefficient
+      : effect.formulaId
       ? Game.rules.evaluate(effect.formulaId, {
           sourceStats: source.components.statBlock.snapshot().values,
           targetStats: target.components.statBlock.snapshot().values
@@ -418,7 +428,7 @@
   }
 
   function applyStatus(encounter, source, target, abilityDef, effect, effectIndex) {
-    var def = Game.content.get('status', effect.statusId);
+    var def = Game.actors.status(source, effect.statusId);
     if (!def || !target.components.statuses) return null;
     var potency = stat(source, 'statusPotency') || 1;
     var tenacity = stat(target, 'tenacity') || 0;
@@ -426,12 +436,17 @@
       Math.max(0.2, potency / Math.max(0.1, 1 + tenacity))));
     var key = statusIdentity(encounter, source, target, def, abilityDef);
     var found = target.components.statuses.filter(function (status) { return status.key === key; })[0];
-    if (found && def.stacking === 'refresh') {
+    if (found && (def.stacking === 'refresh' || def.stacking === 'unique')) {
       found.expiresTick = encounter.tick + duration;
-      found.stacks = Math.min(def.maxStacks || 1, found.stacks + (effect.stacks || 1));
+      found.stacks = 1;
+      found.modifierSnapshot = Game.contentCompiler.clone(def.modifiers || []);
+      found.periodicSnapshot = Game.contentCompiler.clone(def.periodic || []);
     } else if (found && def.stacking === 'stack') {
       found.stacks = Math.min(def.maxStacks || 1, found.stacks + (effect.stacks || 1));
       found.expiresTick = encounter.tick + duration;
+      found.modifierSnapshot = Game.contentCompiler.clone(def.modifiers || []);
+      found.periodicSnapshot = Game.contentCompiler.clone(def.periodic || []);
+      found.periodicIntervalTicks = Number(def.periodicIntervalTicks) || 0;
     } else {
       var id = encounter.id + ':status:' + encounter.nextSequence;
       found = {
@@ -439,22 +454,21 @@
         sourceAbilityId: abilityDef.id, appliedTick: encounter.tick,
         expiresTick: encounter.tick + duration,
         nextPeriodicTick: def.periodicIntervalTicks ? encounter.tick + def.periodicIntervalTicks : 0,
-        stacks: effect.stacks || 1,
+        stacks: Math.min(def.maxStacks || 1, Math.max(1, effect.stacks || 1)),
         potencySnapshot: potency,
+        modifierSnapshot: Game.contentCompiler.clone(def.modifiers || []),
+        periodicSnapshot: Game.contentCompiler.clone(def.periodic || []),
+        periodicIntervalTicks: Number(def.periodicIntervalTicks) || 0,
         shieldState: null
       };
       target.components.statuses.push(found);
     }
-    target.components.modifierLedger.removeSource(found.id);
-    (def.modifiers || []).forEach(function (modifier) {
-      target.components.modifierLedger.add(Object.assign({}, modifier, {
-        sourceId: found.id,
-        value: Number(modifier.value) * found.stacks
-      }));
+    var statusModifiers = (found.modifierSnapshot || def.modifiers || []).map(function (modifier) {
+      return Game.units.stackModifier(modifier, found.stacks);
     });
-    if ((def.modifiers || []).some(function (modifier) { return modifier.stat === 'maxHp'; })) {
-      Game.units.reconcile(target, { hpPolicy: 'preserveRatio' });
-    }
+    Game.units.setModifierSource(target, found.id, statusModifiers, {
+      hpPolicy: 'preserveRatio'
+    });
     var event = emit(encounter, 'status:applied', {
       sourceActorId: source.id, targetActorIds: [target.id], abilityId: abilityDef.id,
       effectIndex: effectIndex, payload: { statusId: def.id, stacks: found.stacks, durationTicks: duration }
@@ -470,10 +484,7 @@
       var def = Game.content.get('status', status.statusId);
       if (!predicate(status, def)) continue;
       target.components.statuses.splice(i, 1);
-      target.components.modifierLedger.removeSource(status.id);
-      if (def && (def.modifiers || []).some(function (modifier) { return modifier.stat === 'maxHp'; })) {
-        Game.units.reconcile(target, { hpPolicy: 'preserveRatio' });
-      }
+      Game.units.removeModifierSource(target, status.id, { hpPolicy: 'preserveRatio' });
       removed.push(status);
       emit(encounter, 'status:removed', {
         targetActorIds: [target.id], payload: { statusId: status.statusId, reason: reason }
@@ -631,7 +642,7 @@
       var repeats = Math.min(effect.times || 1, encounter.rules.maxRepeat || 8);
       for (var ri = 0; ri < repeats; ri++) applyEffects(encounter, source, primaryTarget, abilityDef, effect.effects || [], context);
     } else if (effect.type === 'triggerAbility') {
-      var triggered = Game.content.get('ability', effect.abilityId);
+      var triggered = Game.actors.ability(source, effect.abilityId);
       if (triggered) applyEffects(encounter, source, primaryTarget, triggered, triggered.effects || [], context);
     }
   }
@@ -661,7 +672,7 @@
   function resolveAction(encounter, item) {
     var actor = Game.actors.get(item.actorId);
     var target = Game.actors.get(item.targetId);
-    var def = actor && Game.content.get('ability', item.abilityId);
+    var def = actor && Game.actors.ability(actor, item.abilityId);
     if (!alive(actor) || !def || actor.components.actionState.actionId !== item.actionToken) return;
     if (!target || !alive(target)) target = Game.combatAI.chooseTarget(encounter, actor, def.target);
     if (!target && def.target.relation !== 'self') {
@@ -686,7 +697,7 @@
   function beginChannel(encounter, item) {
     var actor = Game.actors.get(item.actorId);
     var target = Game.actors.get(item.targetId);
-    var def = actor && Game.content.get('ability', item.abilityId);
+    var def = actor && Game.actors.ability(actor, item.abilityId);
     if (!alive(actor) || !def ||
         actor.components.actionState.actionId !== item.actionToken) return;
     if (!target || !alive(target)) target = Game.combatAI.chooseTarget(encounter, actor, def.target);
@@ -731,7 +742,7 @@
   function resolveChannelPulse(encounter, item) {
     var actor = Game.actors.get(item.actorId);
     var target = Game.actors.get(item.targetId);
-    var def = actor && Game.content.get('ability', item.abilityId);
+    var def = actor && Game.actors.ability(actor, item.abilityId);
     if (!alive(actor) || !def || actor.components.actionState.state !== 'channeling' ||
         actor.components.actionState.actionId !== item.actionToken) return;
     if (!target || !alive(target)) target = Game.combatAI.chooseTarget(encounter, actor, def.target);
@@ -758,12 +769,14 @@
       var def = Game.content.get('status', status.statusId);
       if (!def || !status.nextPeriodicTick || status.nextPeriodicTick > encounter.tick) return;
       var source = Game.actors.get(status.sourceActorId) || actor;
-      applyEffects(encounter, source, actor, {
-        id: status.sourceAbilityId || status.statusId,
-        target: { relation: source.id === actor.id ? 'self' : Game.relations.resolve(source.id, actor.id, encounter.id), shape: 'single' },
-        tags: ['periodic']
-      }, def.periodic || [], { periodic: true });
-      status.nextPeriodicTick += def.periodicIntervalTicks;
+      for (var stackIndex = 0; stackIndex < Math.max(1, status.stacks || 1); stackIndex++) {
+        applyEffects(encounter, source, actor, {
+          id: status.sourceAbilityId || status.statusId,
+          target: { relation: source.id === actor.id ? 'self' : Game.relations.resolve(source.id, actor.id, encounter.id), shape: 'single' },
+          tags: ['periodic']
+        }, status.periodicSnapshot || def.periodic || [], { periodic: true });
+      }
+      status.nextPeriodicTick += status.periodicIntervalTicks || def.periodicIntervalTicks;
     });
   }
 
@@ -778,14 +791,24 @@
   }
 
   function resourceTick(encounter, actor) {
+    var regenScale = Math.max(0, stat(actor, 'resourceRegen') || 0);
     Object.keys(actor.components.resources || {}).forEach(function (id) {
       var resource = actor.components.resources[id];
       if (resource.regenPerTick) {
-        resource.value = Game.util.clamp(resource.value + resource.regenPerTick, resource.min, resource.max);
+        resource.value = Game.util.clamp(
+          resource.value + resource.regenPerTick * regenScale,
+          resource.min, resource.max
+        );
       }
     });
+    var healthRegen = Math.max(0, stat(actor, 'healthRegenPct') || 0);
+    if (healthRegen > 0 && actor.components.vitals.hp < actor.components.vitals.maxHp) {
+      Game.units.heal(actor,
+        actor.components.vitals.maxHp * healthRegen * encounter.rules.tickMs / 1000,
+        { source: 'health-regen' });
+    }
     (actor.abilities || []).forEach(function (id) {
-      var def = Game.content.get('ability', id);
+      var def = Game.actors.ability(actor, id);
       if (def && def.kind === 'action') refreshCharges(encounter, actor, def);
     });
   }
@@ -904,7 +927,7 @@
       if (rule.statusId) applyStatus(encounter, actor, actor, { id: 'encounter-phase', target: { relation: 'self', shape: 'single' } },
         { statusId: rule.statusId, durationTicks: rule.durationTicks || 999999 }, 0);
       if (rule.abilityId) {
-        var phaseAbility = Game.content.get('ability', rule.abilityId);
+        var phaseAbility = Game.actors.ability(actor, rule.abilityId);
         if (phaseAbility) applyEffects(encounter, actor, actor, phaseAbility, phaseAbility.effects, {});
       }
       emit(encounter, 'boss:phase', {
@@ -1096,7 +1119,7 @@
       var actor = Game.actors.get(actorId);
       var encounter = encounterOf(actor);
       if (!encounter || !actor.components.actionState.actionId) return false;
-      var def = Game.content.get('ability', actor.components.actionState.abilityId);
+      var def = Game.actors.ability(actor, actor.components.actionState.abilityId);
       refund(actor, def || { timing: {} });
       refundCharge(encounter, actor, def);
       var token = actor.components.actionState.actionId;
@@ -1162,7 +1185,7 @@
       var encounter = Game.encounters.get(context.encounterId);
       var source = Game.actors.get(context.sourceActorId);
       var target = Game.actors.get(context.targetActorId);
-      var def = Game.content.get('ability', context.abilityId) || {
+      var def = Game.actors.ability(source, context.abilityId) || {
         id: context.abilityId || 'system', target: { relation: 'self', shape: 'single' }, tags: []
       };
       if (encounter && source) return applyEffect(encounter, source, target || source, def, effect, context.effectIndex || 0, context);
@@ -1190,12 +1213,7 @@
       var actor = Game.actors.get(actorId);
       var encounter = Game.encounters.get(context.encounterId || actor && actor.encounterId);
       if (!actor || !encounter || actor.components.actionState.state === 'defeated') return false;
-      Game.units.setHp(actor, 0, { source: 'defeat' });
-      actor.components.actionState.state = 'defeated';
-      actor.components.actionState.abilityId = null;
-      actor.components.movement.intent = null;
-      actor.dead = true;
-      actor.deathT = 0.5;
+      Game.units.defeat(actor, { source: 'defeat', deathT: 0.5 });
       encounter.metrics.defeated.push(actor.id);
       emit(encounter, 'actor:defeated', {
         sourceActorId: context.sourceActorId || null,

@@ -29,6 +29,7 @@
           id: 'fighter.warcry', schemaVersion: 1, stacking: 'refresh', durationTicks: 160,
           modifiers: [
             { stat: 'physicalPower', phase: 'status', operation: 'multiply', value: 1.16 },
+            { stat: 'armor', phase: 'status', operation: 'multiply', value: 1.15 },
             { stat: 'threatMultiplier', phase: 'status', operation: 'multiply', value: 1.5 }
           ],
           presentation: { nameKey: 'combat.status.fighter_warcry.name', icon: 'icon_skill_might' }
@@ -140,12 +141,31 @@
         talentIds: ['ft_heavy', 'ft_tough', 'ft_whirl', 'ft_mastery', 'ft_warcry', 'ft_second']
       }],
       talent: [
-        { id: 'ft_heavy', classId: 'fighter', unlockLevel: 1, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'fighter.heavy_slash' }, presentation: { nameKey: 'skill.ft_heavy.name', descKey: 'skill.ft_heavy.desc' } },
-        { id: 'ft_tough', classId: 'fighter', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'maxHp', perRank: 0.05 }, { stat: 'armor', perRank: 0.06 }], presentation: { nameKey: 'skill.ft_tough.name', descKey: 'skill.ft_tough.desc' } },
-        { id: 'ft_whirl', classId: 'fighter', unlockLevel: 3, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'fighter.whirlwind' }, presentation: { nameKey: 'skill.ft_whirl.name', descKey: 'skill.ft_whirl.desc' } },
-        { id: 'ft_mastery', classId: 'fighter', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'physicalPower', perRank: 0.05 }], presentation: { nameKey: 'skill.ft_mastery.name', descKey: 'skill.ft_mastery.desc' } },
-        { id: 'ft_warcry', classId: 'fighter', unlockLevel: 5, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'fighter.warcry_action' }, presentation: { nameKey: 'skill.ft_warcry.name', descKey: 'skill.ft_warcry.desc' } },
-        { id: 'ft_second', classId: 'fighter', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'healingPower', perRank: 0.025 }], presentation: { nameKey: 'skill.ft_second.name', descKey: 'skill.ft_second.desc' } }
+        {
+          id: 'ft_heavy', classId: 'fighter', unlockLevel: 1, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'fighter.heavy_slash', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 2.3, perRank: 0.15 }
+          ] },
+          presentation: { nameKey: 'skill.ft_heavy.name', descKey: 'skill.ft_heavy.desc' }
+        },
+        { id: 'ft_tough', classId: 'fighter', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'maxHp', phase: 'addPct', operation: 'addPct', perRank: 0.05 }, { stat: 'armor', phase: 'addPct', operation: 'addPct', perRank: 0.06 }], presentation: { nameKey: 'skill.ft_tough.name', descKey: 'skill.ft_tough.desc' } },
+        {
+          id: 'ft_whirl', classId: 'fighter', unlockLevel: 3, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'fighter.whirlwind', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.5, perRank: 0.1 }
+          ] },
+          presentation: { nameKey: 'skill.ft_whirl.name', descKey: 'skill.ft_whirl.desc' }
+        },
+        { id: 'ft_mastery', classId: 'fighter', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'physicalPower', phase: 'addPct', operation: 'addPct', perRank: 0.05 }], presentation: { nameKey: 'skill.ft_mastery.name', descKey: 'skill.ft_mastery.desc' } },
+        {
+          id: 'ft_warcry', classId: 'fighter', unlockLevel: 5, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'fighter.warcry_action', patches: [
+            { target: 'status', id: 'fighter.warcry', path: 'modifiers.0.value', baseValue: 1.15, perRank: 0.02 },
+            { target: 'status', id: 'fighter.warcry', path: 'modifiers.1.value', baseValue: 1.15, perRank: 0.02 }
+          ] },
+          presentation: { nameKey: 'skill.ft_warcry.name', descKey: 'skill.ft_warcry.desc' }
+        },
+        { id: 'ft_second', classId: 'fighter', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'healthRegenPct', phase: 'otherFlat', operation: 'add', perRank: 0.0025 }], presentation: { nameKey: 'skill.ft_second.name', descKey: 'skill.ft_second.desc' } }
       ]
     }
   });

@@ -43,19 +43,57 @@ Game.content.registerPack({
   id: 'fixture.runtime-actions', version: '1.0.0', schemaVersion: 1,
   requires: [{ id: 'core.combat', range: '^2.0.0' }],
   definitions: {
-    ability: [{
-      id: 'fixture.channel-charge', kind: 'action', actionType: 'ogcd',
-      timing: {
-        castTicks: 2, channelTicks: 6, channelIntervalTicks: 2,
-        animationLockTicks: 1, cooldownTicks: 0,
-        charges: 2, rechargeTicks: 10, interruptible: true,
-        queueable: false, refundRatio: 1
+    status: [
+      {
+        id: 'fixture.stack-multiply', stacking: 'stack', maxStacks: 3,
+        durationTicks: 50,
+        modifiers: [{
+          stat: 'armor', phase: 'status', operation: 'multiply', value: 0.9
+        }],
+        presentation: {
+          nameKey: 'combat.status.ranger_marked.name', icon: 'icon_skill_guard'
+        }
       },
-      target: { relation: 'hostile', shape: 'single', range: 24 },
-      effects: [{ type: 'damage', damageTypeId: 'true', amount: 1, canCrit: false }],
-      aiHints: { priority: 999, role: 'defensive' },
-      presentation: { nameKey: 'combat.ability.fighter_slash.name', icon: 'icon_skill_strike' }
-    }]
+      {
+        id: 'fixture.stack-dot', stacking: 'stack', maxStacks: 3,
+        durationTicks: 50, periodicIntervalTicks: 1,
+        periodic: [{
+          type: 'damage', damageTypeId: 'true', amount: 4, canCrit: false
+        }],
+        presentation: {
+          nameKey: 'combat.status.rogue_poison.name', icon: 'icon_skill_poison'
+        }
+      },
+      {
+        id: 'fixture.unique', stacking: 'unique', maxStacks: 1,
+        durationTicks: 50,
+        presentation: {
+          nameKey: 'combat.status.fighter_guard.name', icon: 'icon_skill_guard'
+        }
+      }
+    ],
+    ability: [
+      {
+        id: 'fixture.channel-charge', kind: 'action', actionType: 'ogcd',
+        timing: {
+          castTicks: 2, channelTicks: 6, channelIntervalTicks: 2,
+          animationLockTicks: 1, cooldownTicks: 0,
+          charges: 2, rechargeTicks: 10, interruptible: true,
+          queueable: false, refundRatio: 1
+        },
+        target: { relation: 'hostile', shape: 'single', range: 24 },
+        effects: [{ type: 'damage', damageTypeId: 'true', amount: 1, canCrit: false }],
+        aiHints: { priority: 999, role: 'defensive' },
+        presentation: { nameKey: 'combat.ability.fighter_slash.name', icon: 'icon_skill_strike' }
+      },
+      {
+        id: 'fixture.apply-status', kind: 'action', actionType: 'ogcd',
+        timing: { castTicks: 0, animationLockTicks: 0, cooldownTicks: 0 },
+        target: { relation: 'hostile', shape: 'single', range: 100 },
+        effects: [],
+        presentation: { nameKey: 'combat.ability.fighter_guard.name', icon: 'icon_skill_guard' }
+      }
+    ]
   }
 });
 const audit = Game.content.finalize({ strict: true });
@@ -297,6 +335,46 @@ Game.combat.tickFixed(leashEncounter.id);
 assert.equal(leashEncounter.lifecycle, 'ended');
 assert.equal(leashEncounter.result.reason, 'leash');
 assert.equal(channeler.encounterId, null);
+
+// Status contracts: multiplicative stacks exponentiate, periodic effects scale
+// with stacks, and unique reapplication never creates duplicate instances.
+const statusEncounter = Game.encounters.start('encounter.grassland', {
+  id: 'test:status-contracts', seed: 23, silent: true
+});
+channeler.x = 0;
+channeler.y = 0;
+channelTarget.x = 10;
+channelTarget.y = 0;
+Game.encounters.join(statusEncounter.id, channeler.id, 'party');
+Game.encounters.join(statusEncounter.id, channelTarget.id, 'enemy');
+const baseArmor = Game.units.stat(channelTarget, 'armor');
+function applyFixtureStatus(statusId) {
+  return Game.combat.applyStatus({
+    encounterId: statusEncounter.id,
+    sourceActorId: channeler.id,
+    targetActorId: channelTarget.id,
+    abilityId: 'fixture.apply-status',
+    effect: {
+      statusId,
+      target: { relation: 'hostile', shape: 'single', range: 100 }
+    }
+  });
+}
+applyFixtureStatus('fixture.stack-multiply');
+applyFixtureStatus('fixture.stack-multiply');
+assert.ok(Math.abs(Game.units.stat(channelTarget, 'armor') - baseArmor * 0.81) < 1e-9,
+  'two 0.9 multiplicative stacks resolve to 0.9^2');
+applyFixtureStatus('fixture.stack-dot');
+applyFixtureStatus('fixture.stack-dot');
+applyFixtureStatus('fixture.unique');
+applyFixtureStatus('fixture.unique');
+assert.equal(channelTarget.components.statuses.filter((status) =>
+  status.statusId === 'fixture.unique').length, 1);
+const beforePeriodic = channelTarget.hp;
+Game.combat.tickFixed(statusEncounter.id);
+assert.equal(beforePeriodic - channelTarget.hp, 8,
+  'two periodic stacks must execute two deterministic pulses');
+Game.encounters.end(statusEncounter.id, 'test');
 
 // Every Boss enters its immutable 50% phase rule.
 for (let index = 0; index < regions.length; index++) {

@@ -101,10 +101,37 @@ assert.equal(serialized.roster.actors['player-main'].loadout.lockedSlots.weapon,
 assert.equal(JSON.stringify(serialized).includes('encounterId'), false);
 assert.equal(JSON.stringify(serialized).includes('cooldowns'), false);
 
+// The serialized roster is a real persistence boundary, not a primary-only view.
+const multiRoster = JSON.parse(JSON.stringify(serialized));
+multiRoster.roster.actors['companion-ranger'] = {
+  id: 'companion-ranger',
+  archetypeId: 'adventurer',
+  classId: 'ranger',
+  level: 9,
+  exp: 3,
+  skillPoints: 1,
+  talentRanks: { rn_survival: 2 },
+  permanentUpgrades: {},
+  persistentResources: { hp: 88 },
+  loadout: {
+    equipment: { weapon: null, armor: null, ring: null },
+    lockedSlots: { weapon: false, armor: false, ring: false }
+  }
+};
+multiRoster.roster.activeParty = ['player-main', 'companion-ranger'];
+v11.Game.save.applyLoaded(multiRoster);
+assert.equal(v11.Game.state.roster.actors['companion-ranger'].classId, 'ranger');
+assert.equal(v11.Game.state.roster.actors['companion-ranger'].persistentResources.hp, 88);
+assert.deepEqual(
+  Array.from(v11.Game.state.roster.activeParty),
+  ['player-main', 'companion-ranger']
+);
+
 // Missing content degrades to a legal unclassed state and refunds invalid talents.
-serialized.roster.actors['player-main'].classId = 'removed-class';
-serialized.roster.actors['player-main'].talentRanks = { removed_talent: 4 };
-v11.Game.save.applyLoaded(serialized);
+const degradedSave = JSON.parse(JSON.stringify(serialized));
+degradedSave.roster.actors['player-main'].classId = 'removed-class';
+degradedSave.roster.actors['player-main'].talentRanks = { removed_talent: 4 };
+v11.Game.save.applyLoaded(degradedSave);
 assert.equal(v11.Game.state.player.classId, null);
 assert.equal(v11.Game.state.player.sp, 6);
 assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);

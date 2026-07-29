@@ -36,6 +36,53 @@
     return value;
   }
 
+  var allowedEffects = [
+    'damage', 'heal', 'shield', 'applyStatus', 'removeStatus', 'dispel',
+    'modifyResource', 'modifyCooldown', 'modifyThreat', 'movement',
+    'knockback', 'pull', 'summon', 'changeTeam', 'conditional',
+    'sequence', 'repeat', 'triggerAbility', 'setCombo', 'markTarget',
+    'interrupt'
+  ];
+
+  function collectEffectRefs(type, def, effect, path, definitions, issues) {
+    if (!effect || allowedEffects.indexOf(effect.type) < 0) {
+      issue(issues, 'unknown-effect', {
+        type: type, id: def.id, path: path, ref: effect && effect.type
+      });
+      return;
+    }
+    if (effect.formulaId && !Game.rules.formula(effect.formulaId)) {
+      issue(issues, 'missing-formula', {
+        type: type, id: def.id, path: path + '.formulaId', ref: effect.formulaId
+      });
+    }
+    [
+      ['damageTypeId', 'damageType'],
+      ['resourceId', 'resource'],
+      ['statusId', 'status'],
+      ['abilityId', 'ability'],
+      ['archetypeId', 'actorArchetype']
+    ].forEach(function (mapping) {
+      var field = mapping[0], targetType = mapping[1];
+      if (effect[field] && (!definitions[targetType] ||
+          !definitions[targetType][effect[field]])) {
+        issue(issues, 'missing-reference', {
+          type: type, id: def.id, path: path + '.' + field,
+          refType: targetType, ref: effect[field]
+        });
+      }
+    });
+    (effect.effects || []).forEach(function (nested, index) {
+      collectEffectRefs(type, def, nested, path + '.effects.' + index, definitions, issues);
+    });
+    (effect.then || []).forEach(function (nested, index) {
+      collectEffectRefs(type, def, nested, path + '.then.' + index, definitions, issues);
+    });
+    (effect.else || []).forEach(function (nested, index) {
+      collectEffectRefs(type, def, nested, path + '.else.' + index, definitions, issues);
+    });
+  }
+
   function collectRefs(type, def, definitions, issues) {
     var refs = S.references[type] || {};
     Object.keys(refs).forEach(function (path) {
@@ -70,6 +117,25 @@
         });
       });
     }
+    if (type === 'talent') {
+      var grants = def.grants || {};
+      if (grants.modifyAbilityId && !definitions.ability[grants.modifyAbilityId]) {
+        issue(issues, 'missing-reference', {
+          type: type, id: def.id, path: 'grants.modifyAbilityId',
+          refType: 'ability', ref: grants.modifyAbilityId
+        });
+      }
+      (grants.patches || []).forEach(function (patch, index) {
+        var targetType = patch.target || 'ability';
+        var targetId = patch.id || grants.modifyAbilityId;
+        if (!definitions[targetType] || !definitions[targetType][targetId]) {
+          issue(issues, 'missing-reference', {
+            type: type, id: def.id, path: 'grants.patches.' + index + '.id',
+            refType: targetType, ref: targetId
+          });
+        }
+      });
+    }
     if (type === 'ability') {
       (def.costs || []).forEach(function (cost, ci) {
         if (!definitions.resource[cost.resourceId]) {
@@ -79,72 +145,126 @@
           });
         }
       });
-      var allowedEffects = [
-        'damage', 'heal', 'shield', 'applyStatus', 'removeStatus', 'dispel',
-        'modifyResource', 'modifyCooldown', 'modifyThreat', 'movement',
-        'knockback', 'pull', 'summon', 'changeTeam', 'conditional',
-        'sequence', 'repeat', 'triggerAbility', 'setCombo', 'markTarget',
-        'interrupt'
-      ];
-      function visitEffect(effect, path) {
-        if (!effect || allowedEffects.indexOf(effect.type) < 0) {
-          issue(issues, 'unknown-effect', {
-            type: type, id: def.id, path: path, ref: effect && effect.type
-          });
-          return;
-        }
-        if (effect.formulaId && !Game.rules.formula(effect.formulaId)) {
-          issue(issues, 'missing-formula', {
-            type: type, id: def.id, path: path + '.formulaId', ref: effect.formulaId
-          });
-        }
-        if (effect.damageTypeId && !definitions.damageType[effect.damageTypeId]) {
-          issue(issues, 'missing-reference', {
-            type: type, id: def.id, path: path + '.damageTypeId',
-            refType: 'damageType', ref: effect.damageTypeId
-          });
-        }
-        if (effect.resourceId && !definitions.resource[effect.resourceId]) {
-          issue(issues, 'missing-reference', {
-            type: type, id: def.id, path: path + '.resourceId',
-            refType: 'resource', ref: effect.resourceId
-          });
-        }
-        if (effect.statusId && !definitions.status[effect.statusId]) {
-          issue(issues, 'missing-reference', {
-            type: type, id: def.id, path: path + '.statusId',
-            refType: 'status', ref: effect.statusId
-          });
-        }
-        if (effect.abilityId && !definitions.ability[effect.abilityId]) {
-          issue(issues, 'missing-reference', {
-            type: type, id: def.id, path: path + '.abilityId',
-            refType: 'ability', ref: effect.abilityId
-          });
-        }
-        if (effect.archetypeId && !definitions.actorArchetype[effect.archetypeId]) {
-          issue(issues, 'missing-reference', {
-            type: type, id: def.id, path: path + '.archetypeId',
-            refType: 'actorArchetype', ref: effect.archetypeId
-          });
-        }
-        (effect.effects || []).forEach(function (nested, index) {
-          visitEffect(nested, path + '.effects.' + index);
-        });
-        (effect.then || []).forEach(function (nested, index) {
-          visitEffect(nested, path + '.then.' + index);
-        });
-        (effect.else || []).forEach(function (nested, index) {
-          visitEffect(nested, path + '.else.' + index);
-        });
-      }
       (def.effects || []).forEach(function (effect, ei) {
-        visitEffect(effect, 'effects.' + ei);
+        collectEffectRefs(type, def, effect, 'effects.' + ei, definitions, issues);
+      });
+    }
+    if (type === 'status') {
+      (def.periodic || []).forEach(function (effect, index) {
+        collectEffectRefs(type, def, effect, 'periodic.' + index, definitions, issues);
       });
     }
   }
 
-  function validateDefinition(type, def, issues) {
+  function validateModifiers(type, def, definitions, issues) {
+    (def.modifiers || []).forEach(function (modifier, index) {
+      var path = 'modifiers.' + index;
+      var statDef = definitions.stat && definitions.stat[modifier && modifier.stat];
+      if (!statDef) {
+        issue(issues, 'modifier-stat', {
+          type: type, id: def.id, path: path + '.stat', ref: modifier && modifier.stat
+        });
+        return;
+      }
+      var phase = modifier.phase;
+      if (!phase || (statDef.phases || []).indexOf(phase) < 0) {
+        issue(issues, 'modifier-phase', {
+          type: type, id: def.id, path: path + '.phase', ref: phase
+        });
+      }
+      if (['add', 'addPct', 'multiply', 'set'].indexOf(modifier.operation) < 0) {
+        issue(issues, 'modifier-operation', {
+          type: type, id: def.id, path: path + '.operation', ref: modifier.operation
+        });
+      }
+      var value = type === 'talent' ? modifier.perRank : modifier.value;
+      if (!Number.isFinite(value)) {
+        issue(issues, 'modifier-value', {
+          type: type, id: def.id,
+          path: path + (type === 'talent' ? '.perRank' : '.value')
+        });
+      }
+    });
+  }
+
+  function validateTalent(def, definitions, issues) {
+    if (!Number.isInteger(def.maxRank) || def.maxRank < 1) {
+      issue(issues, 'talent-max-rank', { type: 'talent', id: def.id, path: 'maxRank' });
+    }
+    if (!Array.isArray(def.costs) || !def.costs.length ||
+        (def.costs.length !== 1 && def.costs.length !== def.maxRank) ||
+        def.costs.some(function (cost) {
+          return !Number.isInteger(cost) || cost < 1;
+        })) {
+      issue(issues, 'talent-costs', { type: 'talent', id: def.id, path: 'costs' });
+    }
+    var grants = def.grants || {};
+    (grants.patches || []).forEach(function (patch, index) {
+      var targetType = patch.target || 'ability';
+      var targetId = patch.id || grants.modifyAbilityId;
+      var target = definitions[targetType] && definitions[targetType][targetId];
+      var path = 'grants.patches.' + index;
+      if (['ability', 'status'].indexOf(targetType) < 0) {
+        issue(issues, 'talent-patch-target', {
+          type: 'talent', id: def.id, path: path + '.target', ref: targetType
+        });
+        return;
+      }
+      if (!patch.path || !target || !Number.isFinite(valueAt(target, patch.path))) {
+        issue(issues, 'talent-patch-path', {
+          type: 'talent', id: def.id, path: path + '.path', ref: patch.path
+        });
+      }
+      if (patch.operation && ['set', 'multiply'].indexOf(patch.operation) < 0) {
+        issue(issues, 'talent-patch-operation', {
+          type: 'talent', id: def.id, path: path + '.operation', ref: patch.operation
+        });
+      }
+      if (patch.baseValue !== undefined && !Number.isFinite(patch.baseValue)) {
+        issue(issues, 'talent-patch-value', {
+          type: 'talent', id: def.id, path: path + '.baseValue'
+        });
+      }
+      if (!Number.isFinite(patch.perRank)) {
+        issue(issues, 'talent-patch-value', {
+          type: 'talent', id: def.id, path: path + '.perRank'
+        });
+      }
+    });
+  }
+
+  function validateEffectNumbers(type, def, effect, path, issues) {
+    if (!effect) return;
+    [
+      'amount', 'coefficient', 'maxHpCoefficient', 'selfHealRatio',
+      'critChanceBonus', 'durationTicks', 'stacks'
+    ].forEach(function (field) {
+      if (effect[field] !== undefined && !Number.isFinite(effect[field])) {
+        issue(issues, 'effect-value', {
+          type: type, id: def.id, path: path + '.' + field
+        });
+      }
+    });
+    Object.keys(effect.params || {}).forEach(function (field) {
+      if (field === 'powerStat') return;
+      if (!Number.isFinite(effect.params[field])) {
+        issue(issues, 'effect-value', {
+          type: type, id: def.id, path: path + '.params.' + field
+        });
+      }
+    });
+    (effect.effects || []).forEach(function (nested, index) {
+      validateEffectNumbers(type, def, nested, path + '.effects.' + index, issues);
+    });
+    (effect.then || []).forEach(function (nested, index) {
+      validateEffectNumbers(type, def, nested, path + '.then.' + index, issues);
+    });
+    (effect.else || []).forEach(function (nested, index) {
+      validateEffectNumbers(type, def, nested, path + '.else.' + index, issues);
+    });
+  }
+
+  function validateDefinition(type, def, definitions, issues) {
     if (!def || !S.stableId.test(def.id || '')) {
       issue(issues, 'definition-id', { type: type, id: def && def.id, sourcePackId: def && def.sourcePackId });
       return;
@@ -189,6 +309,35 @@
           type: type, id: def.id, path: 'timing.rechargeTicks'
         });
       }
+      (def.effects || []).forEach(function (effect, index) {
+        validateEffectNumbers(type, def, effect, 'effects.' + index, issues);
+      });
+    }
+    if (['talent', 'trait', 'status'].indexOf(type) >= 0) {
+      validateModifiers(type, def, definitions, issues);
+    }
+    if (type === 'talent') validateTalent(def, definitions, issues);
+    if (type === 'status') {
+      if (['refresh', 'stack', 'unique'].indexOf(def.stacking) < 0) {
+        issue(issues, 'status-stacking', {
+          type: type, id: def.id, path: 'stacking', ref: def.stacking
+        });
+      }
+      if (!Number.isInteger(def.maxStacks) || def.maxStacks < 1 ||
+          (def.stacking !== 'stack' && def.maxStacks !== 1)) {
+        issue(issues, 'status-max-stacks', {
+          type: type, id: def.id, path: 'maxStacks'
+        });
+      }
+      if ((def.periodic || []).length &&
+          (!Number.isInteger(def.periodicIntervalTicks) || def.periodicIntervalTicks < 1)) {
+        issue(issues, 'status-periodic-interval', {
+          type: type, id: def.id, path: 'periodicIntervalTicks'
+        });
+      }
+      (def.periodic || []).forEach(function (effect, index) {
+        validateEffectNumbers(type, def, effect, 'periodic.' + index, issues);
+      });
     }
     if (type === 'damageType' && ['physical', 'magic', 'true'].indexOf(def.category) < 0) {
       issue(issues, 'damage-category', { type: type, id: def.id, path: 'category' });
@@ -279,7 +428,7 @@
 
       S.definitionTypes.forEach(function (type) {
         ordered[type].forEach(function (id) {
-          validateDefinition(type, compiled[type][id], issues);
+          validateDefinition(type, compiled[type][id], compiled, issues);
         });
       });
       S.definitionTypes.forEach(function (type) {
@@ -329,7 +478,10 @@
           }, {})
         };
       });
-      fingerprint = Game.util.fnv1a(C.stableStringify(canonical));
+      // Content fingerprints are a fixed-width public contract. Keep the
+      // generic hash helper unchanged because save export checksums produced by
+      // older builds used its unpadded form.
+      fingerprint = ('00000000' + Game.util.fnv1a(C.stableStringify(canonical))).slice(-8);
       lastAudit = Game.contentAudit.summary(issues, sorted, compiled, fingerprint);
       if (opts.strict && !lastAudit.ok) {
         var message = lastAudit.issues.slice(0, 12).map(function (x) {

@@ -9,3 +9,5 @@
 召唤物和可战斗 object：`js/data/packs/world/actors.js` 的 `summon.shadow_wisp`、`object.arcane_crystal`。
 
 作者 smoke fixture：`tests/fixtures/packs/authoring-smoke.js`，用于验证外部 Pack 的依赖、引用、Blueprint 与严格审计。
+
+主动 Talent patch：`js/data/packs/jobs/fighter.js` 的 `ft_heavy`（Ability 数值路径）与 `ft_warcry`（来源 Actor 私有 Status 数值路径）。被动多属性 Modifier：`js/data/packs/jobs/rogue.js` 的 `rg_deadly`。可叠倍率与周期状态分别参考 `grassland.corroded`、`forest.poisoned`；运行时合同回归位于 `tests/v2-runtime.test.js`。

@@ -24,5 +24,5 @@
 - 复用正式 `combat_presentation` 与 FX，直接观察攻击帧/突进、斩击、弹道、受击火花、飘字、治疗、护盾和范围环。
 - 并排检查数值 `CombatEvent`、表现 `PresentationEvent` 以及位移/接敌追踪；表现记录包含 tick、sequence、攻击双方、Ability、接触距离、碰撞下限与 overlap 诊断，不影响确定性结算。
 - “双方肖像槽 QA”直接复用正式 `combat_portraits`：友方读取职业专用头像，敌方读取 Actor `portraitId`；同时公开来源模式、非空像素和容器边界，缺图时验证确定性像素剪影。
-- 检查 Actor Card、Blueprint、来源、属性账本、资源、冷却、combo、status、relation、threat、scheduler 与 telegraph。
+- 检查 Actor Card、Blueprint、来源、Actor 私有 Talent Ability/Status、属性账本、Unit 不变量、资源、冷却、combo、status 叠层、relation、threat、scheduler 与 telegraph。
 - 自动枚举正式内容中的 Actor、Ability、Talent、Status、Resource、AI、Faction 与 EncounterProfile；页面与正式游戏、Node 审计使用同一 Pack 集合。

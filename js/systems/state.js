@@ -14,7 +14,9 @@
 
   var State = Game.State = {
     attachCompatibility: function (s) {
-      var record = s.roster.actors[s.roster.primaryActorId];
+      function primaryRecord() {
+        return s.roster.actors[s.roster.primaryActorId];
+      }
       var player = {};
       [
         ['classId', 'classId'], ['level', 'level'], ['exp', 'exp'],
@@ -25,7 +27,7 @@
         Object.defineProperty(player, map[0], {
           enumerable: true,
           get: function () {
-            var value = record;
+            var value = primaryRecord();
             for (var i = 0; i < path.length; i++) value = value[path[i]];
             return value;
           },
@@ -37,7 +39,7 @@
                 return;
               }
             }
-            var value = record;
+            var value = primaryRecord();
             for (var i = 0; i < path.length - 1; i++) value = value[path[i]];
             value[path[path.length - 1]] = next;
           }
@@ -55,13 +57,13 @@
       });
       Object.defineProperty(s.inv, 'equipped', {
         configurable: true, enumerable: false,
-        get: function () { return record.loadout.equipment; },
-        set: function (value) { record.loadout.equipment = value; }
+        get: function () { return primaryRecord().loadout.equipment; },
+        set: function (value) { primaryRecord().loadout.equipment = value; }
       });
       Object.defineProperty(s.inv, 'lockedSlots', {
         configurable: true, enumerable: false,
-        get: function () { return record.loadout.lockedSlots; },
-        set: function (value) { record.loadout.lockedSlots = value; }
+        get: function () { return primaryRecord().loadout.lockedSlots; },
+        set: function (value) { primaryRecord().loadout.lockedSlots = value; }
       });
       return s;
     },
@@ -289,9 +291,10 @@
       }
 
       // 永久强化
-      for (var pid in p.perms) {
+      var perms = opts.perms || p.perms;
+      for (var pid in perms) {
         var pdef = reg.get('shopItem', pid);
-        var n = p.perms[pid];
+        var n = perms[pid];
         if (!pdef && /^commission_/.test(pid) && n) {
           pctAcc.hpPct += 0.01 * n;
           pctAcc.atkPct += 0.01 * n;
@@ -319,8 +322,6 @@
     recalc: function () {
       var s = Game.state, p = s.player;
       var d = Player.previewDerived();
-      s.derived = d;
-      if (p.hp > d.maxHp) p.hp = d.maxHp;
       if (Game.units) {
         var actor = Game.units.primary();
         if (actor) {
@@ -328,8 +329,28 @@
             hp: p.hp,
             hpPolicy: 'preserveAbsolute'
           });
+          var stats = actor.components.statBlock.snapshot().values;
+          var power = actor.blueprint.classId === 'mage' ||
+            actor.blueprint.classId === 'cleric'
+            ? stats.magicPower : stats.physicalPower;
+          d.maxHp = stats.maxHp;
+          d.atk = power;
+          d.def = stats.armor;
+          d.spd = +(10 + (stats.autoAttackSpeed - 1) / 0.018).toFixed(2);
+          d.crit = stats.critChance;
+          d.critDmg = stats.critMultiplier;
+          d.dodge = stats.dodgeChance;
+          d.lifesteal = stats.lifesteal;
+          d.cdr = Math.max(0, stats.cooldownRate - 1);
+          d.regen = stats.healthRegenPct || 0;
+          d.range = stats.range;
+          d.expMul = stats.expMultiplier;
+          d.goldMul = stats.goldMultiplier;
+          d.dropMul = stats.dropMultiplier;
         }
       }
+      s.derived = d;
+      if (p.hp > d.maxHp) p.hp = d.maxHp;
       return d;
     },
 
@@ -413,14 +434,19 @@
 
     upgradeSkill: function (sid) {
       var s = Game.state, p = s.player;
-      var def = reg.get('skill', sid);
-      if (!def) return false;
-      if (def.cls !== p.classId) return false;
+      var legacy = reg.get('skill', sid);
+      var def = Game.content && Game.content.isFinalized()
+        ? Game.content.get('talent', sid) : null;
+      if (!legacy || !def) return false;
+      if (def.classId !== p.classId) return false;
       var lv = p.skills[sid] || 0;
-      if (lv >= Game.SKILL_MAX_LV) return false;
-      if (p.sp < 1) return false;
-      if (p.level < (def.unlockLv || 1)) return false;
-      p.sp--;
+      var cost = def.costs.length === 1
+        ? def.costs[0]
+        : def.costs[Math.min(lv, def.costs.length - 1)];
+      if (lv >= def.maxRank) return false;
+      if (p.sp < cost) return false;
+      if (p.level < def.unlockLevel) return false;
+      p.sp -= cost;
       p.skills[sid] = lv + 1;
       Player.recalc();
       bus.emit('skill:upgraded', { sid: sid, lv: lv + 1 });

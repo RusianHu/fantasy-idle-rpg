@@ -148,7 +148,7 @@
       var move = telegraphIntent(encounter, actor, tactics);
       if (move) return move;
 
-      var abilities = actor.abilities.map(function (id) { return Game.content.get('ability', id); })
+      var abilities = actor.abilities.map(function (id) { return Game.actors.ability(actor, id); })
         .filter(function (ability) { return ability && ability.kind === 'action'; });
       var candidates = [];
       abilities.forEach(function (ability) {

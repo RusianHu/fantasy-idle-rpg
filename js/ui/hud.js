@@ -44,7 +44,7 @@
       return actor && actor.teamId === hero.teamId;
     }).slice(0, 4);
     els.combatPartyMembers.innerHTML = allies.map(function (actor) {
-      var hp = Game.units.snapshot(actor);
+      var hp = Game.units.vitals(actor);
       var pct = U.clamp(hp.hpPct * 100, 0, 100);
       var name = actorName(actor, t);
       return '<div class="combat-v2-member"><b>' + U.esc(name) + '</b><span>' +
@@ -109,7 +109,7 @@
       );
       var enemyAction = enemy.components.actionState;
       var enemyAbility = enemyAction.abilityId &&
-        Game.content.get('ability', enemyAction.abilityId);
+        Game.actors.ability(enemy, enemyAction.abilityId);
       var canInterrupt = enemyAction.state === 'casting' && enemyAbility &&
         (!enemyAbility.timing || enemyAbility.timing.interruptible !== false);
       els.combatEnemyCast.textContent = enemyAction.abilityId
@@ -435,7 +435,7 @@
       els.autoBossSwitch.title = t('ui.autoBossHint');
 
       if (boss) {
-        var bossVitals = Game.units.snapshot(boss);
+        var bossVitals = Game.units.vitals(boss);
         els.gauge.classList.add('hidden');
         els.gauge.classList.remove('resting', 'full');
         els.bossBar.classList.remove('hidden');

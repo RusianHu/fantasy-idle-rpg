@@ -185,17 +185,19 @@
     },
 
     makeHero: function () {
-      var d = Game.player.derived();
       var cls = Game.player.classDef();
       var hero = Game.actors.spawn({
         instanceId: 'player-world',
-        actorRecordId: 'player-main',
+        actorRecordId: Game.state.roster.primaryActorId,
         partyId: 'party-player',
         factionId: 'adventurers',
         controllerId: 'ai:player-auto',
         transform: { x: 100, y: 120, direction: 'd' },
         spawnSource: { kind: 'world', sourceId: 'player', sequence: 0 }
       });
+      // Once the live Actor exists, project UI/legacy world fields from its
+      // canonical StatBlock instead of retaining a parallel Talent calculation.
+      var d = Game.player.recalc();
       hero.sprite = 'hero_' + cls.id;
       hero.atk = d.atk; hero.def = d.def; hero.spd = d.spd;
       hero.crit = d.crit; hero.critDmg = d.critDmg;
@@ -318,15 +320,12 @@
       ent.x = def.x; ent.y = def.y;
       ent.spawnX = ent.x; ent.spawnY = ent.y;
       ent.guardian = true;
-      ent.components.modifierLedger.add({
-        sourceId: 'world:guardian',
+      Game.units.setModifierSource(ent, 'world:guardian', [{
         stat: 'maxHp',
         phase: 'multiply',
         operation: 'multiply',
         value: 4.2
-      });
-      if (Game.units) Game.units.reconcile(ent, { hpPolicy: 'full', commit: false });
-      else ent.hp = ent.maxHp = ent.components.statBlock.value('maxHp');
+      }], { hpPolicy: 'full', commit: false });
       ent.atk = Math.round(ent.atk * 1.55);
       ent.def = Math.round(ent.def * 1.45);
       ent.exp = Math.round(ent.exp * 6);
@@ -754,7 +753,7 @@
 
         if (W.hero.target === ent) W.hero.target = null;
         if (ent.boss) W.onBossDefeated(ent);
-      } else if (ent.actorRecordId === 'player-main') {
+      } else if (ent.actorRecordId === Game.state.roster.primaryActorId) {
         W.onHeroDeath();
       }
     },
@@ -1007,7 +1006,7 @@
         var id = event && event.targetActorIds && event.targetActorIds[0];
         var actor = id && Game.actors.get(id);
         if (!actor) return;
-        if (actor.actorRecordId === 'player-main') W.onHeroDeath();
+        if (actor.actorRecordId === Game.state.roster.primaryActorId) W.onHeroDeath();
         else if (actor.category === 'monster') {
           W.onEntityKilled(actor, event.sourceActorId && Game.actors.get(event.sourceActorId));
         }

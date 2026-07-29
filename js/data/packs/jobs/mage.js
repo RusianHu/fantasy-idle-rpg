@@ -91,12 +91,33 @@
       }],
       talentTree: [{ id: 'talents.mage', schemaVersion: 1, talentIds: ['mg_fireball', 'mg_mastery', 'mg_nova', 'mg_surge', 'mg_barrier', 'mg_armor'] }],
       talent: [
-        { id: 'mg_fireball', classId: 'mage', unlockLevel: 1, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'mage.fireball' }, presentation: { nameKey: 'skill.mg_fireball.name', descKey: 'skill.mg_fireball.desc' } },
-        { id: 'mg_mastery', classId: 'mage', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'magicPower', perRank: 0.06 }], presentation: { nameKey: 'skill.mg_mastery.name', descKey: 'skill.mg_mastery.desc' } },
-        { id: 'mg_nova', classId: 'mage', unlockLevel: 3, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'mage.arcane_nova' }, presentation: { nameKey: 'skill.mg_nova.name', descKey: 'skill.mg_nova.desc' } },
-        { id: 'mg_surge', classId: 'mage', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'cooldownRate', perRank: 0.02 }], presentation: { nameKey: 'skill.mg_surge.name', descKey: 'skill.mg_surge.desc' } },
-        { id: 'mg_barrier', classId: 'mage', unlockLevel: 5, maxRank: 10, costs: [1], grants: { modifyAbilityId: 'mage.barrier_action' }, presentation: { nameKey: 'skill.mg_barrier.name', descKey: 'skill.mg_barrier.desc' } },
-        { id: 'mg_armor', classId: 'mage', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'maxHp', perRank: 0.04 }, { stat: 'ward', perRank: 0.04 }], presentation: { nameKey: 'skill.mg_armor.name', descKey: 'skill.mg_armor.desc' } }
+        {
+          id: 'mg_fireball', classId: 'mage', unlockLevel: 1, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'mage.fireball', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 2.6, perRank: 0.18 }
+          ] },
+          presentation: { nameKey: 'skill.mg_fireball.name', descKey: 'skill.mg_fireball.desc' }
+        },
+        { id: 'mg_mastery', classId: 'mage', unlockLevel: 2, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'magicPower', phase: 'addPct', operation: 'addPct', perRank: 0.06 }], presentation: { nameKey: 'skill.mg_mastery.name', descKey: 'skill.mg_mastery.desc' } },
+        {
+          id: 'mg_nova', classId: 'mage', unlockLevel: 3, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'mage.arcane_nova', patches: [
+            { path: 'effects.0.params.coefficient', baseValue: 1.6, perRank: 0.1 }
+          ] },
+          presentation: { nameKey: 'skill.mg_nova.name', descKey: 'skill.mg_nova.desc' }
+        },
+        { id: 'mg_surge', classId: 'mage', unlockLevel: 4, maxRank: 10, costs: [1], grants: {}, modifiers: [{ stat: 'cooldownRate', phase: 'otherFlat', operation: 'add', perRank: 0.02 }], presentation: { nameKey: 'skill.mg_surge.name', descKey: 'skill.mg_surge.desc' } },
+        {
+          id: 'mg_barrier', classId: 'mage', unlockLevel: 5, maxRank: 10, costs: [1],
+          grants: { modifyAbilityId: 'mage.barrier_action', patches: [
+            { path: 'effects.0.coefficient', baseValue: 0.2, perRank: 0.02 }
+          ] },
+          presentation: { nameKey: 'skill.mg_barrier.name', descKey: 'skill.mg_barrier.desc' }
+        },
+        { id: 'mg_armor', classId: 'mage', unlockLevel: 6, maxRank: 10, costs: [1], grants: {}, modifiers: [
+          { stat: 'maxHp', phase: 'addPct', operation: 'addPct', perRank: 0.04 },
+          { stat: 'armor', phase: 'addPct', operation: 'addPct', perRank: 0.04 }
+        ], presentation: { nameKey: 'skill.mg_armor.name', descKey: 'skill.mg_armor.desc' } }
       ]
     }
   });
