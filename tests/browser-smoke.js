@@ -764,6 +764,138 @@ async function run() {
     const combatHudCapture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     const combatHudScreenshot = path.join(os.tmpdir(), 'firpg-combat-v2-hud-mobile-cdp.png');
     fs.writeFileSync(combatHudScreenshot, Buffer.from(combatHudCapture.data, 'base64'));
+
+    const stageWheelMobile = await cdp.evaluate(`(() => {
+      const canvas = document.getElementById('stage');
+      const rect = canvas.getBoundingClientRect();
+      window.__stageGestureBoss = Game.world.bossEnt;
+      Game.world.bossEnt = null;
+      Game.render.resetViewScale();
+      Game.render.frame(1 / 60);
+      const point = { x: rect.width * .5, y: rect.height * .5 };
+      const beforeAnchor = Game.render.screenToWorld(point.x, point.y);
+      const zoomIn = new WheelEvent('wheel', {
+        deltaY: -120, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left + point.x, clientY: rect.top + point.y,
+        bubbles: true, cancelable: true
+      });
+      const zoomInAllowed = canvas.dispatchEvent(zoomIn);
+      const afterAnchor = Game.render.screenToWorld(point.x, point.y);
+      const zoomAfterIn = Game.render.viewScale();
+      const zoomOut = new WheelEvent('wheel', {
+        deltaY: 120, deltaMode: WheelEvent.DOM_DELTA_PIXEL,
+        clientX: rect.left + point.x, clientY: rect.top + point.y,
+        bubbles: true, cancelable: true
+      });
+      const zoomOutAllowed = canvas.dispatchEvent(zoomOut);
+      return {
+        zoomInAllowed, zoomOutAllowed, zoomAfterIn,
+        zoomAfterOut: Game.render.viewScale(),
+        anchorDelta: Math.hypot(afterAnchor.x - beforeAnchor.x, afterAnchor.y - beforeAnchor.y),
+        touchAction: getComputedStyle(canvas).touchAction,
+        stateSettingUntouched: !Object.prototype.hasOwnProperty.call(Game.state.settings, 'cameraZoom'),
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+      };
+    })()`);
+    assert.equal(stageWheelMobile.zoomInAllowed, false,
+      'stage wheel is consumed while the camera scale changes');
+    assert.equal(stageWheelMobile.zoomOutAllowed, false,
+      'stage wheel zoom-out is consumed while the camera scale changes');
+    assert.ok(stageWheelMobile.zoomAfterIn > 1.1 && stageWheelMobile.zoomAfterIn < 1.3,
+      'stage wheel uses a continuous session camera scale');
+    assert.ok(Math.abs(stageWheelMobile.zoomAfterOut - 1) < .001,
+      'inverse stage wheel deltas return to the authored view');
+    assert.ok(stageWheelMobile.anchorDelta < .001, 'stage wheel keeps the camera anchor stable');
+    assert.equal(stageWheelMobile.touchAction, 'none');
+    assert.equal(stageWheelMobile.stateSettingUntouched, true,
+      'stage camera scale is not written into persistent settings');
+
+    const stageRect = stageWheelMobile.rect;
+    const stageTouchStart = [
+      { x: stageRect.left + stageRect.width * .38, y: stageRect.top + stageRect.height * .42,
+        radiusX: 4, radiusY: 4, force: 1, id: 41 },
+      { x: stageRect.left + stageRect.width * .62, y: stageRect.top + stageRect.height * .42,
+        radiusX: 4, radiusY: 4, force: 1, id: 42 }
+    ];
+    const stageTouchEnd = [
+      { x: stageRect.left + stageRect.width * .30, y: stageRect.top + stageRect.height * .42,
+        radiusX: 4, radiusY: 4, force: 1, id: 41 },
+      { x: stageRect.left + stageRect.width * .70, y: stageRect.top + stageRect.height * .42,
+        radiusX: 4, radiusY: 4, force: 1, id: 42 }
+    ];
+    await cdp.evaluate(`(() => {
+      const rect = document.getElementById('stage').getBoundingClientRect();
+      window.__stageGestureFixture = {
+        originalTap: Game.world.handleTap,
+        tapCount: 0,
+        anchor: Game.render.screenToWorld(rect.width * .5, rect.height * .42)
+      };
+      Game.world.handleTap = function () { window.__stageGestureFixture.tapCount++; };
+      return true;
+    })()`);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: stageTouchStart });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: stageTouchEnd });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    const stagePinch = await cdp.evaluate(`(() => {
+      const canvas = document.getElementById('stage');
+      const rect = canvas.getBoundingClientRect();
+      const anchor = Game.render.screenToWorld(rect.width * .5, rect.height * .42);
+      const ghostClickAllowed = canvas.dispatchEvent(new MouseEvent('click', {
+        clientX: rect.left + rect.width * .5,
+        clientY: rect.top + rect.height * .42,
+        bubbles: true, cancelable: true
+      }));
+      return {
+        scale: Game.render.viewScale(),
+        anchorDelta: Math.hypot(
+          anchor.x - window.__stageGestureFixture.anchor.x,
+          anchor.y - window.__stageGestureFixture.anchor.y
+        ),
+        ghostClickAllowed,
+        tapCount: window.__stageGestureFixture.tapCount
+      };
+    })()`);
+    assert.ok(Math.abs(stagePinch.scale - 1.35) < .01,
+      'stage pinch continuously scales to the session maximum');
+    assert.ok(stagePinch.anchorDelta < 1,
+      'stage pinch keeps its midpoint world anchor stable: ' + JSON.stringify(stagePinch));
+    assert.equal(stagePinch.ghostClickAllowed, false, 'stage pinch suppresses the synthetic trailing click');
+    assert.equal(stagePinch.tapCount, 0, 'stage pinch does not issue a world tap command');
+
+    await delay(500);
+    const stageTapRecovery = await cdp.evaluate(`(() => {
+      const canvas = document.getElementById('stage');
+      const rect = canvas.getBoundingClientRect();
+      const clickAllowed = canvas.dispatchEvent(new MouseEvent('click', {
+        clientX: rect.left + rect.width * .5,
+        clientY: rect.top + rect.height * .42,
+        bubbles: true, cancelable: true
+      }));
+      const tapCount = window.__stageGestureFixture.tapCount;
+      Game.world.handleTap = window.__stageGestureFixture.originalTap;
+      delete window.__stageGestureFixture;
+      const originalCinematic = Game.world.cinematic;
+      Game.world.cinematic = { ent: Game.world.hero };
+      Game.render.frame(1 / 60);
+      const directedScale = Game.render.viewScale();
+      const directedWheelAllowed = canvas.dispatchEvent(new WheelEvent('wheel', {
+        deltaY: -120, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2,
+        bubbles: true, cancelable: true
+      }));
+      const directedScaleAfter = Game.render.viewScale();
+      Game.world.cinematic = originalCinematic;
+      Game.world.bossEnt = window.__stageGestureBoss;
+      delete window.__stageGestureBoss;
+      Game.render.frame(1 / 60);
+      Game.render.resetViewScale();
+      return { clickAllowed, tapCount, directedWheelAllowed, directedScale, directedScaleAfter };
+    })()`);
+    assert.equal(stageTapRecovery.clickAllowed, true, 'ordinary stage taps recover after gesture suppression');
+    assert.equal(stageTapRecovery.tapCount, 1, 'ordinary stage tap still reaches world input');
+    assert.equal(stageTapRecovery.directedWheelAllowed, true, 'director camera releases the wheel event');
+    assert.equal(stageTapRecovery.directedScaleAfter, stageTapRecovery.directedScale,
+      'director camera ignores user zoom input');
+
     await cdp.evaluate(`(() => {
       const fixture = window.__combatHudFixture;
       Game.world.endEncounter('browser-hud-fixture-complete');

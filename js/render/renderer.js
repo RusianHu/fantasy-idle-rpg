@@ -15,6 +15,126 @@
   var SW = 480;              // 视差条带宽（可平铺）
   var vignetteC = null;      // 暗角缓存
   var lastBubbleLayouts = [];
+  var viewScale = 1;         // 会话级视野倍率；刷新后恢复默认，不进入存档。
+  var viewOffset = { x: 0, y: 0 };
+  var viewOffsetHold = 0;
+  var authoredCamera = { x: 200, y: 200, zoom: 2, directed: false };
+  var stagePointers = Object.create(null);
+  var stagePointerOrder = [];
+  var stagePinch = null;
+  var suppressStageTapUntil = 0;
+  var VIEW_SCALE_MIN = 0.75;
+  var VIEW_SCALE_MAX = 1.35;
+  var TAP_MOVE_THRESHOLD = 8;
+
+  function stageInputAllowed() {
+    if (!canvas || !Game.world || !Game.world.region || !Game.world.hero) return false;
+    if (Game.entryState !== undefined && Game.entryState !== 'active') return false;
+    if (Game.transitions && Game.transitions.isActive()) return false;
+    if (Game.ending && Game.ending.isActive && Game.ending.isActive()) return false;
+    if (Game.world.cinematic) return false;
+    var panel = document.getElementById('panel-container');
+    if (panel && !panel.classList.contains('hidden')) return false;
+    var modal = document.getElementById('modal-root');
+    if (modal && modal.children.length) return false;
+    return true;
+  }
+
+  function viewScaleBounds() {
+    return {
+      min: VIEW_SCALE_MIN,
+      // Boss 战维持导演构图的近景上限，但仍允许玩家缩远观察。
+      max: Game.world && Game.world.bossEnt ? 1 : VIEW_SCALE_MAX
+    };
+  }
+
+  function effectiveViewScale() {
+    var bounds = viewScaleBounds();
+    return U.clamp(viewScale, bounds.min, bounds.max);
+  }
+
+  function clampCameraPosition(x, y, zoom) {
+    var W = Game.world;
+    if (!W || !W.region || !W.region.world) return { x: x, y: y };
+    var vw = cw / zoom, vh = ch / zoom;
+    var ww = W.region.world.w, wh = W.region.world.h;
+    var minX = vw / 2, maxX = ww - vw / 2;
+    var minY = vh / 2 - 78, maxY = wh - vh / 2;
+    return {
+      x: minX > maxX ? ww / 2 : U.clamp(x, minX, maxX),
+      y: minY > maxY ? wh / 2 : U.clamp(y, minY, maxY)
+    };
+  }
+
+  function markStageGesture() {
+    suppressStageTapUntil = Date.now() + 450;
+  }
+
+  function stageCanvasPoint(clientX, clientY) {
+    var rect = canvas.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function setStageViewScale(nextScale, sx, sy, anchor) {
+    if (!stageInputAllowed() || authoredCamera.directed) return false;
+    var bounds = viewScaleBounds();
+    nextScale = U.clamp(nextScale, bounds.min, bounds.max);
+    if (!Number.isFinite(nextScale)) return false;
+    var currentScale = effectiveViewScale();
+    if (Math.abs(nextScale - currentScale) < 0.0001) return false;
+    sx = sx === undefined || sx === null ? cw / 2 : sx;
+    sy = sy === undefined || sy === null ? ch / 2 : sy;
+    anchor = anchor || R.screenToWorld(sx, sy);
+
+    viewScale = nextScale;
+    var nextZoom = authoredCamera.zoom * effectiveViewScale();
+    var next = clampCameraPosition(
+      anchor.x - (sx - cw / 2) / nextZoom,
+      anchor.y - (sy - ch / 2) / nextZoom,
+      nextZoom
+    );
+    cam.zoom = nextZoom;
+    cam.x = next.x;
+    cam.y = next.y;
+    viewOffset.x = cam.x - authoredCamera.x;
+    viewOffset.y = cam.y - authoredCamera.y;
+    viewOffsetHold = 0.36;
+    canvas.setAttribute('data-stage-view-scale', effectiveViewScale().toFixed(4));
+    return true;
+  }
+
+  function stagePointerPair() {
+    return [stagePointers[stagePointerOrder[0]], stagePointers[stagePointerOrder[1]]];
+  }
+
+  function beginStagePinch() {
+    var pair = stagePointerPair();
+    if (!pair[0] || !pair[1]) return;
+    var dx = pair[1].x - pair[0].x, dy = pair[1].y - pair[0].y;
+    var midpoint = stageCanvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+    stagePinch = {
+      distance: Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+      scale: effectiveViewScale(),
+      anchor: R.screenToWorld(midpoint.x, midpoint.y)
+    };
+    markStageGesture();
+  }
+
+  function removeStagePointer(pointerId, cancelled) {
+    var pointer = stagePointers[pointerId];
+    if (!pointer) return;
+    if (stagePinch || pointer.moved || cancelled) markStageGesture();
+    delete stagePointers[pointerId];
+    var index = stagePointerOrder.indexOf(pointerId);
+    if (index >= 0) stagePointerOrder.splice(index, 1);
+    stagePinch = null;
+    if (stagePointerOrder.length === 2) beginStagePinch();
+    else if (stagePointerOrder.length === 1) {
+      var remaining = stagePointers[stagePointerOrder[0]];
+      remaining.startX = remaining.x;
+      remaining.startY = remaining.y;
+    }
+  }
 
   function buildVignette() {
     vignetteC = document.createElement('canvas');
@@ -540,10 +660,62 @@
       window.addEventListener('resize', R.resize);
       // 点击/触摸交互：点怪=锁定目标，点地=移动指令，点营地=扎营/拔营
       canvas.addEventListener('click', function (e) {
+        if (Date.now() < suppressStageTapUntil) {
+          e.preventDefault();
+          return;
+        }
         var rect = canvas.getBoundingClientRect();
         var pt = R.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
         if (Game.world && Game.world.handleTap) Game.world.handleTap(pt.x, pt.y);
       });
+      canvas.addEventListener('wheel', function (e) {
+        if (!stageInputAllowed()) return;
+        var delta = e.deltaY;
+        if (e.deltaMode === 1) delta *= 16;
+        else if (e.deltaMode === 2) delta *= canvas.clientHeight || ch;
+        delta = U.clamp(delta, -240, 240);
+        if (!delta) return;
+        var point = stageCanvasPoint(e.clientX, e.clientY);
+        if (setStageViewScale(effectiveViewScale() * Math.exp(-delta * 0.0015), point.x, point.y)) {
+          e.preventDefault();
+        }
+      }, { passive: false });
+      canvas.addEventListener('pointerdown', function (e) {
+        if (e.pointerType !== 'touch' || !stageInputAllowed() || stagePointerOrder.length >= 2) return;
+        stagePointers[e.pointerId] = {
+          x: e.clientX, y: e.clientY,
+          startX: e.clientX, startY: e.clientY,
+          moved: false
+        };
+        stagePointerOrder.push(e.pointerId);
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+        if (stagePointerOrder.length === 2) beginStagePinch();
+      });
+      canvas.addEventListener('pointermove', function (e) {
+        var pointer = stagePointers[e.pointerId];
+        if (!pointer) return;
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+        if (Math.sqrt(
+          Math.pow(pointer.x - pointer.startX, 2) +
+          Math.pow(pointer.y - pointer.startY, 2)
+        ) > TAP_MOVE_THRESHOLD) {
+          pointer.moved = true;
+          markStageGesture();
+        }
+        if (stagePointerOrder.length < 2) return;
+        if (!stagePinch) beginStagePinch();
+        var pair = stagePointerPair();
+        var dx = pair[1].x - pair[0].x, dy = pair[1].y - pair[0].y;
+        var midpoint = stageCanvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+        setStageViewScale(
+          stagePinch.scale * Math.sqrt(dx * dx + dy * dy) / stagePinch.distance,
+          midpoint.x, midpoint.y, stagePinch.anchor
+        );
+      });
+      canvas.addEventListener('pointerup', function (e) { removeStagePointer(e.pointerId, false); });
+      canvas.addEventListener('pointercancel', function (e) { removeStagePointer(e.pointerId, true); });
+      canvas.addEventListener('lostpointercapture', function (e) { removeStagePointer(e.pointerId, true); });
     },
 
     /** 屏幕坐标（CSS px，相对画布）→ 世界坐标 */
@@ -562,11 +734,25 @@
       canvas.height = Math.round(ch * dpr);
       canvas.style.width = cw + 'px';
       canvas.style.height = ch + 'px';
+      viewOffset.x = 0; viewOffset.y = 0; viewOffsetHold = 0;
       vignetteC = null;
     },
 
     snapCamera: function (x, y) {
       cam.x = x; cam.y = y;
+      viewOffset.x = 0; viewOffset.y = 0; viewOffsetHold = 0;
+    },
+
+    viewScale: function () {
+      return effectiveViewScale();
+    },
+
+    setViewScale: function (scale, sx, sy) {
+      return setStageViewScale(scale, sx, sy);
+    },
+
+    resetViewScale: function () {
+      return setStageViewScale(1, cw / 2, ch / 2);
     },
 
     /* ---------- 相机 ---------- */
@@ -603,18 +789,33 @@
       if (cw < 400) zoomT *= 0.92;
 
       var cinematic = endingCam || transitionCam || W.cinematic;
+      authoredCamera.x = focusX;
+      authoredCamera.y = focusY;
+      authoredCamera.zoom = zoomT;
+      authoredCamera.directed = !!cinematic;
+      if (cinematic) {
+        viewOffset.x = 0; viewOffset.y = 0; viewOffsetHold = 0;
+      } else {
+        if (stagePinch) viewOffsetHold = 0.12;
+        else if (viewOffsetHold > 0) viewOffsetHold = Math.max(0, viewOffsetHold - dt);
+        else {
+          viewOffset.x = U.approach(viewOffset.x, 0, 5.2, dt);
+          viewOffset.y = U.approach(viewOffset.y, 0, 5.2, dt);
+        }
+        focusX += viewOffset.x;
+        focusY += viewOffset.y;
+        zoomT *= effectiveViewScale();
+      }
+      if (canvas) canvas.setAttribute('data-stage-view-scale', effectiveViewScale().toFixed(4));
       cam.zoom = U.approach(cam.zoom, zoomT, cinematic ? 5 : 2.6, dt);
       var rate = cinematic ? 6 : 3.6;
       cam.x = U.approach(cam.x, focusX, rate, dt);
       cam.y = U.approach(cam.y, focusY, rate, dt);
 
       // 视口收敛与边界
-      var vw = cw / cam.zoom, vh = ch / cam.zoom;
-      var ww = W.region.world.w, wh = W.region.world.h;
-      var minX = vw / 2, maxX = ww - vw / 2;
-      if (minX > maxX) { cam.x = ww / 2; } else { cam.x = U.clamp(cam.x, minX, maxX); }
-      var minY = vh / 2 - 78, maxY = wh - vh / 2;
-      if (minY > maxY) { cam.y = wh / 2; } else { cam.y = U.clamp(cam.y, minY, maxY); }
+      var clamped = clampCameraPosition(cam.x, cam.y, cam.zoom);
+      cam.x = clamped.x;
+      cam.y = clamped.y;
     },
 
     /* ---------- 主帧绘制 ---------- */
