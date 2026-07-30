@@ -727,9 +727,13 @@
       order.timer -= dt;
       if (order.timer > 0) return true;
       if (order.type === 'gather') Game.environment.completeGather(target);
-      else Game.environment.openChest(target);
       hero.interactOrder = null;
-      hero.state = 'idle';
+      if (order.type === 'chest') {
+        var chestResult = Game.environment.openChest(target);
+        if (!chestResult || chestResult.outcome !== 'mimic') hero.state = 'idle';
+      } else {
+        hero.state = 'idle';
+      }
       return true;
     },
 
@@ -740,7 +744,10 @@
       }
       var chest = Game.environment && Game.environment.nearestChest(hero.x, hero.y);
       if (chest && (W.controlMode() === 'auto' || chest.distance <= 26)) {
-        return W.startInteraction({ type: 'chest', target: chest.target }, false);
+        if (W.controlMode() !== 'auto' || !Game.environment.autoChestReady ||
+            Game.environment.autoChestReady(chest.target)) {
+          return W.startInteraction({ type: 'chest', target: chest.target }, false);
+        }
       }
       if (W.controlMode() === 'auto' && Game.environment) {
         var node = Game.environment.nearestNode(hero.x, hero.y, 120);

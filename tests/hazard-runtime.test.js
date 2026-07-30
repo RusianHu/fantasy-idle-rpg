@@ -162,6 +162,15 @@ hero.x = hero.components.transform.x = 392;
 hero.y = hero.components.transform.y = 240;
 Game.hazards.initRegion('grassland', damageLayout);
 const clueThorn = Game.hazards.all().find((hazard) => hazard.profileId === 'hazard.grassland.thorn_stakes');
+const routeInspection = Game.hazards.inspectPath([
+  { x: 200, y: 240 }, { x: 400, y: 240 }
+], { instanceIds: [clueThorn.id] });
+assert.equal(routeInspection.interactions.length, 1);
+assert.ok(routeInspection.interactions[0].clue.distanceAlong <
+  routeInspection.interactions[0].reveal.distanceAlong);
+assert.ok(routeInspection.interactions[0].reveal.distanceAlong <
+  routeInspection.interactions[0].trigger.distanceAlong);
+assert.ok(routeInspection.interactions[0].minCenterDistance <= 0.01);
 advanceHazards(1);
 assert.equal(clueThorn.clueVisible, true);
 assert.equal(clueThorn.awareness, 'concealed');
@@ -179,6 +188,56 @@ Game.hazards.initRegion('grassland', damageLayout);
 hero.x = hero.components.transform.x = 360;
 advanceHazards(1);
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:warning'), 'swept trigger catches fast movement');
+
+// Auto escape owns the warning response even while a lower-priority chest or
+// gathering interaction is active.
+world = reset('grassland');
+hero = spawnHero('hazard:auto-interaction', 300, 240);
+world.hero = hero;
+world.entities = [hero];
+world.layout = damageLayout;
+let cancelledFor = null;
+world.cancelInteraction = (reason) => {
+  cancelledFor = reason;
+  hero.interactOrder = null;
+  return true;
+};
+Game.state.settings.controlMode = 'auto';
+hero.interactOrder = { type: 'chest', target: { id: 'test-chest' } };
+Game.hazards.initRegion('grassland', damageLayout);
+const autoThorn = Game.hazards.all().find((hazard) => hazard.profileId === 'hazard.grassland.thorn_stakes');
+assert.equal(Game.hazards.forceTrigger(autoThorn.id, hero.id), true);
+assert.equal(cancelledFor, 'hazard');
+assert.equal(hero.interactOrder, null);
+assert.equal(hero.moveOrder.hazardEscapeId, autoThorn.id);
+assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:escapeRequested'));
+
+// Directional placement is aligned to sampled route geometry and publishes its
+// coverage metadata for the Hazard Lab.
+world = reset('lavacave');
+hero = spawnHero('hazard:route-placement', 0, 0);
+world.hero = hero;
+world.entities = [hero];
+const routeLayout = {
+  version: 3,
+  macro: {
+    centers: [{ x: 0, y: 200 }, { x: 400, y: 200 }],
+    edges: [{ a: 0, b: 1, kind: 'main' }]
+  },
+  hazardAnchors: [
+    { id: 'route-anchor', x: 200, y: 200, clearance: 64 },
+    { id: 'off-route-anchor', x: 200, y: 360, clearance: 64 }
+  ],
+  threats: [], landmarks: [], nodes: [], curios: [], ecology: []
+};
+world.layout = routeLayout;
+Game.hazards.initRegion('lavacave', routeLayout);
+const flameVent = Game.hazards.all().find((hazard) =>
+  hazard.profileId === 'hazard.lavacave.flame_vent' && hazard.anchorId === 'route-anchor');
+assert.ok(flameVent);
+assert.ok(flameVent.placement.triggerRouteIds.length > 0);
+assert.ok(Math.abs(Math.sin(flameVent.orientation)) < 0.6,
+  `cone orientation follows route axis: ${flameVent.orientation}`);
 
 // External periodic Statuses continue on the world fixed tick and clean up at expiry.
 const periodicHp = hero.hp;

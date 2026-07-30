@@ -314,6 +314,103 @@
     }
     ratio = walkable / usable;
 
+    // Boss 点不是普通空地上的一组装饰，而是导航层真实存在的战斗房：
+    // 中央保持开阔，外围用不可通行的椭圆墙带分隔；所有实际接入 Boss
+    // 中心的宏观道路都会在墙带上切出门洞，视觉层复用同一份几何数据。
+    var bossCenter = macro.centers[1];
+    var bossDef = region.exploration && region.exploration.landmarks &&
+      region.exploration.landmarks[3];
+    var territory = bossDef && bossDef.territory || {};
+    var arenaRx = U.clamp(territory.radius || 126, 104, 160);
+    var arenaSquash = U.clamp(territory.squash || 0.64, 0.52, 0.78);
+    var arenaRy = arenaRx * arenaSquash;
+    var wallThickness = U.clamp(territory.wallThickness || 24, 18, 32);
+    var doorHalfAngle = U.clamp(territory.doorHalfAngle || 0.56, 0.42, 0.72);
+    var arenaDoors = [];
+
+    function normalizedArenaAngle(x, y) {
+      return Math.atan2((y - bossCenter.y) / arenaRy, (x - bossCenter.x) / arenaRx);
+    }
+    function angleDelta(a, b) {
+      return Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+    }
+    function addArenaDoor(angle, edgeId, kind) {
+      for (var adi = 0; adi < arenaDoors.length; adi++) {
+        if (angleDelta(angle, arenaDoors[adi].angle) < 0.12) return;
+      }
+      arenaDoors.push({ angle: angle, edgeId: edgeId || null, kind: kind || 'main' });
+    }
+
+    for (var aei = 0; aei < macro.edges.length; aei++) {
+      var arenaEdge = macro.edges[aei];
+      if (arenaEdge.a !== 1 && arenaEdge.b !== 1) continue;
+      var edgeA = macro.centers[arenaEdge.a], edgeB = macro.centers[arenaEdge.b];
+      // 在曲线上搜索与椭圆墙带的实际交点，让门洞精确接上弯曲道路。
+      var arenaSample = bossCenter;
+      var arenaSampleError = Infinity;
+      for (var asi = 1; asi <= 32; asi++) {
+        var arenaT = arenaEdge.a === 1 ? asi / 32 : 1 - asi / 32;
+        var sampleCandidate = pointOnEdge(edgeA, edgeB, arenaEdge.bend, arenaT);
+        var sampleNx = (sampleCandidate.x - bossCenter.x) / arenaRx;
+        var sampleNy = (sampleCandidate.y - bossCenter.y) / arenaRy;
+        var sampleError = Math.abs(Math.sqrt(sampleNx * sampleNx + sampleNy * sampleNy) - 1);
+        if (sampleError < arenaSampleError) {
+          arenaSampleError = sampleError;
+          arenaSample = sampleCandidate;
+        }
+      }
+      addArenaDoor(normalizedArenaAngle(arenaSample.x, arenaSample.y), arenaEdge.id, arenaEdge.kind);
+    }
+    // 极端拓扑下仍至少保留一个面向营地的主入口。
+    if (!arenaDoors.length) {
+      addArenaDoor(normalizedArenaAngle(macro.centers[0].x, macro.centers[0].y), null, 'main');
+    }
+
+    var wallNorm = wallThickness / Math.max(1, Math.min(arenaRx, arenaRy)) * 0.55;
+    var arenaMinX = Math.max(2, Math.floor((bossCenter.x - arenaRx - wallThickness) / NAV));
+    var arenaMaxX = Math.min(nw - 3, Math.ceil((bossCenter.x + arenaRx + wallThickness) / NAV));
+    var arenaMinY = Math.max(Math.ceil(BOUND_TOP / NAV) + 1,
+      Math.floor((bossCenter.y - arenaRy - wallThickness) / NAV));
+    var arenaMaxY = Math.min(nh - 3, Math.ceil((bossCenter.y + arenaRy + wallThickness) / NAV));
+    for (gy = arenaMinY; gy <= arenaMaxY; gy++) {
+      for (gx = arenaMinX; gx <= arenaMaxX; gx++) {
+        var arenaWx = gx * NAV + NAV / 2;
+        var arenaWy = gy * NAV + NAV / 2;
+        var arenaNx = (arenaWx - bossCenter.x) / arenaRx;
+        var arenaNy = (arenaWy - bossCenter.y) / arenaRy;
+        var arenaNorm = Math.sqrt(arenaNx * arenaNx + arenaNy * arenaNy);
+        var arenaIdx = gy * nw + gx;
+        if (arenaNorm < 1 - wallNorm) {
+          flat[arenaIdx] = 1;
+          protectedCells[arenaIdx] = 1;
+          continue;
+        }
+        if (Math.abs(arenaNorm - 1) > wallNorm) continue;
+        var arenaAngle = Math.atan2(arenaNy, arenaNx);
+        var throughDoor = false;
+        for (var doorIndex = 0; doorIndex < arenaDoors.length; doorIndex++) {
+          if (angleDelta(arenaAngle, arenaDoors[doorIndex].angle) <= doorHalfAngle) {
+            throughDoor = true;
+            break;
+          }
+        }
+        flat[arenaIdx] = throughDoor ? 1 : 0;
+        protectedCells[arenaIdx] = 1;
+      }
+    }
+
+    walkable = 0;
+    for (i = 0; i < flat.length; i++) if (flat[i]) walkable++;
+    ratio = walkable / usable;
+    var bossArena = {
+      x: bossCenter.x, y: bossCenter.y,
+      rx: arenaRx, ry: arenaRy,
+      wallThickness: wallThickness,
+      doorHalfAngle: doorHalfAngle,
+      floorScale: 1 - wallNorm * 1.25,
+      doors: arenaDoors
+    };
+
     var grid = [], costs = [], centersAt = [], danger = [];
     var matChoices = [region.terrain.base.mat];
     for (i = 0; i < region.terrain.patches.length; i++) {
@@ -362,7 +459,7 @@
     return {
       cell: NAV, w: nw, h: nh, grid: grid, flat: flat, costs: costs,
       macroCenter: centersAt, danger: danger, distance: distance,
-      blockers: blockers, walkableRatio: ratio
+      blockers: blockers, bossArena: bossArena, walkableRatio: ratio
     };
   }
 
@@ -439,11 +536,13 @@
       });
     }
     var lairDef = landmarkDefs[3] || { id: 'boss_lair', function: 'boss', sprite: 'exp_boss_lair' };
+    var approachAngle = Math.atan2(camp.y - bossPoint.y, camp.x - bossPoint.x);
     landmarks.push({
       kind: 'landmark', id: region.id + ':landmark:' + lairDef.id,
       defId: lairDef.id, nameKey: lairDef.nameKey, function: 'boss',
       sprite: lairDef.sprite || 'exp_boss_lair', x: bossPoint.x, y: bossPoint.y, discovered: false,
-      bossLair: true
+      bossLair: true, territory: lairDef.territory || null,
+      approachAngle: approachAngle, shadow: true, large: true
     });
 
     var resourceDefs = cfg.resources || [];
@@ -590,7 +689,14 @@
         var campGround = region.layout && region.layout.road && region.layout.road.mat || base.mat;
         if (campGround === 'water' || campGround === 'lava' || campGround === 'void') campGround = base.mat;
         var inCamp = U.dist(wx, wy, content.camp.x, content.camp.y) <= 92;
-        var inLair = U.dist(wx, wy, content.bossPoint.x, content.bossPoint.y) <= 116;
+        var lair = content.landmarks[3];
+        var territory = lair && lair.territory;
+        var arena = nav.bossArena;
+        var lairRx = arena ? arena.rx * arena.floorScale : 116;
+        var lairRy = arena ? arena.ry * arena.floorScale : 76;
+        var lairNx = (wx - content.bossPoint.x) / lairRx;
+        var lairNy = (wy - content.bossPoint.y) / lairRy;
+        var inLair = lairNx * lairNx + lairNy * lairNy <= 1;
         var broad = smoothNoise(gx, gy, 15, worldSeed ^ 0xa913);
         var fine = smoothNoise(gx + 37, gy - 19, 5.5, worldSeed ^ 0x4b71);
         var choose = broad * 0.72 + fine * 0.28;
@@ -600,9 +706,13 @@
           : null;
         var mat = inCamp ? campGround : (inLair ? base.mat : (pd ? pd.mat : base.mat));
         grid[idx] = mat;
+        var lairGround = territory && territory.ground;
+        var lairColors = lairGround
+          ? [lairGround.fill, U.shade(lairGround.fill, 0.76), lairGround.edge]
+          : base.colors;
         colors[idx] = inCamp
           ? (region.layout && region.layout.road && region.layout.road.colors || base.colors)
-          : (inLair ? base.colors : (pd ? pd.colors : base.colors));
+          : (inLair ? lairColors : (pd ? pd.colors : base.colors));
         if (mat === 'water') water.push(idx);
         if (mat === 'lava') lava.push(idx);
       }
@@ -643,6 +753,12 @@
       return true;
     }
     function clearOfContent(x, y, radius) {
+      var clearArena = nav.bossArena;
+      if (clearArena) {
+        var clearArenaX = (x - clearArena.x) / (clearArena.rx + 34);
+        var clearArenaY = (y - clearArena.y) / (clearArena.ry + 28);
+        if (clearArenaX * clearArenaX + clearArenaY * clearArenaY < 1) return false;
+      }
       if (U.dist(x, y, content.camp.x, content.camp.y) < 155 ||
           U.dist(x, y, content.bossPoint.x, content.bossPoint.y) < 120) return false;
       var important = content.landmarks.concat(content.nodes, content.curios, content.ecology, [content.guardian]);
@@ -706,6 +822,57 @@
         var wgy = U.clamp(Math.floor(wpy / CELL), 0, gh - 1);
         if (grid[wgy * gw + wgx] === 'water') addDecor(weighted(waterDeco), wpx, wpy, false);
       }
+    }
+
+    // Boss 领地装饰使用独立的 landmarks 随机流，不改变既有地表物、
+    // 花簇或资源坐标。装饰贴着不可通行墙带排布，中央战斗房保持开阔。
+    // 它们仍是非碰撞视觉实体，真正的分隔由 nav.bossArena 墙格承担。
+    lair = content.landmarks[3];
+    territory = lair && lair.territory;
+    if (territory && territory.decor && territory.decor.length) {
+      var territoryRng = U.seededRng(seedFor(worldSeed, region.id, 'landmarks', attempt) ^ 0x71c3a95d);
+      var territoryDeck = [];
+      for (var tdi = 0; tdi < territory.decor.length; tdi++) {
+        var repeats = Math.max(1, territory.decor[tdi].count || 1);
+        for (var tdr = 0; tdr < repeats; tdr++) territoryDeck.push(territory.decor[tdi]);
+      }
+      var territoryCount = U.clamp(territory.decorCount || 8, 4, 14);
+      var clearAngle = U.clamp(territory.approachClearance || 0.7, 0.45, 1.1);
+      var arc = Math.PI * 2 - clearAngle * 2;
+      var territoryRadius = U.clamp(territory.radius || 126, 96, 156);
+      var territorySquash = U.clamp(territory.squash || 0.64, 0.52, 0.78);
+      var placedTerritory = 0;
+      for (var tdi2 = 0; tdi2 < territoryCount; tdi2++) {
+        var unit = (tdi2 + 0.5) / territoryCount;
+        var angle = lair.approachAngle + clearAngle + unit * arc +
+          (territoryRng() - 0.5) * 0.22;
+        var ring = territoryRadius * (0.88 + (tdi2 % 2) * 0.10 + territoryRng() * 0.06);
+        var territoryX = lair.x + Math.cos(angle) * ring;
+        var territoryY = lair.y + Math.sin(angle) * ring * territorySquash;
+        if (!propSpace(territoryX, territoryY, 23)) continue;
+        var territoryDef = territoryDeck[(tdi2 + Math.floor(territoryRng() * territoryDeck.length)) % territoryDeck.length];
+        var territoryProp = {
+          kind: 'bossDecor',
+          id: region.id + ':boss-decor:' + placedTerritory,
+          sprite: territoryDef.sprite,
+          x: territoryX, y: territoryY,
+          phase: territoryRng() * 6.28,
+          flipX: territoryRng() < 0.5,
+          sway: !!territoryDef.sway,
+          bob: !!territoryDef.bob,
+          flicker: !!territoryDef.flicker,
+          animSpd: territoryDef.flicker ? 0.24 : (0.85 + territoryRng() * 0.65),
+          shadow: territoryDef.shadow !== false,
+          glow: territoryDef.glow || null,
+          h: 18, bossTerritoryId: lair.id
+        };
+        props.push(territoryProp);
+        var territoryKey = Math.floor(territoryX / 32) + ':' + Math.floor(territoryY / 32);
+        (propBuckets[territoryKey] = propBuckets[territoryKey] || []).push(territoryProp);
+        if (territoryProp.glow) glows.push(territoryProp);
+        placedTerritory++;
+      }
+      lair.territoryDecorCount = placedTerritory;
     }
 
     var tuftTarget = Math.round((region.terrain.tufts || 0) * 6);
@@ -820,6 +987,7 @@
       camp: content.camp,
       bossPoint: content.bossPoint,
       bossLair: content.landmarks[3],
+      bossArena: nav.bossArena,
       campSafeRadius: 120,
       bossSafeRadius: 105,
       corridor: { points: corridor, width: 72, mat: region.layout.road.mat },

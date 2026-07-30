@@ -174,6 +174,10 @@
           nodeCooldowns: {},
           exploration: {},
           hazards: { layoutVersion: 3, regions: {} },
+          chestMimic: {
+            rollOrdinal: 0,
+            genuineOpenedSinceMimic: 0
+          },
           social: {
             spawnVariants: {},
             memories: { spawnId: {}, socialGroupId: {}, factionId: {} }

@@ -3415,13 +3415,25 @@ async function run() {
     const hazardDemo = await cdp.evaluate(`(() => {
       const stage = document.getElementById('stage');
       const sheet = document.getElementById('contact-sheet');
+      const routeCanvas = document.getElementById('route-audit-map');
+      const mimicSheet = document.getElementById('mimic-sheet');
       const stagePixels = stage.getContext('2d').getImageData(0, 0, stage.width, stage.height).data;
       const sheetPixels = sheet.getContext('2d').getImageData(0, 0, sheet.width, sheet.height).data;
-      let stageVisible = 0, sheetVisible = 0;
+      const routePixels = routeCanvas.getContext('2d')
+        .getImageData(0, 0, routeCanvas.width, routeCanvas.height).data;
+      const mimicPixels = mimicSheet.getContext('2d')
+        .getImageData(0, 0, mimicSheet.width, mimicSheet.height).data;
+      let stageVisible = 0, sheetVisible = 0, routeVisible = 0, mimicVisible = 0;
       for (let i = 3; i < stagePixels.length; i += 128) if (stagePixels[i]) stageVisible++;
       for (let i = 3; i < sheetPixels.length; i += 64) if (sheetPixels[i]) sheetVisible++;
+      for (let i = 3; i < routePixels.length; i += 128) if (routePixels[i]) routeVisible++;
+      for (let i = 3; i < mimicPixels.length; i += 64) if (mimicPixels[i]) mimicVisible++;
       const catalog = HazardEffectsLab.catalog();
       const triggered = HazardEffectsLab.trigger();
+      const routeReport = HazardEffectsLab.auditReport();
+      const mimicReport = HazardEffectsLab.mimicReport();
+      const mimicIndexes = mimicReport.entries
+        .filter((entry) => entry.mimic).map((entry) => entry.index);
       return {
         title: document.querySelector('h1')?.textContent,
         catalog: catalog.length,
@@ -3431,6 +3443,14 @@ async function run() {
         triggered,
         stageVisible,
         sheetVisible,
+        routeVisible,
+        mimicVisible,
+        routeSummary: routeReport.summary,
+        mimicSamples: mimicReport.entries.length,
+        mimicProtection: mimicReport.entries[0].eligible === false &&
+          mimicReport.entries[1].eligible === false,
+        mimicGapOk: mimicIndexes.every((index, ordinal) =>
+          ordinal === 0 || index - mimicIndexes[ordinal - 1] >= 3),
         controlsTouchable: Array.from(document.querySelectorAll('button, select, a'))
           .every((el) => el.getBoundingClientRect().height >= 44),
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
@@ -3444,6 +3464,14 @@ async function run() {
     assert.match(hazardDemo.state, /revealed \/ warning/);
     assert.ok(hazardDemo.stageVisible > 100);
     assert.ok(hazardDemo.sheetVisible > 100);
+    assert.ok(hazardDemo.routeVisible > 100);
+    assert.ok(hazardDemo.mimicVisible > 100);
+    assert.equal(hazardDemo.routeSummary.activePlacements, hazardDemo.routeSummary.placements);
+    assert.ok(hazardDemo.routeSummary.links > 40);
+    assert.ok(hazardDemo.routeSummary.baselineCrossings > 0);
+    assert.equal(hazardDemo.mimicSamples, 24);
+    assert.equal(hazardDemo.mimicProtection, true);
+    assert.equal(hazardDemo.mimicGapOk, true);
     assert.equal(hazardDemo.controlsTouchable, true);
     assert.equal(hazardDemo.noHorizontalOverflow, true);
 
@@ -3673,9 +3701,9 @@ async function run() {
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.catalog.complete, true);
-    assert.equal(unitsBubbleDemo.catalog.actorCount, 53);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 54);
     assert.equal(unitsBubbleDemo.catalog.classCount, 5);
-    assert.equal(unitsBubbleDemo.catalog.monsterCount, 40);
+    assert.equal(unitsBubbleDemo.catalog.monsterCount, 41);
     assert.equal(unitsBubbleDemo.catalog.summonCount, 9);
     assert.equal(unitsBubbleDemo.catalog.encounterCount, 18);
     assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);

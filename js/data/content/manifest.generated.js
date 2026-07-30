@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "b292c462ee04dbe64550351f0df000c5d77db25d7ce110f6b52bb6990180cc06",
+  "sourceSetHash": "b651dc2caaddf6d8f0a71606a0ff5a375e34f0cc7c3bc41d3427dda07fd42aa3",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "264c7f2471159a8d403589094b5f807da459cb4ba0c195cc5bb9e9d05dbfd559"
+      "sha256": "1e208b9709d4d3d9381e4aad12324956c52a8f7fc1ee211f760ba2b8a4e29e88"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -94,6 +94,11 @@
       "path": "js/data/packs/world/actors.pack.js",
       "kind": "pack",
       "sha256": "4fa57377de50e7eb5530953039aee4ea2b0d835a3ca6d3b91482c4c9d22c9cfa"
+    },
+    {
+      "path": "js/data/packs/world/hoard-mimic.pack.js",
+      "kind": "pack",
+      "sha256": "116f55a08a19b12ef24ded4125a4879d075b1fa5eb2623512421c5cc8f294015"
     },
     {
       "path": "js/data/packs/world/meadow-fox.pack.js",
@@ -230,10 +235,14 @@
       "version": "2.0.0"
     },
     {
+      "id": "world.hoard-mimic",
+      "version": "1.0.0"
+    },
+    {
       "id": "world.meadow-fox",
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "4592179c"
+  "contentFingerprint": "f248239c"
 });
 })();

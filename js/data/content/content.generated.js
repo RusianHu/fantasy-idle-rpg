@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "b292c462ee04dbe64550351f0df000c5d77db25d7ce110f6b52bb6990180cc06",
+  "sourceSetHash": "b651dc2caaddf6d8f0a71606a0ff5a375e34f0cc7c3bc41d3427dda07fd42aa3",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "264c7f2471159a8d403589094b5f807da459cb4ba0c195cc5bb9e9d05dbfd559"
+      "sha256": "1e208b9709d4d3d9381e4aad12324956c52a8f7fc1ee211f760ba2b8a4e29e88"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -94,6 +94,11 @@
       "path": "js/data/packs/world/actors.pack.js",
       "kind": "pack",
       "sha256": "4fa57377de50e7eb5530953039aee4ea2b0d835a3ca6d3b91482c4c9d22c9cfa"
+    },
+    {
+      "path": "js/data/packs/world/hoard-mimic.pack.js",
+      "kind": "pack",
+      "sha256": "116f55a08a19b12ef24ded4125a4879d075b1fa5eb2623512421c5cc8f294015"
     },
     {
       "path": "js/data/packs/world/meadow-fox.pack.js",
@@ -230,11 +235,15 @@
       "version": "2.0.0"
     },
     {
+      "id": "world.hoard-mimic",
+      "version": "1.0.0"
+    },
+    {
       "id": "world.meadow-fox",
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "4592179c"
+  "contentFingerprint": "f248239c"
 });
 })();
 /* source: js/data/packs/regions/catalog.support.js */
@@ -679,9 +688,127 @@
     }
   };
 
+  // Boss 领地由内容数据声明；生成器只解释通用的地表纹样、装饰池和
+  // 正面净空，不按区域 ID 写视觉特判。
+  var BOSS_TERRITORIES = {
+    grassland: {
+      sprite: 'boss_lair_grassland',
+      radius: 126, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      ground: {
+        fill: '#416447', edge: '#91a85e', accent: '#65b9d4',
+        marks: ['pools', 'stones']
+      },
+      aura: { color: '#64c8e8', radius: 46, alpha: 0.12 },
+      decor: [
+        { sprite: 'boss_decor_grassland_1', count: 3, glow: { color: '#5ec6e8', r: 13 } },
+        { sprite: 'boss_decor_grassland_2', count: 2, sway: true },
+        { sprite: 'boss_decor_grassland_3', count: 3 }
+      ]
+    },
+    forest: {
+      sprite: 'boss_lair_forest',
+      radius: 132, squash: 0.66, decorCount: 10, approachClearance: 0.74,
+      ground: {
+        fill: '#304c32', edge: '#778751', accent: '#55c4a8',
+        marks: ['roots', 'wisps']
+      },
+      aura: { color: '#54d6bd', radius: 48, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_forest_1', count: 3, bob: true, glow: { color: '#65d7c3', r: 14 } },
+        { sprite: 'boss_decor_forest_2', count: 3 },
+        { sprite: 'boss_decor_forest_3', count: 2, sway: true, glow: { color: '#58cbb5', r: 13 } }
+      ]
+    },
+    mine: {
+      sprite: 'boss_lair_mine',
+      radius: 128, squash: 0.62, decorCount: 9, approachClearance: 0.68,
+      ground: {
+        fill: '#494249', edge: '#8f7455', accent: '#4bc7dc',
+        marks: ['rails', 'circuits']
+      },
+      aura: { color: '#42cfe8', radius: 45, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_mine_1', count: 3, bob: true, glow: { color: '#49d7ed', r: 15 } },
+        { sprite: 'boss_decor_mine_2', count: 3 },
+        { sprite: 'boss_decor_mine_3', count: 2, flicker: true, glow: { color: '#f29a42', r: 14 } }
+      ]
+    },
+    graveyard: {
+      sprite: 'boss_lair_graveyard',
+      radius: 130, squash: 0.64, decorCount: 10, approachClearance: 0.74,
+      ground: {
+        fill: '#383440', edge: '#80758c', accent: '#a36cdb',
+        marks: ['graves', 'candles']
+      },
+      aura: { color: '#aa78e8', radius: 46, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_graveyard_1', count: 4, flicker: true, glow: { color: '#ad79ea', r: 14 } },
+        { sprite: 'boss_decor_graveyard_2', count: 2 },
+        { sprite: 'boss_decor_graveyard_3', count: 2, sway: true }
+      ]
+    },
+    snowpass: {
+      sprite: 'boss_lair_snowpass',
+      radius: 138, squash: 0.62, decorCount: 9, approachClearance: 0.70,
+      ground: {
+        fill: '#b8cad8', edge: '#f1f6fb', accent: '#72c4e3',
+        marks: ['runes', 'cracks']
+      },
+      aura: { color: '#90dcf4', radius: 48, alpha: 0.12 },
+      decor: [
+        { sprite: 'boss_decor_snowpass_1', count: 3, glow: { color: '#8bd8f0', r: 13 } },
+        { sprite: 'boss_decor_snowpass_2', count: 3 },
+        { sprite: 'boss_decor_snowpass_3', count: 2, sway: true }
+      ]
+    },
+    lavacave: {
+      sprite: 'boss_lair_lavacave',
+      radius: 130, squash: 0.63, decorCount: 10, approachClearance: 0.72,
+      ground: {
+        fill: '#37282a', edge: '#91452d', accent: '#f07b2a',
+        marks: ['cracks', 'sigil']
+      },
+      aura: { color: '#f0792e', radius: 49, alpha: 0.15 },
+      decor: [
+        { sprite: 'boss_decor_lavacave_1', count: 3, flicker: true, glow: { color: '#f28a32', r: 15 } },
+        { sprite: 'boss_decor_lavacave_2', count: 3 },
+        { sprite: 'boss_decor_lavacave_3', count: 2, bob: true, glow: { color: '#ff9a38', r: 14 } }
+      ]
+    },
+    skyruins: {
+      sprite: 'boss_lair_skyruins',
+      radius: 134, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      ground: {
+        fill: '#7c8392', edge: '#d9c99e', accent: '#60d2e3',
+        marks: ['rings', 'runes']
+      },
+      aura: { color: '#63d9e8', radius: 50, alpha: 0.14 },
+      decor: [
+        { sprite: 'boss_decor_skyruins_1', count: 3, bob: true, glow: { color: '#65dce9', r: 14 } },
+        { sprite: 'boss_decor_skyruins_2', count: 3, bob: true },
+        { sprite: 'boss_decor_skyruins_3', count: 2, bob: true, glow: { color: '#63d7e6', r: 15 } }
+      ]
+    },
+    darkcastle: {
+      sprite: 'boss_lair_darkcastle',
+      radius: 140, squash: 0.62, decorCount: 11, approachClearance: 0.76,
+      ground: {
+        fill: '#30263b', edge: '#744281', accent: '#c83e5c',
+        marks: ['sigil', 'spikes']
+      },
+      aura: { color: '#aa55d8', radius: 52, alpha: 0.16 },
+      decor: [
+        { sprite: 'boss_decor_darkcastle_1', count: 4, flicker: true, glow: { color: '#a95bd9', r: 16 } },
+        { sprite: 'boss_decor_darkcastle_2', count: 3, sway: true },
+        { sprite: 'boss_decor_darkcastle_3', count: 2, bob: true, glow: { color: '#d84b68', r: 13 } }
+      ]
+    }
+  };
+
   function makeExploration(region) {
     var rid = region.id;
     var ids = CONTENT_IDS[rid];
+    var bossTerritory = BOSS_TERRITORIES[rid];
     var baseResources = GATHER[rid].map(function (x) {
       return {
         id: x.id, material: x.material, sprite: x.sprite,
@@ -697,12 +824,14 @@
       };
     });
     var landmarks = ids.landmarks.map(function (id, index) {
-      return {
+      var landmark = {
         id: id,
         nameKey: 'explore.content.' + rid + '.' + id,
         function: index === 0 ? 'intel' : (index === 1 ? 'shelter' : (index === 2 ? 'shortcut' : 'boss')),
-        sprite: index === 3 ? 'exp_boss_lair' : 'exp_landmark'
+        sprite: index === 3 ? bossTerritory.sprite : 'exp_landmark'
       };
+      if (index === 3) landmark.territory = bossTerritory;
+      return landmark;
     });
     return {
       world: { w: 2400, h: 1440 },
@@ -3788,6 +3917,251 @@ window.Game.contentSupport.installAll();
           traitIds: [], resistanceProfileId: 'resist.standard',
           aiProfileId: 'ai.monster.standard', rewardProfileId: 'reward.none'
         }
+      ]
+    }
+  });
+})();
+
+/* source: js/data/packs/world/hoard-mimic.pack.js */
+(function () {
+  'use strict';
+  var Game = window.Game;
+
+  function damage(coefficient) {
+    return {
+      type: 'damage', damageTypeId: 'blunt',
+      formulaId: 'core.damage.power-coefficient-v1',
+      params: { powerStat: 'physicalPower', coefficient: coefficient }
+    };
+  }
+
+  function stats(id, hpMultiplier, powerMultiplier) {
+    return {
+      id: id, schemaVersion: 1,
+      stats: {
+        maxHp: { base: 55 * hpMultiplier, tierScale: 2.05 },
+        armor: { base: 3.3, tierScale: 1.9 },
+        ward: { base: 2.7, tierScale: 1.9 },
+        physicalPower: { base: 8 * powerMultiplier, tierScale: 1.95 },
+        magicPower: { base: 8 * powerMultiplier, tierScale: 1.95 },
+        accuracy: 0.91, gcdSpeed: 0.94, castSpeed: 0.94,
+        autoAttackSpeed: 0.94, cooldownRate: 1,
+        moveSpeed: 34, range: 26,
+        critChance: 0.04, critMultiplier: 1.5, dodgeChance: 0,
+        healingPower: 0,
+        shieldPower: { base: 55 * hpMultiplier, tierScale: 2.05 },
+        lifesteal: 0, statusPotency: 1.05, tenacity: 0.16,
+        interruptPower: 1, threatMultiplier: 1, resourceRegen: 1,
+        expMultiplier: 1, goldMultiplier: 1, dropMultiplier: 1
+      }
+    };
+  }
+
+  function variant(id, statProfileId, spriteId, abilityGrantIds, tags) {
+    return {
+      id: id, archetypeId: 'hoard_mimic',
+      overrides: {
+        statProfileId: statProfileId,
+        abilityGrantIds: abilityGrantIds,
+        presentation: {
+          spriteId: spriteId, portraitId: spriteId, scale: 1,
+          renderProfileId: 'render.actor.standard'
+        },
+        tags: ['mimic', 'chest-trap', 'ephemeral'].concat(tags || [])
+      },
+      transitions: []
+    };
+  }
+
+  function encounterPack(id, variantId) {
+    return {
+      id: id,
+      members: [{ slotId: 'maw', archetypeId: 'hoard_mimic', variantId: variantId }],
+      formation: { spacing: 0 }, leashRadius: 96, rewardBudget: 1, groupAlert: false
+    };
+  }
+
+  function spawnProfile(id, packId) {
+    return {
+      id: id, encounterPackId: packId, mountTo: [],
+      identity: { scope: 'ephemeral' },
+      placement: {
+        selector: 'anchor', source: 'summoner', required: true,
+        onFailure: 'abortGroup', occupancyRadius: 10
+      },
+      lifecycle: {
+        activation: 'scripted', unload: 'despawn',
+        onDefeat: 'closeLease', onEscape: 'closeLease',
+        respawn: { mode: 'none', resetVariant: true }
+      },
+      offlineEligible: false
+    };
+  }
+
+  Game.content.registerPack({
+    id: 'world.hoard-mimic', version: '1.0.0', schemaVersion: 1,
+    sourceFile: 'js/data/packs/world/hoard-mimic.pack.js',
+    requires: [{ id: 'core.combat', range: '^2.0.0' }],
+    locales: {
+      'zh-CN': {
+        monster: { hoard_mimic: {
+          name: '噬宝匣',
+          desc: '被贪欲唤醒的伪装魔物，会在箱盖掀开的瞬间咬住猎物。'
+        } },
+        combat: {
+          lore: { hoard_mimic: '旧冒险者说，真正的宝箱从不会在你靠近时屏住呼吸。' },
+          ability: {
+            hoard_mimic_bite: { name: '铜牙啮咬' },
+            hoard_mimic_locktongue: { name: '锁舌擒拿' },
+            hoard_mimic_cursed_clasp: { name: '咒扣合围' },
+            hoard_mimic_coin_storm: { name: '恶币风暴' }
+          },
+          status: {
+            hoard_mimic_clasped: { name: '锁舌迟滞' },
+            hoard_mimic_cursed_mark: { name: '贪欲咒印' }
+          },
+          trait: { hoard_mimic: { name: '伪宝本能' } }
+        }
+      },
+      en: {
+        monster: { hoard_mimic: {
+          name: 'Hoard Maw',
+          desc: 'A greed-woken predator that bites the instant its false lid opens.'
+        } },
+        combat: {
+          lore: { hoard_mimic: 'Old adventurers say a real chest never holds its breath when you approach.' },
+          ability: {
+            hoard_mimic_bite: { name: 'Brass-Fang Bite' },
+            hoard_mimic_locktongue: { name: 'Locktongue Snare' },
+            hoard_mimic_cursed_clasp: { name: 'Cursed Clasp' },
+            hoard_mimic_coin_storm: { name: 'Wicked Coinstorm' }
+          },
+          status: {
+            hoard_mimic_clasped: { name: 'Locktongue Slow' },
+            hoard_mimic_cursed_mark: { name: 'Mark of Greed' }
+          },
+          trait: { hoard_mimic: { name: 'False-Hoard Instinct' } }
+        }
+      }
+    },
+    definitions: {
+      statProfile: [
+        stats('stats.hoard_mimic.weathered', 1.25, .9),
+        stats('stats.hoard_mimic.cursed', 1.35, .95),
+        stats('stats.hoard_mimic.royal', 1.45, 1)
+      ],
+      status: [
+        {
+          id: 'hoard_mimic.clasped', stacking: 'refresh', durationTicks: 36,
+          modifiers: [{ stat: 'moveSpeed', phase: 'multiply', operation: 'multiply', value: .68 }],
+          presentation: { nameKey: 'combat.status.hoard_mimic_clasped.name', icon: 'icon_skill_swift' }
+        },
+        {
+          id: 'hoard_mimic.cursed_mark', stacking: 'refresh', durationTicks: 90,
+          modifiers: [
+            { stat: 'armor', phase: 'multiply', operation: 'multiply', value: .86 },
+            { stat: 'ward', phase: 'multiply', operation: 'multiply', value: .86 }
+          ],
+          presentation: { nameKey: 'combat.status.hoard_mimic_cursed_mark.name', icon: 'icon_skill_poison' }
+        }
+      ],
+      ability: [
+        {
+          id: 'hoard_mimic.bite', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 0, animationLockTicks: 10, cooldownTicks: 0, queueable: true },
+          target: { relation: 'hostile', shape: 'single', range: 28 },
+          effects: [damage(.78)],
+          aiHints: { priority: 12 },
+          presentation: { nameKey: 'combat.ability.hoard_mimic_bite.name', icon: 'icon_skill_strike' }
+        },
+        {
+          id: 'hoard_mimic.locktongue', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 12, animationLockTicks: 11, cooldownTicks: 150, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 54 },
+          telegraph: { shape: 'single', radius: 18, expectedDamagePct: .08 },
+          effects: [
+            damage(.64), { type: 'pull', distance: 16 },
+            { type: 'applyStatus', statusId: 'hoard_mimic.clasped' }
+          ],
+          aiHints: { priority: 78 },
+          presentation: { nameKey: 'combat.ability.hoard_mimic_locktongue.name', icon: 'icon_skill_strike' }
+        },
+        {
+          id: 'hoard_mimic.cursed_clasp', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 18, animationLockTicks: 12, cooldownTicks: 210, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'single', range: 34 },
+          telegraph: { shape: 'single', radius: 20, expectedDamagePct: .14 },
+          effects: [damage(1.04), { type: 'applyStatus', statusId: 'hoard_mimic.cursed_mark' }],
+          aiHints: { priority: 84 },
+          presentation: { nameKey: 'combat.ability.hoard_mimic_cursed_clasp.name', icon: 'icon_skill_poison' }
+        },
+        {
+          id: 'hoard_mimic.coinstorm', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: 24, animationLockTicks: 14, cooldownTicks: 240, queueable: true, interruptible: true },
+          target: { relation: 'hostile', shape: 'circle', range: 62, radius: 34, maxTargets: 4 },
+          telegraph: { shape: 'circle', radius: 34, expectedDamagePct: .18 },
+          effects: [damage(1.16), { type: 'knockback', distance: 10 }],
+          aiHints: { priority: 88 },
+          presentation: { nameKey: 'combat.ability.hoard_mimic_coin_storm.name', icon: 'icon_skill_whirl' }
+        }
+      ],
+      trait: [{
+        id: 'hoard_mimic.trait', kind: 'passive', modifiers: [], triggers: [],
+        presentation: { nameKey: 'combat.trait.hoard_mimic.name', icon: 'icon_skill_guard' }
+      }],
+      rewardProfile: [{
+        id: 'reward.hoard_mimic', schemaVersion: 1,
+        exp: { base: 8.4, tierScale: 1.95 },
+        gold: { base: 4.9, tierScale: 1.9 },
+        dropBudget: 1
+      }],
+      actorArchetype: [{
+        id: 'hoard_mimic', category: 'monster', rank: 'normal',
+        identity: {
+          nameKey: 'monster.hoard_mimic.name',
+          descKey: 'monster.hoard_mimic.desc',
+          loreKey: 'combat.lore.hoard_mimic'
+        },
+        presentation: {
+          spriteId: 'mimic_weathered', portraitId: 'mimic_weathered', scale: 1,
+          renderProfileId: 'render.actor.standard'
+        },
+        body: { size: 'medium', collisionRadius: 10, movementTypes: ['ground'] },
+        tags: ['mimic', 'chest-trap', 'ephemeral'], defaultFactionId: 'wild',
+        statProfileId: 'stats.hoard_mimic.weathered',
+        resourceProfileIds: [],
+        abilityGrantIds: ['hoard_mimic.bite', 'hoard_mimic.locktongue'],
+        traitIds: ['hoard_mimic.trait'],
+        resistanceProfileId: 'resist.standard',
+        aiProfileId: 'ai.monster.standard',
+        rewardProfileId: 'reward.hoard_mimic',
+        interactionProfileId: 'interaction.hostile',
+        engagementPolicyId: 'engagement.hostile'
+      }],
+      actorVariant: [
+        variant(
+          'hoard_mimic.weathered', 'stats.hoard_mimic.weathered', 'mimic_weathered',
+          ['hoard_mimic.bite', 'hoard_mimic.locktongue'], ['tier-low']
+        ),
+        variant(
+          'hoard_mimic.cursed', 'stats.hoard_mimic.cursed', 'mimic_cursed',
+          ['hoard_mimic.bite', 'hoard_mimic.locktongue', 'hoard_mimic.cursed_clasp'], ['tier-mid']
+        ),
+        variant(
+          'hoard_mimic.royal', 'stats.hoard_mimic.royal', 'mimic_royal',
+          ['hoard_mimic.bite', 'hoard_mimic.locktongue', 'hoard_mimic.cursed_clasp', 'hoard_mimic.coinstorm'],
+          ['tier-high']
+        )
+      ],
+      encounterPack: [
+        encounterPack('hoard_mimic.weathered', 'hoard_mimic.weathered'),
+        encounterPack('hoard_mimic.cursed', 'hoard_mimic.cursed'),
+        encounterPack('hoard_mimic.royal', 'hoard_mimic.royal')
+      ],
+      worldSpawnProfile: [
+        spawnProfile('spawn.hoard_mimic.weathered', 'hoard_mimic.weathered'),
+        spawnProfile('spawn.hoard_mimic.cursed', 'hoard_mimic.cursed'),
+        spawnProfile('spawn.hoard_mimic.royal', 'hoard_mimic.royal')
       ]
     }
   });

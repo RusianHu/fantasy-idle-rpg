@@ -246,6 +246,19 @@
         };
         data.v = 15;
       }
+    },
+    {
+      // v15 -> v16: persist only the deterministic chest roll ordinal and
+      // the two-genuine-chest protection counter. Active chests and Mimics stay transient.
+      from: 15,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.chestMimic = {
+          rollOrdinal: 0,
+          genuineOpenedSinceMimic: 0
+        };
+        data.v = 16;
+      }
     }
   ];
 
@@ -360,6 +373,20 @@
     return out;
   }
 
+  function normalizeChestMimic(saved) {
+    saved = saved && typeof saved === 'object' ? saved : {};
+    return {
+      rollOrdinal: Math.max(0, Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.floor(Number(saved.rollOrdinal) || 0)
+      )),
+      genuineOpenedSinceMimic: Math.max(0, Math.min(
+        2,
+        Math.floor(Number(saved.genuineOpenedSinceMimic) || 0)
+      ))
+    };
+  }
+
   var S = Game.save = {
     lastTs: function () { return lastLoadedTs; },
 
@@ -401,6 +428,7 @@
           nodeCooldowns: st.world.nodeCooldowns,
           exploration: st.world.exploration,
           hazards: st.world.hazards,
+          chestMimic: st.world.chestMimic,
           social: st.world.social,
           finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
@@ -544,6 +572,9 @@
         data.world && data.world.hazards,
         Math.max(0, Number(st.world.worldTime) || 0),
         st.world.layoutVersion
+      );
+      st.world.chestMimic = normalizeChestMimic(
+        data.world && data.world.chestMimic
       );
       st.world.social = normalizeSocial(
         data.world && data.world.social,

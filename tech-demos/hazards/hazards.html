@@ -4,10 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#121412">
-<meta name="build-id" content="20260730.4">
+<meta name="build-id" content="20260730.8">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121412'/%3E%3Cpath d='M2 13l3-9 3 7 3-9 3 11H2z' fill='%23e2b94f'/%3E%3C/svg%3E">
 <title data-demo-page-title="hazard.pageTitle">Hazard 特效技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="hazards.css?v=20260730.4">
+<link rel="stylesheet" href="hazards.css?v=20260730.8">
 </head>
 <body>
 <div id="modal-root"></div>
@@ -104,87 +104,192 @@
       </div>
     </aside>
   </main>
+
+  <section class="route-audit-panel" aria-labelledby="route-audit-title">
+    <div class="panel-heading route-audit-heading">
+      <div>
+        <p class="section-code">PLACEMENT / POTENTIAL ROUTES / REVEAL REPLAN</p>
+        <h2 id="route-audit-title" data-demo-i18n="hazard.auditTitle">放置与潜在寻路审计</h2>
+        <p data-demo-i18n="hazard.auditSubtitle">用正式导航网格比较机关隐蔽路径、逐个揭示后的重规划路径，并核对互动接近期间仍持续运行的判定链。</p>
+      </div>
+      <div class="audit-controls">
+        <label><span data-demo-i18n="hazard.auditScope">链路样本</span>
+          <select id="audit-scope">
+            <option value="all" data-demo-i18n="hazard.auditScopeAll">宏观骨架 + 内容接近</option>
+            <option value="macro" data-demo-i18n="hazard.auditScopeMacro">仅宏观骨架</option>
+            <option value="objectives" data-demo-i18n="hazard.auditScopeObjectives">仅内容接近</option>
+          </select>
+        </label>
+        <label><span data-demo-i18n="hazard.auditStrategy">自动策略</span>
+          <select id="audit-strategy">
+            <option value="safe" data-demo-i18n="hazard.strategySafe">安全</option>
+            <option value="balanced" selected data-demo-i18n="hazard.strategyBalanced">均衡</option>
+            <option value="loot" data-demo-i18n="hazard.strategyLoot">掠夺</option>
+          </select>
+        </label>
+        <button id="run-route-audit" type="button" class="accent" data-demo-i18n="hazard.runAudit">重新模拟</button>
+      </div>
+    </div>
+
+    <div class="audit-summary" data-demo-i18n-aria="hazard.auditSummaryAria" aria-label="放置与路径审计摘要">
+      <div><span data-demo-i18n="hazard.auditPlacements">有效放置</span><strong id="audit-placement-count">—</strong></div>
+      <div><span data-demo-i18n="hazard.auditLinks">潜在链路</span><strong id="audit-link-count">—</strong></div>
+      <div><span data-demo-i18n="hazard.auditBaseline">隐蔽路径交叉</span><strong id="audit-baseline-count">—</strong></div>
+      <div><span data-demo-i18n="hazard.auditReroutes">揭示后绕开</span><strong id="audit-reroute-count">—</strong></div>
+      <div><span data-demo-i18n="hazard.auditWarnings">重规划后仍预警</span><strong id="audit-warning-count">—</strong></div>
+      <div><span data-demo-i18n="hazard.auditSuppressed">互动接近覆盖</span><strong id="audit-suppressed-count">—</strong></div>
+    </div>
+
+    <div class="audit-grid">
+      <div class="route-map-wrap">
+        <canvas id="route-audit-map" width="960" height="560" data-demo-i18n-aria="hazard.auditMapAria" aria-label="机关放置与潜在寻路链路图"></canvas>
+        <div class="route-legend">
+          <span><i class="route-base"></i><b data-demo-i18n="hazard.legendBaseRoute">机关隐蔽路径</b></span>
+          <span><i class="route-auto"></i><b data-demo-i18n="hazard.legendAutoRoute">揭示重规划路径</b></span>
+          <span><i class="route-trigger"></i><b data-demo-i18n="hazard.legendTriggerCrossing">触发交叉</b></span>
+          <span><i class="route-reveal"></i><b data-demo-i18n="hazard.legendRevealRange">揭示范围</b></span>
+        </div>
+      </div>
+      <div class="audit-log-panel">
+        <div class="audit-log-heading">
+          <div>
+            <p class="section-code">DETERMINISTIC TRACE</p>
+            <h3 data-demo-i18n="hazard.auditLog">模拟日志</h3>
+          </div>
+          <output id="audit-verdict" aria-live="polite">—</output>
+        </div>
+        <ol id="route-audit-log" class="route-audit-log"></ol>
+      </div>
+    </div>
+
+    <div id="placement-audit" class="placement-audit" data-demo-i18n-aria="hazard.placementAria" aria-label="逐机关链路覆盖报告"></div>
+    <p class="audit-note" data-demo-i18n="hazard.auditNote">“重规划后仍预警”表示进入正式触发形状；安全与均衡策略随后会取消低优先级互动并下发逃生路径，掠夺策略则会在生命充足时接受风险。互动接近不再暂停 Hazard tick。</p>
+  </section>
+
+  <section class="mimic-panel" aria-labelledby="mimic-title">
+    <div class="panel-heading mimic-heading">
+      <div>
+        <p class="section-code">CHEST TRAP / EPHEMERAL ACTOR / SAVE V16</p>
+        <h2 id="mimic-title" data-demo-i18n="hazard.mimicTitle">噬宝匣事务与概率验证</h2>
+        <p data-demo-i18n="hazard.mimicSubtitle">复用正式确定性判定，检查两只真箱保护、15% 合资格概率、三阶变体与胜利后双重奖励链。</p>
+      </div>
+      <div class="mimic-controls">
+        <label><span data-demo-i18n="hazard.mimicSamples">开启样本</span>
+          <select id="mimic-samples">
+            <option value="12">12</option>
+            <option value="24" selected>24</option>
+            <option value="60">60</option>
+          </select>
+        </label>
+        <label><span data-demo-i18n="hazard.mimicGenuineStart">起始真箱计数</span>
+          <select id="mimic-genuine-start">
+            <option value="0" selected>0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </label>
+        <button id="run-mimic-audit" type="button" class="accent" data-demo-i18n="hazard.mimicRun">模拟开启</button>
+      </div>
+    </div>
+    <div class="mimic-policy">
+      <div><span data-demo-i18n="hazard.mimicChance">合资格概率</span><strong>15%</strong></div>
+      <div><span data-demo-i18n="hazard.mimicProtection">连出保护</span><strong data-demo-i18n="hazard.mimicProtectionValue">2 只已开启真箱</strong></div>
+      <div><span data-demo-i18n="hazard.mimicAutoHp">自动开箱生命线</span><strong>70% / 50% / 35%</strong></div>
+      <div><span data-demo-i18n="hazard.mimicCommit">承诺点</span><strong data-demo-i18n="hazard.mimicCommitValue">开箱 0.8 秒完成</strong></div>
+    </div>
+    <div class="mimic-grid">
+      <div class="mimic-sheet-wrap">
+        <canvas id="mimic-sheet" width="780" height="250" data-demo-i18n-aria="hazard.mimicSheetAria" aria-label="噬宝匣三阶像素变体"></canvas>
+        <p data-demo-i18n="hazard.mimicRewardNote">击败后结算原普通宝箱奖励，再叠加约 0.7 倍普通怪经验/金币与一次正式掉落；失败、撤退或换区只清理临时 Actor。</p>
+      </div>
+      <div class="mimic-log-panel">
+        <output id="mimic-verdict" aria-live="polite">—</output>
+        <ol id="mimic-log" class="mimic-log"></ol>
+      </div>
+    </div>
+  </section>
 </div>
 
-<script src="../../js/core/utils.js?v=20260730.4"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260730.4"></script>
-<script src="../../js/core/eventbus.js?v=20260730.4"></script>
-<script src="../../js/core/registry.js?v=20260730.4"></script>
-<script src="../../js/i18n/i18n.js?v=20260730.4"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260730.4"></script>
-<script src="../../js/i18n/en.js?v=20260730.4"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260730.4"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260730.4"></script>
-<script src="../../js/core/assets.js?v=20260730.4"></script>
-<script src="../../js/data/formulas.js?v=20260730.4"></script>
-<script src="../../js/sprites/palettes.js?v=20260730.4"></script>
-<script src="../../js/sprites/hero.js?v=20260730.4"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260730.4"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260730.4"></script>
-<script src="../../js/sprites/monsters_expansion.js?v=20260730.4"></script>
-<script src="../../js/sprites/props.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration_v3.manifest.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260730.4"></script>
-<script src="../../js/sprites/flora.js?v=20260730.4"></script>
-<script src="../../js/sprites/minimap_icons.js?v=20260730.4"></script>
-<script src="../../js/data/affixes.js?v=20260730.4"></script>
-<script src="../../js/data/items.js?v=20260730.4"></script>
-<script src="../../js/data/classes.js?v=20260730.4"></script>
-<script src="../../js/data/skills.js?v=20260730.4"></script>
-<script src="../../js/data/routes.js?v=20260730.4"></script>
-<script src="../../js/core/content/rules.js?v=20260730.4"></script>
-<script src="../../js/core/content/schemas.js?v=20260730.4"></script>
-<script src="../../js/core/content/compiler.js?v=20260730.4"></script>
-<script src="../../js/core/content/audit.js?v=20260730.4"></script>
-<script src="../../js/core/content/registry.js?v=20260730.4"></script>
-<script src="../../js/core/content/support.js?v=20260730.4"></script>
-<script src="../../js/data/content/content.generated.js?v=20260730.4"></script>
-<script src="../../js/systems/routes.js?v=20260730.4"></script>
-<script src="../../js/systems/state.js?v=20260730.4"></script>
-<script src="../../js/systems/terrain.js?v=20260730.4"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260730.4"></script>
-<script src="../../js/systems/nav.js?v=20260730.4"></script>
-<script src="../../js/systems/inventory.js?v=20260730.4"></script>
-<script src="../../js/systems/items.js?v=20260730.4"></script>
-<script src="../../js/systems/actors/relations.js?v=20260730.4"></script>
-<script src="../../js/systems/actors/parties.js?v=20260730.4"></script>
-<script src="../../js/systems/actors/roster.js?v=20260730.4"></script>
-<script src="../../js/systems/actors/actors.js?v=20260730.4"></script>
-<script src="../../js/systems/world_population.js?v=20260730.4"></script>
-<script src="../../js/systems/encounters.js?v=20260730.4"></script>
-<script src="../../js/systems/engagement.js?v=20260730.4"></script>
-<script src="../../js/systems/combat_ai.js?v=20260730.4"></script>
-<script src="../../js/systems/combat.js?v=20260730.4"></script>
-<script src="../../js/systems/hazards.js?v=20260730.4"></script>
-<script src="../../js/systems/combat_estimator.js?v=20260730.4"></script>
-<script src="../../js/systems/automation.js?v=20260730.4"></script>
-<script src="../../js/systems/environment.js?v=20260730.4"></script>
-<script src="../../js/systems/exploration.js?v=20260730.4"></script>
-<script src="../../js/systems/expedition.js?v=20260730.4"></script>
-<script src="../../js/systems/action_bubbles.js?v=20260730.4"></script>
-<script src="../../js/systems/expedition_ai.js?v=20260730.4"></script>
-<script src="../../js/systems/world.js?v=20260730.4"></script>
-<script src="../../js/systems/trade.js?v=20260730.4"></script>
-<script src="../../js/render/terrain.js?v=20260730.4"></script>
-<script src="../../js/render/exploration.js?v=20260730.4"></script>
-<script src="../../js/render/particles.js?v=20260730.4"></script>
-<script src="../../js/render/daynight.js?v=20260730.4"></script>
-<script src="../../js/render/effects.js?v=20260730.4"></script>
-<script src="../../js/render/combat_presentation.js?v=20260730.4"></script>
-<script src="../../js/render/hazards.js?v=20260730.4"></script>
-<script src="../../js/render/renderer.js?v=20260730.4"></script>
-<script src="../../js/ui/modals.js?v=20260730.4"></script>
-<script src="../demo-i18n.js?v=20260730.4"></script>
-<script src="hazards.js?v=20260730.4"></script>
+<script src="../../js/core/utils.js?v=20260730.8"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260730.8"></script>
+<script src="../../js/core/eventbus.js?v=20260730.8"></script>
+<script src="../../js/core/registry.js?v=20260730.8"></script>
+<script src="../../js/i18n/i18n.js?v=20260730.8"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260730.8"></script>
+<script src="../../js/i18n/en.js?v=20260730.8"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260730.8"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260730.8"></script>
+<script src="../../js/core/assets.js?v=20260730.8"></script>
+<script src="../../js/data/formulas.js?v=20260730.8"></script>
+<script src="../../js/sprites/palettes.js?v=20260730.8"></script>
+<script src="../../js/sprites/hero.js?v=20260730.8"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260730.8"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260730.8"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260730.8"></script>
+<script src="../../js/sprites/props.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260730.8"></script>
+<script src="../../js/sprites/boss_landmarks.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration_v3.manifest.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260730.8"></script>
+<script src="../../js/sprites/flora.js?v=20260730.8"></script>
+<script src="../../js/sprites/minimap_icons.js?v=20260730.8"></script>
+<script src="../../js/data/affixes.js?v=20260730.8"></script>
+<script src="../../js/data/items.js?v=20260730.8"></script>
+<script src="../../js/data/classes.js?v=20260730.8"></script>
+<script src="../../js/data/skills.js?v=20260730.8"></script>
+<script src="../../js/data/routes.js?v=20260730.8"></script>
+<script src="../../js/core/content/rules.js?v=20260730.8"></script>
+<script src="../../js/core/content/schemas.js?v=20260730.8"></script>
+<script src="../../js/core/content/compiler.js?v=20260730.8"></script>
+<script src="../../js/core/content/audit.js?v=20260730.8"></script>
+<script src="../../js/core/content/registry.js?v=20260730.8"></script>
+<script src="../../js/core/content/support.js?v=20260730.8"></script>
+<script src="../../js/data/content/content.generated.js?v=20260730.8"></script>
+<script src="../../js/systems/routes.js?v=20260730.8"></script>
+<script src="../../js/systems/state.js?v=20260730.8"></script>
+<script src="../../js/systems/terrain.js?v=20260730.8"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260730.8"></script>
+<script src="../../js/systems/nav.js?v=20260730.8"></script>
+<script src="../../js/systems/inventory.js?v=20260730.8"></script>
+<script src="../../js/systems/items.js?v=20260730.8"></script>
+<script src="../../js/systems/actors/relations.js?v=20260730.8"></script>
+<script src="../../js/systems/actors/parties.js?v=20260730.8"></script>
+<script src="../../js/systems/actors/roster.js?v=20260730.8"></script>
+<script src="../../js/systems/actors/actors.js?v=20260730.8"></script>
+<script src="../../js/systems/world_population.js?v=20260730.8"></script>
+<script src="../../js/systems/encounters.js?v=20260730.8"></script>
+<script src="../../js/systems/engagement.js?v=20260730.8"></script>
+<script src="../../js/systems/combat_ai.js?v=20260730.8"></script>
+<script src="../../js/systems/combat.js?v=20260730.8"></script>
+<script src="../../js/systems/hazards.js?v=20260730.8"></script>
+<script src="../../js/systems/combat_estimator.js?v=20260730.8"></script>
+<script src="../../js/systems/automation.js?v=20260730.8"></script>
+<script src="../../js/systems/environment.js?v=20260730.8"></script>
+<script src="../../js/systems/exploration.js?v=20260730.8"></script>
+<script src="../../js/systems/expedition.js?v=20260730.8"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260730.8"></script>
+<script src="../../js/systems/expedition_ai.js?v=20260730.8"></script>
+<script src="../../js/systems/world.js?v=20260730.8"></script>
+<script src="../../js/systems/trade.js?v=20260730.8"></script>
+<script src="../../js/render/terrain.js?v=20260730.8"></script>
+<script src="../../js/render/exploration.js?v=20260730.8"></script>
+<script src="../../js/render/particles.js?v=20260730.8"></script>
+<script src="../../js/render/daynight.js?v=20260730.8"></script>
+<script src="../../js/render/effects.js?v=20260730.8"></script>
+<script src="../../js/render/combat_presentation.js?v=20260730.8"></script>
+<script src="../../js/render/hazards.js?v=20260730.8"></script>
+<script src="../../js/render/renderer.js?v=20260730.8"></script>
+<script src="../../js/ui/modals.js?v=20260730.8"></script>
+<script src="../demo-i18n.js?v=20260730.8"></script>
+<script src="hazards.js?v=20260730.8"></script>
 </body>
 </html>

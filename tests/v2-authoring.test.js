@@ -11,7 +11,7 @@ const output = execFileSync(process.execPath, ['tools/audit-content.js', '--fixt
 const audit = JSON.parse(output);
 assert.equal(audit.ok, true);
 assert.ok(audit.packs.some((pack) => pack.id === 'fixture.authoring'));
-assert.equal(audit.counts.actorArchetype, 57);
+assert.equal(audit.counts.actorArchetype, 58);
 assert.ok(audit.counts.worldSpawnProfile >= 29);
 const scaffold = fs.readFileSync(path.join(ROOT, 'tools/scaffold-actor.ps1'), 'utf8');
 assert.match(scaffold, /OutputDirectory must stay inside js\/data\/packs/);

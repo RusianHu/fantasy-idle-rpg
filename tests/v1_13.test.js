@@ -69,6 +69,11 @@ for (const region of regions) {
   assert.equal(region.exploration.world.h, 1440);
   assert.equal(region.exploration.resources.length, 5);
   assert.equal(region.exploration.landmarks.length, 4);
+  const bossLandmarkDef = region.exploration.landmarks[3];
+  assert.equal(bossLandmarkDef.sprite, `boss_lair_${region.id}`);
+  assert.ok(bossLandmarkDef.territory && bossLandmarkDef.territory.ground);
+  assert.ok(bossLandmarkDef.territory.decor.length === 3);
+  assert.ok(bossLandmarkDef.territory.ground.marks.length >= 2);
   assert.equal(region.exploration.curios.length, 3);
   assert.equal(region.exploration.ecology.length, 2);
   assert.equal(region.exploration.commissions.length, 4);
@@ -105,9 +110,49 @@ for (const region of regions) {
     assert.equal(first.curios.length, 3);
     assert.equal(first.ecology.length, 2);
     assert.ok(first.guardian && first.bossLair);
+    assert.equal(first.bossLair.sprite, `boss_lair_${region.id}`);
+    assert.equal(first.bossLair.territory, bossLandmarkDef.territory);
+    assert.equal(first.bossArena, first.nav.bossArena);
+    assert.ok(first.bossArena.rx >= 104 && first.bossArena.ry >= 54);
+    assert.ok(first.bossArena.wallThickness >= 18);
+    assert.ok(first.bossArena.doors.length >= 1);
+    const arenaNavCell = (x, y) => first.nav.grid[
+      Math.floor(y / first.nav.cell)
+    ][Math.floor(x / first.nav.cell)];
+    assert.equal(arenaNavCell(first.bossArena.x, first.bossArena.y), 1,
+      `${region.id}:${seed} boss room center must remain walkable`);
+    for (const door of first.bossArena.doors) {
+      assert.equal(arenaNavCell(
+        first.bossArena.x + Math.cos(door.angle) * first.bossArena.rx,
+        first.bossArena.y + Math.sin(door.angle) * first.bossArena.ry
+      ), 1, `${region.id}:${seed} boss room doorway must be walkable`);
+    }
+    let arenaWallSamples = 0;
+    let arenaBlockedSamples = 0;
+    for (let sample = 0; sample < 96; sample++) {
+      const angle = sample / 96 * Math.PI * 2;
+      const throughDoor = first.bossArena.doors.some((door) => Math.abs(Math.atan2(
+        Math.sin(angle - door.angle),
+        Math.cos(angle - door.angle)
+      )) <= first.bossArena.doorHalfAngle);
+      if (throughDoor) continue;
+      arenaWallSamples++;
+      if (!arenaNavCell(
+        first.bossArena.x + Math.cos(angle) * first.bossArena.rx,
+        first.bossArena.y + Math.sin(angle) * first.bossArena.ry
+      )) arenaBlockedSamples++;
+    }
+    assert.ok(arenaWallSamples >= 20 && arenaBlockedSamples / arenaWallSamples >= 0.88,
+      `${region.id}:${seed} boss room wall must be a real impassable partition`);
     const surfaceMaterial = (x, y) => first.grid[
       Math.floor(y / first.cell) * first.gw + Math.floor(x / first.cell)
     ];
+    const surfacePalette = (x, y) => first.colorGrid[
+      Math.floor(y / first.cell) * first.gw + Math.floor(x / first.cell)
+    ];
+    assert.equal(surfacePalette(first.bossLair.x, first.bossLair.y)[0],
+      bossLandmarkDef.territory.ground.fill,
+      `${region.id}:${seed} boss room needs a region-specific floor palette`);
     for (const [dx, dy] of [[0, 0], [30, 26], [22, 22], [-62, 25], [48, 4]]) {
       assert.ok(
         !['water', 'lava', 'blocked', 'void'].includes(surfaceMaterial(first.camp.x + dx, first.camp.y + dy)),
@@ -127,6 +172,30 @@ for (const region of regions) {
       for (const def of region.terrain.deco) {
         assert.ok(actualSprites.has(def.sprite),
           `${region.id}:${seed} configured theme decoration ${def.sprite} was not instantiated`);
+      }
+      const territoryProps = first.props.filter((prop) => prop.kind === 'bossDecor');
+      assert.equal(territoryProps.length, bossLandmarkDef.territory.decorCount);
+      assert.ok(territoryProps.every((prop) => !prop.blockerProp && prop.bossTerritoryId === first.bossLair.id));
+      const territorySprites = new Set(bossLandmarkDef.territory.decor.map((def) => def.sprite));
+      assert.ok(territoryProps.every((prop) => territorySprites.has(prop.sprite)));
+      for (const prop of territoryProps) {
+        const normalizedRadius = Math.hypot(
+          (prop.x - first.bossLair.x) / bossLandmarkDef.territory.radius,
+          (prop.y - first.bossLair.y) /
+            (bossLandmarkDef.territory.radius * bossLandmarkDef.territory.squash)
+        );
+        assert.ok(normalizedRadius >= 0.84,
+          `${region.id}:${seed} boss decor belongs on the room boundary, not the combat floor`);
+        const angle = Math.atan2(
+          (prop.y - first.bossLair.y) / bossLandmarkDef.territory.squash,
+          prop.x - first.bossLair.x
+        );
+        const delta = Math.abs(Math.atan2(
+          Math.sin(angle - first.bossLair.approachAngle),
+          Math.cos(angle - first.bossLair.approachAngle)
+        ));
+        assert.ok(delta >= bossLandmarkDef.territory.approachClearance - 0.12,
+          `${region.id}:${seed} boss decor must preserve the approach lane`);
       }
     }
     if (region.terrain.tufts > 0) {
@@ -532,6 +601,9 @@ const assetBox = {
 };
 vm.createContext(assetBox);
 vm.runInContext(read('js/sprites/exploration_v3.js'), assetBox, { filename: 'js/sprites/exploration_v3.js' });
+vm.runInContext(read('js/sprites/boss_landmarks.generated.js'), assetBox, {
+  filename: 'js/sprites/boss_landmarks.generated.js'
+});
 vm.runInContext(read('js/sprites/exploration_v3.manifest.js'), assetBox, { filename: 'js/sprites/exploration_v3.manifest.js' });
 const manifest = assetBox.window.Game.EXPLORATION_V3_ASSETS;
 const actualSourceHash = crypto.createHash('sha256')
@@ -544,7 +616,24 @@ for (const id of manifest.assets) assert.ok(assetBox.defs.has(id), `${id} code f
 const newResourceSprites = regions.flatMap((r) => r.exploration.resources.slice(2).map((x) => x.sprite));
 assert.equal(new Set(newResourceSprites).size, 24);
 for (const id of newResourceSprites) assert.ok(manifest.assets.includes(id));
+const bossManifest = assetBox.window.Game.BOSS_TERRITORY_SPRITES;
+assert.equal(Object.keys(bossManifest.sources).length, 8);
+assert.equal(Object.keys(bossManifest.assets).length, 32);
+for (const [rid, source] of Object.entries(bossManifest.sources)) {
+  const sourceHash = crypto.createHash('sha256')
+    .update(fs.readFileSync(path.join(ROOT, source.path)))
+    .digest('hex');
+  assert.equal(sourceHash, source.sha256, `${rid} boss source provenance`);
+  assert.deepEqual(
+    Array.from(bossManifest.regions[rid]),
+    [`boss_lair_${rid}`, `boss_decor_${rid}_1`, `boss_decor_${rid}_2`, `boss_decor_${rid}_3`]
+  );
+}
+for (const id of Object.keys(bossManifest.assets)) {
+  assert.ok(assetBox.defs.has(id), `${id} compiled boss-territory sprite exists`);
+}
 const index = read('index.html');
+assert.ok(index.indexOf('boss_landmarks.generated.js') > index.indexOf('exploration_v3.js'));
 assert.ok(index.indexOf('systems/terrain_v3.js') > index.indexOf('systems/terrain.js'));
 assert.ok(index.indexOf('systems/exploration.js') < index.indexOf('systems/world.js'));
 assert.ok(index.indexOf('systems/action_bubbles.js') < index.indexOf('systems/expedition_ai.js'));

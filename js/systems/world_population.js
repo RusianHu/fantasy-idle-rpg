@@ -89,6 +89,39 @@
     return output;
   }
 
+  function ambushProfileForThreat(view, rid, threat, currentProfile, counts, context) {
+    if (!threat || threat.defId !== 'ambush') return currentProfile;
+    var hazard = Game.content.all('hazardProfile').filter(function (profile) {
+      return profile.regionId === rid && profile.category === 'ambushTrigger';
+    })[0];
+    var allowed = hazard && hazard.outcome && hazard.outcome.encounterPackIds || [];
+    function compatible(profile) {
+      var pack = profile && Game.content.get('encounterPack', profile.encounterPackId);
+      return !!pack && pack.ambushEligible === true && (pack.members || []).length <= 2 &&
+        allowed.indexOf(pack.id) >= 0;
+    }
+    if (compatible(currentProfile)) return currentProfile;
+    var config = view.channels.regular;
+    var entries = config.spawnRefs.filter(function (entry) {
+      if (!conditionAllows(entry, view, context.tier || 1)) return false;
+      if (entry.maxCount && (counts[entry.profileId] || 0) >= entry.maxCount) return false;
+      return compatible(Game.content.get('worldSpawnProfile', entry.profileId));
+    });
+    var total = entries.reduce(function (sum, entry) {
+      return sum + (entry.mode === 'weighted' ? entry.weight : 1);
+    }, 0);
+    if (!total) return null;
+    var roll = Game.util.strSeed([
+      context.worldSeed, rid, context.layoutVersion, view.id,
+      threat.id, context.expeditionIndex || 0, 'ambush-pack'
+    ].join('|')) % total;
+    for (var index = 0; index < entries.length; index++) {
+      roll -= entries[index].mode === 'weighted' ? entries[index].weight : 1;
+      if (roll < 0) return Game.content.get('worldSpawnProfile', entries[index].profileId);
+    }
+    return Game.content.get('worldSpawnProfile', entries[0].profileId);
+  }
+
   function stableSpawnId(profile, context) {
     var scope = profile.identity.scope;
     if (scope === 'worldStable') return 'world:' + profile.identity.persistentKey;
@@ -387,11 +420,10 @@
         expeditionIndex: context.expeditionIndex || 0
       });
       var profileCounts = {};
-      profileIds.forEach(function (profileId, selectionOrdinal) {
+      profileIds.forEach(function (selectedProfileId, selectionOrdinal) {
+        var profileId = selectedProfileId;
         var profile = Game.content.get('worldSpawnProfile', profileId);
         if (!profile) return;
-        var ordinal = profileCounts[profileId] || 0;
-        profileCounts[profileId] = ordinal + 1;
         var pool = candidatePool(profile, layout, channel, context);
         var chosen = null;
         for (var candidateIndex = 0; candidateIndex < pool.length && !chosen; candidateIndex++) {
@@ -399,12 +431,40 @@
         }
         if (!chosen) {
           failures.push({
-            channel: channel, profileId: profileId, ordinal: ordinal,
+            channel: channel, profileId: profileId, ordinal: profileCounts[profileId] || 0,
             required: !!profile.placement.required,
             reason: 'placement-failed', onFailure: profile.placement.onFailure
           });
           return;
         }
+        if (channel === 'regular' && chosen.threat && chosen.threat.defId === 'ambush') {
+          var ambushProfile = ambushProfileForThreat(view, rid, chosen.threat, profile, profileCounts, {
+            tier: context.tier || 1,
+            worldSeed: context.worldSeed || 0,
+            layoutVersion: layout.version,
+            expeditionIndex: context.expeditionIndex || 0
+          });
+          if (!ambushProfile) {
+            failures.push({
+              channel: channel, profileId: profileId, ordinal: 0,
+              required: false, reason: 'ambush-pack-unavailable', onFailure: 'skipOptional'
+            });
+            return;
+          }
+          profile = ambushProfile;
+          profileId = profile.id;
+          chosen = legalPlacement(profile, chosen, layout, reservations);
+          if (!chosen) {
+            failures.push({
+              channel: channel, profileId: profileId, ordinal: 0,
+              required: !!profile.placement.required,
+              reason: 'ambush-placement-failed', onFailure: profile.placement.onFailure
+            });
+            return;
+          }
+        }
+        var ordinal = profileCounts[profileId] || 0;
+        profileCounts[profileId] = ordinal + 1;
         var slotId = [channel, profileId, ordinal].join(':');
         var slot = {
           id: slotId, channel: channel, profileId: profileId,

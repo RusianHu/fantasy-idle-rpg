@@ -123,12 +123,198 @@
     return minimum + Math.floor(rng() * (maximum - minimum + 1));
   }
 
+  function pointSegmentDistance(point, from, to) {
+    var dx = to.x - from.x;
+    var dy = to.y - from.y;
+    var lengthSq = dx * dx + dy * dy;
+    if (!lengthSq) return U.dist(point.x, point.y, from.x, from.y);
+    var ratio = U.clamp(((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSq, 0, 1);
+    return U.dist(point.x, point.y, from.x + dx * ratio, from.y + dy * ratio);
+  }
+
+  function routeDefinitions() {
+    var routes = [];
+    var macro = layout.macro || {};
+    var centers = macro.centers || [];
+    (macro.edges || []).forEach(function (edge, index) {
+      var from = centers[edge.a];
+      var to = centers[edge.b];
+      if (!from || !to) return;
+      routes.push({
+        id: 'macro:' + edge.a + '>' + edge.b + ':' + index,
+        from: from, to: to, weight: edge.kind === 'alternate' ? 1 : 1.25
+      });
+    });
+    function nearestCenter(point) {
+      if (!point || !centers.length) return null;
+      return centers.reduce(function (best, center) {
+        var distance = U.dist(point.x, point.y, center.x, center.y);
+        return !best || distance < best.distance ? { point: center, distance: distance } : best;
+      }, null);
+    }
+    [
+      ['landmark', layout.landmarks || [], 1.25],
+      ['resource', layout.nodes || [], 1.15],
+      ['curio', layout.curios || [], 1],
+      ['ecology', layout.ecology || [], .9],
+      ['threat', layout.threats || [], 1.3],
+      ['guardian', layout.guardian ? [layout.guardian] : [], 1.4],
+      ['boss', layout.bossLair ? [layout.bossLair] : [], 1.4]
+    ].forEach(function (group) {
+      group[1].forEach(function (target, index) {
+        var nearest = nearestCenter(target);
+        if (!nearest || nearest.distance < 6) return;
+        routes.push({
+          id: 'approach:' + group[0] + ':' + (target.id || index),
+          from: nearest.point, to: target, weight: group[2]
+        });
+      });
+    });
+    return routes;
+  }
+
+  function walkableEscape(profile, anchor) {
+    if (!profile.placement.requireWalkableEscape || !Game.terrain ||
+        typeof Game.terrain.isWalkable !== 'function') return true;
+    var radius = Math.max(
+      profile.trigger.radius || 0,
+      profile.trigger.length || 0,
+      (profile.trigger.width || 0) / 2,
+      (profile.trigger.height || 0) / 2,
+      16
+    ) + 24;
+    var exits = 0;
+    for (var index = 0; index < 12; index++) {
+      var angle = Math.PI * 2 * index / 12;
+      if (Game.terrain.isWalkable(
+          anchor.x + Math.cos(angle) * radius,
+          anchor.y + Math.sin(angle) * radius, 8)) exits++;
+    }
+    return exits >= 2;
+  }
+
+  function validAnchor(profile, anchor) {
+    var placement = profile.placement || {};
+    if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return false;
+    if (layout.camp && Number.isFinite(placement.minCampDistance) &&
+        U.dist(anchor.x, anchor.y, layout.camp.x, layout.camp.y) < placement.minCampDistance) return false;
+    if (Number.isFinite(placement.minLandmarkDistance) && (layout.landmarks || []).some(function (landmark) {
+      return U.dist(anchor.x, anchor.y, landmark.x, landmark.y) < placement.minLandmarkDistance;
+    })) return false;
+    return walkableEscape(profile, anchor);
+  }
+
+  function routeMetrics(profile, anchor, routes) {
+    var triggerReach = Math.max(
+      profile.trigger.radius || 0,
+      profile.trigger.length || 0,
+      (profile.trigger.width || 0) / 2,
+      (profile.trigger.height || 0) / 2,
+      16
+    );
+    var revealReach = Math.max(triggerReach, profile.detection.revealRadius || 0);
+    var metrics = { triggerRouteIds: [], revealRouteIds: [], minRouteDistance: Infinity };
+    routes.forEach(function (route) {
+      var distance = pointSegmentDistance(anchor, route.from, route.to);
+      metrics.minRouteDistance = Math.min(metrics.minRouteDistance, distance);
+      if (distance <= triggerReach + 8) metrics.triggerRouteIds.push(route.id);
+      if (distance <= revealReach) metrics.revealRouteIds.push(route.id);
+    });
+    return metrics;
+  }
+
+  function bestOrientation(profile, anchor, routes, id) {
+    if (profile.trigger.shape === 'circle') return 0;
+    var best = null;
+    var offset = U.strSeed(id + ':orientation') % 16;
+    for (var ordinal = 0; ordinal < 16; ordinal++) {
+      var orientation = Math.PI * 2 * ((ordinal + offset) % 16) / 16;
+      var probe = { x: anchor.x, y: anchor.y, orientation: orientation, profile: profile };
+      var score = 0;
+      routes.forEach(function (route) {
+        var length = U.dist(route.from.x, route.from.y, route.to.x, route.to.y);
+        var steps = Math.max(1, Math.ceil(length / 6));
+        for (var step = 0; step <= steps; step++) {
+          var ratio = step / steps;
+          if (contains(probe,
+              route.from.x + (route.to.x - route.from.x) * ratio,
+              route.from.y + (route.to.y - route.from.y) * ratio)) score += route.weight;
+        }
+      });
+      if (!best || score > best.score) best = { orientation: orientation, score: score };
+    }
+    return best ? best.orientation : 0;
+  }
+
+  function selectAnchors(profile) {
+    var source;
+    if (profile.placement.source === 'threatTerritory') {
+      source = (layout.threats || []).filter(function (threat) {
+        return threat.defId === 'ambush';
+      }).map(function (threat) {
+        return { id: threat.id + ':hazard', threatId: threat.id, x: threat.x, y: threat.y };
+      });
+    } else {
+      source = (layout.hazardAnchors || []).map(function (anchor) {
+        return Object.assign({}, anchor);
+      });
+    }
+    var routes = routeDefinitions();
+    var candidates = source.filter(function (anchor) {
+      return validAnchor(profile, anchor);
+    }).map(function (anchor) {
+      anchor.routeMetrics = routeMetrics(profile, anchor, routes);
+      anchor.tieBreak = U.strSeed([
+        Game.state.world.worldSeed, regionId, profile.id, anchor.id
+      ].join('|'));
+      return anchor;
+    });
+    var selected = [];
+    var coveredTrigger = {};
+    var coveredReveal = {};
+    var targetCount = Math.min(countFor(profile), candidates.length);
+    var minSpacing = Math.max(0, Number(profile.placement.minSpacing) || 0);
+    while (selected.length < targetCount) {
+      var best = null;
+      candidates.forEach(function (candidate) {
+        if (selected.indexOf(candidate) >= 0) return;
+        if (selected.some(function (placed) {
+          return U.dist(candidate.x, candidate.y, placed.x, placed.y) < minSpacing;
+        })) return;
+        var freshTrigger = candidate.routeMetrics.triggerRouteIds.filter(function (id) {
+          return !coveredTrigger[id];
+        }).length;
+        var freshReveal = candidate.routeMetrics.revealRouteIds.filter(function (id) {
+          return !coveredReveal[id];
+        }).length;
+        var score = freshTrigger * 20000 + freshReveal * 2500 +
+          candidate.routeMetrics.triggerRouteIds.length * 400 +
+          candidate.routeMetrics.revealRouteIds.length * 40 +
+          200 / (1 + candidate.routeMetrics.minRouteDistance);
+        if (!best || score > best.score ||
+            (score === best.score && candidate.tieBreak < best.anchor.tieBreak)) {
+          best = { anchor: candidate, score: score };
+        }
+      });
+      if (!best) break;
+      var chosen = best.anchor;
+      chosen.routeMetrics.triggerRouteIds.forEach(function (id) { coveredTrigger[id] = true; });
+      chosen.routeMetrics.revealRouteIds.forEach(function (id) { coveredReveal[id] = true; });
+      chosen.placementFallback = chosen.routeMetrics.revealRouteIds.length === 0;
+      selected.push(chosen);
+    }
+    selected.forEach(function (anchor, ordinal) {
+      var id = stableInstanceId(profile, ordinal);
+      anchor.orientation = bestOrientation(profile, anchor, routes, id);
+    });
+    return selected;
+  }
+
   function makeInstance(profile, ordinal, anchor) {
     var id = stableInstanceId(profile, ordinal);
     var saved = savedRegion(regionId);
     var cooldownUntil = Number(saved.hazardCooldowns[id]) || 0;
     var discovered = saved.discoveredHazardIds.indexOf(id) >= 0;
-    var orientation = (U.strSeed(id + ':orientation') % 4) * Math.PI / 2;
     var instance = {
       id: id,
       profileId: profile.id,
@@ -137,9 +323,16 @@
       regionId: regionId,
       x: anchor.x,
       y: anchor.y,
-      orientation: orientation,
+      orientation: Number(anchor.orientation) || 0,
       anchorId: anchor.id,
       threatId: anchor.threatId || null,
+      placement: {
+        triggerRouteIds: anchor.routeMetrics ? anchor.routeMetrics.triggerRouteIds.slice() : [],
+        revealRouteIds: anchor.routeMetrics ? anchor.routeMetrics.revealRouteIds.slice() : [],
+        minRouteDistance: anchor.routeMetrics && Number.isFinite(anchor.routeMetrics.minRouteDistance)
+          ? anchor.routeMetrics.minRouteDistance : null,
+        fallback: !!anchor.placementFallback
+      },
       awareness: discovered ? 'revealed' : 'concealed',
       clueVisible: false,
       clueNotified: false,
@@ -170,18 +363,7 @@
       return profile.regionId === regionId;
     }).sort(function (a, b) { return a.id.localeCompare(b.id); });
     profiles.forEach(function (profile) {
-      var anchors;
-      if (profile.placement.source === 'threatTerritory') {
-        anchors = (layout.threats || []).filter(function (threat) {
-          return threat.defId === 'ambush';
-        }).map(function (threat) {
-          return { id: threat.id + ':hazard', threatId: threat.id, x: threat.x, y: threat.y };
-        });
-      } else {
-        anchors = (layout.hazardAnchors || []).slice();
-        var offset = anchors.length ? U.strSeed(profile.id + ':' + Game.state.world.worldSeed) % anchors.length : 0;
-        anchors = anchors.slice(offset).concat(anchors.slice(0, offset)).slice(0, countFor(profile));
-      }
+      var anchors = selectAnchors(profile);
       anchors.forEach(function (anchor, index) { makeInstance(profile, index, anchor); });
     });
     var valid = {};
@@ -269,11 +451,42 @@
     return Math.max(trigger.width || 0, trigger.height || 0, (trigger.radius || 0) * 2) / 2 || 16;
   }
 
+  function hazardDistance(instance, x, y) {
+    if (contains(instance, x, y)) return 0;
+    var trigger = instance.profile.trigger;
+    var point = localPoint(instance, x, y);
+    if (trigger.shape === 'circle') {
+      return Math.max(0, Math.sqrt(point.x * point.x + point.y * point.y) - (trigger.radius || 16));
+    }
+    if (trigger.shape === 'cone') {
+      var length = trigger.length || trigger.radius || 36;
+      var halfAngle = (trigger.angleDeg || 60) * Math.PI / 360;
+      var upper = { x: Math.cos(halfAngle) * length, y: Math.sin(halfAngle) * length };
+      var lower = { x: Math.cos(-halfAngle) * length, y: Math.sin(-halfAngle) * length };
+      var local = { x: point.x, y: point.y };
+      var distance = Math.min(
+        pointSegmentDistance(local, { x: 0, y: 0 }, upper),
+        pointSegmentDistance(local, { x: 0, y: 0 }, lower)
+      );
+      for (var sample = 0; sample <= 12; sample++) {
+        var angle = -halfAngle + (halfAngle * 2 * sample / 12);
+        distance = Math.min(distance, U.dist(
+          local.x, local.y, Math.cos(angle) * length, Math.sin(angle) * length));
+      }
+      return distance;
+    }
+    var width = trigger.width || trigger.length || 40;
+    var height = trigger.height || trigger.radius * 2 || 16;
+    var dx = Math.max(Math.abs(point.x) - width / 2, 0);
+    var dy = Math.max(Math.abs(point.y) - height / 2, 0);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   function candidateTouchesDanger(x, y, ignoreId) {
     return instances.some(function (other) {
       if (other.id === ignoreId || other.disabled || other.phase === 'cooldown') return false;
       if (other.awareness === 'concealed') return false;
-      return U.dist(x, y, other.x, other.y) <= triggerRadius(other) + 10;
+      return hazardDistance(other, x, y) <= 10;
     });
   }
 
@@ -298,6 +511,17 @@
 
   function requestEscape(instance, actor) {
     if (!actor || Game.state.settings.controlMode === 'manual') return;
+    var strategy = Game.state.settings.expeditionStrategy || 'balanced';
+    var vitals = actor.components && actor.components.vitals;
+    var hpRatio = vitals && vitals.maxHp ? vitals.hp / vitals.maxHp :
+      (actor.maxHp ? actor.hp / actor.maxHp : 1);
+    if (strategy === 'loot' && hpRatio >=
+        (instance.profile.category === 'ambushTrigger' ? .55 : .4)) {
+      emit(instance, 'hazard:riskAccepted', {
+        strategy: strategy, hpRatio: hpRatio, targetActorIds: [actor.id]
+      });
+      return;
+    }
     var radius = triggerRadius(instance);
     var best = null;
     for (var i = 0; i < 16; i++) {
@@ -313,6 +537,9 @@
       if (!best || distance < best.distance) best = { x: candidate.x, y: candidate.y, distance: distance };
     }
     if (!best) return;
+    if (Game.world && actor === Game.world.hero && actor.interactOrder) {
+      Game.world.cancelInteraction('hazard');
+    }
     actor.target = null;
     actor.manualTarget = false;
     actor.moveOrder = {
@@ -321,6 +548,10 @@
       ai: true, hazardEscapeId: instance.id
     };
     if (Game.nav) Game.nav.clear(actor);
+    emit(instance, 'hazard:escapeRequested', {
+      strategy: strategy, hpRatio: hpRatio,
+      targetActorIds: [actor.id], destination: { x: best.x, y: best.y }
+    });
   }
 
   function startWarning(instance, actors) {
@@ -432,7 +663,7 @@
     var world = Game.world;
     var hero = world && world.hero;
     return !world || !hero || Game.state.world.mode !== 'battle' ||
-      !!world.cinematic || !!hero.interactOrder ||
+      !!world.cinematic ||
       (Game.transitions && Game.transitions.isActive());
   }
 
@@ -525,11 +756,73 @@
     }
   }
 
-  function approximateRadius(instance) {
-    var trigger = instance.profile.trigger;
-    if (trigger.shape === 'circle') return trigger.radius;
-    return Math.max(trigger.radius || 0, trigger.width || 0, trigger.height || 0,
-      trigger.length || 0) / 2;
+  function inspectPath(points, options) {
+    options = options || {};
+    var allowed = {};
+    var restrict = Array.isArray(options.instanceIds) && options.instanceIds.length;
+    if (restrict) options.instanceIds.forEach(function (id) { allowed[id] = true; });
+    var path = (points || []).filter(function (point) {
+      return point && Number.isFinite(point.x) && Number.isFinite(point.y);
+    }).map(function (point) {
+      return { x: Number(point.x), y: Number(point.y) };
+    });
+    var candidates = instances.filter(function (instance) {
+      return (!restrict || allowed[instance.id]) && (options.includeDisabled || !instance.disabled);
+    });
+    var results = candidates.map(function (instance) {
+      return {
+        instanceId: instance.id,
+        profileId: instance.profileId,
+        category: instance.profile.category,
+        minCenterDistance: Infinity,
+        clue: null,
+        reveal: null,
+        trigger: null
+      };
+    });
+    var totalLength = 0;
+    var sampleStep = U.clamp(Number(options.sampleStep) || 4, 1, 8);
+
+    function inspectPoint(point, distanceAlong) {
+      candidates.forEach(function (instance, index) {
+        var result = results[index];
+        var distance = U.dist(point.x, point.y, instance.x, instance.y);
+        result.minCenterDistance = Math.min(result.minCenterDistance, distance);
+        if (!result.clue && distance <= instance.profile.detection.clueRadius) {
+          result.clue = { distanceAlong: distanceAlong, point: { x: point.x, y: point.y } };
+        }
+        if (!result.reveal && distance <= instance.profile.detection.revealRadius) {
+          result.reveal = { distanceAlong: distanceAlong, point: { x: point.x, y: point.y } };
+        }
+        if (!result.trigger && contains(instance, point.x, point.y)) {
+          result.trigger = { distanceAlong: distanceAlong, point: { x: point.x, y: point.y } };
+        }
+      });
+    }
+
+    if (path.length) inspectPoint(path[0], 0);
+    for (var pi = 1; pi < path.length; pi++) {
+      var from = path[pi - 1];
+      var to = path[pi];
+      var segmentLength = U.dist(from.x, from.y, to.x, to.y);
+      var steps = Math.max(1, Math.ceil(segmentLength / sampleStep));
+      for (var step = 1; step <= steps; step++) {
+        var ratio = step / steps;
+        inspectPoint({
+          x: from.x + (to.x - from.x) * ratio,
+          y: from.y + (to.y - from.y) * ratio
+        }, totalLength + segmentLength * ratio);
+      }
+      totalLength += segmentLength;
+    }
+    results.forEach(function (result) {
+      if (!Number.isFinite(result.minCenterDistance)) result.minCenterDistance = null;
+    });
+    return {
+      length: totalLength,
+      points: path,
+      interactions: results
+    };
   }
 
   var H = Game.hazards = {
@@ -612,8 +905,7 @@
       var cost = 0;
       instances.forEach(function (instance) {
         if (instance.disabled || instance.awareness !== 'revealed') return;
-        var radius = approximateRadius(instance) + 12;
-        if (U.dist(x, y, instance.x, instance.y) > radius) return;
+        if (hazardDistance(instance, x, y) > 12) return;
         if (instance.phase === 'warning' || instance.phase === 'active') cost += 250;
         else if (instance.phase === 'dormant') {
           cost += strategy === 'safe' ? 90 : (strategy === 'loot' ? 4 : 24);
@@ -621,6 +913,8 @@
       });
       return cost;
     },
+
+    inspectPath: inspectPath,
 
     snapshot: function () {
       return instances.map(function (instance) {
@@ -631,6 +925,7 @@
           x: instance.x,
           y: instance.y,
           orientation: instance.orientation,
+          placement: clone(instance.placement),
           awareness: instance.awareness,
           phase: instance.phase,
           phaseSinceTick: instance.phaseSinceTick,

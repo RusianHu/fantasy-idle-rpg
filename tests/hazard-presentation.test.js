@@ -102,9 +102,17 @@ assert.match(renderer, /Game\.hazardRender\.drawOverlay\(/);
 assert.match(renderer, /!visibleDynamic\[j\]\.hazardConcealed/);
 assert.match(nav, /Game\.hazards\.navigationCost/);
 assert.match(demoHtml, /id="contact-sheet"/);
+assert.match(demoHtml, /id="route-audit-map"/);
+assert.match(demoHtml, /id="route-audit-log"/);
+assert.match(demoHtml, /id="mimic-sheet"/);
+assert.match(demoHtml, /id="mimic-log"/);
 assert.match(demoHtml, /js\/systems\/hazards\.js\?v=/);
 assert.match(demoHtml, /js\/render\/hazards\.js\?v=/);
 assert.match(demoScript, /Game\.hazardRender\.drawPreview/);
+assert.match(demoScript, /Game\.hazards\.inspectPath/);
+assert.match(demoScript, /simulatePotentialRoute/);
+assert.match(demoScript, /Game\.environment\.simulateMimicSequence/);
+assert.match(demoScript, /mimicReport/);
 assert.match(demoScript, /window\.HazardEffectsLab/);
 assert.doesNotMatch(mapHtml, /id="hazard-lab-title"/, 'Hazard QA is extracted from the general map workbench');
 

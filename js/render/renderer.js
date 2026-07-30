@@ -868,20 +868,20 @@
       Game.terrain.drawLiquid(ctx, viewL, viewT, viewR, viewB);
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
-      if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB);
+      if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB, t);
       if (Game.hazardRender) Game.hazardRender.drawGround(ctx, viewL, viewT, viewR, viewB);
 
       // 5) y 排序绘制（装饰 + 实体）
       var drawables = [];
       var j, e;
       var visibleProps = Game.terrain.spatialQuery && W.layout.version >= 3
-        ? Game.terrain.spatialQuery(viewL - 20, viewT - 40, viewR + 20, viewB + 20, false)
+        ? Game.terrain.spatialQuery(viewL - 48, viewT - 76, viewR + 48, viewB + 28, false)
         : W.props;
       visibleProps = visibleProps || W.props;
       for (j = 0; j < visibleProps.length; j++) {
         var p = visibleProps[j];
         if (p.kind === 'ecology' && Game.expedition && !Game.expedition.isEcologyActive(p.defId)) continue;
-        if (p.x < viewL - 20 || p.x > viewR + 20 || p.y < viewT - 40 || p.y > viewB + 20) continue;
+        if (p.x < viewL - 48 || p.x > viewR + 48 || p.y < viewT - 76 || p.y > viewB + 28) continue;
         drawables.push(p);
       }
       var visibleDynamic = Game.terrain.spatialQuery && W.layout.version >= 3
@@ -1339,6 +1339,14 @@
       ctx.drawImage(Game.assets.glowTex(color, 16), chest.x - 18, y - 20, 36, 36);
       ctx.globalCompositeOperation = 'source-over';
       Game.assets.draw(ctx, spriteId, 'idle0', chest.x, y, { alpha: alpha });
+      if (chest.oddity) {
+        var tell = motion ? (((t * 3 + chest.phase) | 0) % 13 === 0) : true;
+        if (tell) {
+          ctx.globalAlpha = alpha * .72;
+          ctx.fillStyle = '#7f3037';
+          ctx.fillRect(Math.round(chest.x + 3), Math.round(y - 8), 1, 1);
+        }
+      }
       if (motion && (!chest.rare || (((t * 4 + chest.phase) | 0) % 9 < 2))) {
         var sx = Math.round(chest.x + (chest.rare ? 7 : 5));
         var sy = Math.round(y - (chest.rare ? 12 : 10));

@@ -99,7 +99,7 @@ const audit = Game.content.finalize({ strict: true });
 assert.equal(audit.ok, true);
 assert.equal(audit.counts.class, 5);
 assert.equal(audit.counts.talent, 30);
-assert.equal(audit.counts.actorArchetype, 53);
+assert.equal(audit.counts.actorArchetype, 54);
 assert.equal(audit.counts.encounterProfile, 16);
 
 [

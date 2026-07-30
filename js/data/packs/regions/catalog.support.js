@@ -439,9 +439,127 @@
     }
   };
 
+  // Boss 领地由内容数据声明；生成器只解释通用的地表纹样、装饰池和
+  // 正面净空，不按区域 ID 写视觉特判。
+  var BOSS_TERRITORIES = {
+    grassland: {
+      sprite: 'boss_lair_grassland',
+      radius: 126, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      ground: {
+        fill: '#416447', edge: '#91a85e', accent: '#65b9d4',
+        marks: ['pools', 'stones']
+      },
+      aura: { color: '#64c8e8', radius: 46, alpha: 0.12 },
+      decor: [
+        { sprite: 'boss_decor_grassland_1', count: 3, glow: { color: '#5ec6e8', r: 13 } },
+        { sprite: 'boss_decor_grassland_2', count: 2, sway: true },
+        { sprite: 'boss_decor_grassland_3', count: 3 }
+      ]
+    },
+    forest: {
+      sprite: 'boss_lair_forest',
+      radius: 132, squash: 0.66, decorCount: 10, approachClearance: 0.74,
+      ground: {
+        fill: '#304c32', edge: '#778751', accent: '#55c4a8',
+        marks: ['roots', 'wisps']
+      },
+      aura: { color: '#54d6bd', radius: 48, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_forest_1', count: 3, bob: true, glow: { color: '#65d7c3', r: 14 } },
+        { sprite: 'boss_decor_forest_2', count: 3 },
+        { sprite: 'boss_decor_forest_3', count: 2, sway: true, glow: { color: '#58cbb5', r: 13 } }
+      ]
+    },
+    mine: {
+      sprite: 'boss_lair_mine',
+      radius: 128, squash: 0.62, decorCount: 9, approachClearance: 0.68,
+      ground: {
+        fill: '#494249', edge: '#8f7455', accent: '#4bc7dc',
+        marks: ['rails', 'circuits']
+      },
+      aura: { color: '#42cfe8', radius: 45, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_mine_1', count: 3, bob: true, glow: { color: '#49d7ed', r: 15 } },
+        { sprite: 'boss_decor_mine_2', count: 3 },
+        { sprite: 'boss_decor_mine_3', count: 2, flicker: true, glow: { color: '#f29a42', r: 14 } }
+      ]
+    },
+    graveyard: {
+      sprite: 'boss_lair_graveyard',
+      radius: 130, squash: 0.64, decorCount: 10, approachClearance: 0.74,
+      ground: {
+        fill: '#383440', edge: '#80758c', accent: '#a36cdb',
+        marks: ['graves', 'candles']
+      },
+      aura: { color: '#aa78e8', radius: 46, alpha: 0.13 },
+      decor: [
+        { sprite: 'boss_decor_graveyard_1', count: 4, flicker: true, glow: { color: '#ad79ea', r: 14 } },
+        { sprite: 'boss_decor_graveyard_2', count: 2 },
+        { sprite: 'boss_decor_graveyard_3', count: 2, sway: true }
+      ]
+    },
+    snowpass: {
+      sprite: 'boss_lair_snowpass',
+      radius: 138, squash: 0.62, decorCount: 9, approachClearance: 0.70,
+      ground: {
+        fill: '#b8cad8', edge: '#f1f6fb', accent: '#72c4e3',
+        marks: ['runes', 'cracks']
+      },
+      aura: { color: '#90dcf4', radius: 48, alpha: 0.12 },
+      decor: [
+        { sprite: 'boss_decor_snowpass_1', count: 3, glow: { color: '#8bd8f0', r: 13 } },
+        { sprite: 'boss_decor_snowpass_2', count: 3 },
+        { sprite: 'boss_decor_snowpass_3', count: 2, sway: true }
+      ]
+    },
+    lavacave: {
+      sprite: 'boss_lair_lavacave',
+      radius: 130, squash: 0.63, decorCount: 10, approachClearance: 0.72,
+      ground: {
+        fill: '#37282a', edge: '#91452d', accent: '#f07b2a',
+        marks: ['cracks', 'sigil']
+      },
+      aura: { color: '#f0792e', radius: 49, alpha: 0.15 },
+      decor: [
+        { sprite: 'boss_decor_lavacave_1', count: 3, flicker: true, glow: { color: '#f28a32', r: 15 } },
+        { sprite: 'boss_decor_lavacave_2', count: 3 },
+        { sprite: 'boss_decor_lavacave_3', count: 2, bob: true, glow: { color: '#ff9a38', r: 14 } }
+      ]
+    },
+    skyruins: {
+      sprite: 'boss_lair_skyruins',
+      radius: 134, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      ground: {
+        fill: '#7c8392', edge: '#d9c99e', accent: '#60d2e3',
+        marks: ['rings', 'runes']
+      },
+      aura: { color: '#63d9e8', radius: 50, alpha: 0.14 },
+      decor: [
+        { sprite: 'boss_decor_skyruins_1', count: 3, bob: true, glow: { color: '#65dce9', r: 14 } },
+        { sprite: 'boss_decor_skyruins_2', count: 3, bob: true },
+        { sprite: 'boss_decor_skyruins_3', count: 2, bob: true, glow: { color: '#63d7e6', r: 15 } }
+      ]
+    },
+    darkcastle: {
+      sprite: 'boss_lair_darkcastle',
+      radius: 140, squash: 0.62, decorCount: 11, approachClearance: 0.76,
+      ground: {
+        fill: '#30263b', edge: '#744281', accent: '#c83e5c',
+        marks: ['sigil', 'spikes']
+      },
+      aura: { color: '#aa55d8', radius: 52, alpha: 0.16 },
+      decor: [
+        { sprite: 'boss_decor_darkcastle_1', count: 4, flicker: true, glow: { color: '#a95bd9', r: 16 } },
+        { sprite: 'boss_decor_darkcastle_2', count: 3, sway: true },
+        { sprite: 'boss_decor_darkcastle_3', count: 2, bob: true, glow: { color: '#d84b68', r: 13 } }
+      ]
+    }
+  };
+
   function makeExploration(region) {
     var rid = region.id;
     var ids = CONTENT_IDS[rid];
+    var bossTerritory = BOSS_TERRITORIES[rid];
     var baseResources = GATHER[rid].map(function (x) {
       return {
         id: x.id, material: x.material, sprite: x.sprite,
@@ -457,12 +575,14 @@
       };
     });
     var landmarks = ids.landmarks.map(function (id, index) {
-      return {
+      var landmark = {
         id: id,
         nameKey: 'explore.content.' + rid + '.' + id,
         function: index === 0 ? 'intel' : (index === 1 ? 'shelter' : (index === 2 ? 'shortcut' : 'boss')),
-        sprite: index === 3 ? 'exp_boss_lair' : 'exp_landmark'
+        sprite: index === 3 ? bossTerritory.sprite : 'exp_landmark'
       };
+      if (index === 3) landmark.territory = bossTerritory;
+      return landmark;
     });
     return {
       world: { w: 2400, h: 1440 },

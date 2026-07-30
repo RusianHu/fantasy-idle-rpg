@@ -862,6 +862,32 @@ const customResult = Game.encounters.evaluateObjectives(customEncounter.id);
 assert.equal(customResult.status, 'success');
 assert.equal(customResult.objectiveResults[0].details.evaluatedTick, 3);
 
+// Ambush territories receive a pack that the corresponding HazardProfile can
+// actually reveal; random regular allocation may not silently disable them.
+resetRuntime();
+const ambushPlan = Game.population.prepareRegion('grassland', {
+  version: 3,
+  threats: [
+    { id: 'threat:ambush:a', defId: 'ambush', x: 120, y: 100 },
+    { id: 'threat:patrol:a', defId: 'patrol', x: 260, y: 100 },
+    { id: 'threat:ambush:b', defId: 'ambush', x: 400, y: 100 }
+  ],
+  guardian: null
+}, {
+  tier: 1, worldSeed: 0x12345678, expeditionIndex: 0,
+  channelLimits: { boss: 0, guardian: 0, npc: 0, rare: 0, regular: 3 }
+});
+assert.equal(ambushPlan.ok, true);
+const ambushHazard = Game.content.all('hazardProfile').find((profile) =>
+  profile.regionId === 'grassland' && profile.category === 'ambushTrigger');
+ambushPlan.slots.filter((slot) => slot.threat && slot.threat.defId === 'ambush').forEach((slot) => {
+  const spawn = Game.content.get('worldSpawnProfile', slot.profileId);
+  const pack = Game.content.get('encounterPack', spawn.encounterPackId);
+  assert.equal(pack.ambushEligible, true);
+  assert.ok(pack.members.length <= 2);
+  assert.ok(ambushHazard.outcome.encounterPackIds.includes(pack.id));
+});
+
 console.log(
-  'Unit ecosystem v14 tests passed: Population leases, Engagement atomicity, social memory, Variants and Objectives.'
+  'Unit ecosystem v14 tests passed: Population leases, ambush allocation, Engagement atomicity, social memory, Variants and Objectives.'
 );

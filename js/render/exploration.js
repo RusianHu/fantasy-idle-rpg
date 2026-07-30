@@ -88,6 +88,220 @@
     ctx.restore();
   }
 
+  function pixelRing(ctx, cx, cy, rx, ry, color, alpha, count, phase) {
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha;
+    for (var i = 0; i < count; i++) {
+      var angle = phase + i / count * Math.PI * 2;
+      ctx.fillRect(
+        Math.round(cx + Math.cos(angle) * rx) - 1,
+        Math.round(cy + Math.sin(angle) * ry) - 1,
+        i % 3 === 0 ? 3 : 2,
+        i % 4 === 0 ? 2 : 1
+      );
+    }
+  }
+
+  function pixelLine(ctx, x1, y1, x2, y2, color, alpha, stride) {
+    var dx = x2 - x1, dy = y2 - y1;
+    var steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / (stride || 3)));
+    ctx.fillStyle = color;
+    ctx.globalAlpha = alpha;
+    for (var i = 0; i <= steps; i++) {
+      var k = i / steps;
+      ctx.fillRect(Math.round(x1 + dx * k), Math.round(y1 + dy * k), i % 3 ? 2 : 3, 1);
+    }
+  }
+
+  function drawTerritoryMark(ctx, token, lair, territory, layout, tokenIndex) {
+    var ground = territory.ground;
+    var radius = territory.radius || 126;
+    var squash = territory.squash || 0.64;
+    var seed = layout.seeds.landmarks ^ U.strSeed(token + ':' + tokenIndex);
+    var approach = lair.approachAngle || 0;
+    var i, angle, ring, x, y;
+
+    if (token === 'rails') {
+      var normalX = Math.cos(approach + Math.PI / 2) * 5;
+      var normalY = Math.sin(approach + Math.PI / 2) * 5;
+      for (i = -1; i <= 1; i += 2) {
+        pixelLine(
+          ctx,
+          lair.x + Math.cos(approach) * radius * 0.88 + normalX * i,
+          lair.y + Math.sin(approach) * radius * squash * 0.88 + normalY * i,
+          lair.x + Math.cos(approach) * 25 + normalX * i,
+          lair.y + Math.sin(approach) * 25 * squash + normalY * i,
+          ground.edge, 0.34, 3
+        );
+      }
+      return;
+    }
+    if (token === 'rings' || token === 'sigil') {
+      pixelRing(ctx, lair.x, lair.y + 7, radius * 0.48, radius * squash * 0.45,
+        ground.accent, token === 'sigil' ? 0.30 : 0.24, token === 'sigil' ? 18 : 30, 0.12);
+      if (token === 'sigil') {
+        pixelLine(ctx, lair.x - 30, lair.y + 7, lair.x + 30, lair.y + 7, ground.accent, 0.22, 4);
+        pixelLine(ctx, lair.x, lair.y - 12, lair.x, lair.y + 25, ground.accent, 0.22, 4);
+      }
+      return;
+    }
+
+    for (i = 0; i < 8; i++) {
+      angle = i / 8 * Math.PI * 2 + noise(i, tokenIndex, seed) * 0.42;
+      ring = radius * (0.48 + noise(i, tokenIndex + 3, seed) * 0.36);
+      x = Math.round(lair.x + Math.cos(angle) * ring);
+      y = Math.round(lair.y + Math.sin(angle) * ring * squash);
+      ctx.fillStyle = i % 2 ? ground.edge : ground.accent;
+      ctx.globalAlpha = 0.20 + noise(i, tokenIndex + 7, seed) * 0.16;
+      if (token === 'pools') {
+        ctx.beginPath();
+        ctx.ellipse(x, y, 5 + (i % 3) * 2, 2 + (i % 2), 0, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (token === 'stones' || token === 'graves') {
+        var sw = token === 'graves' ? 5 : 3 + (i % 3);
+        var sh = token === 'graves' ? 7 : 2 + (i % 2);
+        ctx.fillRect(x - (sw >> 1), y - sh + 2, sw, sh);
+        if (token === 'graves') {
+          ctx.globalAlpha *= 0.8;
+          ctx.fillRect(x - 2, y - sh, 4, 1);
+        }
+      } else if (token === 'roots' || token === 'cracks' || token === 'circuits') {
+        var inner = 25 + (i % 3) * 6;
+        var ix = lair.x + Math.cos(angle + (token === 'circuits' ? 0.14 : 0)) * inner;
+        var iy = lair.y + Math.sin(angle) * inner * squash;
+        if (token === 'circuits') {
+          pixelLine(ctx, ix, iy, x, iy, ground.accent, 0.21, 3);
+          pixelLine(ctx, x, iy, x, y, ground.accent, 0.21, 3);
+        } else {
+          pixelLine(ctx, ix, iy, x, y, token === 'roots' ? ground.edge : ground.accent, 0.20, 4);
+        }
+      } else if (token === 'runes') {
+        ctx.fillRect(x - 2, y - 2, 5, 1);
+        ctx.fillRect(x, y - 4, 1, 5);
+        ctx.fillRect(x - 2, y, 2, 1);
+      } else if (token === 'wisps' || token === 'candles') {
+        ctx.fillRect(x, y - 3, 1, 4);
+        ctx.fillRect(x - 1, y - 2, 3, 1);
+      } else if (token === 'spikes') {
+        ctx.fillRect(x, y - 6, 2, 7);
+        ctx.fillRect(x - 1, y - 3, 4, 1);
+      }
+    }
+  }
+
+  function drawBossTerritorySurface(ctx, layout, chunk) {
+    var lair = layout.bossLair;
+    var territory = lair && lair.territory;
+    var ground = territory && territory.ground;
+    if (!ground) return;
+    var arena = layout.bossArena || layout.nav && layout.nav.bossArena;
+    var cx = arena ? arena.x : lair.x;
+    var cy = arena ? arena.y : lair.y + 7;
+    var radius = arena ? arena.rx : (territory.radius || 126);
+    var radiusY = arena ? arena.ry : radius * (territory.squash || 0.64);
+    var wall = arena ? arena.wallThickness : 22;
+    var floorScale = arena ? arena.floorScale : 0.82;
+    if (cx + radius + wall < chunk.x || cx - radius - wall > chunk.x + chunk.w ||
+        cy + radiusY + wall < chunk.y || cy - radiusY - wall > chunk.y + chunk.h) return;
+
+    ctx.save();
+    ctx.translate(-chunk.x, -chunk.y);
+    // 高对比专属地板：底色、规则铺装噪点与双层边线都与普通区域分开。
+    ctx.globalAlpha = 0.76;
+    ctx.fillStyle = ground.fill;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, radius * floorScale, radiusY * floorScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, radius * floorScale - 2, radiusY * floorScale - 2, 0, 0, Math.PI * 2);
+    ctx.clip();
+    for (var tileY = cy - radiusY; tileY <= cy + radiusY; tileY += 10) {
+      for (var tileX = cx - radius; tileX <= cx + radius; tileX += 10) {
+        var tileNoise = noise(
+          Math.floor(tileX / 10), Math.floor(tileY / 10),
+          layout.seeds.details ^ 0x6b21
+        );
+        if (tileNoise < 0.50) continue;
+        ctx.globalAlpha = tileNoise > 0.82 ? 0.22 : 0.12;
+        ctx.fillStyle = tileNoise > 0.82 ? ground.accent : ground.edge;
+        ctx.fillRect(Math.round(tileX), Math.round(tileY), tileNoise > 0.82 ? 5 : 3, 1);
+        if (tileNoise > 0.90) ctx.fillRect(Math.round(tileX), Math.round(tileY) - 3, 1, 4);
+      }
+    }
+    ctx.restore();
+
+    pixelRing(ctx, cx, cy, radius * floorScale - 2, radiusY * floorScale - 2,
+      ground.edge, 0.72, 76, 0.04);
+    pixelRing(ctx, cx, cy, radius * floorScale * 0.70, radiusY * floorScale * 0.68,
+      ground.accent, 0.30, 48, 0.13);
+    var marks = ground.marks || [];
+    for (var i = 0; i < marks.length; i++) {
+      drawTerritoryMark(ctx, marks[i], lair, territory, layout, i);
+    }
+
+    // 用离散像素块画出与导航墙格完全同源的“房间”边界，并按门洞角度
+    // 留空。它不是装饰碰撞假象，玩家确实无法穿越这些墙段。
+    var doors = arena && arena.doors || [];
+    var doorHalf = arena ? arena.doorHalfAngle : (territory.approachClearance || 0.72) * 0.55;
+    function atDoor(angle) {
+      for (var doorIndex = 0; doorIndex < doors.length; doorIndex++) {
+        var delta = Math.abs(Math.atan2(
+          Math.sin(angle - doors[doorIndex].angle),
+          Math.cos(angle - doors[doorIndex].angle)
+        ));
+        if (delta <= doorHalf) return true;
+      }
+      if (!doors.length) {
+        var approachDelta = Math.abs(Math.atan2(
+          Math.sin(angle - lair.approachAngle),
+          Math.cos(angle - lair.approachAngle)
+        ));
+        return approachDelta <= doorHalf;
+      }
+      return false;
+    }
+    var wallSteps = 116;
+    var layerStep = wall / Math.max(1, Math.min(radius, radiusY)) * 0.36;
+    for (var wallLayer = -1; wallLayer <= 1; wallLayer++) {
+      var wallScale = 1 + wallLayer * layerStep;
+      for (var wallIndex = 0; wallIndex < wallSteps; wallIndex++) {
+        var wallAngle = wallIndex / wallSteps * Math.PI * 2;
+        if (atDoor(wallAngle)) continue;
+        var wallX = Math.round(cx + Math.cos(wallAngle) * radius * wallScale);
+        var wallY = Math.round(cy + Math.sin(wallAngle) * radiusY * wallScale);
+        ctx.globalAlpha = wallLayer === 0 ? 0.92 : 0.70;
+        ctx.fillStyle = wallLayer < 0
+          ? ground.edge
+          : (wallLayer > 0 ? 'rgba(9,8,16,0.88)' : ground.fill);
+        ctx.fillRect(wallX - 3, wallY - 2 + (wallLayer > 0 ? 2 : 0), 7, 4);
+        if (wallLayer === 0 && wallIndex % 3 === 0) {
+          ctx.globalAlpha = 0.58;
+          ctx.fillStyle = ground.accent;
+          ctx.fillRect(wallX - 1, wallY - 2, 3, 1);
+        }
+      }
+    }
+    // 门槛让入口位置在画面上立即可读。
+    for (var gateway = 0; gateway < doors.length; gateway++) {
+      var gateAngle = doors[gateway].angle;
+      var gateX = Math.round(cx + Math.cos(gateAngle) * radius);
+      var gateY = Math.round(cy + Math.sin(gateAngle) * radiusY);
+      var tangentX = -Math.sin(gateAngle), tangentY = Math.cos(gateAngle);
+      for (var sill = -2; sill <= 2; sill++) {
+        ctx.globalAlpha = 0.74;
+        ctx.fillStyle = sill % 2 ? ground.accent : ground.edge;
+        ctx.fillRect(
+          Math.round(gateX + tangentX * sill * 7) - 3,
+          Math.round(gateY + tangentY * sill * 7) - 1,
+          7, 2
+        );
+      }
+    }
+    ctx.restore();
+  }
+
   function bakeChunk(layout, chunk) {
     var c = document.createElement('canvas');
     c.width = chunk.w; c.height = chunk.h;
@@ -146,6 +360,7 @@
       }
     }
     drawBroadMotifs(ctx, layout, chunk);
+    drawBossTerritorySurface(ctx, layout, chunk);
     drawCampSurface(ctx, layout, chunk);
 
     for (gy = gy0; gy < gy1; gy++) {
@@ -250,11 +465,42 @@
   };
 
   Game.explorationRender = {
-    drawWorldOverlay: function (ctx, viewL, viewT, viewR, viewB) {
+    drawWorldOverlay: function (ctx, viewL, viewT, viewR, viewB, time) {
       var layout = Game.world && Game.world.layout;
       if (!layout || layout.version < 3 || !Game.exploration) return;
       var rid = Game.state.world.region;
       ctx.save();
+      var lair = layout.bossLair;
+      var territory = lair && lair.territory;
+      var aura = territory && territory.aura;
+      if (aura && lair.x + aura.radius > viewL && lair.x - aura.radius < viewR &&
+          lair.y + aura.radius > viewT && lair.y - aura.radius < viewB) {
+        var motion = U.motionEnabled();
+        var pulse = motion ? 0.5 + 0.5 * Math.sin((time || 0) * 1.8) : 0.5;
+        var auraRadius = aura.radius * (0.94 + pulse * 0.08);
+        var gradient = ctx.createRadialGradient(
+          lair.x, lair.y - 12, 3,
+          lair.x, lair.y - 12, auraRadius
+        );
+        gradient.addColorStop(0, aura.color);
+        gradient.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.globalAlpha = aura.alpha * (0.72 + pulse * 0.28);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(lair.x - auraRadius, lair.y - 12 - auraRadius, auraRadius * 2, auraRadius * 2);
+        if (motion) {
+          ctx.fillStyle = aura.color;
+          for (var mote = 0; mote < 6; mote++) {
+            var ma = mote / 6 * Math.PI * 2 + (time || 0) * (mote % 2 ? -0.18 : 0.14);
+            ctx.globalAlpha = aura.alpha * (0.8 + (mote % 2) * 0.6);
+            ctx.fillRect(
+              Math.round(lair.x + Math.cos(ma) * auraRadius * 0.72),
+              Math.round(lair.y - 14 + Math.sin(ma) * auraRadius * 0.38),
+              mote % 3 === 0 ? 2 : 1, mote % 3 === 0 ? 2 : 1
+            );
+          }
+        }
+        ctx.globalAlpha = 1;
+      }
       for (var i = 0; i < layout.threats.length; i++) {
         var t = layout.threats[i];
         if (!Game.exploration.isRevealed(t.x, t.y, rid)) continue;

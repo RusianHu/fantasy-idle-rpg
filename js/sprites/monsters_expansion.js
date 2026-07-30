@@ -94,4 +94,14 @@
   add('summon.soul_cage', { m: '#68616d', c: '#2c2732', s: '#d6cfb7', v: '#a761d2', e: '#f0e26d' }, [
     '...mmmmmm.......', '..mssssssm......', '..msvssvsm......', '..msseessm......', '..msvvvvsm......', '..msvvvvsm......', '..msseessm......', '..msvvvvsm......', '..mssssssm......', '...mmmmmm.......', '..mc.mc.cm......', '.cc..cc..cc.....'
   ], { bob: true });
+
+  add('mimic_weathered', { w: '#a56c36', d: '#5a3828', m: '#77716b', t: '#d7b66b', r: '#9f3e3e', e: '#f2dc6b' }, [
+    '...mmmmmmmm.....', '..mttttttttm....', '.mwwwwwwwwwwm...', '.mwwddddddwwm...', '..mddddddddm....', '..mrrdrrdrrm....', '.mrreddddderm...', '.mrrdrrrrdrrm...', 'mrrrddddddrrrm..', '.mrrwwwwwwrrm...', '..mwwwwwwwwm....', '...mww..wwm.....', '..mmm....mmm....'
+  ]);
+  add('mimic_cursed', { w: '#70435e', d: '#35283f', m: '#75667c', t: '#b98ab4', v: '#a55bdd', e: '#f0cf67' }, [
+    '...mmmmmmmm.....', '..mtttvttttm....', '.mwwwwwwwwwwm...', '.mwwddddddwwm...', '..mddddddddm....', '..mvvddvvddm....', '.mvvedddddevm...', '.mvvdrvvrdvvm...', 'mvvvddddddvvvm..', '.mvvwwwwwwvvm...', '..mwwwwwwwwm....', '...mww..wwm.....', '..mmm....mmm....'
+  ]);
+  add('mimic_royal', { w: '#9a6532', d: '#432a2b', m: '#8c7548', g: '#e0b849', r: '#b83d4e', e: '#fff09a' }, [
+    '....g.gg.g......', '...gggggggg.....', '..mggggggggm....', '.mwwwwwwwwwwm...', '.mwwddddddwwm...', '..mddddddddm....', '..mrrdrrdrrm....', '.mrreddddderm...', '.mrrdrrrrdrrm...', 'mrrrddddddrrrm..', '.mrrwggggwrrm...', '..mwwwwwwwwm....', '..mmm....mmm....'
+  ]);
 })();

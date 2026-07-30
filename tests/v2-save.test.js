@@ -83,7 +83,7 @@ function legacy(version) {
 
 const v11 = boot(legacy(11));
 const migrated = v11.Game.save.load();
-assert.equal(migrated.v, 15);
+assert.equal(migrated.v, 16);
 assert.equal(migrated.player, undefined);
 assert.equal(migrated.roster.actors['player-main'].talentRanks.ft_heavy, 3);
 v11.Game.save.applyLoaded(migrated);
@@ -92,7 +92,7 @@ assert.equal(v11.Game.state.player.skills.ft_tough, 2);
 assert.equal(v11.Game.state.inv.lockedSlots.weapon, true);
 assert.equal(Object.prototype.propertyIsEnumerable.call(v11.Game.state, 'player'), false);
 const serialized = v11.Game.save.serialize();
-assert.equal(serialized.v, 15);
+assert.equal(serialized.v, 16);
 assert.equal(serialized.player, undefined);
 assert.ok(serialized.roster && serialized.economy);
 assert.equal(v11.Game.routes.validate(serialized.world.routePlan).length, 0);
@@ -106,6 +106,10 @@ assert.deepEqual(
 assert.deepEqual(
   JSON.parse(JSON.stringify(serialized.world.hazards)),
   { layoutVersion: 3, regions: {} }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(serialized.world.chestMimic)),
+  { rollOrdinal: 0, genuineOpenedSinceMimic: 0 }
 );
 
 // The serialized roster is a real persistence boundary, not a primary-only view.
@@ -146,7 +150,7 @@ assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);
 // Full migration chain remains executable for the oldest supported save.
 const v1 = boot(legacy(1));
 const oldest = v1.Game.save.load();
-assert.equal(oldest.v, 15);
+assert.equal(oldest.v, 16);
 v1.Game.save.applyLoaded(oldest);
 assert.equal(v1.Game.state.roster.primaryActorId, 'player-main');
 assert.ok(v1.Game.State.normalizeRegionOrder(v1.Game.state.world.regionOrder).length >= 8);
@@ -157,9 +161,9 @@ v13Save.v = 13;
 v13Save.roster.actors['player-main'].variantId = 'removed.variant';
 delete v13Save.world.social;
 const v13 = boot(v13Save);
-const upgradedV15 = v13.Game.save.load();
-assert.equal(upgradedV15.v, 15);
-v13.Game.save.applyLoaded(upgradedV15);
+const upgradedV16 = v13.Game.save.load();
+assert.equal(upgradedV16.v, 16);
+v13.Game.save.applyLoaded(upgradedV16);
 assert.equal(v13.Game.state.roster.actors['player-main'].variantId, null);
 assert.deepEqual(
   JSON.parse(JSON.stringify(v13.Game.state.world.social)),
@@ -173,10 +177,14 @@ v14Save.v = 14;
 delete v14Save.world.hazards;
 const v14 = boot(v14Save);
 const hazardMigrated = v14.Game.save.load();
-assert.equal(hazardMigrated.v, 15);
+assert.equal(hazardMigrated.v, 16);
 assert.deepEqual(
   JSON.parse(JSON.stringify(hazardMigrated.world.hazards)),
   { layoutVersion: 3, regions: {} }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(hazardMigrated.world.chestMimic)),
+  { rollOrdinal: 0, genuineOpenedSinceMimic: 0 }
 );
 
 const hazardSave = JSON.parse(JSON.stringify(serialized));
@@ -305,4 +313,21 @@ assert.equal(
   'hostile'
 );
 
-console.log('V2 save tests passed: v1/v11/v13/v14 to v15 migration, Hazard/social pruning, route plan, transient boundary.');
+const mimicSave = JSON.parse(JSON.stringify(serialized));
+mimicSave.world.chestMimic = {
+  rollOrdinal: Number.MAX_SAFE_INTEGER + 100,
+  genuineOpenedSinceMimic: 99,
+  activeActorId: 'transient'
+};
+const mimicBoot = boot(mimicSave);
+mimicBoot.Game.save.applyLoaded(mimicSave);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(mimicBoot.Game.state.world.chestMimic)),
+  { rollOrdinal: Number.MAX_SAFE_INTEGER, genuineOpenedSinceMimic: 2 }
+);
+assert.equal(
+  JSON.stringify(mimicBoot.Game.save.serialize().world.chestMimic).includes('activeActorId'),
+  false
+);
+
+console.log('V2 save tests passed: v1/v11/v13/v14/v15 to v16 migration, Hazard/social/Mimic pruning, route plan, transient boundary.');

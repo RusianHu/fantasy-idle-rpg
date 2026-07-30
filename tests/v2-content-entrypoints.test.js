@@ -35,7 +35,7 @@ const audit = JSON.parse(execFileSync(process.execPath, ['tools/audit-content.js
   cwd: ROOT, encoding: 'utf8'
 }));
 assert.equal(audit.ok, true);
-assert.equal(audit.packs.length, 16);
+assert.equal(audit.packs.length, 17);
 assert.match(audit.fingerprint, /^[0-9a-f]{8}$/);
 execFileSync(process.execPath, ['tools/build-content-bundle.js', '--check'], { cwd: ROOT, stdio: 'pipe' });
 console.log(`Content entrypoints passed: 5 consumers share one generated bundle / ${audit.fingerprint}.`);
