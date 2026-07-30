@@ -1,0 +1,1132 @@
+{
+  "version": 1,
+  "pipeline": "independent-transparent-png-to-character-grid",
+  "sourceRoot": "assets/sprite-source/ground-decorations",
+  "outputRoot": "assets/sprites/ground-decorations",
+  "preview": "assets/sprite-source/ground-decorations-preview.png",
+  "outline": "#16122b",
+  "regions": {
+    "grassland": [
+      "deco_grassland_clover",
+      "deco_grassland_wild_wheat",
+      "deco_grassland_dandelions",
+      "deco_grassland_burrow",
+      "deco_grassland_fallen_branch",
+      "deco_grassland_fairy_ring"
+    ],
+    "forest": [
+      "deco_forest_mossy_log",
+      "deco_forest_red_shrooms",
+      "deco_forest_cones_acorns",
+      "deco_forest_root_knot",
+      "deco_forest_leaf_pile",
+      "deco_forest_fern_stones"
+    ],
+    "mine": [
+      "deco_mine_broken_rail",
+      "deco_mine_coal_pile",
+      "deco_mine_discarded_pick",
+      "deco_mine_lantern",
+      "deco_mine_timber_scraps",
+      "deco_mine_copper_rubble"
+    ],
+    "graveyard": [
+      "deco_graveyard_cracked_slab",
+      "deco_graveyard_wilted_flowers",
+      "deco_graveyard_chain_coil",
+      "deco_graveyard_urn_shards",
+      "deco_graveyard_ectoplasm",
+      "deco_graveyard_fresh_mound"
+    ],
+    "snowpass": [
+      "deco_snowpass_ice_spikes",
+      "deco_snowpass_snow_bones",
+      "deco_snowpass_frost_shrub",
+      "deco_snowpass_trail_cairn",
+      "deco_snowpass_frozen_puddle",
+      "deco_snowpass_broken_sled"
+    ],
+    "lavacave": [
+      "deco_lavacave_ember_vent",
+      "deco_lavacave_sulfur_crystals",
+      "deco_lavacave_lava_crust",
+      "deco_lavacave_basalt_shards",
+      "deco_lavacave_scorched_bones",
+      "deco_lavacave_ash_mound"
+    ],
+    "skyruins": [
+      "deco_skyruins_rune_tile",
+      "deco_skyruins_gear_fragment",
+      "deco_skyruins_marble_rubble",
+      "deco_skyruins_aether_motes",
+      "deco_skyruins_cloud_grass",
+      "deco_skyruins_mosaic"
+    ],
+    "darkcastle": [
+      "deco_darkcastle_ritual_rune",
+      "deco_darkcastle_iron_chain",
+      "deco_darkcastle_banner_scrap",
+      "deco_darkcastle_claw_marks",
+      "deco_darkcastle_purple_fungus",
+      "deco_darkcastle_gargoyle_fragment"
+    ]
+  },
+  "assets": {
+    "deco_grassland_clover": {
+      "region": "grassland",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_clover.png",
+        "sha256": "0b5f13a8a164e3bf6e296aa03ee1f8d504604ec80ee5e3f367461b646ca484de"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_clover.png",
+      "size": {
+        "width": 12,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 14,
+        "height": 8
+      },
+      "anchor": {
+        "x": 6,
+        "y": 5
+      },
+      "colors": 2
+    },
+    "deco_grassland_wild_wheat": {
+      "region": "grassland",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_wild_wheat.png",
+        "sha256": "7264a99b0175abbeac443cbde8d242d0c366899b816697f7d4553a5a0920bee5"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_wild_wheat.png",
+      "size": {
+        "width": 11,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 13,
+        "height": 11
+      },
+      "anchor": {
+        "x": 5,
+        "y": 8
+      },
+      "colors": 3
+    },
+    "deco_grassland_dandelions": {
+      "region": "grassland",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_dandelions.png",
+        "sha256": "8d44b5f8599af2634d26c2377329c90ee9789913cbd36e2d76189a587cb36458"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_dandelions.png",
+      "size": {
+        "width": 12,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 14,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_grassland_burrow": {
+      "region": "grassland",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_burrow.png",
+        "sha256": "a230f081f17d8adb5356a2457dab1576fc119ea5962833ce15e31c7be26ebaa0"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_burrow.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_grassland_fallen_branch": {
+      "region": "grassland",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_fallen_branch.png",
+        "sha256": "db53589863749321e2d26180edd3f2b4db8b7dcf6e1cb9f7bfc4b77dd0b49c14"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_fallen_branch.png",
+      "size": {
+        "width": 14,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 8
+      },
+      "anchor": {
+        "x": 7,
+        "y": 5
+      },
+      "colors": 3
+    },
+    "deco_grassland_fairy_ring": {
+      "region": "grassland",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_fairy_ring.png",
+        "sha256": "de6b5f6e0ca37c7681491e0c14dcce2aca747d571ed12bad88a500e02a31bad7"
+      },
+      "png": "assets/sprites/ground-decorations/grassland/deco_grassland_fairy_ring.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_forest_mossy_log": {
+      "region": "forest",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_mossy_log.png",
+        "sha256": "116afa432dbf841f46c6c05807e2b63bdbb7d7bf0e2d95136768dd6c0d12bbc4"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_mossy_log.png",
+      "size": {
+        "width": 16,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 18,
+        "height": 10
+      },
+      "anchor": {
+        "x": 8,
+        "y": 7
+      },
+      "colors": 5
+    },
+    "deco_forest_red_shrooms": {
+      "region": "forest",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_red_shrooms.png",
+        "sha256": "c5052cd8b43538552083f144856c459a71b8b19ca3f93819311b7c221a70fb93"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_red_shrooms.png",
+      "size": {
+        "width": 15,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 10
+      },
+      "anchor": {
+        "x": 7,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_forest_cones_acorns": {
+      "region": "forest",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_cones_acorns.png",
+        "sha256": "88509cab9e682cd9a2deaa7d325b303f0db4ae645bbf575f4286da19ecf85359"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_cones_acorns.png",
+      "size": {
+        "width": 14,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 5
+    },
+    "deco_forest_root_knot": {
+      "region": "forest",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_root_knot.png",
+        "sha256": "f78cfc913ac1f068a19dc365c8d52f596774a973bf07584a0f200467f2183fb3"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_root_knot.png",
+      "size": {
+        "width": 13,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 11
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "colors": 4
+    },
+    "deco_forest_leaf_pile": {
+      "region": "forest",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_leaf_pile.png",
+        "sha256": "02cf5308679d1e8b01aab8d72b1332d71670a13c0dce926890bc5a25790a5f48"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_leaf_pile.png",
+      "size": {
+        "width": 14,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 8
+      },
+      "anchor": {
+        "x": 7,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_forest_fern_stones": {
+      "region": "forest",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/forest/deco_forest_fern_stones.png",
+        "sha256": "1b067de4f3c6cb86cb777d3ac52f155022deedfabbfd0b2b9de1ee473c2d1cb5"
+      },
+      "png": "assets/sprites/ground-decorations/forest/deco_forest_fern_stones.png",
+      "size": {
+        "width": 15,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 11
+      },
+      "anchor": {
+        "x": 7,
+        "y": 8
+      },
+      "colors": 4
+    },
+    "deco_mine_broken_rail": {
+      "region": "mine",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_broken_rail.png",
+        "sha256": "519559f70146f456ac6d2e6b92fbbea129e3de398a305b609d89202de7d2aa6a"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_broken_rail.png",
+      "size": {
+        "width": 15,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_mine_coal_pile": {
+      "region": "mine",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_coal_pile.png",
+        "sha256": "ef37e975964ec806993cb25f3e0bd021fbcaa9219235410ad77a5eea586703e2"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_coal_pile.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_mine_discarded_pick": {
+      "region": "mine",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_discarded_pick.png",
+        "sha256": "0c468430b4d9e3a07f14dafc3bf1032aa3c3f7d603c16367c9768340683b7947"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_discarded_pick.png",
+      "size": {
+        "width": 14,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 11
+      },
+      "anchor": {
+        "x": 7,
+        "y": 8
+      },
+      "colors": 3
+    },
+    "deco_mine_lantern": {
+      "region": "mine",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_lantern.png",
+        "sha256": "2560d62067c952a6d000110aa733db5adb46759dcb0dc6ea55b8cf7f863e4a46"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_lantern.png",
+      "size": {
+        "width": 9,
+        "height": 10
+      },
+      "runtimeSize": {
+        "width": 11,
+        "height": 12
+      },
+      "anchor": {
+        "x": 4,
+        "y": 9
+      },
+      "colors": 4
+    },
+    "deco_mine_timber_scraps": {
+      "region": "mine",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_timber_scraps.png",
+        "sha256": "c597b6e8aa79342423d64662207247d92ddee385b5b7258cf793a4e242855713"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_timber_scraps.png",
+      "size": {
+        "width": 16,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 18,
+        "height": 9
+      },
+      "anchor": {
+        "x": 8,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_mine_copper_rubble": {
+      "region": "mine",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/mine/deco_mine_copper_rubble.png",
+        "sha256": "d27cc8a8286e47abd9e938e78c4e604a2c817ca787d50440381da755c83cebaf"
+      },
+      "png": "assets/sprites/ground-decorations/mine/deco_mine_copper_rubble.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_graveyard_cracked_slab": {
+      "region": "graveyard",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_cracked_slab.png",
+        "sha256": "4cd603cb8aa986f884407def3cbd6478ee1d4d9d7864b1ef54b307adbeed9e3d"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_cracked_slab.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_graveyard_wilted_flowers": {
+      "region": "graveyard",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_wilted_flowers.png",
+        "sha256": "e42505340acb2a140f84c073b08357813b7604c4f35bd12c58b2b0a5fd434052"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_wilted_flowers.png",
+      "size": {
+        "width": 12,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 14,
+        "height": 11
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "colors": 5
+    },
+    "deco_graveyard_chain_coil": {
+      "region": "graveyard",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_chain_coil.png",
+        "sha256": "6d2a6bf1d8017c33a624df73598fbedf194f65c7214de2d2b40f6f0179def5e1"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_chain_coil.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 3
+    },
+    "deco_graveyard_urn_shards": {
+      "region": "graveyard",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_urn_shards.png",
+        "sha256": "0a8408491cae43d9849336e2681b5fc22b42a1ed0895504fec77cde1a120f42c"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_urn_shards.png",
+      "size": {
+        "width": 12,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 14,
+        "height": 10
+      },
+      "anchor": {
+        "x": 6,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_graveyard_ectoplasm": {
+      "region": "graveyard",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_ectoplasm.png",
+        "sha256": "779b8fdd5006e851fc41d570d21ee48cc4e4ae826a97cda7c3c85be196ce5761"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_ectoplasm.png",
+      "size": {
+        "width": 13,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 8
+      },
+      "anchor": {
+        "x": 6,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_graveyard_fresh_mound": {
+      "region": "graveyard",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_fresh_mound.png",
+        "sha256": "738defe9094e3abf7c3c7368be33a9823165ffe4e63f1cf9462bb09921bd6293"
+      },
+      "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_fresh_mound.png",
+      "size": {
+        "width": 13,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 8
+      },
+      "anchor": {
+        "x": 6,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_snowpass_ice_spikes": {
+      "region": "snowpass",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_ice_spikes.png",
+        "sha256": "2df82c6487200879a27af6cdd02fa7b7da3ca63c6ec63f2d560f028bd56865c8"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_ice_spikes.png",
+      "size": {
+        "width": 13,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 11
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "colors": 4
+    },
+    "deco_snowpass_snow_bones": {
+      "region": "snowpass",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_snow_bones.png",
+        "sha256": "56a3447909439c3a7645231ef841ae74a1250799ac5a2a98fd7b84ed044e2ee0"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_snow_bones.png",
+      "size": {
+        "width": 14,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_snowpass_frost_shrub": {
+      "region": "snowpass",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_frost_shrub.png",
+        "sha256": "cb541ac6210c6487bc8271a9bef13daca636dd4e2aa8bd6069d99662491bad88"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_frost_shrub.png",
+      "size": {
+        "width": 13,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 11
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "colors": 4
+    },
+    "deco_snowpass_trail_cairn": {
+      "region": "snowpass",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_trail_cairn.png",
+        "sha256": "eba07728ae7b53b49b345608087c3086c396aaabda585c2adbfd4206db94db7c"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_trail_cairn.png",
+      "size": {
+        "width": 10,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 12,
+        "height": 10
+      },
+      "anchor": {
+        "x": 5,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_snowpass_frozen_puddle": {
+      "region": "snowpass",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_frozen_puddle.png",
+        "sha256": "86f710a5a565c1a200dfd5aedd29ed194175a4b5363d00a5c28bb42fee4334b6"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_frozen_puddle.png",
+      "size": {
+        "width": 15,
+        "height": 5
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 7
+      },
+      "anchor": {
+        "x": 7,
+        "y": 4
+      },
+      "colors": 4
+    },
+    "deco_snowpass_broken_sled": {
+      "region": "snowpass",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_broken_sled.png",
+        "sha256": "79514a057ab2dbf0f055b0cbd393b09ecf0a1efb08bb55841a304e0f773a4f77"
+      },
+      "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_broken_sled.png",
+      "size": {
+        "width": 15,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_lavacave_ember_vent": {
+      "region": "lavacave",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_ember_vent.png",
+        "sha256": "56cb81524a1dc3d1cb69ed026f4ea2d0a7dfb06a1dac7b93fcf6b5b6ce11f124"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_ember_vent.png",
+      "size": {
+        "width": 13,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 10
+      },
+      "anchor": {
+        "x": 6,
+        "y": 7
+      },
+      "colors": 5
+    },
+    "deco_lavacave_sulfur_crystals": {
+      "region": "lavacave",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_sulfur_crystals.png",
+        "sha256": "ee9572aa3cda44e314c7067df4a2604de42d2f99b98a70a7875e296e74c48c75"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_sulfur_crystals.png",
+      "size": {
+        "width": 13,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 11
+      },
+      "anchor": {
+        "x": 6,
+        "y": 8
+      },
+      "colors": 4
+    },
+    "deco_lavacave_lava_crust": {
+      "region": "lavacave",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_lava_crust.png",
+        "sha256": "f22c2ef4fa4cea0d299cf01ceae665af91de346ab18760f9d1ad20ac5db1d293"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_lava_crust.png",
+      "size": {
+        "width": 14,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 8
+      },
+      "anchor": {
+        "x": 7,
+        "y": 5
+      },
+      "colors": 5
+    },
+    "deco_lavacave_basalt_shards": {
+      "region": "lavacave",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_basalt_shards.png",
+        "sha256": "1e7345ea0c40da22a4d05c2aac3cc071964137b9d0d57b7caa12cae7e5701be9"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_basalt_shards.png",
+      "size": {
+        "width": 13,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 10
+      },
+      "anchor": {
+        "x": 6,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_lavacave_scorched_bones": {
+      "region": "lavacave",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_scorched_bones.png",
+        "sha256": "5745ca19a610b0ebbacb66518ac058d1008863db9c590e2c75bda5a3356b7084"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_scorched_bones.png",
+      "size": {
+        "width": 14,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 8
+      },
+      "anchor": {
+        "x": 7,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_lavacave_ash_mound": {
+      "region": "lavacave",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_ash_mound.png",
+        "sha256": "9beded51f2417b83272d5747092b565c16b1a25e0388cd44c7ede90694cf9f7b"
+      },
+      "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_ash_mound.png",
+      "size": {
+        "width": 13,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 8
+      },
+      "anchor": {
+        "x": 6,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_skyruins_rune_tile": {
+      "region": "skyruins",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_rune_tile.png",
+        "sha256": "1c8494b584ee60818075629e03e1a38f23aa648afa3adcb1cc7767e41e2a9df7"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_rune_tile.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 5
+    },
+    "deco_skyruins_gear_fragment": {
+      "region": "skyruins",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_gear_fragment.png",
+        "sha256": "abc7e27026eb79fb5b51ed336e7bc0db13c5a7c73db602809a2b25a5350d9d25"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_gear_fragment.png",
+      "size": {
+        "width": 11,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 13,
+        "height": 11
+      },
+      "anchor": {
+        "x": 5,
+        "y": 8
+      },
+      "colors": 3
+    },
+    "deco_skyruins_marble_rubble": {
+      "region": "skyruins",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_marble_rubble.png",
+        "sha256": "cbfd687fbde0124a371ad851b84a2e7a0805f5c81aeb83d027c52bde9fe29641"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_marble_rubble.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_skyruins_aether_motes": {
+      "region": "skyruins",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_aether_motes.png",
+        "sha256": "efa3826e95767de78a23601178987ae7d705a7ad963f74261267c85504663190"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_aether_motes.png",
+      "size": {
+        "width": 12,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 14,
+        "height": 10
+      },
+      "anchor": {
+        "x": 6,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_skyruins_cloud_grass": {
+      "region": "skyruins",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_cloud_grass.png",
+        "sha256": "f16b9c8dd9a8cc478ff452b96053455c1c6068a7bfe945f79ce545f69992944a"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_cloud_grass.png",
+      "size": {
+        "width": 13,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 9
+      },
+      "anchor": {
+        "x": 6,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_skyruins_mosaic": {
+      "region": "skyruins",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_mosaic.png",
+        "sha256": "582f6a4e95eaa9351fc52c230b1edd0bf02b54c5c0980f1ba931d801efa2e6f0"
+      },
+      "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_mosaic.png",
+      "size": {
+        "width": 14,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 5
+    },
+    "deco_darkcastle_ritual_rune": {
+      "region": "darkcastle",
+      "slot": 1,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_ritual_rune.png",
+        "sha256": "af2a16b3e1ded5b82d1a440e4eeb3de4bceeac9369dd446413b6c344057ebd72"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_ritual_rune.png",
+      "size": {
+        "width": 15,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 17,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 4
+    },
+    "deco_darkcastle_iron_chain": {
+      "region": "darkcastle",
+      "slot": 2,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_iron_chain.png",
+        "sha256": "72c53a2221c426fdbd0c5bd4f13649a14041098530d4216718866627eeb4140e"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_iron_chain.png",
+      "size": {
+        "width": 13,
+        "height": 6
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 8
+      },
+      "anchor": {
+        "x": 6,
+        "y": 5
+      },
+      "colors": 4
+    },
+    "deco_darkcastle_banner_scrap": {
+      "region": "darkcastle",
+      "slot": 3,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_banner_scrap.png",
+        "sha256": "edd462fb1bf3045f4a69e20e6fd9ae55fead0c55bca65ed02e9dc55c843c55ff"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_banner_scrap.png",
+      "size": {
+        "width": 14,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 10
+      },
+      "anchor": {
+        "x": 7,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_darkcastle_claw_marks": {
+      "region": "darkcastle",
+      "slot": 4,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_claw_marks.png",
+        "sha256": "f7a373c640a2e0e352027b0d93e7f415268c99bb1a33ef8aa00934a3a0f1495e"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_claw_marks.png",
+      "size": {
+        "width": 14,
+        "height": 7
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 9
+      },
+      "anchor": {
+        "x": 7,
+        "y": 6
+      },
+      "colors": 3
+    },
+    "deco_darkcastle_purple_fungus": {
+      "region": "darkcastle",
+      "slot": 5,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_purple_fungus.png",
+        "sha256": "4d971f96b32381cb56ac76db4c40fd0bcfede067120c977f862cbf0cc865ee31"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_purple_fungus.png",
+      "size": {
+        "width": 13,
+        "height": 8
+      },
+      "runtimeSize": {
+        "width": 15,
+        "height": 10
+      },
+      "anchor": {
+        "x": 6,
+        "y": 7
+      },
+      "colors": 4
+    },
+    "deco_darkcastle_gargoyle_fragment": {
+      "region": "darkcastle",
+      "slot": 6,
+      "source": {
+        "path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_gargoyle_fragment.png",
+        "sha256": "5f5f2f806d9396521e5f5db8f856fc25116025c3c93b4d3adbe74cee9ad34b5a"
+      },
+      "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_gargoyle_fragment.png",
+      "size": {
+        "width": 14,
+        "height": 9
+      },
+      "runtimeSize": {
+        "width": 16,
+        "height": 11
+      },
+      "anchor": {
+        "x": 7,
+        "y": 8
+      },
+      "colors": 4
+    }
+  }
+}

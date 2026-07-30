@@ -24,7 +24,7 @@
 | --- | --- |
 | **开场体验** | 标题画面采用半俯视悬崖构图：全景先在半分辨率画布逐像素绘制，再以 2× 最近邻放大；四名队友在近岸营地围火、游侠在同侧河岸警戒上游，完整岩壁明确高台落差；远山曲流在崖口收束并与瀑布同轴，落入带浅滩、暗岸与河中岩石的横向河湾，视线继续跨过巨兽巢穴、不规则混生密林、多重雪山，最终落到山隘间极远的小比例魔王城；启动先展示无遮挡营地观景态，点击进入后才显示主操作，并可随时返回观景；纯空档使用独立的公会纹章「开始新游戏」特殊按钮，不套用档案槽位外壳，进行中档则显示远征档案、职业头像、等级、区域、游玩时长、路线进度、世界种子与「继续游戏」；选档前不启动主循环、不自动存档、不结算离线收益；确认后经传送光柱、符文与像素帘幕进入序章或世界 |
 | **职业系统** | DnD 风格五职业（战士/盗贼/法师/牧师/游侠），开局选择、永久生效；数值成长、攻击方式（近战/远程弹道）、技能组、精灵立绘、武器全面区分 |
-| **环境视觉** | 程序化多阶树冠大树（摇曳）、草簇风场行波、烘焙花簇/色斑/裂纹/雪地反光、发光体光晕（水晶/烛火/营灯）、林间光柱、道具软阴影、暗角；营地含磨损地垫、刻印、旗帜、补给、铺盖、坐木与炊具；全部可开关、视口剔除（实测满帧） |
+| **环境视觉** | 程序化多阶树冠大树（摇曳）、连续密度场草簇/花簇、烘焙色斑/裂纹/雪地反光、八区各 6 件专属 v3 地表装饰；普通装饰按生态适宜度、同类簇群、伴生锚点与八种形状语法形成岸带、行列、轨迹、环形和自然斑块。发光体光晕（水晶/烛火/营灯）、林间光柱、道具软阴影、暗角；营地含磨损地垫、刻印、旗帜、补给、铺盖、坐木与炊具；全部可开关并执行视口剔除 |
 | 挂机战斗 | 50ms 整数 tick 的确定性自动时间轴：GCD/oGCD、队列窗口、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、威胁、护盾和治疗共用一条结算管线；普通遭遇为 1–3 人 pack，巡逻与接敌入口统一受共享 leash 约束，Boss 具备预警、阶段与有限增援 |
 | 开放远征世界 | 八区均以世界种子生成稳定的 `2400×1440` 连续开放地图；14–18 个宏观中心、硬阻挡、宽窄路线、支路与环路共同形成可选择拓扑，16px 分层导航、扫掠碰撞、512px 分块渲染和空间桶支撑长途探索 |
 | 世界生态 | 八区 Population 先生成不可变 `PopulationMountPlan`，按 Boss→守门→NPC→稀有→常规顺序预留合法坐标，再通过稳定 SpawnLease 生成普通怪、Boss、NPC 与和平生物；Population 统一管理死亡/逃跑后的 delay 或 worldTime 重生，`spawnId + generation` 隔离旧命令。Encounter 内召唤物使用确定性 ephemeral sequence，不挂 Population、默认无奖励，并随战斗生命周期挂载和回收 |
@@ -86,11 +86,11 @@ js/
   main.js             启动引导
 ```
 
-**探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。八区 Boss 领地使用 `assets/sprite-source/boss-territories/` 的透明 ImageGen 母版；运行 `python tools\build-boss-landmarks.py` 重建 8 个主地标、24 个装饰精灵、运行时联系表和来源清单，提交前同样用 `--check` 校验。`*.generated.js` 不直接手改。
+**探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。八区各 6 件地表装饰以 `assets/sprite-source/ground-decorations/<region>/<stable-id>.png` 的 48 张独立透明图为维护源；运行 `python tools\build-ground-decorations.py` 重建逐件生产 PNG、八区模块、来源清单和联系表，提交前用 `--check` 校验。初始提示词与精准替换步骤记录在 `ground-decorations-source.md`，`v3Only` 声明保证旧布局不消费它们。八区 Boss 领地使用 `assets/sprite-source/boss-territories/` 的透明 ImageGen 母版；运行 `python tools\build-boss-landmarks.py` 重建 8 个主地标、24 个装饰精灵、运行时联系表和来源清单，提交前同样用 `--check` 校验。`*.generated.js` 不直接手改。
 
 **扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与四个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
 
-**地图 QA 分工**：`tech-demos/map-effects` 是无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，提供交互小地图、检查/寻路/放置探针、确定性复验、巡游预览和结构化报告；目录默认关联当前地图，并将单位、资源、宝箱定义、地标、奇物、生态、威胁、Hazard 锚点、营地、装饰与材质独立分类。它不启动存档、战斗、Hazard、探索 AI、宝箱或交易。`tech-demos/exploration-v3` 独立负责导航网格、长途路径、拓扑可视化和多 Seed 批量审计。
+**地图 QA 分工**：`tech-demos/map-effects` 是无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，提供交互小地图、检查/寻路/放置探针、确定性复验、巡游预览和结构化报告；目录默认关联当前地图，并将单位、资源、宝箱定义、地标、奇物、生态、威胁、Hazard 锚点、营地、装饰与材质独立分类。地表装饰同时枚举双语名称、稳定 ID、当前实例数与放置语法；选择装饰后可叠加查看适宜度热区、簇群椭圆、方向轴与簇内关系，并审计配额完成率、平均最近邻、同类富集和留白。它不启动存档、战斗、Hazard、探索 AI、宝箱或交易。`tech-demos/exploration-v3` 独立负责导航网格、长途路径、拓扑可视化和多 Seed 批量审计。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`。
 
@@ -102,7 +102,7 @@ js/
 - **生成管线**：`Game.terrain` 将 `generate / validate / repair / mount` 分离——生成 `2400×1440` 地图（14–18 个宏观中心、至少两条有效环路、营地到巢穴替代路线、60–70% 主连通可行走区、≥48px 必要路线净宽）；Boss 点额外生成开阔战斗房、不可通行椭圆墙带与按实际道路切出的门洞，并使用区域专属地板和贴边装饰。验证后对畸形做确定性修复再装载；v1/v2 兼容生成器保留，由 `tests/v1_7.test.js` 的固定快照与八区种子矩阵保护。
 - **布局版本**：当前 `layoutVersion:3` 使用 14–18 个宏观中心、真实硬阻挡和 60–70% 主连通可行走区；河流、悬崖、密林、塌方、熔岩、虚空与残墙均可阻断移动。长途路径失败时只接受合法点投影或重新求解，禁止直线穿墙兜底。`900×520`、98–135 个装饰、全格可通行与直线回退均只属于 v1/v2 兼容生成器。
 - **动态远征层**：永久层保存地形、迷雾与图鉴；动态层按 `worldSeed + regionId + expeditionIndex` 确定性生成异常、生态、威胁与词缀。`Game.expeditionAI` 的安全/均衡/掠夺三策略只读取已揭示情报，提供三段卡死恢复；`trace()` 返回最近 80 次意图切换供 QA。
-- **导航与渲染**：512px 地表区块组成 5×3 网格，视口预加载与 LRU 只保留热区块，动态实体使用空间桶；长途移动先固定为可即时打断的宏观航点行程，再逐段运行局部 A*，避免在宏观分区边界随 0.6s 重算往返。导航队列受单帧 2ms 预算约束，结果下一帧接续；失败缓存、扫掠停滞恢复、目标/token/策略变更重编排同时覆盖自动 AI、点击移动与「前往巢穴」。键盘和点触移动均执行硬阻挡扫掠碰撞。v3 区块以多尺度平滑噪声替代方块材质选择，恢复材质微纹理、草叶/裂纹/雪光、材质边缘、宽域色斑、花簇与营地磨损地面，未探索区完全遮蔽以防泄露底层粗网格与实体轮廓。
+- **导航与渲染**：512px 地表区块组成 5×3 网格，视口预加载与 LRU 只保留热区块，动态实体使用空间桶；长途移动先固定为可即时打断的宏观航点行程，再逐段运行局部 A*，避免在宏观分区边界随 0.6s 重算往返。导航队列受单帧 2ms 预算约束，结果下一帧接续；失败缓存、扫掠停滞恢复、目标/token/策略变更重编排同时覆盖自动 AI、点击移动与「前往巢穴」。键盘和点触移动均执行硬阻挡扫掠碰撞。v3 区块以多尺度平滑噪声替代方块材质选择；装饰再以按定义独立的适宜度场、簇群点过程和形状语法形成同类富集、伴生关系与负空间，避免抖动网格式平均散布。材质微纹理、草叶/裂纹/雪光、材质边缘、宽域色斑、花簇与营地磨损地面保持可见，未探索区完全遮蔽以防泄露底层粗网格与实体轮廓。
 - **地图交互**：区域地图以独立底图和实时角色覆盖层合成，支持按钮、连续滚轮/触控板、双指捏合缩放及单指拖动；倍率限制为 `1×–3×`，缩放期间不重建面板或底图，到达边界后释放滚轮供面板继续滚动。
 - **迷雾与采集**：迷雾采用 32px Base64 bitset 加硬阻挡视线遮挡，前沿只选未知、可走且具备净宽的导航格，并以稳定 ID 屏蔽失败目标。八区环境实体每图至少 550 个（其中 ≥350 个大型树木、岩群、墓碑或遗迹与硬阻挡一一对应），可行走区另铺小型植被。当前 v3 由独立 `resources` 流放置 16–22 个节点；自动采集统一要求节点已揭示，揭示后即可立即采集，活跃小型资源使用 2× 整数缩放并加光晕描边，枯竭后改为独立地痕。
 - **Hazard**：v3 使用独立稳定流生成候选锚点，再按宏观骨架及地标、资源、奇物、威胁、守门者和巢穴接近链做确定性覆盖选择；方向形状搜索朝向以最大化触发/揭示链路。`Game.hazards` 独占 clue/reveal awareness、shape-aware swept trigger/导航距离、fixed-tick warning/active window、伏击编队绑定和持久冷却；互动指令不暂停 tick，安全/均衡会取消低优先级互动并下发避开相邻危险的逃生路径，掠夺在生命充足时记录并接受风险。当前 16 个 Hazard 均由 `HazardProfile/HazardVisualProfile` 数据驱动，`tech-demos/hazards` 直接复用正式链路做六阶段、潜在路径与噬宝匣概率/事务对照。
@@ -180,6 +180,7 @@ node tests\hazard-runtime.test.js
 node tests\hazard-layout.test.js
 node tests\hazard-presentation.test.js
 node tests\action-bubble-demo.test.js
+node tests\decoration-ecology.test.js
 node tests\map-effects-inspector.test.js
 node tests\browser-smoke.js
 node tests\cache-version.test.js

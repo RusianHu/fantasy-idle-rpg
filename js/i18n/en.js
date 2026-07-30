@@ -366,6 +366,41 @@
       darkcastle: { name: 'Demon Castle', desc: 'The source of the miasma. Slay the Demon Lord and end this calamity!' }
     },
 
+    decor: {
+      grassland: {
+        clover: 'Clover Patch', wildWheat: 'Wild Wheat', dandelions: 'Dandelion Cluster',
+        burrow: 'Rabbit Burrow', fallenBranch: 'Fallen Branch', fairyRing: 'Fairy Ring'
+      },
+      forest: {
+        mossyLog: 'Mossy Fallen Log', redShrooms: 'Red Mushroom Cluster', conesAcorns: 'Cones and Acorns',
+        rootKnot: 'Exposed Root Knot', leafPile: 'Fallen Leaf Pile', fernStones: 'Fern and Stone Patch'
+      },
+      mine: {
+        brokenRail: 'Broken Mine Rail', coalPile: 'Coal Pile', discardedPick: 'Discarded Pickaxe',
+        lantern: 'Mining Lantern', timberScraps: 'Splintered Timbers', copperRubble: 'Copper Ore Rubble'
+      },
+      graveyard: {
+        crackedSlab: 'Cracked Grave Slab', wiltedFlowers: 'Wilted Grave Flowers', chainCoil: 'Rusty Chain Coil',
+        urnShards: 'Funeral Urn Shards', ectoplasm: 'Ectoplasm Puddle', freshMound: 'Fresh Grave Mound'
+      },
+      snowpass: {
+        iceSpikes: 'Ice Spike Cluster', snowBones: 'Snow-covered Bones', frostShrub: 'Frost Shrub',
+        trailCairn: 'Trail Cairn', frozenPuddle: 'Frozen Puddle', brokenSled: 'Broken Sled'
+      },
+      lavacave: {
+        emberVent: 'Ember Vent', sulfurCrystals: 'Sulfur Crystal Cluster', lavaCrust: 'Cooled Lava Crust',
+        basaltShards: 'Basalt Shard Pile', scorchedBones: 'Scorched Bones', ashMound: 'Ash Mound'
+      },
+      skyruins: {
+        runeTile: 'Glowing Rune Tile', gearFragment: 'Ancient Gear Fragment', marbleRubble: 'Sky-marble Rubble',
+        aetherMotes: 'Aether Motes', cloudGrass: 'Cloud Grass', mosaic: 'Azure-gold Mosaic'
+      },
+      darkcastle: {
+        ritualRune: 'Crimson Ritual Rune', ironChain: 'Iron Chain Coil', bannerScrap: 'Torn Black Banner',
+        clawMarks: 'Demon Claw Marks', purpleFungus: 'Purple Miasma Fungus', gargoyleFragment: 'Gargoyle Fragment'
+      }
+    },
+
     ach: {
       kill_100: { name: 'First Steps', desc: 'Slay 100 monsters' },
       kill_1000: { name: 'Subjugator', desc: 'Slay 1,000 monsters' },

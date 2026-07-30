@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260730.11") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.1") format("woff2");
   font-display: swap;
 }
 
@@ -305,6 +305,61 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   font-size: 9px;
 }
 
+.ecology-panel {
+  min-width: 0;
+  margin-top: 12px;
+  border: 1px solid #465044;
+  background:
+    linear-gradient(135deg, rgba(88, 122, 83, .08), transparent 42%),
+    var(--surface);
+}
+.ecology-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.ecology-metric {
+  min-width: 0;
+  padding: 10px 11px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.ecology-metric:last-child { border-right: 0; }
+.ecology-metric strong {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 3px;
+  color: #9fd39a;
+  font: 15px/1.1 Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ecology-metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+.pattern-summary {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+}
+.pattern-chip {
+  padding: 4px 6px;
+  color: #d5d7c7;
+  border: 1px solid #465044;
+  background: #1b211b;
+  font: 8px Consolas, monospace;
+}
+.pattern-chip.selected {
+  color: #171b15;
+  border-color: #a8d2a0;
+  background: #a8d2a0;
+}
+
 .map-dock {
   display: grid;
   grid-template-columns: minmax(280px, .9fr) minmax(300px, 1.1fr);
@@ -588,7 +643,9 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   .layer-groups { grid-template-columns: 1fr; }
   .map-dock { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ecology-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .metric { border-bottom: 1px solid var(--line); }
+  .ecology-metric { border-bottom: 1px solid var(--line); }
   .runtime-actions button { flex-basis: calc(50% - 6px); }
   .runtime-actions output { flex-basis: 100%; }
   .inspector-tabs button { font-size: 9px; }
@@ -597,6 +654,7 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
 @media (max-width: 420px) {
   .stage-wrap { aspect-ratio: 390 / 300; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ecology-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .catalog-filters { grid-template-columns: 1fr; }
   .log-row { grid-template-columns: 50px 66px minmax(0, 1fr); }
 }

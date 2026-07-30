@@ -168,7 +168,7 @@
       var roadWidth = U.clamp(lc.road.width || 48, 40, 64);
       var campSafe = lc.campSafeRadius || 80;
       var bossSafe = lc.bossSafeRadius || 70;
-      var needsWaterDecor = cfg.deco.some(function (def) { return !!def.water; });
+      var needsWaterDecor = cfg.deco.some(function (def) { return !def.v3Only && !!def.water; });
 
       var gw = Math.ceil(w / CELL), gh = Math.ceil(h / CELL);
       var grid = new Array(gw * gh);
@@ -319,6 +319,9 @@
 
       for (i = 0; i < cfg.deco.length; i++) {
         var dd = cfg.deco[i];
+        // v3Only 装饰扩展正式开放地图的主题细节，但不得改写 v1/v2
+        // 的历史布局、随机流消费或黄金快照。
+        if (dd.v3Only) continue;
         var decorCount = scaledCount(dd.count, dd.water ? waterDecorDensity : decorDensity);
         var centers = [];
         if (dd.cluster) {

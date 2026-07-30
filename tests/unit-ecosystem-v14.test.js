@@ -33,7 +33,16 @@ const load = (file) => vm.runInContext(read(file), sandbox, { filename: file });
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js',
-  'js/sprites/props.js', 'js/sprites/exploration_v3.js',
+  'js/sprites/props.js',
+  'js/sprites/ground-decorations/grassland.generated.js',
+  'js/sprites/ground-decorations/forest.generated.js',
+  'js/sprites/ground-decorations/mine.generated.js',
+  'js/sprites/ground-decorations/graveyard.generated.js',
+  'js/sprites/ground-decorations/snowpass.generated.js',
+  'js/sprites/ground-decorations/lavacave.generated.js',
+  'js/sprites/ground-decorations/skyruins.generated.js',
+  'js/sprites/ground-decorations/darkcastle.generated.js',
+  'js/sprites/exploration_v3.js',
   'js/core/content/support.js', 'js/data/content/content.generated.js'
 ].forEach(load);
 

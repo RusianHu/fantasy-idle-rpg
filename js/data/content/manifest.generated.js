@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "b651dc2caaddf6d8f0a71606a0ff5a375e34f0cc7c3bc41d3427dda07fd42aa3",
+  "sourceSetHash": "dd7fba42567f11c1f8bf5f5038390beee13290edc1bb8581a4a4d7f6c97f26c4",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "1e208b9709d4d3d9381e4aad12324956c52a8f7fc1ee211f760ba2b8a4e29e88"
+      "sha256": "088c55e0f1eb813af2a6ba882e8d922a0047eb8e489a2e1b3e0216691294e0f5"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -243,6 +243,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "f248239c"
+  "contentFingerprint": "35426d72"
 });
 })();

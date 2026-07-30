@@ -44,6 +44,14 @@ const bootstrap = [
   'js/sprites/monsters_b.js',
   'js/sprites/monsters_expansion.js',
   'js/sprites/props.js',
+  'js/sprites/ground-decorations/grassland.generated.js',
+  'js/sprites/ground-decorations/forest.generated.js',
+  'js/sprites/ground-decorations/mine.generated.js',
+  'js/sprites/ground-decorations/graveyard.generated.js',
+  'js/sprites/ground-decorations/snowpass.generated.js',
+  'js/sprites/ground-decorations/lavacave.generated.js',
+  'js/sprites/ground-decorations/skyruins.generated.js',
+  'js/sprites/ground-decorations/darkcastle.generated.js',
   'js/sprites/exploration_v3.js',
   'js/data/content/content.generated.js'
 ];

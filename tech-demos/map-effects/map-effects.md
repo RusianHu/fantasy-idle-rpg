@@ -8,6 +8,8 @@
 - 无玩家、无迷雾、无存档读写；不创建战斗、运行时 Hazard、探索 AI、宝箱或交易状态。
 - 全图小地图支持点击和拖动镜头、视口框同步、地点/Actor/错误标记与对象聚焦。
 - 检查、正式导航测距、SpawnProfile 放置探针、放置审计、确定性复验及固定 50ms 的 Seeded 巡游预览。
+- 生产装饰生态报告：适宜度场、簇群中心、形状包络、方向轴、簇内关系、配额完成率、平均最近邻、同类富集与大尺度留白。
+- 目录选择任一地表装饰后，“装饰适宜度场 / 簇群与形状 / 簇内关系”诊断层会切换到该稳定 ID；普通检查探针同时报告该点的适宜度分数。
 
 ## 目录
 
@@ -15,11 +17,11 @@
 - “全部类别”按类别分段，不把不同类型平铺在同一列表；选择分类后只显示一个精确 `category`。
 - 单位拆分为普通怪物、Boss、NPC、和平生物、召唤物和 Object。
 - 地图内容拆分为可采集资源、宝箱、普通地标、Boss 巢穴、奇物、生态、威胁、Hazard 定义、Hazard 锚点和营地组件。
-- 装饰拆分为阻挡、地表、水域、Boss 领地、草簇、花朵及地形材质。
+- 装饰拆分为阻挡、地表、水域、Boss 领地、草簇、花朵及地形材质；八区各 6 件 `v3Only` 主题地表装饰来自逐件透明 PNG 与分区 generated 模块，并按中英文名称、稳定 ID、像素预览和当前实例数自动枚举。
 - 当前实例关联坐标并可聚焦；未挂载单位、召唤物、Hazard 和普通/稀有宝箱只显示正式定义与 `0` 实例，不向地图注入运行时对象。
 
 ## QA 接口
 
-`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`verifyDeterminism` 和 `resetPositions`。
+`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`verifyDeterminism`、`decorationReport` 和 `resetPositions`。确定性复验同时比较宏观地形、完整装饰生态、Population 计划与 Actor 坐标。
 
 长途导航、拓扑可视化和多 Seed 批量审计仍由 `tech-demos/exploration-v3` 独立负责。

@@ -50,8 +50,9 @@ function expectedDecorCount(region, def, version) {
 
 function assertLayout(region, seed, layout, version) {
   const cfg = region.layout;
+  const legacyDeco = region.terrain.deco.filter((def) => !def.v3Only);
   const campPropCount = version >= 2 ? 8 : 2;
-  const expectedProps = region.terrain.deco.reduce((sum, def) => sum + expectedDecorCount(region, def, version), 0) + campPropCount;
+  const expectedProps = legacyDeco.reduce((sum, def) => sum + expectedDecorCount(region, def, version), 0) + campPropCount;
   const expectedPatches = region.terrain.patches.reduce((sum, def) => {
     return sum + scaledCount(def.count, version === 1 ? 1 : cfg.patchDensity);
   }, 0);
@@ -78,13 +79,16 @@ function assertLayout(region, seed, layout, version) {
   assert.ok(layout.corridor.width >= 40 && layout.corridor.width <= 64);
 
   const counts = propCounts(layout.props);
-  for (const def of region.terrain.deco) {
+  for (const def of legacyDeco) {
     assert.equal(counts[def.sprite], expectedDecorCount(region, def, version), region.id + ':' + def.sprite);
+  }
+  for (const def of region.terrain.deco.filter((item) => item.v3Only)) {
+    assert.equal(counts[def.sprite], undefined, region.id + ':' + def.sprite + ' must stay out of v1/v2');
   }
   assert.equal(counts.tent, 1);
   assert.equal(counts.campfire, 1);
   if (version === 2) {
-    const baseProps = region.terrain.deco.reduce((sum, def) => sum + def.count, 0) + 2;
+    const baseProps = legacyDeco.reduce((sum, def) => sum + def.count, 0) + 2;
     const basePatches = region.terrain.patches.reduce((sum, def) => sum + def.count, 0);
     assert.ok(layout.props.length >= baseProps * 2.8, region.id + ' v2 decor density');
     assert.ok(layout.patches.length > basePatches, region.id + ' v2 patch density');

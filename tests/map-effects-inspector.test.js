@@ -27,6 +27,65 @@ const Game = sandbox.window.Game;
 const regions = Game.reg.all('region');
 const nonPlayerActors = Game.content.all('actorArchetype')
   .filter((definition) => definition.category !== 'player');
+const groundManifest = Game.GROUND_DECORATION_SPRITES;
+
+assert.ok(groundManifest, 'ground-decoration asset manifest is loaded');
+assert.equal(Object.keys(groundManifest.regions).length, 8);
+assert.equal(Object.keys(groundManifest.assets).length, 48);
+assert.equal(new Set(Object.keys(groundManifest.assets)).size, 48);
+
+for (const region of regions) {
+  const themedGroundDecor = (region.terrain.deco || [])
+    .filter((definition) => definition.v3Only);
+  assert.equal(themedGroundDecor.length, 6,
+    `${region.id} registers exactly six new v3 ground decorations`);
+  assert.deepEqual(
+    Array.from(groundManifest.regions[region.id]),
+    Array.from(themedGroundDecor, (definition) => definition.sprite),
+    `${region.id} generated module follows region catalog order`
+  );
+  for (const definition of themedGroundDecor) {
+    const asset = groundManifest.assets[definition.sprite];
+    assert.equal(definition.placement, 'ground',
+      `${definition.sprite} remains a non-blocking ground decoration`);
+    assert.ok(Game.assets.has(definition.sprite),
+      `${definition.sprite} has a production pixel sprite`);
+    assert.ok(asset, `${definition.sprite} has independent source metadata`);
+    assert.ok(fs.existsSync(path.join(ROOT, asset.source.path)),
+      `${definition.sprite} source PNG exists`);
+    assert.ok(fs.existsSync(path.join(ROOT, asset.png)),
+      `${definition.sprite} production PNG exists`);
+    assert.equal(
+      require('node:crypto').createHash('sha256')
+        .update(fs.readFileSync(path.join(ROOT, asset.source.path)))
+        .digest('hex'),
+      asset.source.sha256,
+      `${definition.sprite} source hash matches the generated manifest`
+    );
+    assert.ok(definition.nameKey,
+      `${definition.sprite} exposes a localized catalog name`);
+    assert.ok(definition.distribution,
+      `${definition.sprite} exposes a data-authored v3 distribution profile`);
+    assert.ok([
+      'blob', 'edgeBand', 'line', 'ring', 'arc', 'row', 'trail', 'scatter'
+    ].includes(definition.distribution.pattern),
+    `${definition.sprite} uses a supported semantic shape grammar`);
+    assert.ok(Game.i18n.has('zh-CN', definition.nameKey),
+      `${definition.nameKey} exists in zh-CN`);
+    assert.ok(Game.i18n.has('en', definition.nameKey),
+      `${definition.nameKey} exists in English`);
+  }
+}
+
+const propSource = read('js/sprites/props.js');
+assert.doesNotMatch(propSource, /deco_(?:grassland|forest|mine|graveyard|snowpass|lavacave|skyruins|darkcastle)_/,
+  'theme decorations no longer live in the monolithic props source');
+for (const region of regions) {
+  const modulePath = `js/sprites/ground-decorations/${region.id}.generated.js`;
+  assert.ok(fs.existsSync(path.join(ROOT, modulePath)), `${region.id} module exists`);
+  assert.ok(html.indexOf(modulePath) > html.indexOf('js/sprites/props.js'),
+    `${region.id} module loads after the shared props module`);
+}
 
 const i18nKeys = new Set(
   [...html.matchAll(/data-demo-(?:i18n|page-title|i18n-aria|i18n-title|i18n-label)="([^"]+)"/g)]
@@ -50,6 +109,7 @@ assert.equal(nonPlayerActors.length, Game.content.all('actorArchetype').length -
 
 for (const call of [
   'Game.terrain.generate(', 'Game.terrain.validate(', 'Game.terrain.mount(',
+  'Game.terrain.decorationField(', 'Game.terrain.decorSuitability(',
   'Game.population.prepareRegion(', 'Game.population.mountChannel(',
   'Game.render.frame(', 'Game.nav.solveImmediate(',
   'Game.population.inspectPlacement(', 'Game.population.inspectCandidates('
@@ -68,6 +128,7 @@ for (const excluded of [
 for (const id of [
   'stage', 'stage-overlay', 'minimap', 'seed-input', 'seed-random',
   'profile-select', 'motion-toggle', 'probe-output', 'runtime-metrics',
+  'decor-ecology-metrics', 'decor-pattern-summary',
   'catalog-scope', 'catalog-list', 'issues-panel', 'log-list'
 ]) {
   assert.match(html, new RegExp(`id="${id}"`), `Lab exposes #${id}`);
@@ -76,6 +137,7 @@ for (const layer of [
   'terrainMaterial', 'liquid', 'decorBlocker', 'decorGround', 'decorWater',
   'decorBoss', 'tufts', 'flowers', 'camp', 'landmarks', 'resources', 'curios',
   'ecology', 'threats', 'actors', 'hazards', 'macro', 'nav', 'distance', 'danger',
+  'decorHabitat', 'decorClusters', 'decorGroups',
   'chunks', 'candidates', 'reservations', 'formations', 'spawnOrigins', 'ids'
 ]) {
   assert.match(html, new RegExp(`data-layer="${layer}"`), `Lab exposes ${layer} layer`);
@@ -84,13 +146,15 @@ for (const layer of [
 for (const method of [
   'regenerate', 'randomize', 'catalog', 'snapshot', 'logs', 'focus',
   'setCamera', 'setLayer', 'setMotion', 'probe', 'measure',
-  'verifyDeterminism', 'resetPositions'
+  'verifyDeterminism', 'decorationReport', 'resetPositions'
 ]) {
   assert.match(script, new RegExp(`${method}:`), `MapGenerationLab exposes ${method}`);
 }
 assert.match(script, /window\.MapGenerationLab\s*=/);
 assert.match(script, /scope === 'all' \|\| item\.inRegion/,
   'catalog defaults to current-region relevance while retaining an all-definition scope');
+assert.match(script, /definition\.nameKey \? nameFromKey\(definition\.nameKey, definition\.sprite\)/,
+  'decoration definitions expose localized names in the generated catalog');
 assert.match(script, /group:\s*'unit'/,
   'catalog keeps a first-class unit group in addition to actor subcategories');
 for (const category of [
@@ -131,6 +195,12 @@ assert.match(renderer, /terrainLayers\.material !== false/);
 assert.match(renderer, /terrainLayers\.liquid !== false/);
 assert.match(terrain, /placementOf\(def\)/,
   'v3 decoration roles remain data-driven');
+assert.match(terrain, /habitat-cluster-grammar/,
+  'v3 publishes the habitat, cluster and grammar generation method');
+assert.match(terrain, /T\.decorationField\s*=/,
+  'production terrain exposes a read-only habitat diagnostic field');
+assert.match(terrain, /T\.decorationSnapshot\s*=/,
+  'production terrain exposes deterministic decoration snapshots');
 assert.doesNotMatch(terrain, /tree\|oak|fern\|bush/,
   'v3 does not infer placement from sprite IDs');
 

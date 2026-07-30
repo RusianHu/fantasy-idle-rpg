@@ -30,6 +30,8 @@
   var recentSeeds = [];
   var generationRecord = null;
   var miniTerrain = null;
+  var decorField = null;
+  var decorFieldKey = null;
   var spatialQueries = 0;
   var frameSamples = [];
   var lastFrame = performance.now();
@@ -62,7 +64,10 @@
       copied: '已复制', reset: 'Actor 已精确复位', verified: '确定性复验通过',
       mismatch: '确定性复验不一致', png: '已导出主画布 PNG',
       noPath: '正式导航未找到路径', catalog: '目录项', logCleared: '日志已清空',
-      instances: '当前实例', currentMapScope: '当前地图', allMapsScope: '全部地图定义'
+      instances: '当前实例', currentMapScope: '当前地图', allMapsScope: '全部地图定义',
+      decorInstances: '生态装饰', decorClusters: '簇群中心', decorDefinitions: '装饰类型',
+      decorNearest: '平均最近邻', decorEnrichment: '同类富集倍数', decorCoverage: '配额完成率',
+      habitatViable: '适宜区域', habitatNone: '选择装饰后显示适宜度场'
     },
     en: {
       ready: 'Generation complete', generating: 'Generating', none: 'No object selected',
@@ -76,7 +81,10 @@
       copied: 'Copied', reset: 'Actor positions restored exactly', verified: 'Determinism verified',
       mismatch: 'Determinism mismatch', png: 'Main canvas PNG exported',
       noPath: 'Production navigation found no route', catalog: 'catalog items', logCleared: 'Log cleared',
-      instances: 'current instances', currentMapScope: 'current map', allMapsScope: 'all map definitions'
+      instances: 'current instances', currentMapScope: 'current map', allMapsScope: 'all map definitions',
+      decorInstances: 'ecology props', decorClusters: 'cluster centers', decorDefinitions: 'decor types',
+      decorNearest: 'mean nearest', decorEnrichment: 'same-type enrichment', decorCoverage: 'quota coverage',
+      habitatViable: 'viable habitat', habitatNone: 'select a decoration to inspect habitat'
     }
   };
 
@@ -263,6 +271,123 @@
     };
   }
 
+  function decorationDefinition(sprite) {
+    return (region && region.terrain && region.terrain.deco || []).filter(function (definition) {
+      return definition.sprite === sprite;
+    })[0] || null;
+  }
+
+  function activeDecorationSprite() {
+    var sprite = selected && (selected.sprite || selected.data && selected.data.sprite);
+    if (sprite && decorationDefinition(sprite)) return sprite;
+    var definitions = region && region.terrain && region.terrain.deco || [];
+    var preferred = definitions.filter(function (definition) {
+      return definition.v3Only && definition.placement === 'ground';
+    })[0] || definitions.filter(function (definition) {
+      return definition.placement === 'ground';
+    })[0];
+    return preferred && preferred.sprite || null;
+  }
+
+  function refreshDecorField(force) {
+    if (!layout || !region || !Game.terrain.decorationField) return null;
+    var sprite = activeDecorationSprite();
+    if (!sprite) {
+      decorField = null;
+      decorFieldKey = null;
+      return null;
+    }
+    var key = region.id + ':' + layout.worldSeed + ':' + sprite;
+    if (force || key !== decorFieldKey) {
+      decorField = Game.terrain.decorationField(layout, region, sprite, 64);
+      decorFieldKey = key;
+    }
+    return decorField;
+  }
+
+  function drawDecorHabitat() {
+    var field = refreshDecorField(false);
+    if (!field) return;
+    var zoom = Game.render.cam.zoom;
+    var topLeft = screenToWorld(0, 0);
+    var bottomRight = screenToWorld(stageWrap.clientWidth, stageWrap.clientHeight);
+    var left = clamp(Math.floor(topLeft.x / field.cell), 0, field.cols - 1);
+    var top = clamp(Math.floor(topLeft.y / field.cell), 0, field.rows - 1);
+    var right = clamp(Math.ceil(bottomRight.x / field.cell), 0, field.cols - 1);
+    var bottom = clamp(Math.ceil(bottomRight.y / field.cell), 0, field.rows - 1);
+    var size = Math.ceil(field.cell * zoom) + 1;
+    for (var y = top; y <= bottom; y++) {
+      for (var x = left; x <= right; x++) {
+        var value = field.values[y * field.cols + x] || 0;
+        if (value <= 0.02) continue;
+        var screen = worldToScreen({ x: x * field.cell, y: y * field.cell });
+        var red = Math.round(54 + value * 96);
+        var green = Math.round(92 + value * 122);
+        var blue = Math.round(72 - value * 24);
+        overlayCtx.fillStyle = 'rgba(' + red + ',' + green + ',' + blue + ',' +
+          (0.06 + value * 0.34).toFixed(3) + ')';
+        overlayCtx.fillRect(Math.floor(screen.x), Math.floor(screen.y), size, size);
+      }
+    }
+  }
+
+  function clusterColor(pattern, alpha) {
+    var colors = {
+      blob: '104,202,132', edgeBand: '83,190,211', line: '232,190,92',
+      row: '232,190,92', trail: '219,137,88', ring: '190,119,224',
+      arc: '190,119,224', scatter: '174,182,151'
+    };
+    return 'rgba(' + (colors[pattern] || '174,182,151') + ',' + alpha + ')';
+  }
+
+  function drawDecorClusterGrammar() {
+    var ecology = layout.decorationEcology;
+    var sprite = activeDecorationSprite();
+    if (!ecology || !sprite) return;
+    var zoom = Game.render.cam.zoom;
+    (ecology.clusters || []).forEach(function (cluster) {
+      if (cluster.sprite !== sprite) return;
+      var screen = worldToScreen(cluster);
+      if (screen.x < -160 || screen.y < -160 ||
+          screen.x > stageWrap.clientWidth + 160 || screen.y > stageWrap.clientHeight + 160) return;
+      overlayCtx.save();
+      overlayCtx.translate(screen.x, screen.y);
+      overlayCtx.rotate(cluster.angle || 0);
+      overlayCtx.beginPath();
+      overlayCtx.ellipse(
+        0, 0,
+        Math.max(3, cluster.radiusX * zoom),
+        Math.max(3, cluster.radiusY * zoom),
+        0, 0, Math.PI * 2
+      );
+      overlayCtx.fillStyle = clusterColor(cluster.pattern, 0.06);
+      overlayCtx.fill();
+      overlayCtx.strokeStyle = clusterColor(cluster.pattern, 0.82);
+      overlayCtx.lineWidth = 1;
+      overlayCtx.setLineDash(cluster.pattern === 'scatter' ? [3, 3] : []);
+      overlayCtx.stroke();
+      overlayCtx.beginPath();
+      overlayCtx.moveTo(-cluster.radiusX * zoom, 0);
+      overlayCtx.lineTo(cluster.radiusX * zoom, 0);
+      overlayCtx.strokeStyle = clusterColor(cluster.pattern, 0.46);
+      overlayCtx.stroke();
+      overlayCtx.restore();
+      drawCircle(cluster, 3, clusterColor(cluster.pattern, 0.95), 'rgba(255,255,255,.16)');
+    });
+  }
+
+  function drawDecorGroupLinks() {
+    var ecology = layout.decorationEcology;
+    var sprite = activeDecorationSprite();
+    if (!ecology || !sprite) return;
+    var centers = {};
+    (ecology.clusters || []).forEach(function (cluster) { centers[cluster.id] = cluster; });
+    (masters.props || []).forEach(function (prop) {
+      if (prop.sprite !== sprite || !prop.decorGroup || !centers[prop.decorGroup]) return;
+      drawWorldLine([centers[prop.decorGroup], prop], 'rgba(174,211,157,.28)', 1, [2, 3]);
+    });
+  }
+
   function resizeOverlay() {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
     var width = Math.max(1, stageWrap.clientWidth);
@@ -344,6 +469,7 @@
     resizeOverlay();
     overlayCtx.clearRect(0, 0, stageWrap.clientWidth, stageWrap.clientHeight);
     if (!layout) return;
+    if (layers.decorHabitat) drawDecorHabitat();
     if (layers.nav) drawGridLayer('nav');
     if (layers.distance) drawGridLayer('distance');
     if (layers.danger) drawGridLayer('danger');
@@ -405,6 +531,8 @@
         }
       });
     }
+    if (layers.decorClusters) drawDecorClusterGrammar();
+    if (layers.decorGroups) drawDecorGroupLinks();
     if (measureState.a) drawCircle(measureState.a, 4, '#74d9d4', 'rgba(116,217,212,.35)');
     if (measureState.b) drawCircle(measureState.b, 4, '#f0d86e', 'rgba(240,216,110,.35)');
     if (measureState.path) drawWorldLine([measureState.a].concat(measureState.path), '#f1d765', 2);
@@ -516,6 +644,10 @@
     var gx = clamp(Math.floor(point.x / nav.cell), 0, nav.w - 1);
     var gy = clamp(Math.floor(point.y / nav.cell), 0, nav.h - 1);
     var nearest = nearestObject(point.x, point.y);
+    var activeSprite = activeDecorationSprite();
+    var habitat = activeSprite
+      ? Game.terrain.decorSuitability(layout, region, activeSprite, point.x, point.y)
+      : null;
     var report = {
       tool: 'inspect',
       point: { x: point.x, y: point.y },
@@ -528,6 +660,14 @@
       walkable: Game.terrain.isWalkable(point.x, point.y, 1),
       clearance: (nav.distance[gy][gx] || 0) * nav.cell,
       danger: Game.terrain.dangerAt(point.x, point.y),
+      decorationHabitat: habitat ? {
+        sprite: activeSprite,
+        score: habitat.score,
+        field: habitat.field,
+        anchorDistance: habitat.anchorDistance,
+        material: habitat.material,
+        reason: habitat.reason || null
+      } : null,
       nearest: nearest ? { key: nearest.item.key, id: nearest.item.id, kind: nearest.item.kind, distance: nearest.distance } : null
     };
     probeState = report;
@@ -641,6 +781,10 @@
         row('walkable', probeState.walkable ? lt('pass') : lt('fail'), probeState.walkable) +
         row('clearance', probeState.clearance.toFixed(1) + ' px') +
         row('danger', probeState.danger.toFixed(3)) +
+        row('decor habitat', probeState.decorationHabitat
+          ? probeState.decorationHabitat.sprite + ' / ' +
+            Number(probeState.decorationHabitat.score || 0).toFixed(3)
+          : '—') +
         row('nearest', probeState.nearest ? probeState.nearest.kind + ' / ' + probeState.nearest.id + ' / ' + probeState.nearest.distance.toFixed(1) + ' px' : '—') +
         '</dl>';
       return;
@@ -678,8 +822,10 @@
   function selectObject(item) {
     if (!item) return null;
     selected = item.key ? item : contentPoint(item, item.kind || 'object');
+    decorFieldKey = null;
     renderSelection();
     renderCatalog();
+    renderDecorationEcology();
     drawMinimap();
     return copy({
       key: selected.key, kind: selected.kind, id: selected.id,
@@ -715,6 +861,17 @@
       details.lease = actorLease ? 'active / generation ' + actorLease.generation : '—';
     } else if (data.defId) {
       details.definition = data.defId;
+    }
+    var decorDef = decorationDefinition(selected.sprite || data.sprite);
+    if (decorDef) {
+      var target = layout.decorationEcology && layout.decorationEcology.targets &&
+        layout.decorationEcology.targets[decorDef.sprite];
+      details.pattern = decorDef.distribution && decorDef.distribution.pattern || '—';
+      details.anchor = decorDef.distribution && decorDef.distribution.anchor || 'none';
+      details.group = data.decorGroup || 'definition';
+      details.role = data.decorRole || '—';
+      details.habitatScore = Number.isFinite(data.decorScore) ? data.decorScore : '—';
+      details.quota = target ? target.placed + ' / ' + target.target : '—';
     }
     host.innerHTML = '<section class="inspect-section"><h3>' + esc(lt('selected')) + '</h3><dl class="inspect-grid">' +
       Object.keys(details).map(function (key) { return '<dt>' + esc(key) + '</dt><dd>' + esc(details[key]) + '</dd>'; }).join('') +
@@ -936,7 +1093,7 @@
           category: definition.placement === 'blocker' ? 'decor-blocker' :
             definition.placement === 'water' ? 'decor-water' : 'decor-ground',
           id: definition.sprite,
-          name: definition.sprite,
+          name: definition.nameKey ? nameFromKey(definition.nameKey, definition.sprite) : definition.sprite,
           sprite: definition.sprite,
           data: definition
         }, candidateRegion.id);
@@ -1223,6 +1380,41 @@
         addIssue('decoration-definition', 'unregistered decoration sprite: ' + prop.sprite, prop);
       }
     });
+    var decorEcology = layout.decorationEcology;
+    if (!decorEcology || decorEcology.method !== 'habitat-cluster-grammar') {
+      addIssue('decoration-ecology', 'v3 habitat / cluster grammar report is missing');
+    } else {
+      var decorMetrics = decorEcology.metrics || {};
+      if ((decorMetrics.sameTypeEnrichment || 0) < 1.5) {
+        addIssue('decoration-enrichment',
+          'same-type enrichment is too close to independent random mixing: ' +
+          (decorMetrics.sameTypeEnrichment || 0), null, 'warn');
+      }
+      if ((decorMetrics.meanNearest || 0) < 12) {
+        addIssue('decoration-crowding',
+          'mean nearest-neighbour distance is below sprite readability: ' +
+          (decorMetrics.meanNearest || 0), null, 'warn');
+      }
+      if (Object.keys(decorMetrics.patterns || {}).length < 3) {
+        addIssue('decoration-grammar',
+          'fewer than three placement grammars are represented', null, 'warn');
+      }
+      Object.keys(decorEcology.targets || {}).forEach(function (sprite) {
+        var target = decorEcology.targets[sprite];
+        if (!target.target || target.placed / target.target >= 0.78) return;
+        addIssue('decoration-quota',
+          sprite + ' placed ' + target.placed + ' / ' + target.target,
+          (masters.props || []).filter(function (prop) { return prop.sprite === sprite; })[0],
+          'warn');
+      });
+      (masters.props || []).forEach(function (prop) {
+        if (prop.campProp || prop.kind === 'bossDecor' || prop.blockerProp) return;
+        if (!prop.decorGroup || !prop.decorPattern || !prop.decorRole) {
+          addIssue('decoration-provenance',
+            prop.sprite + ' lacks cluster / grammar provenance', prop);
+        }
+      });
+    }
     (populationPlan.failures || []).forEach(function (failure) {
       if (failure.required && failure.onFailure !== 'skipOptional') {
         addIssue('population-required', failure.profileId + ': ' + failure.reason);
@@ -1281,7 +1473,8 @@
       actors: actors.length,
       contentDensityPerMegapixel: Math.round(
         contentPoints.length / Math.max(1, layout.world.w * layout.world.h) * 1000000
-      )
+      ),
+      decorationEcology: decorEcology && decorEcology.metrics
     }, auditIssues.length ? 'warn' : 'info');
     renderIssues();
     return copy(auditIssues);
@@ -1483,6 +1676,7 @@
     var started = now();
     var regenerated = Game.terrain.generate(region, layout.worldSeed, 3);
     var terrainSnapshot = Game.terrain.snapshotV3(regenerated);
+    var decorationSnapshot = Game.terrain.decorationSnapshot(regenerated);
     var previewContext = Object.assign({}, populationContext, { preview: true });
     var previewPlan = Game.population.prepareRegion(region.id, regenerated, previewContext);
     var expected = expectedActorCoordinates(previewPlan);
@@ -1495,6 +1689,11 @@
         match: hash(terrainSnapshot) === generationRecord.terrainHash,
         expectedHash: generationRecord.terrainHash,
         actualHash: hash(terrainSnapshot)
+      },
+      decorationEcology: {
+        match: hash(decorationSnapshot) === generationRecord.decorationHash,
+        expectedHash: generationRecord.decorationHash,
+        actualHash: hash(decorationSnapshot)
       },
       population: {
         match: hash(planSignature(previewPlan)) === generationRecord.populationHash,
@@ -1510,7 +1709,8 @@
       },
       elapsedMs: now() - started
     };
-    result.ok = result.terrain.match && result.population.match && result.actors.match;
+    result.ok = result.terrain.match && result.decorationEcology.match &&
+      result.population.match && result.actors.match;
     result.reportHash = hash(result);
     log('determinism', result.ok ? 'terrain, population and actor coordinates match' : 'determinism mismatch', result, result.ok ? 'info' : 'error');
     setStatus(result.ok ? lt('verified') + ' · ' + result.reportHash : lt('mismatch'));
@@ -1612,6 +1812,12 @@
         }
       },
       layers: copy(layers),
+      decorationEcology: copy(layout.decorationEcology),
+      decorationField: refreshDecorField(false) ? {
+        sprite: decorField.sprite,
+        viableShare: decorField.viableShare,
+        max: decorField.max
+      } : null,
       motion: motion,
       selection: selected ? {
         key: selected.key,
@@ -1623,6 +1829,48 @@
       contentFingerprint: Game.content.fingerprint(),
       reportHash: generationRecord && generationRecord.reportHash
     };
+  }
+
+  function renderDecorationEcology() {
+    var host = document.getElementById('decor-ecology-metrics');
+    var summary = document.getElementById('decor-pattern-summary');
+    if (!host || !summary || !layout || !layout.decorationEcology) return;
+    var ecology = layout.decorationEcology;
+    var metrics = ecology.metrics || {};
+    var targets = ecology.targets || {};
+    var targetTotal = 0, placedTotal = 0;
+    Object.keys(targets).forEach(function (sprite) {
+      targetTotal += targets[sprite].target || 0;
+      placedTotal += targets[sprite].placed || 0;
+    });
+    var coverage = placedTotal / Math.max(1, targetTotal);
+    var field = refreshDecorField(false);
+    var values = [
+      [metrics.instances || 0, lt('decorInstances')],
+      [metrics.clusters || 0, lt('decorClusters')],
+      [metrics.definitions || 0, lt('decorDefinitions')],
+      [(metrics.meanNearest || 0).toFixed(1) + ' px', lt('decorNearest')],
+      [(metrics.sameTypeEnrichment || 0).toFixed(2) + '×', lt('decorEnrichment')],
+      [(coverage * 100).toFixed(1) + '%', lt('decorCoverage')]
+    ];
+    host.innerHTML = values.map(function (entry) {
+      return '<div class="ecology-metric"><strong>' + esc(entry[0]) +
+        '</strong><span>' + esc(entry[1]) + '</span></div>';
+    }).join('');
+    var activeSprite = activeDecorationSprite();
+    var activeDefinition = decorationDefinition(activeSprite);
+    var activePattern = activeDefinition && activeDefinition.distribution &&
+      activeDefinition.distribution.pattern;
+    var patternCounts = metrics.patterns || {};
+    var chips = Object.keys(patternCounts).sort().map(function (pattern) {
+      return '<span class="pattern-chip' + (pattern === activePattern ? ' selected' : '') +
+        '">' + esc(pattern + ' ×' + patternCounts[pattern]) + '</span>';
+    });
+    chips.unshift('<span class="pattern-chip selected">' +
+      esc((activeSprite || '—') + ' · ' +
+        (field ? (field.viableShare * 100).toFixed(1) + '% ' + lt('habitatViable') : lt('habitatNone'))) +
+      '</span>');
+    summary.innerHTML = chips.join('');
   }
 
   function renderMetrics() {
@@ -1701,6 +1949,8 @@
     var timings = {};
     var began = now();
     layout = Game.terrain.generate(region, requestedSeed, 3);
+    decorField = null;
+    decorFieldKey = null;
     timings.generate = now() - began;
     log('terrain', 'terrain.generate complete', {
       regionId: region.id, seed: U.hex32(requestedSeed), elapsedMs: timings.generate,
@@ -1759,12 +2009,14 @@
     generationRecord = {
       timings: timings,
       terrainHash: hash(Game.terrain.snapshotV3(layout)),
+      decorationHash: hash(Game.terrain.decorationSnapshot(layout)),
       populationHash: hash(planSignature(populationPlan)),
       actorCoordinateHash: hash(expectedActorCoordinates(populationPlan))
     };
     runAudit();
     generationRecord.reportHash = hash({
       terrain: generationRecord.terrainHash,
+      decoration: generationRecord.decorationHash,
       population: generationRecord.populationHash,
       actors: generationRecord.actorCoordinateHash,
       audit: auditIssues
@@ -1775,6 +2027,7 @@
     renderTabs();
     renderSelection();
     renderProbe();
+    renderDecorationEcology();
     document.getElementById('seed-input').value = U.hex32(requestedSeed);
     document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
     document.getElementById('stage-region-name').textContent = regionName(region);
@@ -2074,7 +2327,12 @@
       setCamera(Game.render.cam.x, Game.render.cam.y, Game.render.cam.zoom);
     });
     window.addEventListener('demo:locale', function () {
-      renderTabs(); rebuildCatalog(); renderSelection(); renderProbe(); renderMetrics();
+      renderTabs(); rebuildCatalog(); renderSelection(); renderProbe();
+      renderMetrics(); renderDecorationEcology();
+      if (region) {
+        document.getElementById('stage-region-name').textContent = regionName(region);
+        document.getElementById('runtime-status').textContent = lt('ready');
+      }
     });
   }
 
@@ -2133,6 +2391,12 @@
       inspect: inspectAt,
       measure: measure,
       verifyDeterminism: verifyDeterminism,
+      decorationReport: function () {
+        return copy({
+          ecology: layout && layout.decorationEcology,
+          field: refreshDecorField(false)
+        });
+      },
       resetPositions: resetPositions
     };
     requestAnimationFrame(frame);
