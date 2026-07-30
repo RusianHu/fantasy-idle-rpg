@@ -116,9 +116,9 @@
     hazards: [
       {
         id: 'hazard.grassland.thorn_stakes', regionId: 'grassland', category: 'damageTrap',
-        trigger: { mode: 'enter', shape: 'circle', radius: 16, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 72, revealRadius: 48 },
-        lifecycle: { revealTicks: 8, warningTicks: 20, activeTicks: 4, cooldownTicks: 600 },
+        trigger: { mode: 'enter', shape: 'circle', radius: 24, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 96, revealRadius: 64 },
+        lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 8, cooldownTicks: 600 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.06 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'grassland.bleeding', stacks: 1, firstPulseOnly: true }
@@ -129,9 +129,9 @@
       },
       {
         id: 'hazard.grassland.roadside_ambush', regionId: 'grassland', category: 'ambushTrigger',
-        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 84, revealRadius: 52 },
-        lifecycle: { revealTicks: 6, warningTicks: 16, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 112, revealRadius: 74 },
+        lifecycle: { revealTicks: 6, warningTicks: 22, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['grassland.solo-a', 'grassland.solo-b', 'grassland.solo-c', 'grassland.duo', 'grassland.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.grassland.roadside_ambush.name', descKey: 'hazard.grassland.roadside_ambush.desc', warningKey: 'hazard.grassland.roadside_ambush.warning', hitKey: 'hazard.grassland.roadside_ambush.hit', ambushKey: 'hazard.grassland.roadside_ambush.ambush' },

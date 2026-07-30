@@ -60,7 +60,8 @@
   function phaseDuration(instance) {
     var lifecycle = instance.profile.lifecycle;
     if (instance.phase === 'warning') return Math.max(1, instance.warningEndTick - instance.phaseSinceTick);
-    if (instance.phase === 'active') return Math.max(1, lifecycle.activeTicks || 1);
+    if (instance.phase === 'active') return Math.max(1,
+      (instance.activeEndTick || (instance.phaseSinceTick + lifecycle.activeTicks)) - instance.phaseSinceTick);
     if (instance.phase === 'cooldown') return Math.max(1, lifecycle.cooldownTicks || 1);
     return 1;
   }
@@ -76,6 +77,7 @@
   function reveal(instance, reason) {
     if (instance.awareness === 'revealed') return false;
     instance.awareness = 'revealed';
+    instance.revealUntilTick = worldTick + Math.max(0, instance.profile.lifecycle.revealTicks || 0);
     var saved = savedRegion(instance.regionId);
     if (saved.discoveredHazardIds.indexOf(instance.id) < 0) {
       saved.discoveredHazardIds.push(instance.id);
@@ -139,13 +141,18 @@
       anchorId: anchor.id,
       threatId: anchor.threatId || null,
       awareness: discovered ? 'revealed' : 'concealed',
+      clueVisible: false,
+      clueNotified: false,
+      revealUntilTick: 0,
       phase: cooldownUntil > worldTime() ? 'cooldown' : 'dormant',
       phaseSinceTick: worldTick,
       cooldownUntilWorldTime: cooldownUntil,
       triggerOrdinal: 0,
       warningEndTick: 0,
+      activeEndTick: 0,
       nextPulseTick: 0,
       pulsesApplied: 0,
+      pulsesComplete: false,
       armedAfterExit: true,
       insideActors: {},
       actorIds: [],
@@ -254,6 +261,22 @@
     });
   }
 
+  function triggerRadius(instance) {
+    var trigger = instance.profile.trigger;
+    if (trigger.shape === 'circle') return trigger.radius || 16;
+    if (trigger.shape === 'cone') return trigger.length || trigger.radius || 36;
+    if (trigger.shape === 'line') return trigger.length || trigger.width || trigger.radius || 36;
+    return Math.max(trigger.width || 0, trigger.height || 0, (trigger.radius || 0) * 2) / 2 || 16;
+  }
+
+  function candidateTouchesDanger(x, y, ignoreId) {
+    return instances.some(function (other) {
+      if (other.id === ignoreId || other.disabled || other.phase === 'cooldown') return false;
+      if (other.awareness === 'concealed') return false;
+      return U.dist(x, y, other.x, other.y) <= triggerRadius(other) + 10;
+    });
+  }
+
   function playerActors() {
     return (Game.world.entities || []).filter(function (actor) {
       return actor && actor.components && actor.components.vitals && !actor.dead &&
@@ -275,8 +298,7 @@
 
   function requestEscape(instance, actor) {
     if (!actor || Game.state.settings.controlMode === 'manual') return;
-    var trigger = instance.profile.trigger;
-    var radius = trigger.radius || Math.max(trigger.width || 0, trigger.height || 0, trigger.length || 0) / 2 || 24;
+    var radius = triggerRadius(instance);
     var best = null;
     for (var i = 0; i < 16; i++) {
       var angle = Math.PI * 2 * i / 16;
@@ -286,6 +308,7 @@
       };
       if (!Game.terrain.isWalkable(candidate.x, candidate.y, 8)) continue;
       if (contains(instance, candidate.x, candidate.y)) continue;
+      if (candidateTouchesDanger(candidate.x, candidate.y, instance.id)) continue;
       var distance = U.dist(actor.x, actor.y, candidate.x, candidate.y);
       if (!best || distance < best.distance) best = { x: candidate.x, y: candidate.y, distance: distance };
     }
@@ -303,13 +326,14 @@
   function startWarning(instance, actors) {
     if (instance.disabled || instance.phase !== 'dormant' || !instance.armedAfterExit ||
         activeHazardCount() >= 2 || instance.cooldownUntilWorldTime > worldTime()) return false;
-    var wasConcealed = instance.awareness === 'concealed';
     reveal(instance, 'trigger');
     instance.triggerOrdinal++;
     instance.warningEndTick = worldTick + instance.profile.lifecycle.warningTicks +
-      (wasConcealed ? instance.profile.lifecycle.revealTicks : 0);
+      Math.max(0, instance.revealUntilTick - worldTick);
     instance.pulsesApplied = 0;
+    instance.pulsesComplete = false;
     instance.nextPulseTick = 0;
+    instance.activeEndTick = 0;
     instance.armedAfterExit = false;
     setPhase(instance, 'warning', {
       triggerOrdinal: instance.triggerOrdinal,
@@ -330,6 +354,12 @@
     setPhase(instance, 'active');
     instance.nextPulseTick = worldTick;
     instance.pulsesApplied = 0;
+    instance.pulsesComplete = false;
+    var outcome = instance.profile.outcome;
+    var pulseSpan = Math.max(1, ((outcome.pulses || 1) - 1) *
+      Math.max(1, outcome.intervalTicks || 1) + 1);
+    instance.activeEndTick = worldTick + Math.max(
+      instance.profile.lifecycle.activeTicks || 1, pulseSpan);
   }
 
   function applyDamagePulse(instance) {
@@ -351,7 +381,7 @@
       regionTier: Game.State.regionTier(instance.regionId),
       pulse: instance.pulsesApplied
     });
-    instance.hitUntilTick = worldTick + 3;
+    instance.hitUntilTick = worldTick + 6;
     emit(instance, 'hazard:hit', {
       pulse: instance.pulsesApplied,
       targetActorIds: targets.map(function (actor) { return actor.id; }),
@@ -359,7 +389,7 @@
     });
     instance.pulsesApplied++;
     instance.nextPulseTick = worldTick + Math.max(1, outcome.intervalTicks || 1);
-    if (instance.pulsesApplied >= (outcome.pulses || 1)) beginCooldown(instance, 'pulses-complete');
+    if (instance.pulsesApplied >= (outcome.pulses || 1)) instance.pulsesComplete = true;
   }
 
   function revealAmbushActors(instance, visible) {
@@ -418,9 +448,21 @@
     var actors = playerActors();
     instances.forEach(function (instance) {
       if (instance.disabled) return;
-      var proximityActor = actors.filter(function (actor) {
-        return U.dist(actor.x, actor.y, instance.x, instance.y) <= instance.profile.detection.revealRadius;
-      })[0];
+      var nearestDistance = Infinity;
+      var proximityActor = null;
+      actors.forEach(function (actor) {
+        var distance = U.dist(actor.x, actor.y, instance.x, instance.y);
+        if (distance < nearestDistance) nearestDistance = distance;
+        if (!proximityActor && distance <= instance.profile.detection.revealRadius) proximityActor = actor;
+      });
+      var clueVisible = nearestDistance <= instance.profile.detection.clueRadius;
+      if (clueVisible && !instance.clueNotified && instance.awareness === 'concealed') {
+        instance.clueNotified = true;
+        emit(instance, 'hazard:clue', { distance: nearestDistance });
+      } else if (!clueVisible) {
+        instance.clueNotified = false;
+      }
+      instance.clueVisible = clueVisible;
       if (proximityActor) reveal(instance, 'proximity');
 
       var crossing = actors.filter(function (actor) {
@@ -459,8 +501,12 @@
         return;
       }
       if (instance.phase === 'active' && instance.profile.category === 'damageTrap' &&
-          worldTick >= instance.nextPulseTick) {
+          !instance.pulsesComplete && worldTick >= instance.nextPulseTick) {
         applyDamagePulse(instance);
+      }
+      if (instance.phase === 'active' && instance.profile.category === 'damageTrap' &&
+          instance.pulsesComplete && worldTick >= instance.activeEndTick) {
+        beginCooldown(instance, 'active-complete');
       }
     });
     actors.forEach(function (actor) {
@@ -547,9 +593,14 @@
       instance.cooldownUntilWorldTime = 0;
       instance.triggerOrdinal = 0;
       instance.warningEndTick = 0;
+      instance.activeEndTick = 0;
       instance.pulsesApplied = 0;
+      instance.pulsesComplete = false;
       instance.nextPulseTick = 0;
       instance.hitUntilTick = 0;
+      instance.revealUntilTick = 0;
+      instance.clueVisible = false;
+      instance.clueNotified = false;
       instance.armedAfterExit = targetsInside(instance).length === 0;
       revealAmbushActors(instance, false);
       emit(instance, 'hazard:reset', {});
@@ -583,6 +634,9 @@
           awareness: instance.awareness,
           phase: instance.phase,
           phaseSinceTick: instance.phaseSinceTick,
+          clueVisible: instance.clueVisible,
+          warningEndTick: instance.warningEndTick,
+          activeEndTick: instance.activeEndTick,
           cooldownUntilWorldTime: instance.cooldownUntilWorldTime,
           triggerOrdinal: instance.triggerOrdinal,
           threatId: instance.threatId,

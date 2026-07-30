@@ -3273,11 +3273,47 @@ async function run() {
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 3, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 4, 'technical demo hub exposes every current workbench');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);
     assert.equal(demoHub.noHorizontalOverflow, true);
+
+    await cdp.navigate(BASE + 'tech-demos/hazards/hazards.html?seed=1234ABCD&region=grassland&lang=en');
+    const hazardDemo = await cdp.evaluate(`(() => {
+      const stage = document.getElementById('stage');
+      const sheet = document.getElementById('contact-sheet');
+      const stagePixels = stage.getContext('2d').getImageData(0, 0, stage.width, stage.height).data;
+      const sheetPixels = sheet.getContext('2d').getImageData(0, 0, sheet.width, sheet.height).data;
+      let stageVisible = 0, sheetVisible = 0;
+      for (let i = 3; i < stagePixels.length; i += 128) if (stagePixels[i]) stageVisible++;
+      for (let i = 3; i < sheetPixels.length; i += 64) if (sheetPixels[i]) sheetVisible++;
+      const catalog = HazardEffectsLab.catalog();
+      const triggered = HazardEffectsLab.trigger();
+      return {
+        title: document.querySelector('h1')?.textContent,
+        catalog: catalog.length,
+        regions: new Set(catalog.map((profile) => profile.regionId)).size,
+        profilesInSelect: document.querySelectorAll('#profile-select option').length,
+        state: document.getElementById('hazard-state').textContent,
+        triggered,
+        stageVisible,
+        sheetVisible,
+        controlsTouchable: Array.from(document.querySelectorAll('button, select, a'))
+          .every((el) => el.getBoundingClientRect().height >= 44),
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(hazardDemo.title, 'Hazard Effects QA');
+    assert.equal(hazardDemo.catalog, 16);
+    assert.equal(hazardDemo.regions, 8);
+    assert.equal(hazardDemo.profilesInSelect, 16);
+    assert.equal(hazardDemo.triggered, true);
+    assert.match(hazardDemo.state, /revealed \/ warning/);
+    assert.ok(hazardDemo.stageVisible > 100);
+    assert.ok(hazardDemo.sheetVisible > 100);
+    assert.equal(hazardDemo.controlsTouchable, true);
+    assert.equal(hazardDemo.noHorizontalOverflow, true);
 
     await cdp.navigate(BASE + 'tech-demos/exploration-v3/exploration-v3.html?seed=20260727&region=grassland&lang=en');
     const generatorDemo = await cdp.evaluate(`(() => {

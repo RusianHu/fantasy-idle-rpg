@@ -30,7 +30,8 @@ function context() {
   const ctx = { operations };
   for (const method of [
     'save', 'restore', 'translate', 'rotate', 'beginPath', 'arc', 'moveTo', 'lineTo',
-    'stroke', 'fill', 'closePath', 'rect', 'fillRect', 'bezierCurveTo', 'setLineDash'
+    'stroke', 'fill', 'closePath', 'rect', 'fillRect', 'strokeRect', 'ellipse',
+    'bezierCurveTo', 'setLineDash', 'fillText'
   ]) {
     ctx[method] = (...args) => operations.push([method, ...args]);
   }
@@ -43,7 +44,7 @@ function hazard(glyph, phase, awareness, index) {
   return {
     id: `hazard:${glyph}:${phase}`, profileId: `hazard.test.${glyph}`,
     x: 40 + index * 18, y: 50, orientation: index % 4 * Math.PI / 2,
-    awareness, phase, phaseSinceTick: 0, warningEndTick: 20,
+    awareness, clueVisible: awareness === 'concealed', phase, phaseSinceTick: 0, warningEndTick: 20,
     hitUntilTick: phase === 'active' ? 12 : 0, disabled: false,
     profile: { trigger: { shape, radius: 16, width: 44, height: 18, length: 36, angleDeg: 54 } },
     visual: { glyph, palette: { element: '#abcdef', clue: '#456789' } }
@@ -63,8 +64,22 @@ Game.hazardRender.draw(allCtx, -20, -20, 400, 180);
 assert.ok(allCtx.operations.length > 500, 'all glyph/phase combinations produce a nonblank mechanism layer');
 assert.ok(allCtx.operations.some((entry) => entry[0] === 'setLineDash'));
 assert.ok(allCtx.operations.some((entry) => entry[0] === 'rotate' && entry[1] !== 0));
-assert.equal(allCtx.operations.filter((entry) => entry[0] === 'save').length, instances.length);
-assert.equal(allCtx.operations.filter((entry) => entry[0] === 'restore').length, instances.length);
+assert.ok(allCtx.operations.filter((entry) => entry[0] === 'save').length >= instances.length);
+assert.equal(allCtx.operations.filter((entry) => entry[0] === 'save').length,
+  allCtx.operations.filter((entry) => entry[0] === 'restore').length);
+assert.ok(allCtx.operations.some((entry) => entry[0] === 'fillText'), 'warnings include localized countdown labels');
+
+const splitCtx = context();
+Game.hazardRender.drawGround(splitCtx, -20, -20, 400, 180);
+const groundCount = splitCtx.operations.length;
+Game.hazardRender.drawOverlay(splitCtx, -20, -20, 400, 180);
+assert.ok(groundCount > 0 && splitCtx.operations.length > groundCount, 'ground and foreground layers render independently');
+
+const previewCtx = context();
+Game.hazardRender.drawPreview(previewCtx, instances[0].profile, {
+  visual: instances[0].visual, phase: 'active', hit: true, x: 40, y: 40
+});
+assert.ok(previewCtx.operations.length > 20, 'standalone Lab preview uses the production renderer');
 
 const culledCtx = context();
 Game.hazardRender.draw(culledCtx, 1000, 1000, 1200, 1200);
@@ -79,8 +94,18 @@ assert.equal(sparks, 1);
 
 const renderer = read('js/render/renderer.js');
 const nav = read('js/systems/nav.js');
-assert.match(renderer, /Game\.hazardRender\.draw\(/);
+const demoHtml = read('tech-demos/hazards/hazards.html');
+const demoScript = read('tech-demos/hazards/hazards.js');
+const mapHtml = read('tech-demos/map-effects/map-effects.html');
+assert.match(renderer, /Game\.hazardRender\.drawGround\(/);
+assert.match(renderer, /Game\.hazardRender\.drawOverlay\(/);
 assert.match(renderer, /!visibleDynamic\[j\]\.hazardConcealed/);
 assert.match(nav, /Game\.hazards\.navigationCost/);
+assert.match(demoHtml, /id="contact-sheet"/);
+assert.match(demoHtml, /js\/systems\/hazards\.js\?v=/);
+assert.match(demoHtml, /js\/render\/hazards\.js\?v=/);
+assert.match(demoScript, /Game\.hazardRender\.drawPreview/);
+assert.match(demoScript, /window\.HazardEffectsLab/);
+assert.doesNotMatch(mapHtml, /id="hazard-lab-title"/, 'Hazard QA is extracted from the general map workbench');
 
 console.log('Hazard presentation tests passed: nine glyphs, five visual states, culling, particles and renderer/nav bridges.');

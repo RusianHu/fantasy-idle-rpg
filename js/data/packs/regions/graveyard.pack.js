@@ -116,8 +116,8 @@
     hazards: [
       {
         id: 'hazard.graveyard.soul_seal', regionId: 'graveyard', category: 'damageTrap',
-        trigger: { mode: 'enter', shape: 'circle', radius: 22, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 76, revealRadius: 50 }, lifecycle: { revealTicks: 8, warningTicks: 22, activeTicks: 17, cooldownTicks: 640 },
+        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 106, revealRadius: 70 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 22, cooldownTicks: 640 },
         outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 8, effects: [
           { type: 'damage', damageTypeId: 'necrotic', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.025 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'graveyard.withered', stacks: 1, firstPulseOnly: true }
@@ -128,8 +128,8 @@
       },
       {
         id: 'hazard.graveyard.grave_ambush', regionId: 'graveyard', category: 'ambushTrigger',
-        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 20, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['graveyard.solo-a', 'graveyard.solo-b', 'graveyard.solo-c', 'graveyard.duo', 'graveyard.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.graveyard.grave_ambush.name', descKey: 'hazard.graveyard.grave_ambush.desc', warningKey: 'hazard.graveyard.grave_ambush.warning', hitKey: 'hazard.graveyard.grave_ambush.hit', ambushKey: 'hazard.graveyard.grave_ambush.ambush' },

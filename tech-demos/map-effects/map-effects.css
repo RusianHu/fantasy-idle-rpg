@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260730.1") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260730.3") format("woff2");
   font-display: swap;
 }
 #modal-root {
@@ -449,41 +449,6 @@ h1 {
   line-height: 1.65;
 }
 
-.hazard-runtime { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.hazard-controls {
-  display: grid;
-  grid-template-columns: minmax(180px, 2fr) repeat(4, minmax(96px, 1fr));
-  gap: 8px;
-  align-items: end;
-  padding: 13px 16px;
-}
-.hazard-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
-.hazard-controls select,
-.hazard-controls button {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  border: 1px solid var(--line-strong);
-  border-radius: 2px;
-  color: var(--text);
-  background: var(--surface-2);
-}
-.hazard-controls select { padding: 0 9px; }
-.hazard-controls button { padding: 0 8px; cursor: pointer; }
-.hazard-controls button:hover { border-color: var(--gold); }
-.hazard-events {
-  min-height: 96px;
-  max-height: 188px;
-  margin: 0;
-  padding: 12px 16px;
-  overflow: auto;
-  border-top: 1px solid var(--line);
-  color: #c8ccb9;
-  background: #12130f;
-  font: 10px/1.5 Consolas, monospace;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
 
 .source-line {
   display: flex;
@@ -681,8 +646,6 @@ h1 {
   .lab-actions { grid-template-columns: 1fr; }
   .lab-action-group { grid-template-columns: 1fr 1fr; }
   .lab-action-group > span { grid-column: 1 / -1; }
-  .hazard-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .hazard-controls label { grid-column: 1 / -1; }
   .source-line { line-height: 1.6; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .sprite-row { grid-template-columns: 42px minmax(88px, 0.8fr) minmax(0, 1.2fr); }

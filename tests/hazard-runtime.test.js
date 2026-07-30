@@ -117,12 +117,17 @@ assert.equal(Game.hazards.forceTrigger(thorn.id, hero.id), true);
 assert.equal(Game.hazards.get(thorn.id).phase, 'warning');
 assert.equal(Game.hazards.navigationCost(thorn.x, thorn.y, 'safe'), 250);
 const hpBeforeTrap = hero.hp;
-advanceHazards(22);
+advanceHazards(33);
 assert.ok(hero.hp < hpBeforeTrap, 'Hazard damage resolves through the formal external Effect path: ' +
   JSON.stringify({ hp: hero.hp, before: hpBeforeTrap, x: hero.x, y: hero.y, dead: hero.dead, kind: hero.kind,
     partyId: hero.partyId, entities: Game.world.entities.map((actor) => actor.id), transform: hero.components.transform,
     movementTypes: hero.components.body && hero.components.body.movementTypes,
     tick: Game.hazards.tick(), snapshot: Game.hazards.snapshot(), events: Game.hazards.events() }));
+assert.equal(Game.hazards.get(thorn.id).phase, 'active',
+  'single-pulse damage keeps the active presentation window open for activeTicks');
+const activeEndTick = Game.hazards.get(thorn.id).activeEndTick;
+assert.ok(activeEndTick > Game.hazards.tick());
+advanceHazards(activeEndTick - Game.hazards.tick());
 assert.equal(Game.hazards.get(thorn.id).phase, 'cooldown');
 assert.ok(Game.state.world.hazards.regions.grassland.discoveredHazardIds.includes(thorn.id));
 assert.ok(Game.state.world.hazards.regions.grassland.hazardCooldowns[thorn.id] > Game.state.world.worldTime);
@@ -139,7 +144,7 @@ const avoidedThorn = Game.hazards.all().find((hazard) => hazard.profileId === 'h
 const hpBeforeAvoid = hero.hp;
 Game.hazards.forceTrigger(avoidedThorn.id, hero.id);
 hero.x = hero.components.transform.x = 420;
-advanceHazards(22);
+advanceHazards(32);
 assert.equal(hero.hp, hpBeforeAvoid);
 assert.equal(Game.hazards.get(avoidedThorn.id).phase, 'dormant');
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:avoided'));
@@ -151,6 +156,21 @@ assert.equal(Game.hazards.get(avoidedThorn.id).awareness, 'concealed');
 assert.equal(Game.hazards.get(avoidedThorn.id).phase, 'dormant');
 assert.ok(!Game.state.world.hazards.regions.grassland.discoveredHazardIds.includes(avoidedThorn.id));
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:reset'));
+
+// The expanded clue radius exposes only an environmental clue before reveal.
+hero.x = hero.components.transform.x = 392;
+hero.y = hero.components.transform.y = 240;
+Game.hazards.initRegion('grassland', damageLayout);
+const clueThorn = Game.hazards.all().find((hazard) => hazard.profileId === 'hazard.grassland.thorn_stakes');
+advanceHazards(1);
+assert.equal(clueThorn.clueVisible, true);
+assert.equal(clueThorn.awareness, 'concealed');
+assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:clue'));
+hero.x = hero.components.transform.x = 360;
+advanceHazards(1);
+assert.equal(clueThorn.awareness, 'revealed');
+assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:revealed'));
+assert.equal(Game.hazards.snapshot()[0].clueVisible, true);
 
 // A single 120px movement segment still crosses the trap and produces a warning.
 hero.x = hero.components.transform.x = 240;
@@ -257,7 +277,7 @@ const ambush = Game.hazards.all().find((hazard) => hazard.profileId === 'hazard.
 assert.ok(ambush && !ambush.disabled);
 assert.equal(ambusher.hazardConcealed, true);
 Game.hazards.forceTrigger(ambush.id, hero.id);
-advanceHazards(20);
+advanceHazards(30);
 assert.equal(ambusher.hazardConcealed, false);
 assert.equal(Game.hazards.get(ambush.id).phase, 'active');
 Game.bus.emit('encounter:ended', { encounterId: 'ambush:encounter' });

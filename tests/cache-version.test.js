@@ -11,6 +11,7 @@ const index = read('index.html');
 const demoFiles = [
   ['tech-demos/index.html', 'tech-demos/demo-index.css'],
   ['tech-demos/map-effects/map-effects.html', 'tech-demos/map-effects/map-effects.css'],
+  ['tech-demos/hazards/hazards.html', 'tech-demos/hazards/hazards.css'],
   ['tech-demos/exploration-v3/exploration-v3.html', 'tech-demos/exploration-v3/exploration-v3.css'],
   ['tech-demos/units/units.html', 'tech-demos/units/units.css']
 ].map(([html, css]) => ({ html, css, source: read(html), style: read(css) }));

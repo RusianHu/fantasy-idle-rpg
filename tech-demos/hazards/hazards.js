@@ -1,0 +1,589 @@
+/* global Game, DemoI18n */
+(function () {
+  'use strict';
+
+  var U = Game.util;
+  var D = DemoI18n;
+  var regions = [];
+  var profiles = [];
+  var currentIndex = 0;
+  var paused = false;
+  var timeMode = 'cycle';
+  var lastFrame = performance.now();
+  var lastUiUpdate = 0;
+  var feed = [];
+  var EVENT_TYPES = [
+    'hazard:clue', 'hazard:revealed', 'hazard:warning', 'hazard:activated',
+    'hazard:hit', 'hazard:avoided', 'hazard:ambushStarted', 'hazard:cooldown', 'hazard:reset'
+  ];
+
+  function queryParams() {
+    try { return new URLSearchParams(location.search); } catch (_) { return new URLSearchParams(); }
+  }
+
+  function parseSeed(value) {
+    value = String(value || '').trim();
+    return /^[0-9a-f]{1,8}$/i.test(value) ? parseInt(value, 16) >>> 0 : null;
+  }
+
+  function regionName(region) {
+    return Game.i18n.t('region.' + region.id + '.name');
+  }
+
+  function profileName(profile) {
+    if (!profile) return '—';
+    var value = Game.i18n.t(profile.presentation.nameKey);
+    return value === profile.presentation.nameKey ? profile.id : value;
+  }
+
+  function selectedInstance() {
+    return Game.hazards.get(document.getElementById('hazard-select').value);
+  }
+
+  function selectedProfile() {
+    return Game.content.get('hazardProfile', document.getElementById('profile-select').value);
+  }
+
+  function updateUrl() {
+    if (location.protocol === 'file:') return;
+    var url = new URL(location.href);
+    url.searchParams.set('seed', U.hex32(Game.state.world.worldSeed));
+    url.searchParams.set('region', Game.world.region.id);
+    url.searchParams.set('lang', D.locale());
+    history.replaceState(null, '', url.href);
+  }
+
+  function setHeroPosition(x, y) {
+    var hero = Game.world.hero;
+    if (!hero) return;
+    var point = Game.terrain.projectPoint(x, y, 1) || Game.world.layout.camp;
+    Game.world.cancelInteraction('hazard-lab');
+    hero.x = U.clamp(point.x, 24, Game.world.layout.world.w - 24);
+    hero.y = U.clamp(point.y, Game.world.BOUND_TOP + 8, Game.world.layout.world.h - 24);
+    hero.target = null;
+    hero.moveOrder = null;
+    hero.manualTarget = false;
+    hero.state = 'idle';
+    Game.nav.clear(hero);
+    Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: Game.world.region.id });
+    Game.render.snapCamera(hero.x, hero.y);
+  }
+
+  function prepareManual() {
+    if (Game.world.controlMode() !== 'manual') Game.world.setControlMode('manual');
+    var hero = Game.world.hero;
+    if (!hero) return;
+    hero.target = null;
+    hero.manualTarget = false;
+    hero.moveOrder = null;
+    hero.state = 'idle';
+    Game.nav.clear(hero);
+  }
+
+  function outsideDistance(instance) {
+    var trigger = instance.profile.trigger;
+    var triggerRadius = trigger.shape === 'circle' ? trigger.radius :
+      (trigger.shape === 'cone' ? trigger.length : Math.max(trigger.width || 0, trigger.height || 0) / 2);
+    return Math.max(instance.profile.detection.clueRadius + 28, triggerRadius + 42);
+  }
+
+  function resetAtOutside(instance) {
+    prepareManual();
+    setHeroPosition(instance.x + outsideDistance(instance), instance.y);
+    Game.hazards.update(.05);
+    if (!Game.hazards.resetInstance(instance.id)) {
+      activateRegion(currentIndex, instance.id);
+      instance = selectedInstance();
+      prepareManual();
+      setHeroPosition(instance.x + outsideDistance(instance), instance.y);
+      Game.hazards.update(.05);
+      Game.hazards.resetInstance(instance.id);
+    }
+    Game.state.player.hp = Game.state.derived.maxHp;
+    return instance;
+  }
+
+  function showClue() {
+    var instance = selectedInstance();
+    if (!instance) return false;
+    paused = true;
+    instance = resetAtOutside(instance);
+    var detection = instance.profile.detection;
+    var distance = Math.max(detection.revealRadius + 6, detection.clueRadius - 4);
+    setHeroPosition(instance.x + distance, instance.y);
+    Game.hazards.update(.05);
+    callout(D.t('hazard.clueShown') + ' · ' + profileName(instance.profile));
+    syncPauseUi();
+    updateRuntime(true);
+    return instance.clueVisible && instance.awareness === 'concealed';
+  }
+
+  function revealHazard() {
+    var instance = selectedInstance();
+    if (!instance) return false;
+    paused = true;
+    instance = resetAtOutside(instance);
+    var detection = instance.profile.detection;
+    var trigger = instance.profile.trigger;
+    var triggerRadius = trigger.shape === 'circle' ? trigger.radius :
+      (trigger.shape === 'cone' ? trigger.length : Math.max(trigger.width || 0, trigger.height || 0) / 2);
+    var distance = Math.max(triggerRadius + 7, detection.revealRadius - 3);
+    setHeroPosition(instance.x + distance, instance.y);
+    Game.hazards.update(.05);
+    callout(D.t('hazard.revealed') + ' · ' + profileName(instance.profile));
+    syncPauseUi();
+    updateRuntime(true);
+    return instance.awareness === 'revealed';
+  }
+
+  function triggerHazard() {
+    var instance = selectedInstance();
+    if (!instance) return false;
+    paused = true;
+    instance = resetAtOutside(instance);
+    prepareManual();
+    setHeroPosition(instance.x, instance.y);
+    Game.hazards.update(.05);
+    var triggered = instance.phase === 'warning' || Game.hazards.forceTrigger(instance.id, Game.world.hero.id);
+    callout(D.t(triggered ? 'hazard.triggered' : 'hazard.disabled') + ' · ' + profileName(instance.profile));
+    syncPauseUi();
+    updateRuntime(true);
+    return triggered;
+  }
+
+  function stepUntil(test, limit) {
+    var steps = 0;
+    while (!test() && steps < limit) {
+      Game.hazards.update(.05);
+      steps++;
+    }
+    return steps;
+  }
+
+  function advanceHazard() {
+    var instance = selectedInstance();
+    if (!instance) return 0;
+    paused = true;
+    if (instance.phase === 'dormant') triggerHazard();
+    instance = selectedInstance();
+    var start = instance.phase;
+    var steps = stepUntil(function () { return instance.phase !== start; }, 180);
+    callout(D.t('hazard.advanced') + ' · ' + start + ' → ' + instance.phase);
+    syncPauseUi();
+    updateRuntime(true);
+    return steps;
+  }
+
+  function resolveHazard() {
+    var instance = selectedInstance();
+    if (!instance) return 0;
+    paused = true;
+    if (instance.phase === 'dormant') triggerHazard();
+    instance = selectedInstance();
+    var steps = stepUntil(function () {
+      return instance.phase === 'cooldown' || instance.lockEncounterId ||
+        Game.hazards.events().some(function (event) {
+          return event.instanceId === instance.id && (event.type === 'hazard:hit' || event.type === 'hazard:ambushStarted');
+        });
+    }, 220);
+    callout(D.t('hazard.resolved') + ' · ' + profileName(instance.profile));
+    syncPauseUi();
+    updateRuntime(true);
+    return steps;
+  }
+
+  function resetHazard() {
+    var instance = selectedInstance();
+    if (!instance) return false;
+    paused = true;
+    resetAtOutside(instance);
+    callout(D.t('hazard.resetDone') + ' · ' + profileName(instance.profile));
+    syncPauseUi();
+    updateRuntime(true);
+    return true;
+  }
+
+  function focusHazard() {
+    var instance = selectedInstance();
+    if (!instance) return false;
+    prepareManual();
+    setHeroPosition(instance.x + outsideDistance(instance) * .55, instance.y + 12);
+    updateRuntime(true);
+    return true;
+  }
+
+  function shapeText(profile) {
+    var trigger = profile.trigger;
+    if (trigger.shape === 'circle') return 'circle · r' + trigger.radius;
+    if (trigger.shape === 'cone') return 'cone · ' + trigger.length + 'px / ' + trigger.angleDeg + '°';
+    return trigger.shape + ' · ' + (trigger.width || trigger.length) + '×' + (trigger.height || trigger.radius * 2);
+  }
+
+  function renderTabs() {
+    document.getElementById('region-tabs').innerHTML = regions.map(function (region, index) {
+      return '<button type="button" data-region-index="' + index + '" class="' +
+        (index === currentIndex ? 'active' : '') + '"' + (index === currentIndex ? ' aria-current="page"' : '') +
+        '><small>' + String(index + 1).padStart(2, '0') + ' / T' + region.tier + '</small><span>' +
+        U.esc(regionName(region)) + '</span></button>';
+    }).join('');
+  }
+
+  function refreshSelects(preferredId) {
+    var instances = Game.hazards.all();
+    var select = document.getElementById('hazard-select');
+    select.innerHTML = instances.map(function (instance, index) {
+      return '<option value="' + U.esc(instance.id) + '"' + (instance.disabled ? ' disabled' : '') + '>' +
+        U.esc(profileName(instance.profile)) + ' · ' + (index + 1) +
+        (instance.disabled ? ' · ' + U.esc(D.t('hazard.unavailable')) : '') + '</option>';
+    }).join('');
+    var available = instances.filter(function (instance) { return !instance.disabled; });
+    var preferred = instances.some(function (instance) { return instance.id === preferredId && !instance.disabled; })
+      ? preferredId : (available[0] && available[0].id);
+    if (preferred) select.value = preferred;
+
+    var profileSelect = document.getElementById('profile-select');
+    var previousProfile = profileSelect.value;
+    profileSelect.innerHTML = profiles.map(function (profile) {
+      var region = Game.reg.get('region', profile.regionId);
+      return '<option value="' + U.esc(profile.id) + '">' + U.esc(regionName(region)) + ' · ' +
+        U.esc(profileName(profile)) + '</option>';
+    }).join('');
+    var instance = selectedInstance();
+    profileSelect.value = profiles.some(function (profile) { return profile.id === previousProfile; })
+      ? previousProfile : (instance ? instance.profileId : profiles[0].id);
+  }
+
+  function callout(message) {
+    document.getElementById('event-callout').textContent = message;
+  }
+
+  function eventText(type, instance) {
+    var profile = instance && (instance.profile || instance);
+    var presentation = profile && profile.presentation || {};
+    var key = type === 'hazard:warning' ? presentation.warningKey :
+      (type === 'hazard:hit' ? presentation.hitKey :
+        (type === 'hazard:ambushStarted' ? presentation.ambushKey : ''));
+    if (key) {
+      var translated = Game.i18n.t(key);
+      if (translated !== key) return translated;
+    }
+    return D.t('hazard.event.' + type.split(':')[1]);
+  }
+
+  function pushEvent(type, event) {
+    var instance = Game.hazards.get(event.instanceId);
+    var text = eventText(type, instance);
+    feed.unshift({
+      tick: event.tick,
+      type: type,
+      profileId: event.profileId
+    });
+    feed = feed.slice(0, 7);
+    callout(text);
+    renderFeed();
+  }
+
+  function renderFeed() {
+    document.getElementById('event-feed').innerHTML = feed.length ? feed.map(function (item) {
+      var profile = Game.content.get('hazardProfile', item.profileId);
+      return '<li><b>t' + item.tick + '</b> · ' + U.esc(item.type) + ' · ' +
+        U.esc(profile ? profileName(profile) : item.profileId) +
+        '<br>' + U.esc(eventText(item.type, profile)) + '</li>';
+    }).join('') : '<li>' + U.esc(D.t('hazard.noEvents')) + '</li>';
+  }
+
+  function renderContactSheet() {
+    var canvas = document.getElementById('contact-sheet');
+    var ctx = canvas.getContext('2d');
+    var profile = selectedProfile();
+    if (!profile) return;
+    var visual = Game.content.get('hazardVisualProfile', profile.visualProfileId);
+    var states = [
+      { label: D.t('hazard.phase.clue'), phase: 'dormant', awareness: 'concealed', clueVisible: true },
+      { label: D.t('hazard.phase.dormant'), phase: 'dormant' },
+      { label: D.t('hazard.phase.warningEarly'), phase: 'warning', progress: .28 },
+      { label: D.t('hazard.phase.warningLate'), phase: 'warning', progress: .84 },
+      { label: D.t('hazard.phase.active'), phase: 'active', hit: true },
+      { label: D.t('hazard.phase.cooldown'), phase: 'cooldown' }
+    ];
+    var cellW = canvas.width / 3;
+    var cellH = canvas.height / 2;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.imageSmoothingEnabled = false;
+    states.forEach(function (state, index) {
+      var col = index % 3, row = Math.floor(index / 3);
+      var x = col * cellW, y = row * cellH;
+      ctx.fillStyle = index % 2 ? '#17150f' : '#11120e';
+      ctx.fillRect(x, y, cellW, cellH);
+      ctx.fillStyle = '#1d2018';
+      for (var py = y + 5; py < y + cellH - 5; py += 8) {
+        for (var px = x + 5 + ((py / 8) % 2 ? 4 : 0); px < x + cellW - 5; px += 8) {
+          ctx.fillRect(px, py, 1, 1);
+        }
+      }
+      ctx.strokeStyle = '#3d3829';
+      ctx.strokeRect(x + .5, y + .5, cellW - 1, cellH - 1);
+      ctx.fillStyle = '#aa8d4c';
+      ctx.fillRect(x + 8, y + 8, 3, 11);
+      ctx.fillRect(x + 8, y + 8, 11, 3);
+      ctx.fillRect(x + cellW - 11, y + 8, 3, 11);
+      ctx.fillRect(x + cellW - 19, y + 8, 11, 3);
+      ctx.fillStyle = '#d4c49c';
+      ctx.font = '9px "Fusion Pixel", Consolas, monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText('0' + (index + 1) + '  ' + state.label.toUpperCase(), x + 24, y + 10);
+      var cone = profile.trigger.shape === 'cone';
+      var wide = profile.trigger.shape === 'rect' && (profile.trigger.width || profile.trigger.length) > 52;
+      ctx.save();
+      ctx.translate(x + cellW * (cone ? .3 : .5), y + cellH * .6);
+      var previewScale = cone ? 1.55 : (wide ? 1.78 : 2.05);
+      ctx.scale(previewScale, previewScale);
+      Game.hazardRender.drawPreview(ctx, profile, {
+        visual: visual,
+        phase: state.phase,
+        awareness: state.awareness || 'revealed',
+        clueVisible: state.clueVisible,
+        progress: state.progress,
+        hit: state.hit,
+        compact: true,
+        static: !document.getElementById('effects-toggle').checked
+      });
+      ctx.restore();
+    });
+    renderProfileDetails(profile);
+  }
+
+  function renderProfileDetails(profile) {
+    var detection = profile.detection;
+    var lifecycle = profile.lifecycle;
+    var desc = Game.i18n.t(profile.presentation.descKey);
+    document.getElementById('profile-details').innerHTML =
+      '<div><span>' + U.esc(D.t('hazard.profileId')) + '</span><strong>' + U.esc(profile.id) + '</strong></div>' +
+      '<div><span>' + U.esc(D.t('hazard.shape')) + '</span><strong>' + U.esc(shapeText(profile)) + '</strong></div>' +
+      '<div><span>' + U.esc(D.t('hazard.detection')) + '</span><strong>' +
+        detection.clueRadius + ' / ' + detection.revealRadius + ' px</strong></div>' +
+      '<div><span>' + U.esc(D.t('hazard.lifecycle')) + '</span><strong>' +
+        (lifecycle.warningTicks * .05).toFixed(2) + 's / ' + (lifecycle.activeTicks * .05).toFixed(2) + 's</strong></div>' +
+      '<p>' + U.esc(desc) + '</p>';
+  }
+
+  function updateRuntime(force) {
+    var now = performance.now();
+    if (!force && now - lastUiUpdate < 100) return;
+    lastUiUpdate = now;
+    var instance = selectedInstance();
+    if (!instance) return;
+    var detection = instance.profile.detection;
+    var lifecycle = instance.profile.lifecycle;
+    document.getElementById('hazard-state').textContent =
+      instance.awareness + ' / ' + instance.phase + (instance.clueVisible ? ' / clue' : '');
+    document.getElementById('hazard-ranges').textContent =
+      detection.clueRadius + ' / ' + detection.revealRadius + ' / ' + shapeText(instance.profile);
+    document.getElementById('hazard-timing').textContent =
+      (lifecycle.warningTicks * .05).toFixed(2) + 's / ' + (lifecycle.activeTicks * .05).toFixed(2) + 's';
+    document.getElementById('hazard-costs').textContent = ['safe', 'balanced', 'loot'].map(function (strategy) {
+      return strategy.charAt(0).toUpperCase() + ':' +
+        Game.hazards.navigationCost(instance.x, instance.y, strategy);
+    }).join(' / ');
+    document.getElementById('tick-status').textContent = 'tick ' + Game.hazards.tick();
+  }
+
+  function activateRegion(index, preferredId) {
+    currentIndex = (index + regions.length) % regions.length;
+    var region = regions[currentIndex];
+    feed = [];
+    Game.state.settings.controlMode = 'manual';
+    Game.state.world.region = region.id;
+    Game.state.world.layoutVersion = 3;
+    Game.state.world.mode = 'battle';
+    Game.state.world.deathsRow = 0;
+    Game.state.player.level = 1 + Math.max(0, region.tier - 1) * 9;
+    Game.state.player.exp = 0;
+    Game.state.player.skills = {};
+    Game.player.recalc();
+    Game.state.player.hp = Game.state.derived.maxHp;
+    Game.world.init(region.id);
+    document.getElementById('region-name').textContent = regionName(region);
+    document.getElementById('seed-input').value = U.hex32(Game.state.world.worldSeed);
+    renderTabs();
+    refreshSelects(preferredId);
+    renderFeed();
+    focusHazard();
+    renderContactSheet();
+    callout(regionName(region) + ' · ' + D.t('hazard.regionReady'));
+    updateUrl();
+    updateRuntime(true);
+  }
+
+  function setTimeMode(mode) {
+    timeMode = mode;
+    var dayLength = Game.F.BAL.dayLength;
+    if (mode === 'day') Game.state.world.worldTime = dayLength * .28;
+    if (mode === 'night') Game.state.world.worldTime = dayLength * .82;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-time]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-time') === mode);
+    });
+  }
+
+  function syncPauseUi() {
+    var button = document.getElementById('toggle-play');
+    button.textContent = paused ? D.t('common.resume') : D.t('common.pause');
+    document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('common.running');
+  }
+
+  function bindControls() {
+    document.getElementById('region-tabs').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-region-index]');
+      if (button) activateRegion(Number(button.getAttribute('data-region-index')));
+    });
+    document.getElementById('prev-region').addEventListener('click', function () { activateRegion(currentIndex - 1); });
+    document.getElementById('next-region').addEventListener('click', function () { activateRegion(currentIndex + 1); });
+    document.getElementById('toggle-play').addEventListener('click', function () {
+      paused = !paused;
+      syncPauseUi();
+    });
+    document.getElementById('hazard-select').addEventListener('change', function () {
+      var instance = selectedInstance();
+      if (instance) document.getElementById('profile-select').value = instance.profileId;
+      focusHazard();
+      renderContactSheet();
+      updateRuntime(true);
+    });
+    document.getElementById('profile-select').addEventListener('change', renderContactSheet);
+    document.getElementById('show-clue').addEventListener('click', showClue);
+    document.getElementById('reveal-hazard').addEventListener('click', revealHazard);
+    document.getElementById('trigger-hazard').addEventListener('click', triggerHazard);
+    document.getElementById('advance-hazard').addEventListener('click', advanceHazard);
+    document.getElementById('resolve-hazard').addEventListener('click', resolveHazard);
+    document.getElementById('reset-hazard').addEventListener('click', resetHazard);
+    document.getElementById('effects-toggle').addEventListener('change', function () {
+      Game.state.settings.effects = this.checked;
+      Game.particles.setEnabled(this.checked);
+      renderContactSheet();
+    });
+    document.querySelector('.segmented').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-time]');
+      if (button) setTimeMode(button.getAttribute('data-time'));
+    });
+    document.getElementById('seed-form').addEventListener('submit', function (event) {
+      event.preventDefault();
+      var input = document.getElementById('seed-input');
+      var seed = parseSeed(input.value);
+      if (seed === null) {
+        input.setCustomValidity(D.t('hazard.seedError'));
+        input.reportValidity();
+        return;
+      }
+      input.setCustomValidity('');
+      Game.state.world.worldSeed = seed;
+      Game.state.world.exploration = {};
+      Game.state.world.hazards = { layoutVersion: 3, regions: {} };
+      activateRegion(currentIndex);
+    });
+  }
+
+  function bindEvents() {
+    EVENT_TYPES.forEach(function (type) {
+      Game.bus.on(type, function (event) { pushEvent(type, event); });
+    });
+  }
+
+  function frame(now) {
+    var dt = Math.min(.05, Math.max(0, (now - lastFrame) / 1000));
+    lastFrame = now;
+    if (!paused) {
+      if (timeMode === 'cycle') {
+        Game.state.world.worldTime = (Game.state.world.worldTime + dt) % Game.F.BAL.dayLength;
+      }
+      Game.terrain.update(dt);
+      Game.particles.update(dt);
+      Game.fx.update(dt);
+      Game.world.update(dt);
+      Game.trade.update();
+      Game.actionBubbles.update(dt);
+    }
+    Game.render.frame(paused ? 0 : dt);
+    updateRuntime();
+    requestAnimationFrame(frame);
+  }
+
+  D.init();
+  Game.content.finalize({ strict: true });
+  regions = Game.reg.all('region');
+  profiles = Game.content.all('hazardProfile').sort(function (a, b) {
+    return a.regionId.localeCompare(b.regionId) || a.id.localeCompare(b.id);
+  });
+  Game.ui.modals.init();
+  Game.state = Game.State.newGame();
+  Game.i18n.setLocale(D.locale());
+  Game.state.world.layoutVersion = 3;
+  Game.state.world.regionOrder = Game.reg.ids('region');
+  Game.state.settings.autoAdvance = false;
+  Game.state.settings.autoEquip = false;
+  Game.state.settings.autoCampRest = false;
+  Game.state.settings.groundLoot = false;
+  Game.state.settings.controlMode = 'manual';
+  Game.player.setClass('fighter');
+  var params = queryParams();
+  var seed = parseSeed(params.get('seed'));
+  if (seed !== null) Game.state.world.worldSeed = seed;
+  Game.render.init(document.getElementById('stage'));
+  bindEvents();
+  bindControls();
+  var initialId = params.get('region') || location.hash.slice(1);
+  var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
+  activateRegion(initialIndex >= 0 ? initialIndex : 0);
+
+  window.HazardEffectsLab = {
+    catalog: function () {
+      return profiles.map(function (profile) {
+        return {
+          id: profile.id,
+          regionId: profile.regionId,
+          category: profile.category,
+          trigger: profile.trigger,
+          detection: profile.detection,
+          lifecycle: profile.lifecycle,
+          visualProfileId: profile.visualProfileId
+        };
+      });
+    },
+    snapshot: function () { return Game.hazards.snapshot(); },
+    events: function () { return Game.hazards.events(); },
+    select: function (id) {
+      var select = document.getElementById('hazard-select');
+      select.value = id;
+      if (select.value !== id) return false;
+      select.dispatchEvent(new Event('change'));
+      return true;
+    },
+    clue: showClue,
+    reveal: revealHazard,
+    trigger: triggerHazard,
+    advance: advanceHazard,
+    resolve: resolveHazard,
+    reset: resetHazard,
+    region: function (id) {
+      var index = regions.findIndex(function (region) { return region.id === id; });
+      if (index < 0) return false;
+      activateRegion(index);
+      return true;
+    }
+  };
+
+  window.addEventListener('demo:locale', function () {
+    Game.i18n.setLocale(D.locale());
+    document.getElementById('region-name').textContent = regionName(Game.world.region);
+    renderTabs();
+    refreshSelects(selectedInstance() && selectedInstance().id);
+    renderContactSheet();
+    renderFeed();
+    if (feed.length) {
+      callout(eventText(feed[0].type, Game.content.get('hazardProfile', feed[0].profileId)));
+    }
+    syncPauseUi();
+    updateRuntime(true);
+  });
+  requestAnimationFrame(frame);
+})();

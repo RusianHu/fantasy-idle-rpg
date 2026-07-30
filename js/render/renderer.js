@@ -668,7 +668,7 @@
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
       if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB);
-      if (Game.hazardRender) Game.hazardRender.draw(ctx, viewL, viewT, viewR, viewB);
+      if (Game.hazardRender) Game.hazardRender.drawGround(ctx, viewL, viewT, viewR, viewB);
 
       // 5) y 排序绘制（装饰 + 实体）
       var drawables = [];
@@ -822,6 +822,7 @@
       Game.particles.draw(ctx);
       Game.fx.drawShapes(ctx);
       if (Game.exploration) Game.exploration.drawFog(ctx, viewL, viewT, viewR, viewB);
+      if (Game.hazardRender) Game.hazardRender.drawOverlay(ctx, viewL, viewT, viewR, viewB);
 
       // 8) 屏幕空间：林间光柱 → 日夜色调 → 暗角
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

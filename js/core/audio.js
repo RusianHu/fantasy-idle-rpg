@@ -70,6 +70,13 @@
       bus.on('player:revived', function () { A.playSfx('sfx_revive'); });
       bus.on('achievement:unlocked', function () { A.playSfx('sfx_achievement'); });
       bus.on('skill:upgraded', function () { A.playSfx('sfx_skillup'); });
+      bus.on('hazard:clue', function () { A.playSfx('sfx_hazard_clue'); });
+      bus.on('hazard:revealed', function () { A.playSfx('sfx_hazard_reveal'); });
+      bus.on('hazard:warning', function () { A.playSfx('sfx_hazard_warning'); });
+      bus.on('hazard:activated', function () { A.playSfx('sfx_hazard_activate'); });
+      bus.on('hazard:ambushStarted', function () { A.playSfx('sfx_hazard_ambush'); });
+      bus.on('hazard:hit', function () { A.playSfx('sfx_hazard_hit'); });
+      bus.on('hazard:avoided', function () { A.playSfx('sfx_hazard_avoided'); });
       bus.on('boss:spawned', function () { A.playBgm('bgm_boss'); });
       bus.on('boss:defeated', function () { A.playBgm('bgm_field'); });
       bus.on('boss:failed', function () { A.playBgm('bgm_field'); });

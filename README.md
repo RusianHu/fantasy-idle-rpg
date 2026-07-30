@@ -27,7 +27,7 @@
 | 挂机战斗 | 50ms 整数 tick 的确定性自动时间轴：GCD/oGCD、队列窗口、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、威胁、护盾和治疗共用一条结算管线；普通遭遇为 1–3 人 pack，巡逻与接敌入口统一受共享 leash 约束，Boss 具备预警、阶段与有限增援 |
 | 开放远征世界 | 八区均以世界种子生成稳定的 `2400×1440` 连续开放地图；14–18 个宏观中心、硬阻挡、宽窄路线、支路与环路共同形成可选择拓扑，16px 分层导航、扫掠碰撞、512px 分块渲染和空间桶支撑长途探索 |
 | 世界生态 | 八区 Population 先生成不可变 `PopulationMountPlan`，按 Boss→守门→NPC→稀有→常规顺序预留合法坐标，再通过稳定 SpawnLease 生成普通怪、Boss、NPC 与和平生物；Population 统一管理死亡/逃跑后的 delay 或 worldTime 重生，`spawnId + generation` 隔离旧命令。Encounter 内召唤物使用确定性 ephemeral sequence，不挂 Population、默认无奖励，并随战斗生命周期挂载和回收 |
-| 环境机关 | 每区确定性放置 1 类伤害陷阱与 1 类伏击触发器，共 16 个非 Actor Hazard；隐藏机关仍先揭示并预警，固定 50ms tick 负责扫掠触发、伤害/Status/位移、伏击与冷却。安全/均衡/掠夺策略读取不同导航成本，飞行与非玩家生态不会误触首期地面陷阱 |
+| 环境机关 | 每区确定性放置 1 类伤害陷阱与 1 类伏击触发器，共 16 个非 Actor Hazard；隐藏机关仍先揭示并预警，固定 50ms tick 负责扫掠触发、伤害/Status/位移、伏击与冷却。九类机关使用逐区材质、像素地砖警戒符、战斗铭牌、爆发碎屑与残留；安全/均衡/掠夺策略读取不同导航成本，飞行与非玩家生态不会误触首期地面陷阱 |
 | **自动/手动操控** | 世界舞台常驻双态开关，默认自动挂机；手动时停止游走、索敌和击杀后续敌，支持点地移动、点怪交战及 WASD/方向键，锁定后仍由固定时间轴自动轮转。自动 AI 优先级固定为接敌→掉落→宝箱→采集→游走，安全/均衡/掠夺沿途接敌半径 42/72/96px，玩家临时指令优先于非接触索敌 |
 | **点触交互** | 点击怪物/地面发出交战或移动指令；点击掉落、采集节点、宝箱与交易实体会寻路走近并交互；点篝火=回营/拔营 |
 | **动作气泡** | 自动模式发现资源、开始采集、遭遇敌人、发现宝箱或拾取战利品时显示短时纯图形像素气泡（叶片/采集镐/交叉武器/宝箱/战利品袋）；左右行走时气泡落在后脑斜上方，上下行走时保持正上方，接敌/警戒按对手方向侧移并自动避开边缘与血条 |
@@ -67,7 +67,7 @@ css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 assets/sprite-source/ 采集物与探索宝箱的生成式母版及运行时预览
 assets/sprites/       可独立复用的透明运行时 PNG（exploration/ 按稳定 ID 拆分）
-tech-demos/           双语生产 QA：Actor/召唤 Lab、世界/Hazard 现场与生成器审计
+tech-demos/           双语生产 QA：Actor/战斗、世界现场、Hazard 特效与生成器审计
 docs/content-authoring/ Actor 内容契约、示例与新增流程
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
@@ -87,7 +87,7 @@ js/
 
 **探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。`*.generated.js` 不直接手改。
 
-**扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与三个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
+**扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与四个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`。
 
@@ -102,7 +102,7 @@ js/
 - **导航与渲染**：512px 地表区块组成 5×3 网格，视口预加载与 LRU 只保留热区块，动态实体使用空间桶；长途移动先固定为可即时打断的宏观航点行程，再逐段运行局部 A*，避免在宏观分区边界随 0.6s 重算往返。导航队列受单帧 2ms 预算约束，结果下一帧接续；失败缓存、扫掠停滞恢复、目标/token/策略变更重编排同时覆盖自动 AI、点击移动与「前往巢穴」。键盘和点触移动均执行硬阻挡扫掠碰撞。v3 区块以多尺度平滑噪声替代方块材质选择，恢复材质微纹理、草叶/裂纹/雪光、材质边缘、宽域色斑、花簇与营地磨损地面，未探索区完全遮蔽以防泄露底层粗网格与实体轮廓。
 - **地图交互**：区域地图以独立底图和实时角色覆盖层合成，支持按钮、连续滚轮/触控板、双指捏合缩放及单指拖动；倍率限制为 `1×–3×`，缩放期间不重建面板或底图，到达边界后释放滚轮供面板继续滚动。
 - **迷雾与采集**：迷雾采用 32px Base64 bitset 加硬阻挡视线遮挡，前沿只选未知、可走且具备净宽的导航格，并以稳定 ID 屏蔽失败目标。八区环境实体每图至少 550 个（其中 ≥350 个大型树木、岩群、墓碑或遗迹与硬阻挡一一对应），可行走区另铺小型植被。当前 v3 由独立 `resources` 流放置 16–22 个节点；自动采集统一要求节点已揭示，揭示后即可立即采集，活跃小型资源使用 2× 整数缩放并加光晕描边，枯竭后改为独立地痕。
-- **Hazard**：v3 使用独立稳定流生成 `hazardAnchors`，避开营地、入口、交互圈、Boss 巢穴与唯一窄路。`Game.hazards` 独占 awareness、phase、swept trigger、fixed-tick outcome、伏击锁和持久冷却；`Game.effects.resolveExternal` 统一处理脱战环境伤害，渲染层只消费 PresentationEvent。当前 16 个 Hazard 均由 `HazardProfile/HazardVisualProfile` 数据驱动，不在 world/renderer 写区域分支。
+- **Hazard**：v3 使用独立稳定流生成 `hazardAnchors`，避开营地、入口、交互圈、Boss 巢穴与唯一窄路。`Game.hazards` 独占 clue/reveal awareness、shape-aware swept trigger、fixed-tick warning/active window、伏击锁和持久冷却；自动逃生会排除相邻已揭示危险区。当前 16 个 Hazard 均由 `HazardProfile/HazardVisualProfile` 数据驱动，渲染拆为实体下方的地面范围与迷雾上方的机关/倒计时/命中层；九类机关以像素化材质、离散地砖符、逐类攻击动作和残留取代通用 HUD 圆环，`tech-demos/hazards` 直接复用正式链路做六阶段对照。
 
 ## 存档
 
@@ -183,7 +183,7 @@ node tests\cache-version.test.js
 
 除 `action-bubble-demo.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v15 与多 ActorRecord/RoutePlan/社交/Hazard 迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局、扫掠触发/持久冷却/伏击/渲染、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例验证移动与桌面中英文、44px 触控、正式 Combat HUD、双 Lab、生成器审计、固定 tick Engagement、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v15 与多 ActorRecord/RoutePlan/社交/Hazard 迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局、扫掠触发/持久冷却/伏击/渲染、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例验证移动与桌面中英文、44px 触控、正式 Combat HUD、四个工作台、固定 tick Engagement、存档重开和无横向溢出。
 
 ---
 

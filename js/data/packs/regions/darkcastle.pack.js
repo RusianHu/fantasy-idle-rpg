@@ -126,8 +126,8 @@
     hazards: [
       {
         id: 'hazard.darkcastle.wall_lances', regionId: 'darkcastle', category: 'damageTrap',
-        trigger: { mode: 'enter', shape: 'rect', width: 52, height: 16, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 82, revealRadius: 52 }, lifecycle: { revealTicks: 8, warningTicks: 16, activeTicks: 4, cooldownTicks: 520 },
+        trigger: { mode: 'enter', shape: 'rect', width: 70, height: 28, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 10, cooldownTicks: 520 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.1 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'darkcastle.cursed', stacks: 1, firstPulseOnly: true }
@@ -138,8 +138,8 @@
       },
       {
         id: 'hazard.darkcastle.gate_ambush', regionId: 'darkcastle', category: 'ambushTrigger',
-        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 88, revealRadius: 54 }, lifecycle: { revealTicks: 6, warningTicks: 18, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 120, revealRadius: 80 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['darkcastle.solo-a', 'darkcastle.solo-b', 'darkcastle.solo-c', 'darkcastle.duo', 'darkcastle.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 56, minSpacing: 108, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.darkcastle.gate_ambush.name', descKey: 'hazard.darkcastle.gate_ambush.desc', warningKey: 'hazard.darkcastle.gate_ambush.warning', hitKey: 'hazard.darkcastle.gate_ambush.hit', ambushKey: 'hazard.darkcastle.gate_ambush.ambush' },

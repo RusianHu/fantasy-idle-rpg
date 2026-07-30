@@ -115,8 +115,8 @@
     hazards: [
       {
         id: 'hazard.snowpass.icicle_fall', regionId: 'snowpass', category: 'damageTrap',
-        trigger: { mode: 'enter', shape: 'rect', width: 18, height: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 84, revealRadius: 54 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 4, cooldownTicks: 680 },
+        trigger: { mode: 'enter', shape: 'rect', width: 28, height: 58, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 680 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'frost', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.07 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'snowpass.chilled', stacks: 1, firstPulseOnly: true }
@@ -127,8 +127,8 @@
       },
       {
         id: 'hazard.snowpass.whiteout_ambush', regionId: 'snowpass', category: 'ambushTrigger',
-        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 88, revealRadius: 54 }, lifecycle: { revealTicks: 6, warningTicks: 22, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 120, revealRadius: 78 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['snowpass.solo-a', 'snowpass.solo-b', 'snowpass.solo-c', 'snowpass.duo', 'snowpass.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 52, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.snowpass.whiteout_ambush.name', descKey: 'hazard.snowpass.whiteout_ambush.desc', warningKey: 'hazard.snowpass.whiteout_ambush.warning', hitKey: 'hazard.snowpass.whiteout_ambush.hit', ambushKey: 'hazard.snowpass.whiteout_ambush.ambush' },

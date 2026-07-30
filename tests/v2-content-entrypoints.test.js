@@ -12,6 +12,7 @@ for (const entrypoint of [
   'index.html',
   'tech-demos/units/units.html',
   'tech-demos/map-effects/map-effects.html',
+  'tech-demos/hazards/hazards.html',
   'tech-demos/exploration-v3/exploration-v3.html'
 ]) {
   const html = read(entrypoint);
@@ -22,7 +23,10 @@ for (const entrypoint of [
   assert.doesNotMatch(html, /js\/data\/packs\//, `${entrypoint} does not load authoring sources`);
   assert.doesNotMatch(html, /js\/data\/(monsters|regions)\.js/, `${entrypoint} does not load legacy content`);
 }
-for (const entrypoint of ['index.html', 'tech-demos/units/units.html', 'tech-demos/map-effects/map-effects.html']) {
+for (const entrypoint of [
+  'index.html', 'tech-demos/units/units.html', 'tech-demos/map-effects/map-effects.html',
+  'tech-demos/hazards/hazards.html'
+]) {
   const html = read(entrypoint);
   assert.match(html, /js\/render\/effects\.js\?v=[^"]+"><\/script>\s*<script src="[^"]*js\/render\/combat_presentation\.js\?v=/,
     `${entrypoint} loads the production combat presentation adapter after FX`);
@@ -34,4 +38,4 @@ assert.equal(audit.ok, true);
 assert.equal(audit.packs.length, 16);
 assert.match(audit.fingerprint, /^[0-9a-f]{8}$/);
 execFileSync(process.execPath, ['tools/build-content-bundle.js', '--check'], { cwd: ROOT, stdio: 'pipe' });
-console.log(`Content entrypoints passed: 4 consumers share one generated bundle / ${audit.fingerprint}.`);
+console.log(`Content entrypoints passed: 5 consumers share one generated bundle / ${audit.fingerprint}.`);

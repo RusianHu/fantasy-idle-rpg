@@ -103,8 +103,8 @@
     hazards: [
       {
         id: 'hazard.forest.venom_darts', regionId: 'forest', category: 'damageTrap',
-        trigger: { mode: 'enter', shape: 'rect', width: 42, height: 14, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 82, revealRadius: 54 }, lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 12, cooldownTicks: 480 },
+        trigger: { mode: 'enter', shape: 'rect', width: 58, height: 24, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 104, revealRadius: 70 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 14, cooldownTicks: 480 },
         outcome: { type: 'applyEffects', pulses: 2, intervalTicks: 6, effects: [
           { type: 'damage', damageTypeId: 'poison', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'forest.poisoned', stacks: 1, firstPulseOnly: true }
@@ -115,8 +115,8 @@
       },
       {
         id: 'hazard.forest.thicket_ambush', regionId: 'forest', category: 'ambushTrigger',
-        trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 84, revealRadius: 52 }, lifecycle: { revealTicks: 6, warningTicks: 18, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
+        detection: { clueRadius: 114, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['forest.solo-a', 'forest.solo-b', 'forest.solo-c', 'forest.solo-d', 'forest.duo', 'forest.duo-summoner', 'forest.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.forest.thicket_ambush.name', descKey: 'hazard.forest.thicket_ambush.desc', warningKey: 'hazard.forest.thicket_ambush.warning', hitKey: 'hazard.forest.thicket_ambush.hit', ambushKey: 'hazard.forest.thicket_ambush.ambush' },
