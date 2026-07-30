@@ -3,20 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#151614">
-<meta name="build-id" content="20260730.8">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23151614'/%3E%3C/svg%3E">
-<title data-demo-page-title="map.pageTitle">开放世界现场技术验证 · 幻境远征</title>
-<link rel="stylesheet" href="map-effects.css?v=20260730.8">
+<meta name="theme-color" content="#121411">
+<meta name="build-id" content="20260730.11">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23121411'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23121411'/%3E%3C/svg%3E">
+<title data-demo-page-title="map.pageTitle">地图生成、渲染与放置 Lab · 幻境远征</title>
+<link rel="stylesheet" href="map-effects.css?v=20260730.11">
 </head>
 <body>
-<div id="modal-root"></div>
-<div id="toasts" aria-live="polite"></div>
 <div class="app-shell">
   <header class="topbar">
     <div>
-      <p class="eyebrow">FANTASY IDLE RPG / EFFECTS LAB / MAP-FX-01</p>
-      <h1 data-demo-i18n="map.title">开放世界现场技术验证</h1>
+      <p class="eyebrow">FANTASY IDLE RPG / MAP GENERATION LAB / MAP-GEN-01</p>
+      <h1 data-demo-i18n="map.title">地图生成、渲染与放置 Lab</h1>
+      <p class="subtitle" data-demo-i18n="map.lab.subtitle">无玩家、无迷雾地复现正式地形、装饰与 Population 放置链路。</p>
     </div>
     <div class="top-actions">
       <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
@@ -27,7 +26,7 @@
     </div>
   </header>
 
-  <nav id="region-tabs" class="region-tabs" aria-label="开放世界验证区域" data-demo-i18n-aria="map.regionNav"></nav>
+  <nav id="region-tabs" class="region-tabs" aria-label="地图生成验证区域" data-demo-i18n-aria="map.regionNav"></nav>
 
   <main class="workspace">
     <section class="preview-column" aria-labelledby="stage-region-name">
@@ -36,176 +35,282 @@
           <span id="stage-index" class="region-index">01</span>
           <div>
             <h2 id="stage-region-name">新手草原</h2>
-            <p id="stage-region-id">region / grassland</p>
+            <p id="stage-region-id">region / grassland · layout v3</p>
           </div>
         </div>
         <div class="icon-actions">
-          <button id="prev-region" class="icon-button" type="button" title="上一个" aria-label="上一个" data-demo-i18n-title="common.previous" data-demo-i18n-aria="common.previous">&#8592;</button>
-          <button id="toggle-play" class="icon-button" type="button" title="暂停演示" aria-label="暂停演示" data-demo-i18n-title="common.pause" data-demo-i18n-aria="common.pause">&#8545;</button>
-          <button id="next-region" class="icon-button" type="button" title="下一个" aria-label="下一个" data-demo-i18n-title="common.next" data-demo-i18n-aria="common.next">&#8594;</button>
+          <button id="prev-region" class="icon-button" type="button" data-demo-i18n-title="common.previous" data-demo-i18n-aria="common.previous">←</button>
+          <button id="regenerate" class="icon-button" type="button" data-demo-i18n-title="map.lab.regenerate" data-demo-i18n-aria="map.lab.regenerate">↻</button>
+          <button id="next-region" class="icon-button" type="button" data-demo-i18n-title="common.next" data-demo-i18n-aria="common.next">→</button>
         </div>
       </div>
 
       <div id="stage-wrap" class="stage-wrap">
-        <canvas id="stage" aria-label="开放探索 v3 实时世界画布" data-demo-i18n-aria="map.stageAria"></canvas>
+        <canvas id="stage" aria-label="正式地图生成渲染画布" data-demo-i18n-aria="map.stageAria"></canvas>
+        <canvas id="stage-overlay" aria-hidden="true"></canvas>
         <div class="stage-badges" aria-hidden="true">
-          <span id="runtime-status" data-demo-i18n="map.runtime">开放探索 v3 运行中</span>
-          <span id="runtime-count">0 个实体</span>
+          <span id="runtime-status" data-demo-i18n="map.lab.ready">等待生成</span>
+          <span id="runtime-count">0 actors · 0 props</span>
+          <span id="camera-status">x 0 · y 0 · 1.00×</span>
         </div>
       </div>
 
       <div class="control-strip">
         <form id="seed-form" class="seed-control">
           <label for="seed-input" data-demo-i18n="common.seed">世界种子</label>
+          <button id="seed-prev" type="button" aria-label="Previous seed">−</button>
           <input id="seed-input" type="text" inputmode="text" maxlength="8" spellcheck="false" autocomplete="off" aria-describedby="seed-format">
-          <button type="submit" data-demo-i18n="common.apply">应用</button>
+          <button id="seed-next" type="button" aria-label="Next seed">+</button>
+          <button type="submit" data-demo-i18n="common.generate">生成</button>
+          <button id="seed-random" type="button" data-demo-i18n="map.lab.randomSeed">随机</button>
+          <button id="copy-link" type="button" data-demo-i18n="map.lab.copyParams">复制参数</button>
           <span id="seed-format" data-demo-i18n="map.seedFormat">1–8 位十六进制</span>
         </form>
-        <div class="segmented" aria-label="日夜阶段" data-demo-i18n-aria="map.time">
-          <button type="button" data-time="cycle" class="active" data-demo-i18n="common.dayCycle">循环</button>
-          <button type="button" data-time="day" data-demo-i18n="common.day">昼间</button>
-          <button type="button" data-time="dusk" data-demo-i18n="common.dusk">黄昏</button>
-          <button type="button" data-time="night" data-demo-i18n="common.night">夜晚</button>
-        </div>
+
         <div class="focus-actions" aria-label="镜头视点" data-demo-i18n-aria="map.camera">
           <button type="button" data-focus="camp" data-demo-i18n="map.camp">营地</button>
-          <button type="button" data-focus="center" data-demo-i18n="map.landmark">地标</button>
+          <button type="button" data-focus="selected" data-demo-i18n="map.lab.selected">选中</button>
           <button type="button" data-focus="boss" data-demo-i18n="map.lair">Boss 巢穴</button>
+          <button type="button" data-focus="reset" data-demo-i18n="map.lab.resetView">复位视图</button>
         </div>
-        <div class="strategy-actions" aria-label="远征策略" data-demo-i18n-aria="map.strategyAria">
-          <button type="button" data-strategy="safe" data-demo-i18n="map.safe">安全</button>
-          <button type="button" data-strategy="balanced" class="active" data-demo-i18n="map.balanced">均衡</button>
-          <button type="button" data-strategy="loot" data-demo-i18n="map.loot">掠夺</button>
+
+        <div class="tool-actions" role="group" aria-label="调试工具" data-demo-i18n-aria="map.lab.tools">
+          <button type="button" class="active" data-tool="inspect" data-demo-i18n="map.lab.inspect">检查</button>
+          <button type="button" data-tool="measure" data-demo-i18n="map.lab.measure">测距 / 寻路</button>
+          <button type="button" data-tool="placement" data-demo-i18n="map.lab.placementProbe">放置探针</button>
         </div>
-        <label class="check-control">
-          <input id="effects-toggle" type="checkbox" checked>
-          <span data-demo-i18n="common.effects">环境效果</span>
+
+        <label class="profile-control">
+          <span data-demo-i18n="map.lab.spawnProfile">SpawnProfile</span>
+          <select id="profile-select"></select>
         </label>
-        <div class="dynamic-trade-qa" aria-label="动态交易域接口验证" data-demo-i18n-aria="map.tradeQa">
-          <button id="spawn-dynamic-trade" type="button" data-demo-i18n="map.merchant">注入临时游商</button>
-          <output id="dynamic-trade-status" data-demo-i18n="map.merchantIdle">未注册</output>
-        </div>
+
+        <label class="check-control">
+          <input id="motion-toggle" type="checkbox">
+          <span data-demo-i18n="map.lab.motion">巡游预览</span>
+        </label>
       </div>
 
-      <section class="exploration-lab" aria-labelledby="exploration-lab-title">
-        <div class="lab-heading">
-          <div>
-            <p class="lab-kicker">WORLD INTERACTION / LIVE QA</p>
-            <h3 id="exploration-lab-title" data-demo-i18n="map.interactions">资源 / 宝箱 / 交易域</h3>
-            <p data-demo-i18n="map.interactionCopy">验证 v3 资源揭示、节点冷却、宝箱与动态交易域的生产链路。</p>
-          </div>
-          <output id="exploration-event" class="lab-event" aria-live="polite" data-demo-i18n="map.waiting">等待交互</output>
+      <details class="layer-panel">
+        <summary data-demo-i18n="map.lab.layers">渲染与诊断图层</summary>
+        <div id="layer-controls" class="layer-groups">
+          <fieldset>
+            <legend data-demo-i18n="map.lab.layerTerrain">地形</legend>
+            <label><input type="checkbox" data-layer="terrainMaterial" checked><span data-demo-i18n="map.lab.material">地表材质</span></label>
+            <label><input type="checkbox" data-layer="liquid" checked><span data-demo-i18n="map.lab.liquid">液体</span></label>
+          </fieldset>
+          <fieldset>
+            <legend data-demo-i18n="map.lab.layerDecor">装饰</legend>
+            <label><input type="checkbox" data-layer="decorBlocker" checked><span data-demo-i18n="map.lab.blockers">阻挡</span></label>
+            <label><input type="checkbox" data-layer="decorGround" checked><span data-demo-i18n="map.lab.groundDecor">地表</span></label>
+            <label><input type="checkbox" data-layer="decorWater" checked><span data-demo-i18n="map.lab.waterDecor">水域</span></label>
+            <label><input type="checkbox" data-layer="decorBoss" checked><span data-demo-i18n="map.lab.bossDecor">Boss 领地</span></label>
+            <label><input type="checkbox" data-layer="tufts" checked><span data-demo-i18n="map.lab.tufts">草簇</span></label>
+            <label><input type="checkbox" data-layer="flowers" checked><span data-demo-i18n="map.lab.flowers">花朵</span></label>
+          </fieldset>
+          <fieldset>
+            <legend data-demo-i18n="map.lab.layerContent">内容</legend>
+            <label><input type="checkbox" data-layer="camp" checked><span data-demo-i18n="map.camp">营地</span></label>
+            <label><input type="checkbox" data-layer="landmarks" checked><span data-demo-i18n="map.lab.landmarks">地标</span></label>
+            <label><input type="checkbox" data-layer="resources" checked><span data-demo-i18n="map.lab.resources">资源</span></label>
+            <label><input type="checkbox" data-layer="curios" checked><span data-demo-i18n="map.lab.curios">奇物</span></label>
+            <label><input type="checkbox" data-layer="ecology" checked><span data-demo-i18n="map.lab.ecology">生态</span></label>
+            <label><input type="checkbox" data-layer="threats"><span data-demo-i18n="map.lab.threats">威胁</span></label>
+            <label><input type="checkbox" data-layer="actors" checked><span data-demo-i18n="map.lab.actors">Actor</span></label>
+            <label><input type="checkbox" data-layer="hazards"><span data-demo-i18n="map.lab.hazards">Hazard 锚点</span></label>
+          </fieldset>
+          <fieldset>
+            <legend data-demo-i18n="map.lab.layerDiagnostics">诊断</legend>
+            <label><input type="checkbox" data-layer="macro"><span data-demo-i18n="map.lab.macro">宏观骨架</span></label>
+            <label><input type="checkbox" data-layer="nav"><span data-demo-i18n="map.lab.nav">导航阻挡</span></label>
+            <label><input type="checkbox" data-layer="distance"><span data-demo-i18n="map.lab.distance">距离场</span></label>
+            <label><input type="checkbox" data-layer="danger"><span data-demo-i18n="map.lab.danger">危险度</span></label>
+            <label><input type="checkbox" data-layer="chunks"><span data-demo-i18n="map.lab.chunks">区块</span></label>
+            <label><input type="checkbox" data-layer="candidates"><span data-demo-i18n="map.lab.candidates">候选点</span></label>
+            <label><input type="checkbox" data-layer="reservations" checked><span data-demo-i18n="map.lab.reservations">预留圆</span></label>
+            <label><input type="checkbox" data-layer="formations" checked><span data-demo-i18n="map.lab.formations">Formation</span></label>
+            <label><input type="checkbox" data-layer="spawnOrigins" checked><span data-demo-i18n="map.lab.spawnOrigins">出生点</span></label>
+            <label><input type="checkbox" data-layer="ids"><span data-demo-i18n="map.lab.ids">ID 标签</span></label>
+          </fieldset>
         </div>
-        <div class="lab-runtime" aria-label="探索交互运行状态" data-demo-i18n-aria="map.runtimeAria">
-          <div><span data-demo-i18n="map.nodes">资源节点</span><strong id="gather-runtime">0 / 0 成熟</strong></div>
-          <div><span data-demo-i18n="map.readiness">准备度</span><strong id="discovery-runtime">0 / 100</strong></div>
-          <div><span data-demo-i18n="map.chest">场上宝箱</span><strong id="chest-runtime">—</strong></div>
-        </div>
-        <div class="lab-actions">
-          <div class="lab-action-group">
-            <span data-demo-i18n="map.nodes">资源节点</span>
-            <button id="focus-gather" type="button" data-demo-i18n="map.focusResource">定位成熟资源</button>
-            <button id="reset-gather" type="button" data-demo-i18n="map.revealResources">揭示附近资源</button>
+      </details>
+
+      <section class="map-dock" aria-label="小地图与实时诊断" data-demo-i18n-aria="map.lab.mapDock">
+        <div class="minimap-card">
+          <div class="section-heading">
+            <div><p class="section-kicker">FULL WORLD / CAMERA</p><h3 data-demo-i18n="map.lab.minimap">交互小地图</h3></div>
+            <span data-demo-i18n="map.lab.minimapHint">点击或拖动移动主视角</span>
           </div>
-          <div class="lab-action-group">
-            <span data-demo-i18n="map.chestVariants">宝箱变体</span>
-            <button id="spawn-common-chest" type="button" data-demo-i18n="map.spawnCommon">生成普通宝箱</button>
-            <button id="spawn-rare-chest" type="button" data-demo-i18n="map.spawnRare">生成稀有宝箱</button>
+          <div class="minimap-wrap">
+            <canvas id="minimap" width="600" height="360" aria-label="可交互全图小地图" data-demo-i18n-aria="map.lab.minimapAria"></canvas>
           </div>
         </div>
-        <p class="lab-hint" data-demo-i18n="map.hint">定位后点击画布中的资源或宝箱，实际走完寻路与交互链路。</p>
+        <div class="probe-card">
+          <div class="section-heading">
+            <div><p class="section-kicker">PROBE / PATH / PLACEMENT</p><h3 data-demo-i18n="map.lab.probe">实时探针</h3></div>
+          </div>
+          <div id="probe-output" class="probe-output" aria-live="polite"></div>
+          <div class="probe-actions">
+            <button id="clear-probe" type="button" data-demo-i18n="map.lab.clearProbe">清除探针</button>
+            <button id="issue-prev" type="button" data-demo-i18n="map.lab.prevIssue">上一问题</button>
+            <button id="issue-next" type="button" data-demo-i18n="map.lab.nextIssue">下一问题</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="runtime-panel">
+        <div class="metric-grid" id="runtime-metrics"></div>
+        <div class="runtime-actions">
+          <button id="verify-determinism" type="button" data-demo-i18n="map.lab.verify">确定性复验</button>
+          <button id="reset-positions" type="button" data-demo-i18n="map.lab.resetActors">复位 Actor</button>
+          <button id="export-png" type="button" data-demo-i18n="map.lab.exportPng">导出 PNG</button>
+          <button id="copy-report" type="button" data-demo-i18n="map.lab.copyReport">复制报告</button>
+          <output id="action-status" aria-live="polite"></output>
+        </div>
       </section>
 
       <div class="source-line">
         <span data-demo-i18n="common.source">生产链路</span>
-        <code>Population</code><b>&#8594;</b><code>Engagement</code><b>&#8594;</b><code>world.js</code><b>&#8594;</b><code>renderer.js</code>
+        <code>terrain.generate</code><b>→</b><code>terrain.mount / bake</code><b>→</b><code>PopulationMountPlan</code><b>→</b><code>renderer.frame</code>
       </div>
     </section>
 
-    <aside id="inspector" class="inspector" aria-label="开放世界生成与运行指标" data-demo-i18n-aria="map.inspector"></aside>
+    <aside class="inspector" aria-label="地图生成诊断检查器" data-demo-i18n-aria="map.inspector">
+      <section class="inspector-header">
+        <h2 data-demo-i18n="map.lab.inspectorTitle">生成与放置检查器</h2>
+        <p data-demo-i18n="map.lab.inspectorCopy">目录、选择对象、放置违规和结构化日志全部来自本次正式生成结果。</p>
+      </section>
+
+      <nav class="inspector-tabs" role="tablist" aria-label="检查器分页">
+        <button type="button" class="active" data-inspector-tab="selection" data-demo-i18n="map.lab.tabSelection">选择</button>
+        <button type="button" data-inspector-tab="catalog" data-demo-i18n="map.lab.tabCatalog">目录</button>
+        <button type="button" data-inspector-tab="issues" data-demo-i18n="map.lab.tabIssues">问题</button>
+        <button type="button" data-inspector-tab="logs" data-demo-i18n="map.lab.tabLogs">日志</button>
+      </nav>
+
+      <div id="selection-panel" class="inspector-panel active" data-inspector-panel="selection"></div>
+
+      <div id="catalog-panel" class="inspector-panel" data-inspector-panel="catalog">
+        <div class="catalog-filters">
+          <label><span data-demo-i18n="map.lab.scope">范围</span>
+            <select id="catalog-scope">
+              <option value="region" data-demo-i18n="map.lab.currentRegion">当前地图</option>
+              <option value="all" data-demo-i18n="map.lab.allDefinitions">全部地图定义</option>
+            </select>
+          </label>
+          <label><span data-demo-i18n="map.lab.search">搜索</span><input id="catalog-search" type="search" autocomplete="off"></label>
+          <label><span data-demo-i18n="map.lab.category">分类</span>
+            <select id="catalog-category">
+              <option value="all" data-demo-i18n="map.lab.allCategories">全部类别</option>
+              <optgroup label="单位" data-demo-i18n-label="map.lab.unitGroup">
+                <option value="monster" data-demo-i18n="map.lab.monsterCategory">普通怪物</option>
+                <option value="boss" data-demo-i18n="map.lab.bossCategory">Boss</option>
+                <option value="npc" data-demo-i18n="map.lab.npcCategory">NPC</option>
+                <option value="creature" data-demo-i18n="map.lab.creatureCategory">和平生物</option>
+                <option value="summon" data-demo-i18n="map.lab.summons">召唤物</option>
+                <option value="object" data-demo-i18n="map.lab.objects">Object</option>
+              </optgroup>
+              <optgroup label="地图内容" data-demo-i18n-label="map.lab.contentGroup">
+                <option value="resource" data-demo-i18n="map.lab.resources">可采集资源</option>
+                <option value="chest" data-demo-i18n="map.lab.chests">宝箱</option>
+                <option value="landmark" data-demo-i18n="map.lab.landmarkCategory">普通地标</option>
+                <option value="boss-lair" data-demo-i18n="map.lab.bossLairCategory">Boss 巢穴</option>
+                <option value="curio" data-demo-i18n="map.lab.curioCategory">奇物</option>
+                <option value="ecology" data-demo-i18n="map.lab.ecologyCategory">生态</option>
+                <option value="threat" data-demo-i18n="map.lab.threatCategory">威胁</option>
+                <option value="hazard-definition" data-demo-i18n="map.lab.hazardDefinitionCategory">Hazard 定义</option>
+                <option value="hazard-anchor" data-demo-i18n="map.lab.hazardAnchorCategory">Hazard 锚点</option>
+                <option value="camp" data-demo-i18n="map.lab.campCategory">营地组件</option>
+              </optgroup>
+              <optgroup label="装饰元素" data-demo-i18n-label="map.lab.decorationGroup">
+                <option value="decor-blocker" data-demo-i18n="map.lab.decorBlockerCategory">阻挡装饰</option>
+                <option value="decor-ground" data-demo-i18n="map.lab.decorGroundCategory">地表装饰</option>
+                <option value="decor-water" data-demo-i18n="map.lab.decorWaterCategory">水域装饰</option>
+                <option value="decor-boss" data-demo-i18n="map.lab.decorBossCategory">Boss 领地装饰</option>
+                <option value="tuft" data-demo-i18n="map.lab.tuftCategory">草簇</option>
+                <option value="flower" data-demo-i18n="map.lab.flowerCategory">花朵</option>
+                <option value="material" data-demo-i18n="map.lab.materialCategory">地形材质</option>
+              </optgroup>
+            </select>
+          </label>
+        </div>
+        <div id="catalog-summary" class="catalog-summary"></div>
+        <div id="catalog-list" class="catalog-list"></div>
+      </div>
+
+      <div id="issues-panel" class="inspector-panel" data-inspector-panel="issues"></div>
+
+      <div id="logs-panel" class="inspector-panel" data-inspector-panel="logs">
+        <div class="log-actions">
+          <button id="clear-log" type="button" data-demo-i18n="map.lab.clearLog">清空日志</button>
+        </div>
+        <ol id="log-list" class="log-list"></ol>
+      </div>
+    </aside>
   </main>
 </div>
 
-<script src="../../js/core/utils.js?v=20260730.8"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260730.8"></script>
-<script src="../../js/core/eventbus.js?v=20260730.8"></script>
-<script src="../../js/core/registry.js?v=20260730.8"></script>
-<script src="../../js/i18n/i18n.js?v=20260730.8"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260730.8"></script>
-<script src="../../js/i18n/en.js?v=20260730.8"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260730.8"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260730.8"></script>
-<script src="../../js/core/assets.js?v=20260730.8"></script>
-<script src="../../js/data/formulas.js?v=20260730.8"></script>
-<script src="../../js/sprites/palettes.js?v=20260730.8"></script>
-<script src="../../js/sprites/hero.js?v=20260730.8"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260730.8"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260730.8"></script>
-<script src="../../js/sprites/monsters_expansion.js?v=20260730.8"></script>
-<script src="../../js/sprites/props.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260730.8"></script>
-<script src="../../js/sprites/boss_landmarks.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration_v3.manifest.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260730.8"></script>
-<script src="../../js/sprites/flora.js?v=20260730.8"></script>
-<script src="../../js/sprites/minimap_icons.js?v=20260730.8"></script>
-<script src="../../js/data/affixes.js?v=20260730.8"></script>
-<script src="../../js/data/items.js?v=20260730.8"></script>
-<script src="../../js/data/classes.js?v=20260730.8"></script>
-<script src="../../js/data/skills.js?v=20260730.8"></script>
-<script src="../../js/data/routes.js?v=20260730.8"></script>
-<script src="../../js/core/content/rules.js?v=20260730.8"></script>
-<script src="../../js/core/content/schemas.js?v=20260730.8"></script>
-<script src="../../js/core/content/compiler.js?v=20260730.8"></script>
-<script src="../../js/core/content/audit.js?v=20260730.8"></script>
-<script src="../../js/core/content/registry.js?v=20260730.8"></script>
-<script src="../../js/core/content/support.js?v=20260730.8"></script>
-<script src="../../js/data/content/content.generated.js?v=20260730.8"></script>
-<script src="../../js/systems/routes.js?v=20260730.8"></script>
-<script src="../../js/systems/state.js?v=20260730.8"></script>
-<script src="../../js/systems/terrain.js?v=20260730.8"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260730.8"></script>
-<script src="../../js/systems/nav.js?v=20260730.8"></script>
-<script src="../../js/systems/inventory.js?v=20260730.8"></script>
-<script src="../../js/systems/items.js?v=20260730.8"></script>
-<script src="../../js/systems/actors/relations.js?v=20260730.8"></script>
-<script src="../../js/systems/actors/parties.js?v=20260730.8"></script>
-<script src="../../js/systems/actors/roster.js?v=20260730.8"></script>
-<script src="../../js/systems/actors/actors.js?v=20260730.8"></script>
-<script src="../../js/systems/world_population.js?v=20260730.8"></script>
-<script src="../../js/systems/encounters.js?v=20260730.8"></script>
-<script src="../../js/systems/engagement.js?v=20260730.8"></script>
-<script src="../../js/systems/combat_ai.js?v=20260730.8"></script>
-<script src="../../js/systems/combat.js?v=20260730.8"></script>
-<script src="../../js/systems/hazards.js?v=20260730.8"></script>
-<script src="../../js/systems/combat_estimator.js?v=20260730.8"></script>
-<script src="../../js/systems/automation.js?v=20260730.8"></script>
-<script src="../../js/systems/environment.js?v=20260730.8"></script>
-<script src="../../js/systems/exploration.js?v=20260730.8"></script>
-<script src="../../js/systems/expedition.js?v=20260730.8"></script>
-<script src="../../js/systems/action_bubbles.js?v=20260730.8"></script>
-<script src="../../js/systems/expedition_ai.js?v=20260730.8"></script>
-<script src="../../js/systems/world.js?v=20260730.8"></script>
-<script src="../../js/systems/trade.js?v=20260730.8"></script>
-<script src="../../js/render/terrain.js?v=20260730.8"></script>
-<script src="../../js/render/exploration.js?v=20260730.8"></script>
-<script src="../../js/render/particles.js?v=20260730.8"></script>
-<script src="../../js/render/daynight.js?v=20260730.8"></script>
-<script src="../../js/render/effects.js?v=20260730.8"></script>
-<script src="../../js/render/combat_presentation.js?v=20260730.8"></script>
-<script src="../../js/render/hazards.js?v=20260730.8"></script>
-<script src="../../js/render/renderer.js?v=20260730.8"></script>
-<script src="../../js/ui/modals.js?v=20260730.8"></script>
-<script src="../demo-i18n.js?v=20260730.8"></script>
-<script src="map-effects.js?v=20260730.8"></script>
+<script src="../../js/core/utils.js?v=20260730.11"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260730.11"></script>
+<script src="../../js/core/eventbus.js?v=20260730.11"></script>
+<script src="../../js/core/registry.js?v=20260730.11"></script>
+<script src="../../js/i18n/i18n.js?v=20260730.11"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260730.11"></script>
+<script src="../../js/i18n/en.js?v=20260730.11"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260730.11"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260730.11"></script>
+<script src="../../js/core/assets.js?v=20260730.11"></script>
+<script src="../../js/data/formulas.js?v=20260730.11"></script>
+<script src="../../js/sprites/palettes.js?v=20260730.11"></script>
+<script src="../../js/sprites/hero.js?v=20260730.11"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260730.11"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260730.11"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260730.11"></script>
+<script src="../../js/sprites/props.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260730.11"></script>
+<script src="../../js/sprites/boss_landmarks.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration_v3.manifest.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260730.11"></script>
+<script src="../../js/sprites/flora.js?v=20260730.11"></script>
+<script src="../../js/sprites/minimap_icons.js?v=20260730.11"></script>
+<script src="../../js/data/affixes.js?v=20260730.11"></script>
+<script src="../../js/data/items.js?v=20260730.11"></script>
+<script src="../../js/data/classes.js?v=20260730.11"></script>
+<script src="../../js/data/skills.js?v=20260730.11"></script>
+<script src="../../js/data/routes.js?v=20260730.11"></script>
+<script src="../../js/core/content/rules.js?v=20260730.11"></script>
+<script src="../../js/core/content/schemas.js?v=20260730.11"></script>
+<script src="../../js/core/content/compiler.js?v=20260730.11"></script>
+<script src="../../js/core/content/audit.js?v=20260730.11"></script>
+<script src="../../js/core/content/registry.js?v=20260730.11"></script>
+<script src="../../js/core/content/support.js?v=20260730.11"></script>
+<script src="../../js/data/content/content.generated.js?v=20260730.11"></script>
+<script src="../../js/systems/routes.js?v=20260730.11"></script>
+<script src="../../js/systems/state.js?v=20260730.11"></script>
+<script src="../../js/systems/terrain.js?v=20260730.11"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260730.11"></script>
+<script src="../../js/systems/nav.js?v=20260730.11"></script>
+<script src="../../js/systems/actors/relations.js?v=20260730.11"></script>
+<script src="../../js/systems/actors/parties.js?v=20260730.11"></script>
+<script src="../../js/systems/actors/roster.js?v=20260730.11"></script>
+<script src="../../js/systems/actors/actors.js?v=20260730.11"></script>
+<script src="../../js/systems/world_population.js?v=20260730.11"></script>
+<script src="../../js/systems/world.js?v=20260730.11"></script>
+<script src="../../js/render/terrain.js?v=20260730.11"></script>
+<script src="../../js/render/particles.js?v=20260730.11"></script>
+<script src="../../js/render/daynight.js?v=20260730.11"></script>
+<script src="../../js/render/effects.js?v=20260730.11"></script>
+<script src="../../js/render/renderer.js?v=20260730.11"></script>
+<script src="../demo-i18n.js?v=20260730.11"></script>
+<script src="map-effects.js?v=20260730.11"></script>
 </body>
 </html>

@@ -864,8 +864,13 @@
       var viewL = cam.x - cw / z / 2 - 8, viewR = cam.x + cw / z / 2 + 8;
       var viewT = cam.y - ch / z / 2 - 8, viewB = cam.y + ch / z / 2 + 8;
 
-      Game.terrain.drawGround(ctx, viewL, viewT, viewR, viewB);
-      Game.terrain.drawLiquid(ctx, viewL, viewT, viewR, viewB);
+      var terrainLayers = Game.terrain.renderLayers || {};
+      if (terrainLayers.material !== false) {
+        Game.terrain.drawGround(ctx, viewL, viewT, viewR, viewB);
+      }
+      if (terrainLayers.liquid !== false) {
+        Game.terrain.drawLiquid(ctx, viewL, viewT, viewR, viewB);
+      }
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
       if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB, t);

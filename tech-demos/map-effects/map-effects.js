@@ -4,649 +4,2139 @@
 
   var U = Game.util;
   var D = DemoI18n;
+  var C = Game.contentCompiler;
   var regions = [];
   var currentIndex = 0;
-  var paused = false;
-  var timeMode = 'cycle';
+  var layout = null;
+  var region = null;
+  var validation = null;
+  var populationPlan = null;
+  var populationContext = null;
+  var actors = [];
+  var masters = {};
+  var catalogItems = [];
+  var auditIssues = [];
+  var logs = [];
+  var selected = null;
+  var tool = 'inspect';
+  var measureState = { a: null, b: null, path: null, report: null };
+  var probeState = null;
+  var candidateInspection = null;
+  var issueIndex = -1;
+  var motion = false;
+  var motionAccumulator = 0;
+  var actorOrigins = {};
+  var actorRng = {};
+  var recentSeeds = [];
+  var generationRecord = null;
+  var miniTerrain = null;
+  var spatialQueries = 0;
+  var frameSamples = [];
   var lastFrame = performance.now();
-  var lastRuntimeUpdate = 0;
-  var qaRestoreAuto = false;
-  var explorationMessage = '';
+  var lastMetricsPaint = 0;
+  var overlay = document.getElementById('stage-overlay');
+  var overlayCtx = overlay.getContext('2d');
+  var minimap = document.getElementById('minimap');
+  var minimapCtx = minimap.getContext('2d');
+  var stageWrap = document.getElementById('stage-wrap');
+  var stagePointers = {};
+  var miniDrag = false;
+  var layers = {};
 
-  function tr(key, vars) { return D.t('map.inspector.' + key, vars); }
+  var copy = function (value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  };
+  var now = function () { return performance.now(); };
+  var esc = function (value) { return U.esc(String(value)); };
+  var clamp = U.clamp;
+  var localeText = {
+    'zh-CN': {
+      ready: '生成完成', generating: '正在生成', none: '尚未选择对象',
+      inspectHint: '在主地图点击位置，检查材质、导航与最近对象。',
+      measureHint: '依次点击 A / B 点，使用正式导航求解路径。',
+      placementHint: '选择 SpawnProfile 后，在主地图点击候选位置。',
+      terrain: '地形', population: 'Population', actor: 'Actor', audit: '审计',
+      generation: '生成', bake: '烘焙', materialize: '实例化', renderer: '渲染',
+      pass: '通过', fail: '拒绝', issues: '问题', noIssues: '本次放置审计未发现问题。',
+      definitions: '定义', placed: '已放置', selected: '选中对象', details: '详细信息',
+      copied: '已复制', reset: 'Actor 已精确复位', verified: '确定性复验通过',
+      mismatch: '确定性复验不一致', png: '已导出主画布 PNG',
+      noPath: '正式导航未找到路径', catalog: '目录项', logCleared: '日志已清空',
+      instances: '当前实例', currentMapScope: '当前地图', allMapsScope: '全部地图定义'
+    },
+    en: {
+      ready: 'Generation complete', generating: 'Generating', none: 'No object selected',
+      inspectHint: 'Click the main map to inspect material, navigation and nearby objects.',
+      measureHint: 'Click A then B to solve a route with production navigation.',
+      placementHint: 'Choose a SpawnProfile and click a candidate position.',
+      terrain: 'Terrain', population: 'Population', actor: 'Actor', audit: 'Audit',
+      generation: 'Generate', bake: 'Bake', materialize: 'Materialize', renderer: 'Render',
+      pass: 'Pass', fail: 'Rejected', issues: 'Issues', noIssues: 'No placement issues found.',
+      definitions: 'definitions', placed: 'placed', selected: 'Selection', details: 'Details',
+      copied: 'Copied', reset: 'Actor positions restored exactly', verified: 'Determinism verified',
+      mismatch: 'Determinism mismatch', png: 'Main canvas PNG exported',
+      noPath: 'Production navigation found no route', catalog: 'catalog items', logCleared: 'Log cleared',
+      instances: 'current instances', currentMapScope: 'current map', allMapsScope: 'all map definitions'
+    }
+  };
 
-  function idName(group, id) {
-    var key = 'map.inspector.' + group + '.' + id;
-    var value = D.t(key);
-    return value === key ? id : value;
-  }
-
-  function esc(value) { return U.esc(String(value)); }
-  function regionName(region) { return Game.i18n.t('region.' + region.id + '.name'); }
-  function contentName(item) {
-    if (!item) return tr('none');
-    var fallback = item.defId || item.id || tr('none');
-    if (!item.nameKey) return fallback;
-    var value = Game.i18n.t(item.nameKey);
-    return value === item.nameKey ? fallback : value;
-  }
-  function materialName(id) {
-    var key = 'material.' + id;
-    var value = Game.i18n.t(key);
-    return value === key ? idName('material', id) : value;
-  }
-  function monsterName(id) {
-    var key = 'monster.' + id + '.name';
-    var value = Game.i18n.t(key);
-    return value === key ? id : value;
-  }
-  function unique(values) {
-    return values.filter(function (value, index) { return values.indexOf(value) === index; });
-  }
-  function range(values, digits) {
-    if (!values.length) return tr('none');
-    var min = Math.min.apply(Math, values), max = Math.max.apply(Math, values);
-    var format = function (value) { return digits === undefined ? String(value) : value.toFixed(digits); };
-    return format(min) + (min === max ? '' : '–' + format(max));
-  }
-
-  function queryParams() {
-    try { return new URLSearchParams(location.search); } catch (_) { return new URLSearchParams(); }
-  }
-
-  function parseSeed(value) {
-    value = String(value || '').trim();
-    if (!/^[0-9a-f]{1,8}$/i.test(value)) return null;
-    return parseInt(value, 16) >>> 0;
-  }
-
-  function updateUrl(regionId) {
-    if (location.protocol === 'file:') return;
-    var url = new URL(location.href);
-    url.searchParams.set('seed', U.hex32(Game.state.world.worldSeed));
-    url.searchParams.set('region', regionId);
-    url.searchParams.set('lang', D.locale());
-    history.replaceState(null, '', url.href);
+  function lt(key) {
+    var table = localeText[D.locale()] || localeText['zh-CN'];
+    return table[key] || key;
   }
 
-  function trait(label, cls) {
-    return '<span class="trait' + (cls ? ' ' + cls : '') + '">' + esc(label) + '</span>';
-  }
-
-  function inspectorAttrs(kind, id) {
-    return (kind ? ' data-inspector-kind="' + esc(kind) + '"' : '') +
-      (id ? ' data-inspector-id="' + esc(id) + '"' : '');
-  }
-
-  function spriteRow(sprite, name, traits, kind, id) {
-    return '<div class="sprite-row"' + inspectorAttrs(kind, id) + '>' +
-      '<canvas class="sprite-preview" width="40" height="40" data-sprite="' + esc(sprite) + '"></canvas>' +
-      '<div class="sprite-copy"><strong>' + esc(name) + '</strong><small>' + esc(sprite) + '</small></div>' +
-      '<div class="trait-list">' + traits + '</div></div>';
-  }
-
-  function configRow(label, value, raw, kind, id, runtimeField) {
-    return '<div class="config-row"' + inspectorAttrs(kind, id) + '><span>' + esc(label) + '</span><div>' +
-      '<span class="config-value"' + (runtimeField ? ' data-inspector-runtime="' + esc(runtimeField) + '"' : '') + '>' + esc(value) + '</span>' +
-      (raw ? '<div class="raw-id">' + esc(raw) + '</div>' : '') + '</div></div>';
-  }
-
-  function metric(value, label, id) {
-    return '<div class="metric"><strong' + (id ? ' id="' + id + '"' : '') + '>' + esc(value) +
-      '</strong><span>' + esc(label) + '</span></div>';
-  }
-
-  function catalogGroup(title, rows, kind) {
-    return '<div class="catalog-group" data-inspector-group="' + esc(kind) + '"><h4>' + esc(title) +
-      '</h4><div class="sprite-list">' + rows + '</div></div>';
-  }
-
-  function translatedGameValue(key, fallback) {
+  function nameFromKey(key, fallback) {
+    if (!key) return fallback;
     var value = Game.i18n.t(key);
     return value === key ? fallback : value;
   }
 
-  function renderTabs() {
-    document.getElementById('region-tabs').innerHTML = regions.map(function (region, index) {
-      return '<button class="region-tab' + (index === currentIndex ? ' active' : '') + '" type="button" data-region-index="' + index + '"' +
-        (index === currentIndex ? ' aria-current="page"' : '') + '><small>' + String(index + 1).padStart(2, '0') +
-        ' / ' + esc(tr('tier').toUpperCase()) + ' ' + region.tier + '</small>' + esc(regionName(region)) + '</button>';
+  function regionName(value) {
+    return nameFromKey('region.' + value.id + '.name', value.id);
+  }
+
+  function actorName(definition) {
+    return nameFromKey(definition && definition.identity && definition.identity.nameKey, definition && definition.id || 'actor');
+  }
+
+  function log(phase, message, data, level) {
+    logs.push({
+      at: new Date().toISOString(),
+      phase: phase,
+      level: level || 'info',
+      message: message,
+      data: data === undefined ? null : copy(data)
+    });
+    if (logs.length > 240) logs.splice(0, logs.length - 240);
+    renderLogs();
+  }
+
+  function hash(value) {
+    return U.fnv1a(JSON.stringify(value));
+  }
+
+  function parseSeed(value) {
+    var clean = String(value || '').trim().replace(/^0x/i, '');
+    if (!/^[0-9a-f]{1,8}$/i.test(clean)) return null;
+    return parseInt(clean, 16) >>> 0;
+  }
+
+  function seedValue() {
+    return parseSeed(document.getElementById('seed-input').value);
+  }
+
+  function rememberSeed(seed) {
+    recentSeeds = [seed].concat(recentSeeds.filter(function (entry) { return entry !== seed; })).slice(0, 7);
+    renderSeedHistory();
+  }
+
+  function renderSeedHistory() {
+    var host = document.getElementById('seed-history');
+    if (!host) {
+      host = document.createElement('div');
+      host.id = 'seed-history';
+      host.className = 'seed-history';
+      document.getElementById('seed-form').insertAdjacentElement('afterend', host);
+    }
+    host.innerHTML = recentSeeds.map(function (seed) {
+      return '<button type="button" data-recent-seed="' + U.hex32(seed) + '">0x' + U.hex32(seed) + '</button>';
     }).join('');
   }
 
-  function renderInspector(region) {
-    var layout = Game.world.layout;
-    var report = Game.terrain.validate(layout, region);
-    var metrics = report.metrics;
-    var cfg = region.exploration;
-    var props = layout.props || [];
-    var blockerProps = props.filter(function (item) { return item.blockerProp; }).length;
-    var ai = Game.expeditionAI.intent();
-    var expedition = Game.expedition.current(region.id);
-    var modifiers = Game.expedition.currentModifier(region.id);
-    var summary = Game.collection.regionSummary(region.id);
-    var ready = summary.readiness;
-    var activeEcology = expedition.activeEcology || [];
-    var resourceRows = cfg.resources.map(function (def) {
-      var nodes = layout.nodes.filter(function (node) { return node.defId === def.id; });
-      var cooldowns = nodes.map(function (node) { return node.cooldown; });
-      return spriteRow(def.sprite, materialName(def.material),
-        trait(tr('count') + ' ' + nodes.length) +
-        trait(tr('cooldown') + ' ' + range(cooldowns) + ' ' + tr('seconds')) +
-        trait(def.rarity === 'rare' ? tr('rare') : tr('common'), def.rarity === 'rare' ? 'accent' : ''),
-        'resource', def.id);
-    }).join('');
-    var landmarkRows = layout.landmarks.map(function (item) {
-      var role = item.bossLair ? 'boss' : item.function;
-      return spriteRow(item.sprite, contentName(item), trait(idName('function', role), item.bossLair ? 'boss' : ''),
-        'landmark', item.defId);
-    }).join('');
-    var curioRows = layout.curios.map(function (item) {
-      var choices = (item.choices || []).map(function (id) {
-        return translatedGameValue('explore.curio.' + id, id);
-      }).join(' / ');
-      return spriteRow(item.sprite, contentName(item), trait(tr('choices') + ' ' + choices), 'curio', item.defId);
-    }).join('');
-    var ecologyRows = layout.ecology.map(function (item) {
-      var active = activeEcology.indexOf(item.defId) >= 0;
-      return spriteRow(item.sprite, contentName(item), trait(active ? tr('active') : tr('inactive'), active ? 'accent' : ''),
-        'ecology', item.defId);
-    }).join('');
-    var threatBuckets = {};
-    layout.threats.forEach(function (item) {
-      (threatBuckets[item.defId] = threatBuckets[item.defId] || []).push(item);
+  function setStatus(message) {
+    document.getElementById('action-status').textContent = message || '';
+  }
+
+  function updateUrl() {
+    if (location.protocol === 'file:') return;
+    var url = new URL(location.href);
+    url.searchParams.set('region', region.id);
+    url.searchParams.set('seed', U.hex32(layout.worldSeed));
+    history.replaceState(null, '', url.href);
+  }
+
+  function contentPoint(item, kind) {
+    return {
+      key: kind + ':' + (item.id || item.defId || item.sprite || item.x + ':' + item.y),
+      kind: kind,
+      id: item.id || item.defId || item.sprite || kind,
+      name: item.nameKey ? nameFromKey(item.nameKey, item.defId || item.id) : (item.defId || item.id || item.sprite || kind),
+      sprite: item.sprite || null,
+      x: item.x,
+      y: item.y,
+      data: item
+    };
+  }
+
+  function liveActorPoint(actor) {
+    var definition = Game.content.get('actorArchetype', actor.blueprint.archetypeId);
+    return {
+      key: 'actor:' + actor.id,
+      kind: 'actor',
+      id: actor.id,
+      name: actorName(definition),
+      sprite: actor.components.presentation.spriteId,
+      x: actor.x,
+      y: actor.y,
+      data: actor,
+      category: actor.category,
+      rank: actor.rank
+    };
+  }
+
+  function allWorldPoints() {
+    if (!layout) return [];
+    var out = actors.map(liveActorPoint);
+    out.push(contentPoint({ id: 'camp', x: layout.camp.x, y: layout.camp.y }, 'camp'));
+    (masters.landmarks || []).forEach(function (item) { out.push(contentPoint(item, item.bossLair ? 'lair' : 'landmark')); });
+    (masters.nodes || []).forEach(function (item) { out.push(contentPoint(item, 'resource')); });
+    (masters.curios || []).forEach(function (item) { out.push(contentPoint(item, 'curio')); });
+    (masters.ecology || []).forEach(function (item) { out.push(contentPoint(item, 'ecology')); });
+    (layout.hazardAnchors || []).forEach(function (item, index) {
+      out.push(contentPoint(Object.assign({ id: 'hazard-anchor-' + index }, item), 'hazard'));
     });
-    var threatRows = Object.keys(threatBuckets).map(function (id) {
-      var bucket = threatBuckets[id];
-      var affixes = unique(bucket.map(function (item) {
-        return expedition.threatAffixes[item.id] || item.affix;
-      }));
-      var monsterIds = unique(bucket.map(function (item) { return item.monster; }));
-      var details = tr('count') + ' ' + bucket.length + ' · ' + tr('danger') + ' ' +
-        range(bucket.map(function (item) { return item.danger; }), 2) + ' · ' + tr('radius') + ' ' +
-        range(bucket.map(function (item) { return item.radius; })) + ' px · ' + tr('affixes') + ' ' +
-        affixes.map(function (affix) { return idName('affix', affix); }).join(', ') + ' · ' +
-        tr('monsterSet') + ' ' + monsterIds.map(monsterName).join(', ');
-      return configRow(contentName(bucket[0]), details,
-        bucket.map(function (item) { return item.id; }).join(', '), 'threat', id);
-    }).join('');
-    var guardian = layout.guardian;
-    var guardianRows = spriteRow(guardian.sprite || 'exp_guardian_mark', contentName(guardian),
-      trait(tr('guardian'), 'accent') + trait(monsterName(guardian.monster)), 'guardian', guardian.id);
+    return out;
+  }
 
-    var materialIds = unique([region.terrain.base.mat].concat(region.terrain.patches.map(function (patch) { return patch.mat; })));
-    var decorRows = region.terrain.deco.map(function (def) {
-      var actual = props.filter(function (prop) { return prop.sprite === def.sprite && !prop.campProp; }).length;
-      return spriteRow(def.sprite, def.sprite,
-        trait(tr('actual') + ' ' + actual, actual ? 'accent' : 'boss') +
-        trait(tr('configured') + ' ' + def.count) + trait(idName('role', def.placement)),
-        'decoration', def.sprite);
-    }).join('');
-    var parallaxRows = region.parallax.map(function (layer, index) {
-      return configRow(idName('parallax', layer.type), '×' + layer.factor,
-        layer.type + (layer.y === undefined ? '' : ' / y ' + layer.y), 'parallax', String(index));
-    }).join('');
+  function nearestObject(x, y, maxDistance) {
+    var best = null;
+    allWorldPoints().forEach(function (item) {
+      var distance = U.dist(x, y, item.x, item.y);
+      if ((!best || distance < best.distance) && (maxDistance === undefined || distance <= maxDistance)) {
+        best = { item: item, distance: distance };
+      }
+    });
+    return best;
+  }
 
-    var monsterRows = region.monsters.map(function (id) {
-      var def = Game.reg.get('monster', id);
-      return spriteRow(def && def.sprite || id, monsterName(id), trait(tr('monster')), 'monster', id);
-    }).join('') + spriteRow(region.boss, monsterName(region.boss), trait(tr('boss'), 'boss'), 'boss', region.boss);
-    var regionProfile = Game.content.get('regionProfile', region.id);
-    var population = regionProfile &&
-      Game.content.populationView(regionProfile.populationProfileId);
-    var populationRows = population ? Object.keys(population.channels).sort().map(function (channel) {
-      var definition = population.channels[channel];
-      var refs = definition.spawnRefs.map(function (entry) {
-        return entry.profileId + ' [' + entry.mode + ']';
+  function cameraBounds(x, y, zoom) {
+    if (!layout) return { x: x, y: y };
+    var width = stageWrap.clientWidth / zoom;
+    var height = stageWrap.clientHeight / zoom;
+    return {
+      x: clamp(x, Math.min(layout.world.w / 2, width / 2), Math.max(layout.world.w / 2, layout.world.w - width / 2)),
+      y: clamp(y, Math.min(layout.world.h / 2, height / 2), Math.max(layout.world.h / 2, layout.world.h - height / 2))
+    };
+  }
+
+  function setCamera(x, y, zoom) {
+    if (!layout) return null;
+    var cam = Game.render.cam;
+    zoom = clamp(Number.isFinite(zoom) ? zoom : cam.zoom, 0.4, 3.4);
+    var point = cameraBounds(Number(x), Number(y), zoom);
+    cam.x = point.x;
+    cam.y = point.y;
+    cam.zoom = zoom;
+    updateCameraStatus();
+    drawMinimap();
+    return copy(cam);
+  }
+
+  function focus(target) {
+    var point = null;
+    if (target === 'camp') point = layout && layout.camp;
+    else if (target === 'boss' || target === 'lair') point = layout && layout.bossPoint;
+    else if (target === 'reset') point = layout && { x: layout.world.w / 2, y: layout.world.h / 2, zoom: 1.1 };
+    else if (target === 'selected') point = selected;
+    else if (typeof target === 'string') {
+      point = allWorldPoints().filter(function (item) { return item.id === target || item.key === target; })[0];
+    } else if (target && Number.isFinite(target.x)) point = target;
+    if (!point) return null;
+    setCamera(point.x, point.y, point.zoom || Math.max(1.4, Game.render.cam.zoom));
+    if (point.key) selectObject(point);
+    return { x: point.x, y: point.y, zoom: Game.render.cam.zoom };
+  }
+
+  function worldToScreen(point) {
+    var cam = Game.render.cam;
+    return {
+      x: stageWrap.clientWidth / 2 + (point.x - cam.x) * cam.zoom,
+      y: stageWrap.clientHeight / 2 + (point.y - cam.y) * cam.zoom
+    };
+  }
+
+  function screenToWorld(x, y) {
+    var cam = Game.render.cam;
+    return {
+      x: cam.x + (x - stageWrap.clientWidth / 2) / cam.zoom,
+      y: cam.y + (y - stageWrap.clientHeight / 2) / cam.zoom
+    };
+  }
+
+  function resizeOverlay() {
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var width = Math.max(1, stageWrap.clientWidth);
+    var height = Math.max(1, stageWrap.clientHeight);
+    if (overlay.width !== Math.round(width * dpr) || overlay.height !== Math.round(height * dpr)) {
+      overlay.width = Math.round(width * dpr);
+      overlay.height = Math.round(height * dpr);
+    }
+    overlayCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    overlayCtx.imageSmoothingEnabled = false;
+  }
+
+  function drawCircle(point, radius, color, fill) {
+    var screen = worldToScreen(point);
+    overlayCtx.beginPath();
+    overlayCtx.arc(screen.x, screen.y, Math.max(2, radius * Game.render.cam.zoom), 0, Math.PI * 2);
+    if (fill) {
+      overlayCtx.fillStyle = fill;
+      overlayCtx.fill();
+    }
+    overlayCtx.strokeStyle = color;
+    overlayCtx.lineWidth = 1;
+    overlayCtx.stroke();
+  }
+
+  function drawWorldLine(points, color, width, dashed) {
+    if (!points || !points.length) return;
+    overlayCtx.save();
+    overlayCtx.strokeStyle = color;
+    overlayCtx.lineWidth = width || 2;
+    overlayCtx.setLineDash(dashed || []);
+    overlayCtx.beginPath();
+    points.forEach(function (point, index) {
+      var screen = worldToScreen(point);
+      if (!index) overlayCtx.moveTo(screen.x, screen.y);
+      else overlayCtx.lineTo(screen.x, screen.y);
+    });
+    overlayCtx.stroke();
+    overlayCtx.restore();
+  }
+
+  function visibleGridRange(nav) {
+    var topLeft = screenToWorld(0, 0);
+    var bottomRight = screenToWorld(stageWrap.clientWidth, stageWrap.clientHeight);
+    return {
+      left: clamp(Math.floor(topLeft.x / nav.cell), 0, nav.w - 1),
+      top: clamp(Math.floor(topLeft.y / nav.cell), 0, nav.h - 1),
+      right: clamp(Math.ceil(bottomRight.x / nav.cell), 0, nav.w - 1),
+      bottom: clamp(Math.ceil(bottomRight.y / nav.cell), 0, nav.h - 1)
+    };
+  }
+
+  function drawGridLayer(kind) {
+    if (!layout || !layout.nav) return;
+    var nav = layout.nav;
+    var range = visibleGridRange(nav);
+    var zoom = Game.render.cam.zoom;
+    var size = Math.ceil(nav.cell * zoom) + 1;
+    for (var y = range.top; y <= range.bottom; y++) {
+      for (var x = range.left; x <= range.right; x++) {
+        var value;
+        if (kind === 'nav') value = nav.grid[y][x] ? 0 : 1;
+        else if (kind === 'distance') value = clamp((nav.distance[y][x] || 0) / 7, 0, 1);
+        else value = clamp(nav.danger[y][x] || 0, 0, 1);
+        if (kind !== 'nav' && value <= 0.02) continue;
+        if (kind === 'nav' && !value) continue;
+        var screen = worldToScreen({ x: x * nav.cell, y: y * nav.cell });
+        overlayCtx.fillStyle = kind === 'nav'
+          ? 'rgba(224,72,62,.30)'
+          : kind === 'distance'
+            ? 'rgba(78,193,211,' + (value * 0.35).toFixed(3) + ')'
+            : 'rgba(238,126,54,' + (value * 0.38).toFixed(3) + ')';
+        overlayCtx.fillRect(Math.floor(screen.x), Math.floor(screen.y), size, size);
+      }
+    }
+  }
+
+  function drawOverlay() {
+    resizeOverlay();
+    overlayCtx.clearRect(0, 0, stageWrap.clientWidth, stageWrap.clientHeight);
+    if (!layout) return;
+    if (layers.nav) drawGridLayer('nav');
+    if (layers.distance) drawGridLayer('distance');
+    if (layers.danger) drawGridLayer('danger');
+    if (layers.chunks) {
+      var chunk = layout.spatial && layout.spatial.cell || 192;
+      overlayCtx.strokeStyle = 'rgba(208,203,120,.35)';
+      overlayCtx.lineWidth = 1;
+      for (var cx = 0; cx <= layout.world.w; cx += chunk) {
+        drawWorldLine([{ x: cx, y: 0 }, { x: cx, y: layout.world.h }], 'rgba(208,203,120,.35)', 1, [3, 3]);
+      }
+      for (var cy = 0; cy <= layout.world.h; cy += chunk) {
+        drawWorldLine([{ x: 0, y: cy }, { x: layout.world.w, y: cy }], 'rgba(208,203,120,.35)', 1, [3, 3]);
+      }
+    }
+    if (layers.macro && layout.macro) {
+      (layout.macro.edges || []).forEach(function (edge) {
+        var a = layout.macro.centers[edge.a], b = layout.macro.centers[edge.b];
+        if (a && b) drawWorldLine([a, b], '#68c9c4', 2);
       });
-      return configRow(
-        channel,
-        refs.join(' / ') || tr('none'),
-        tr('capacity') + ' ' + definition.capacity + ' / ' +
-          tr('selection') + ' ' + definition.selection,
-        'population-channel',
-        channel
-      );
-    }).join('') : configRow(tr('population'), tr('none'));
-    var mountPlan = Game.population.mountPlan();
-    if (mountPlan && mountPlan.regionId !== region.id) mountPlan = null;
-    var mountPlanRows = mountPlan ? configRow(
-      mountPlan.populationId,
-      tr('reservations') + ' ' + mountPlan.reservations.length + ' / ' +
-        tr('failures') + ' ' + mountPlan.failures.length,
-      tr('layout') + ' v' + mountPlan.layoutVersion + ' / ' + mountPlan.contentFingerprint,
-      'population-mount-plan', mountPlan.populationId
-    ) : configRow(tr('mountPlan'), tr('none'));
-    var reservationRows = mountPlan && mountPlan.reservations.length
-      ? mountPlan.reservations.map(function (reservation) {
-        var slot = mountPlan.slots.filter(function (entry) {
-          return entry.id === reservation.slotId;
-        })[0];
-        var runtime = mountPlan.runtime && mountPlan.runtime[reservation.slotId];
-        return configRow(
-          slot && slot.profileId || reservation.slotId,
-          (slot && slot.layoutSlotKey || tr('none')) + ' @ ' +
-            Math.round(reservation.x) + ', ' + Math.round(reservation.y),
-          (slot && slot.channel || tr('none')) + ' / ' +
-            (runtime && runtime.state || 'planned') + ' / ' +
-            tr('radius') + ' ' + reservation.occupancyRadius,
-          'population-reservation', reservation.slotId
-        );
-      }).join('') : configRow(tr('reservations'), tr('none'));
-    var failureRows = mountPlan && mountPlan.failures.length
-      ? mountPlan.failures.map(function (failure) {
-        return configRow(
-          failure.profileId,
-          failure.reason,
-          failure.channel + ' / ' + failure.onFailure,
-          'population-failure', failure.profileId + ':' + failure.ordinal
-        );
-      }).join('') : configRow(tr('failures'), tr('none'));
-    var respawnRows = mountPlan && mountPlan.respawnSchedules.length
-      ? mountPlan.respawnSchedules.map(function (schedule) {
-        var timing = schedule.mode === 'worldTime'
-          ? schedule.eligibleAtWorldTime
-          : Math.max(0, schedule.remaining).toFixed(1) + 's';
-        return configRow(
-          schedule.profileId,
-          schedule.spawnId + ' @' + schedule.generation,
-          schedule.mode + ' / ' + timing,
-          'population-respawn', schedule.spawnId
-        );
-      }).join('') : configRow(tr('respawns'), tr('none'));
-    var leaseRows = Game.population.leases().filter(function (lease) {
-      return lease.context && lease.context.regionId === region.id;
-    }).map(function (lease) {
-      return configRow(
-        lease.profileId,
-        lease.spawnId + ' @' + lease.generation,
-        lease.actorIds.join(', '),
-        'spawn-lease',
-        lease.spawnId
-      );
-    }).join('') || configRow(tr('leases'), tr('none'));
-
-    var anomalyNames = expedition.anomalies.map(function (id) { return idName('anomaly', id); });
-    var activeEcologyNames = activeEcology.map(function (id) {
-      var item = layout.ecology.filter(function (entry) { return entry.defId === id; })[0];
-      return item ? contentName(item) : id;
+      (layout.macro.centers || []).forEach(function (center) { drawCircle(center, 5, '#f0df79', 'rgba(240,223,121,.18)'); });
+    }
+    if (layers.hazards) {
+      (layout.hazardAnchors || []).forEach(function (item) {
+        drawCircle(item, item.clearance || 12, '#e97d56', 'rgba(233,125,86,.08)');
+      });
+    }
+    if (layers.threats) {
+      (layout.threats || []).forEach(function (item) {
+        drawCircle(item, item.radius || 18, '#d98955', 'rgba(217,137,85,.06)');
+      });
+    }
+    if (layers.reservations && populationPlan) {
+      populationPlan.reservations.forEach(function (item) {
+        drawCircle(item, item.occupancyRadius || 10, '#c9a95b', 'rgba(201,169,91,.06)');
+      });
+    }
+    if (layers.formations && populationPlan) {
+      populationPlan.slots.forEach(function (slot) {
+        var members = actors.filter(function (actor) { return actor._labSlotId === slot.id; })
+          .map(function (actor) { return actorOrigins[actor.id] || actor; });
+        if (members.length > 1) {
+          drawWorldLine([{ x: slot.x, y: slot.y }].concat(members), 'rgba(174,126,229,.72)', 1, [2, 2]);
+        }
+      });
+    }
+    if (layers.candidates && candidateInspection) {
+      candidateInspection.candidates.forEach(function (entry, index) {
+        drawCircle(entry.candidate || entry.point, 3, entry.ok ? '#77c77b' : '#db6e5e',
+          index === candidateInspection.chosenIndex ? 'rgba(242,215,105,.38)' : null);
+      });
+    }
+    if (layers.spawnOrigins) {
+      actors.forEach(function (actor) {
+        var origin = actorOrigins[actor.id];
+        if (!origin) return;
+        drawCircle(origin, 3, '#82b8ee', 'rgba(130,184,238,.20)');
+        if (motion && (actor.x !== origin.x || actor.y !== origin.y)) {
+          drawWorldLine([origin, actor], 'rgba(130,184,238,.45)', 1, [3, 3]);
+        }
+      });
+    }
+    if (measureState.a) drawCircle(measureState.a, 4, '#74d9d4', 'rgba(116,217,212,.35)');
+    if (measureState.b) drawCircle(measureState.b, 4, '#f0d86e', 'rgba(240,216,110,.35)');
+    if (measureState.path) drawWorldLine([measureState.a].concat(measureState.path), '#f1d765', 2);
+    if (probeState && probeState.point) drawCircle(probeState.point, 5, probeState.ok ? '#79c87c' : '#e36f60', 'rgba(255,255,255,.10)');
+    auditIssues.forEach(function (issue) {
+      if (Number.isFinite(issue.x)) drawCircle(issue, 5, '#ee654f', 'rgba(238,101,79,.24)');
     });
-    var modifierText = Object.keys(modifiers).map(function (key) {
-      return key + ' ×' + Number(modifiers[key]).toFixed(2);
-    }).join(' · ');
-    var readinessText = tr('coverage') + ' ' + ready.exploration + ' · ' + tr('landmarks') + ' ' + ready.landmarks +
-      ' · ' + tr('resources') + ' ' + ready.resources + ' · ' + tr('curios') + ' ' + ready.curios +
-      ' · ' + tr('guardian') + ' ' + ready.guardian;
-    var strategyName = translatedGameValue('explore.strategy.' + Game.expeditionAI.strategy(), Game.expeditionAI.strategy());
-    var intentName = translatedGameValue('explore.intent.' + ai.id, ai.id) + (ai.reason ? ' / ' + ai.reason : '');
+    if (selected && Number.isFinite(selected.x)) drawCircle(selected, 9, '#fff18a', 'rgba(255,241,138,.10)');
+    if (layers.ids) {
+      overlayCtx.font = '9px Consolas';
+      overlayCtx.textBaseline = 'bottom';
+      allWorldPoints().forEach(function (item) {
+        var screen = worldToScreen(item);
+        if (screen.x < -40 || screen.y < -20 || screen.x > stageWrap.clientWidth + 40 || screen.y > stageWrap.clientHeight + 20) return;
+        overlayCtx.fillStyle = 'rgba(8,10,8,.76)';
+        overlayCtx.fillRect(screen.x + 5, screen.y - 14, Math.max(28, item.id.length * 5.5), 12);
+        overlayCtx.fillStyle = '#eee3aa';
+        overlayCtx.fillText(item.id, screen.x + 7, screen.y - 3);
+      });
+    }
+  }
 
-    document.getElementById('inspector').innerHTML =
-      '<div class="inspector-header"><h2>' + esc(regionName(region)) + '</h2><p>' + esc(Game.i18n.t('region.' + region.id + '.desc')) + '</p></div>' +
-      '<div class="metric-grid">' +
-        metric(report.valid ? tr('pass') : tr('fail'), tr('valid')) +
-        metric((metrics.walkableRatio * 100).toFixed(1) + '%', tr('walkable')) +
-        metric(metrics.macroCenters, tr('centers')) +
-        metric(metrics.loopRank, tr('loops')) +
-        metric(layout.nodes.length, tr('resources'), 'inspector-node-count') +
-        metric(props.length, tr('props')) +
-      '</div>' +
-      '<section class="inspect-section"><h3>' + esc(tr('generation')) + '</h3><div class="row-list">' +
-        configRow(tr('world'), layout.world.w + ' × ' + layout.world.h + ' px', 'layout v' + layout.version) +
-        configRow(tr('connected'), metrics.connectedCells + ' / ' + (layout.nav.w * layout.nav.h), 'ratio ' + metrics.connectedRatio) +
-        configRow(tr('centers') + ' / ' + tr('edges'), metrics.macroCenters + ' / ' + metrics.macroEdges) +
-        configRow(tr('loops') + ' / ' + tr('alternate'), metrics.loopRank + ' / ' + metrics.alternateRoutes) +
-        configRow(tr('clearance'), metrics.minClearancePx + ' px') +
-        configRow(tr('chunks'), layout.chunks.length + ' × 512 px') +
-        configRow(tr('attempts'), layout.generation.attempts) +
-        configRow(tr('repairs'), layout.generation.repairs.length ? layout.generation.repairs.join(', ') : tr('none')) +
-        configRow(tr('fallback'), layout.generation.fallback || tr('none')) +
-      '</div><p class="note">' + esc(tr('generationNote')) + '</p></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('content')) + '</h3><div class="metric-grid compact">' +
-        metric(layout.landmarks.length, tr('landmarks')) + metric(layout.curios.length, tr('curios')) +
-        metric(layout.ecology.length, tr('ecology')) + metric(layout.threats.length, tr('threats')) +
-        metric(layout.guardian ? 1 : 0, tr('guardian')) + metric(blockerProps, tr('blockers')) +
-      '</div>' + catalogGroup(tr('landmarks'), landmarkRows, 'landmarks') +
-        catalogGroup(tr('curios'), curioRows, 'curios') + catalogGroup(tr('ecology'), ecologyRows, 'ecology') +
-        catalogGroup(tr('threats'), threatRows, 'threats') + catalogGroup(tr('guardian'), guardianRows, 'guardian') +
-        '<p class="note">' + esc(tr('contentNote')) + '</p></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('resourceCatalog')) + '</h3><div class="sprite-list">' + resourceRows + '</div></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('theme')) + '</h3><div class="row-list">' +
-        configRow(tr('macroPreset'), idName('preset', layout.preset), layout.preset, 'theme-field', 'macro-preset') +
-        configRow(tr('blockerTheme'), idName('preset', cfg.blockerTheme), cfg.blockerTheme, 'theme-field', 'blocker-theme') +
-        configRow(tr('baseMaterial'), materialName(region.terrain.base.mat), region.terrain.base.mat, 'theme-field', 'base-material') +
-        configRow(tr('terrainMaterials'), materialIds.map(materialName).join(' / '), materialIds.join(', '), 'theme-field', 'materials') +
-        configRow(tr('particle'), idName('particle', region.particles), region.particles, 'theme-field', 'particle') +
-        configRow(tr('parallax'), region.parallax.length) + configRow(tr('tufts'), layout.tufts.length) +
-        configRow(tr('flowers'), layout.flowers.length) + '</div>' +
-        catalogGroup(tr('decorations'), decorRows, 'decorations') + catalogGroup(tr('parallax'), parallaxRows, 'parallax') + '</section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('combat')) + '</h3><div class="sprite-list">' + monsterRows + '</div></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('population')) + '</h3><div class="row-list">' +
-        populationRows + '</div><h3>' + esc(tr('mountPlan')) + '</h3><div class="row-list">' +
-        mountPlanRows + '</div><h3>' + esc(tr('reservations')) + '</h3><div class="row-list">' +
-        reservationRows + '</div><h3>' + esc(tr('failures')) + '</h3><div class="row-list">' +
-        failureRows + '</div><h3>' + esc(tr('respawns')) + '</h3><div class="row-list">' +
-        respawnRows + '</div><h3>' + esc(tr('leases')) + '</h3><div class="row-list">' +
-        leaseRows + '</div></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('expedition')) + '</h3><div class="row-list">' +
-        configRow(tr('expeditionIndex'), expedition.index) + configRow(tr('expeditionSeed'), U.hex32(expedition.seed), String(expedition.seed)) +
-        configRow(tr('anomalies'), anomalyNames.join(' / ') || tr('none'), expedition.anomalies.join(', '), 'anomaly', 'active') +
-        configRow(tr('ecology'), activeEcologyNames.join(' / ') || tr('none'), activeEcology.join(', '), 'active-ecology', 'active') +
-        configRow(tr('modifiers'), modifierText) + '</div></section>' +
-      '<section class="inspect-section"><h3>' + esc(tr('qa')) + '</h3><div class="row-list">' +
-        configRow(tr('seed'), U.hex32(layout.worldSeed)) + configRow(tr('layout'), 'v' + layout.version) +
-        configRow(tr('strategy'), strategyName, Game.expeditionAI.strategy(), null, null, 'strategy') +
-        configRow(tr('intent'), intentName, ai.id, null, null, 'intent') +
-        configRow(tr('coverage'), (ready.coverage * 100).toFixed(1) + '%', null, null, null, 'coverage') +
-        configRow(tr('readiness'), ready.total.toFixed(0) + ' / 100', readinessText, null, null, 'readiness') +
-        configRow(tr('complete'), summary.complete ? tr('yes') : tr('no'), null, null, null, 'complete') + '</div></section>';
+  function buildMiniTerrain() {
+    if (!layout) return null;
+    var canvas = document.createElement('canvas');
+    canvas.width = layout.gw;
+    canvas.height = layout.gh;
+    var ctx = canvas.getContext('2d');
+    for (var y = 0; y < layout.gh; y++) {
+      for (var x = 0; x < layout.gw; x++) {
+        var colors = layout.colorGrid[y * layout.gw + x];
+        ctx.fillStyle = colors && colors[0] || '#30352c';
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    return canvas;
+  }
 
-    Array.prototype.forEach.call(document.querySelectorAll('.sprite-preview'), function (canvas) {
-      Game.assets.drawToDom(canvas, canvas.getAttribute('data-sprite'), 'idle0');
+  function miniPoint(point) {
+    return {
+      x: point.x / layout.world.w * minimap.width,
+      y: point.y / layout.world.h * minimap.height
+    };
+  }
+
+  function miniIcon(item) {
+    var types = {
+      camp: 'camp', landmark: 'landmark', lair: 'lair', resource: 'resource',
+      curio: 'curio', ecology: 'ecology', hazard: 'threat'
+    };
+    var point = miniPoint(item);
+    if (item.kind === 'actor') {
+      minimapCtx.fillStyle = item.rank === 'boss' ? '#f08b57' : (item.category === 'npc' ? '#6fd3c4' : '#e0cb6d');
+      minimapCtx.fillRect(Math.round(point.x - 2), Math.round(point.y - 2), item.rank === 'boss' ? 6 : 4, item.rank === 'boss' ? 6 : 4);
+      return;
+    }
+    Game.mapIcons.draw(minimapCtx, types[item.kind] || 'landmark', point.x, point.y, { size: item.kind === 'lair' ? 14 : 10 });
+  }
+
+  function drawMinimap() {
+    if (!layout) return;
+    minimapCtx.clearRect(0, 0, minimap.width, minimap.height);
+    minimapCtx.imageSmoothingEnabled = false;
+    minimapCtx.fillStyle = '#111512';
+    minimapCtx.fillRect(0, 0, minimap.width, minimap.height);
+    if (miniTerrain) minimapCtx.drawImage(miniTerrain, 0, 0, minimap.width, minimap.height);
+    allWorldPoints().forEach(miniIcon);
+    if (measureState.a) {
+      var path = measureState.path ? [measureState.a].concat(measureState.path) : [measureState.a];
+      minimapCtx.strokeStyle = '#fff074';
+      minimapCtx.lineWidth = 2;
+      minimapCtx.beginPath();
+      path.forEach(function (item, index) {
+        var p = miniPoint(item);
+        if (!index) minimapCtx.moveTo(p.x, p.y); else minimapCtx.lineTo(p.x, p.y);
+      });
+      minimapCtx.stroke();
+    }
+    auditIssues.forEach(function (issue) {
+      if (!Number.isFinite(issue.x)) return;
+      var p = miniPoint(issue);
+      minimapCtx.strokeStyle = '#ff493d';
+      minimapCtx.strokeRect(Math.round(p.x - 3), Math.round(p.y - 3), 7, 7);
+    });
+    if (selected && Number.isFinite(selected.x)) {
+      var selectedMini = miniPoint(selected);
+      minimapCtx.strokeStyle = '#ffffff';
+      minimapCtx.lineWidth = 2;
+      minimapCtx.beginPath();
+      minimapCtx.arc(selectedMini.x, selectedMini.y, 6, 0, Math.PI * 2);
+      minimapCtx.stroke();
+    }
+    var cam = Game.render.cam;
+    var viewWidth = stageWrap.clientWidth / cam.zoom;
+    var viewHeight = stageWrap.clientHeight / cam.zoom;
+    var left = (cam.x - viewWidth / 2) / layout.world.w * minimap.width;
+    var top = (cam.y - viewHeight / 2) / layout.world.h * minimap.height;
+    var width = viewWidth / layout.world.w * minimap.width;
+    var height = viewHeight / layout.world.h * minimap.height;
+    minimapCtx.fillStyle = 'rgba(235,225,146,.08)';
+    minimapCtx.fillRect(left, top, width, height);
+    minimapCtx.strokeStyle = '#f2df79';
+    minimapCtx.lineWidth = 2;
+    minimapCtx.strokeRect(left, top, width, height);
+  }
+
+  function inspectAt(point) {
+    var nav = layout.nav;
+    var gx = clamp(Math.floor(point.x / nav.cell), 0, nav.w - 1);
+    var gy = clamp(Math.floor(point.y / nav.cell), 0, nav.h - 1);
+    var nearest = nearestObject(point.x, point.y);
+    var report = {
+      tool: 'inspect',
+      point: { x: point.x, y: point.y },
+      material: Game.terrain.materialAt(point.x, point.y),
+      navCell: { x: gx, y: gy },
+      chunk: {
+        x: Math.floor(point.x / (layout.spatial && layout.spatial.cell || 192)),
+        y: Math.floor(point.y / (layout.spatial && layout.spatial.cell || 192))
+      },
+      walkable: Game.terrain.isWalkable(point.x, point.y, 1),
+      clearance: (nav.distance[gy][gx] || 0) * nav.cell,
+      danger: Game.terrain.dangerAt(point.x, point.y),
+      nearest: nearest ? { key: nearest.item.key, id: nearest.item.id, kind: nearest.item.kind, distance: nearest.distance } : null
+    };
+    probeState = report;
+    if (nearest && nearest.distance <= 22 / Game.render.cam.zoom) selectObject(nearest.item);
+    renderProbe();
+    return copy(report);
+  }
+
+  function pathLength(start, path) {
+    var total = 0;
+    var prev = start;
+    (path || []).forEach(function (point) {
+      total += U.dist(prev.x, prev.y, point.x, point.y);
+      prev = point;
+    });
+    return total;
+  }
+
+  function measure(a, b) {
+    if (a && b) {
+      measureState.a = { x: a.x, y: a.y };
+      measureState.b = { x: b.x, y: b.y };
+    } else if (a && !measureState.a) {
+      measureState.a = { x: a.x, y: a.y };
+      measureState.b = null; measureState.path = null; measureState.report = null;
+      probeState = { tool: 'measure', waiting: 'B', point: measureState.a };
+      renderProbe();
+      return copy(probeState);
+    } else if (a) {
+      measureState.b = { x: a.x, y: a.y };
+    }
+    if (!measureState.a || !measureState.b) return null;
+    var started = now();
+    var path = Game.nav.solveImmediate(
+      measureState.a.x, measureState.a.y, measureState.b.x, measureState.b.y
+    );
+    var elapsed = now() - started;
+    var samples = [measureState.a].concat(path || []);
+    var minClearance = Infinity, maxDanger = 0;
+    samples.forEach(function (point) {
+      var nav = layout.nav;
+      var gx = clamp(Math.floor(point.x / nav.cell), 0, nav.w - 1);
+      var gy = clamp(Math.floor(point.y / nav.cell), 0, nav.h - 1);
+      minClearance = Math.min(minClearance, (nav.distance[gy][gx] || 0) * nav.cell);
+      maxDanger = Math.max(maxDanger, Game.terrain.dangerAt(point.x, point.y));
+    });
+    measureState.path = path;
+    measureState.report = {
+      tool: 'measure',
+      a: copy(measureState.a),
+      b: copy(measureState.b),
+      found: !!path,
+      straightDistance: U.dist(measureState.a.x, measureState.a.y, measureState.b.x, measureState.b.y),
+      pathLength: path ? pathLength(measureState.a, path) : null,
+      minClearance: Number.isFinite(minClearance) ? minClearance : 0,
+      maxDanger: maxDanger,
+      solveMs: elapsed,
+      path: copy(path)
+    };
+    probeState = measureState.report;
+    log('nav', path ? 'production route solved' : 'production route rejected', {
+      solveMs: elapsed, points: path && path.length || 0
+    }, path ? 'info' : 'warn');
+    renderProbe();
+    return copy(measureState.report);
+  }
+
+  function placementProbe(profileId, point) {
+    profileId = profileId || document.getElementById('profile-select').value;
+    var profile = Game.content.get('worldSpawnProfile', profileId);
+    if (!profile || !point || !layout) return null;
+    var channel = profile.channel || inferProfileChannel(profileId);
+    var report = Game.population.inspectPlacement(
+      profileId, point, layout, populationPlan && populationPlan.reservations || []
+    );
+    candidateInspection = Game.population.inspectCandidates(
+      profileId, layout, channel, populationContext,
+      populationPlan && populationPlan.reservations || []
+    );
+    probeState = Object.assign({ tool: 'placement', point: copy(point) }, copy(report));
+    log('population', 'placement probe ' + (report.ok ? 'accepted' : 'rejected'), {
+      profileId: profileId, point: point, failures: report.failures
+    }, report.ok ? 'info' : 'warn');
+    renderProbe();
+    return copy(probeState);
+  }
+
+  function inferProfileChannel(profileId) {
+    var view = Game.content.populationView(populationPlan && populationPlan.populationId);
+    var found = 'regular';
+    if (!view) return found;
+    Object.keys(view.channels || {}).some(function (channel) {
+      var hit = (view.channels[channel].spawnRefs || []).some(function (entry) { return entry.profileId === profileId; });
+      if (hit) found = channel;
+      return hit;
+    });
+    return found;
+  }
+
+  function renderProbe() {
+    var host = document.getElementById('probe-output');
+    if (!probeState) {
+      host.innerHTML = '<p class="empty-state">' + esc(tool === 'inspect' ? lt('inspectHint') : tool === 'measure' ? lt('measureHint') : lt('placementHint')) + '</p>';
+      return;
+    }
+    if (probeState.tool === 'inspect') {
+      host.innerHTML = '<dl>' +
+        row('world', Math.round(probeState.point.x) + ', ' + Math.round(probeState.point.y)) +
+        row('material', probeState.material) +
+        row('nav / chunk', probeState.navCell.x + ':' + probeState.navCell.y + ' / ' + probeState.chunk.x + ':' + probeState.chunk.y) +
+        row('walkable', probeState.walkable ? lt('pass') : lt('fail'), probeState.walkable) +
+        row('clearance', probeState.clearance.toFixed(1) + ' px') +
+        row('danger', probeState.danger.toFixed(3)) +
+        row('nearest', probeState.nearest ? probeState.nearest.kind + ' / ' + probeState.nearest.id + ' / ' + probeState.nearest.distance.toFixed(1) + ' px' : '—') +
+        '</dl>';
+      return;
+    }
+    if (probeState.tool === 'measure') {
+      if (probeState.waiting) {
+        host.innerHTML = '<dl>' + row('A', Math.round(probeState.point.x) + ', ' + Math.round(probeState.point.y)) + row('next', 'B') + '</dl>';
+      } else {
+        host.innerHTML = '<dl>' +
+          row('route', probeState.found ? lt('pass') : lt('noPath'), probeState.found) +
+          row('straight', probeState.straightDistance.toFixed(1) + ' px') +
+          row('path', probeState.pathLength === null ? '—' : probeState.pathLength.toFixed(1) + ' px') +
+          row('min clearance', probeState.minClearance.toFixed(1) + ' px') +
+          row('max danger', probeState.maxDanger.toFixed(3)) +
+          row('solve', probeState.solveMs.toFixed(2) + ' ms') + '</dl>';
+      }
+      return;
+    }
+    var checks = (probeState.checks || []).map(function (check) {
+      return '<dt>' + esc(check.id + (check.enforced ? '' : ' (info)')) + '</dt><dd class="' +
+        (check.pass ? 'pass' : 'fail') + '">' +
+        esc((check.pass ? '✓ ' : '× ') + JSON.stringify(check.actual) +
+          (check.expected === null || check.expected === undefined ? '' : ' / ' + JSON.stringify(check.expected))) + '</dd>';
+    }).join('');
+    host.innerHTML = '<dl>' + row('profile', probeState.profileId) +
+      row('selector', candidateInspection && candidateInspection.selector || '—') +
+      row('source', candidateInspection && candidateInspection.source || '—') +
+      row('result', probeState.ok ? lt('pass') : lt('fail'), probeState.ok) + checks + '</dl>';
+  }
+
+  function row(label, value, pass) {
+    return '<dt>' + esc(label) + '</dt><dd' + (pass === undefined ? '' : ' class="' + (pass ? 'pass' : 'fail') + '"') + '>' + esc(value) + '</dd>';
+  }
+
+  function selectObject(item) {
+    if (!item) return null;
+    selected = item.key ? item : contentPoint(item, item.kind || 'object');
+    renderSelection();
+    renderCatalog();
+    drawMinimap();
+    return copy({
+      key: selected.key, kind: selected.kind, id: selected.id,
+      x: selected.x, y: selected.y, name: selected.name
     });
   }
 
-  function setInspectorRuntime(field, value) {
-    var node = document.querySelector('[data-inspector-runtime="' + field + '"]');
-    if (node) node.textContent = value;
+  function renderSelection() {
+    var host = document.getElementById('selection-panel');
+    if (!selected) {
+      host.innerHTML = '<p class="empty-state">' + esc(lt('none')) + '</p>';
+      return;
+    }
+    var data = selected.data || {};
+    var details = {
+      kind: selected.kind,
+      id: selected.id,
+      name: selected.name,
+      position: Number.isFinite(selected.x) ? Math.round(selected.x) + ', ' + Math.round(selected.y) : 'definition only',
+      sprite: selected.sprite || data.presentation && data.presentation.spriteId || '—'
+    };
+    if (selected.kind === 'actor') {
+      var actorLease = data.spawnId && Game.population.lease(data.spawnId);
+      var actorProfile = actorLease && Game.content.get('worldSpawnProfile', actorLease.profileId);
+      details.archetype = data.blueprint && data.blueprint.archetypeId;
+      details.category = data.category;
+      details.rank = data.rank;
+      details.spawnId = data.spawnId || '—';
+      details.planSlot = data._labSlotId || '—';
+      details.channel = data._labChannel || '—';
+      details.spawnProfile = actorLease && actorLease.profileId || '—';
+      details.encounterPack = actorProfile && actorProfile.encounterPackId || '—';
+      details.lease = actorLease ? 'active / generation ' + actorLease.generation : '—';
+    } else if (data.defId) {
+      details.definition = data.defId;
+    }
+    host.innerHTML = '<section class="inspect-section"><h3>' + esc(lt('selected')) + '</h3><dl class="inspect-grid">' +
+      Object.keys(details).map(function (key) { return '<dt>' + esc(key) + '</dt><dd>' + esc(details[key]) + '</dd>'; }).join('') +
+      '</dl></section><section class="inspect-section"><h3>JSON</h3><div class="raw-id">' +
+      esc(JSON.stringify(serializableSelection(data), null, 2)) + '</div></section>';
   }
 
-  function setExplorationEvent(message) {
-    explorationMessage = message;
-    document.getElementById('exploration-event').textContent = message;
+  function serializableSelection(data) {
+    if (data && data.components) {
+      return {
+        id: data.id, blueprintKey: data.blueprintKey, category: data.category,
+        rank: data.rank, position: { x: data.x, y: data.y },
+        origin: actorOrigins[data.id], tags: data.tags, spawnId: data.spawnId,
+        slotId: data._labSlotId
+      };
+    }
+    return copy(data);
   }
 
-  function prepareQaTarget() {
-    var hero = Game.world.hero;
-    if (!hero) return;
-    qaRestoreAuto = qaRestoreAuto || Game.world.controlMode() === 'auto';
-    Game.world.cancelInteraction('qa-target');
-    if (Game.world.controlMode() === 'auto') Game.world.setControlMode('manual');
-    hero.target = null;
-    hero.manualTarget = false;
-    hero.moveOrder = null;
-    hero.state = 'idle';
-    Game.world.entities.forEach(function (entity) { if (entity.kind === 'monster') entity.engaged = false; });
-    Game.nav.clear(hero);
-  }
-
-  function restoreAutoAfterQa() {
-    if (!qaRestoreAuto) return;
-    qaRestoreAuto = false;
-    Game.world.setControlMode('auto');
-  }
-
-  function setHeroPosition(x, y) {
-    var hero = Game.world.hero;
-    if (!hero) return;
-    var point = Game.terrain.projectPoint(x, y, 1) || Game.world.layout.camp;
-    Game.world.cancelInteraction('qa-focus');
-    hero.x = U.clamp(point.x, 24, Game.world.layout.world.w - 24);
-    hero.y = U.clamp(point.y, Game.world.BOUND_TOP + 8, Game.world.layout.world.h - 24);
-    hero.target = null;
-    hero.moveOrder = null;
-    hero.manualTarget = false;
-    hero.state = 'idle';
-    Game.nav.clear(hero);
-    Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: Game.world.region.id });
-    Game.render.snapCamera(hero.x, hero.y);
-  }
-
-  function focusReadyNode() {
-    var hero = Game.world.hero;
-    var nodes = Game.world.layout.nodes.filter(function (node) { return Game.environment.nodeReady(node); });
-    if (!nodes.length) { setExplorationEvent(tr('noReady')); return; }
-    prepareQaTarget();
-    var node = nodes.reduce(function (best, candidate) {
-      return !best || U.dist(hero.x, hero.y, candidate.x, candidate.y) < U.dist(hero.x, hero.y, best.x, best.y) ? candidate : best;
-    }, null);
-    setHeroPosition(node.x - 32, node.y + 6);
-    Game.exploration.revealAt(node.x, node.y, { force: true, rid: Game.world.region.id });
-    setExplorationEvent(tr('focused') + ' · ' + materialName(node.material));
-  }
-
-  function revealAllResources() {
-    Game.world.layout.nodes.forEach(function (node) {
-      Game.state.world.nodeCooldowns[node.id] = 0;
-      Game.exploration.revealAt(node.x, node.y, { force: true, rid: Game.world.region.id });
+  function actorDefinitionCatalog() {
+    var placed = {};
+    var profiles = Game.content.all('worldSpawnProfile');
+    var regionProfile = Game.content.get('regionProfile', region.id);
+    var populationView = regionProfile && Game.content.populationView(regionProfile.populationProfileId);
+    var projectedSummons = regionProfile && regionProfile.projection && regionProfile.projection.summons ||
+      region.summons || [];
+    var regionProfileIds = {};
+    var profileRegions = {};
+    regions.forEach(function (candidateRegion) {
+      var candidateProfile = Game.content.get('regionProfile', candidateRegion.id);
+      var candidateView = candidateProfile &&
+        Game.content.populationView(candidateProfile.populationProfileId);
+      profileRegions[candidateRegion.id] = {};
+      Object.keys(candidateView && candidateView.channels || {}).forEach(function (channel) {
+        (candidateView.channels[channel].spawnRefs || []).forEach(function (entry) {
+          profileRegions[candidateRegion.id][entry.profileId] = channel;
+        });
+      });
     });
-    setExplorationEvent(tr('revealed') + ' · ' + Game.world.layout.nodes.length);
+    Object.keys(populationView && populationView.channels || {}).forEach(function (channel) {
+      (populationView.channels[channel].spawnRefs || []).forEach(function (entry) {
+        regionProfileIds[entry.profileId] = channel;
+      });
+    });
+    actors.forEach(function (actor) {
+      var id = actor.blueprint.archetypeId;
+      (placed[id] = placed[id] || []).push(liveActorPoint(actor));
+    });
+    return Game.content.all('actorArchetype').filter(function (definition) {
+      return definition.category !== 'player';
+    }).map(function (definition) {
+      var linkedProfiles = profiles.filter(function (profile) {
+        if (profile.actorRef && profile.actorRef.archetypeId === definition.id) return true;
+        var pack = profile.encounterPackId && Game.content.get('encounterPack', profile.encounterPackId);
+        return !!(pack && pack.members.some(function (member) { return member.archetypeId === definition.id; }));
+      });
+      var linkedProfileIds = linkedProfiles.map(function (profile) { return profile.id; });
+      var regionProfiles = linkedProfileIds.filter(function (id) { return regionProfileIds[id]; });
+      var inMonsterPool = (region.monsters || []).indexOf(definition.id) >= 0 || region.boss === definition.id;
+      var definitionRegions = regions.filter(function (candidateRegion) {
+        return (candidateRegion.monsters || []).indexOf(definition.id) >= 0 ||
+          candidateRegion.boss === definition.id ||
+          (candidateRegion.summons || []).indexOf(definition.id) >= 0 ||
+          linkedProfileIds.some(function (profileId) {
+            return !!profileRegions[candidateRegion.id][profileId];
+          });
+      }).map(function (candidateRegion) { return candidateRegion.id; });
+      var inRegion = definitionRegions.indexOf(region.id) >= 0 ||
+        !!(placed[definition.id] && placed[definition.id].length);
+      if (inRegion && definitionRegions.indexOf(region.id) < 0) definitionRegions.push(region.id);
+      var catalogCategory = definition.category;
+      if (definition.category === 'monster' &&
+          regions.some(function (candidateRegion) { return candidateRegion.boss === definition.id; })) {
+        catalogCategory = 'boss';
+      } else if (definition.category === 'npc' && definition.id.indexOf('creature.') === 0) {
+        catalogCategory = 'creature';
+      }
+      return {
+        key: 'definition:' + definition.id,
+        kind: 'actor-definition',
+        group: 'unit',
+        category: catalogCategory,
+        id: definition.id,
+        name: actorName(definition),
+        sprite: definition.presentation && definition.presentation.spriteId,
+        count: placed[definition.id] ? placed[definition.id].length : 0,
+        positions: placed[definition.id] || [],
+        inRegion: inRegion,
+        regions: definitionRegions,
+        data: {
+          definition: definition,
+          regionMonsterPool: inMonsterPool,
+          projectedSummon: projectedSummons.indexOf(definition.id) >= 0,
+          spawnProfiles: linkedProfileIds,
+          regionSpawnProfiles: regionProfiles.map(function (id) {
+            return { id: id, channel: regionProfileIds[id] };
+          }),
+          encounterPacks: linkedProfiles.map(function (profile) { return profile.encounterPackId; }).filter(Boolean),
+          planSlots: (populationPlan && populationPlan.slots || []).filter(function (slot) {
+            return linkedProfileIds.indexOf(slot.profileId) >= 0;
+          }).map(function (slot) {
+            return { id: slot.id, channel: slot.channel, x: slot.x, y: slot.y };
+          })
+        }
+      };
+    });
   }
 
-  function spawnQaChest(rare) {
-    if (Game.world.bossEnt) { setExplorationEvent(tr('bossBlocks')); return null; }
-    prepareQaTarget();
-    Game.environment.resetRegion();
-    var originalChance = U.chance;
-    var chest = null;
-    U.chance = function () { return !!rare; };
-    try {
-      chest = Game.environment.spawnChest();
-      if (!chest) {
-        var candidates = Game.world.layout.spawnCandidates.slice(0, 16);
-        for (var i = 0; i < candidates.length && !chest; i++) {
-          setHeroPosition(candidates[i].x, candidates[i].y);
-          chest = Game.environment.spawnChest();
+  function rebuildCatalog() {
+    catalogItems = actorDefinitionCatalog();
+    var catalogIndex = {};
+    catalogItems.forEach(function (item) { catalogIndex[item.key] = item; });
+
+    function define(item, regionId) {
+      var existing = catalogIndex[item.key];
+      if (!existing) {
+        existing = Object.assign({
+          group: 'world',
+          count: 0,
+          positions: [],
+          inRegion: false,
+          regions: []
+        }, item);
+        catalogIndex[item.key] = existing;
+        catalogItems.push(existing);
+      }
+      if (regionId && existing.regions.indexOf(regionId) < 0) existing.regions.push(regionId);
+      if (regionId === region.id) existing.inRegion = true;
+      return existing;
+    }
+
+    function defineContent(candidateRegion, key, category, definition, fallbackSprite) {
+      if (!definition || !definition.id) return;
+      define({
+        key: key + ':' + definition.id,
+        kind: key + '-definition',
+        category: category,
+        id: definition.id,
+        name: definition.nameKey ? nameFromKey(definition.nameKey, definition.id) : definition.id,
+        sprite: definition.sprite || fallbackSprite || null,
+        data: definition
+      }, candidateRegion.id);
+    }
+
+    var campDefinitions = [
+      { id: 'camp_banner', sprite: 'camp_banner' },
+      { id: 'tent', sprite: 'tent' },
+      { id: 'camp_lantern', sprite: 'camp_lantern' },
+      { id: 'campfire', sprite: 'campfire' },
+      { id: 'camp_cookpot', sprite: 'camp_cookpot' },
+      { id: 'camp_supply', sprite: 'camp_supply' }
+    ];
+    var chestDefinitions = [
+      { id: 'chest_common', sprite: 'chest_common', rarity: 'common' },
+      { id: 'chest_rare', sprite: 'chest_rare', rarity: 'rare' }
+    ];
+
+    regions.forEach(function (candidateRegion) {
+      var exploration = candidateRegion.exploration || {};
+      [
+        ['landmark', 'landmark', exploration.landmarks],
+        ['resource', 'resource', exploration.resources],
+        ['curio', 'curio', exploration.curios],
+        ['ecology', 'ecology', exploration.ecology],
+        ['threat', 'threat', exploration.threats]
+      ].forEach(function (entry) {
+        (entry[2] || []).forEach(function (definition) {
+          var category = entry[1];
+          if (entry[0] === 'landmark' && (definition.function === 'boss' || definition.territory)) {
+            category = 'boss-lair';
+          }
+          defineContent(candidateRegion, entry[0], category, definition);
+        });
+      });
+
+      (candidateRegion.hazards || []).forEach(function (hazardId) {
+        define({
+          key: 'hazard:' + hazardId,
+          kind: 'hazard-definition',
+          category: 'hazard-definition',
+          id: hazardId,
+          name: hazardId,
+          sprite: null,
+          data: { id: hazardId, runtimeMounted: false }
+        }, candidateRegion.id);
+      });
+      define({
+        key: 'hazard-anchors:' + candidateRegion.id,
+        kind: 'hazard-anchor-set',
+        category: 'hazard-anchor',
+        id: candidateRegion.id + '.anchors',
+        name: regionName(candidateRegion) + ' / Hazard anchors',
+        sprite: null,
+        data: { regionId: candidateRegion.id, runtimeMounted: false }
+      }, candidateRegion.id);
+
+      var terrain = candidateRegion.terrain || {};
+      var materialDefinitions = [];
+      if (terrain.base && terrain.base.mat) materialDefinitions.push(terrain.base);
+      (terrain.patches || []).forEach(function (patch) {
+        if (patch.mat) materialDefinitions.push(patch);
+      });
+      materialDefinitions.forEach(function (material) {
+        define({
+          key: 'material:' + material.mat,
+          kind: 'terrain-material',
+          category: 'material',
+          id: material.mat,
+          name: material.mat,
+          sprite: null,
+          data: material
+        }, candidateRegion.id);
+      });
+
+      (terrain.deco || []).forEach(function (definition) {
+        define({
+          key: 'decoration:' + definition.sprite,
+          kind: 'decoration-definition',
+          category: definition.placement === 'blocker' ? 'decor-blocker' :
+            definition.placement === 'water' ? 'decor-water' : 'decor-ground',
+          id: definition.sprite,
+          name: definition.sprite,
+          sprite: definition.sprite,
+          data: definition
+        }, candidateRegion.id);
+      });
+      (exploration.landmarks || []).forEach(function (landmark) {
+        var territory = landmark.territory;
+        (territory && territory.decor || []).forEach(function (definition) {
+          define({
+            key: 'decoration:' + definition.sprite,
+            kind: 'decoration-definition',
+            category: 'decor-boss',
+            id: definition.sprite,
+            name: definition.sprite,
+            sprite: definition.sprite,
+            data: definition
+          }, candidateRegion.id);
+        });
+      });
+      if (terrain.tufts > 0) {
+        define({
+          key: 'decoration:tufts:' + candidateRegion.id,
+          kind: 'decoration-definition',
+          category: 'tuft',
+          id: candidateRegion.id + '.tufts',
+          name: regionName(candidateRegion) + ' / tufts',
+          sprite: null,
+          data: { count: terrain.tufts, colors: terrain.tuftColors || [] }
+        }, candidateRegion.id);
+      }
+      if (terrain.flowers && terrain.flowers.count > 0) {
+        define({
+          key: 'decoration:flowers:' + candidateRegion.id,
+          kind: 'decoration-definition',
+          category: 'flower',
+          id: candidateRegion.id + '.flowers',
+          name: regionName(candidateRegion) + ' / flowers',
+          sprite: null,
+          data: terrain.flowers
+        }, candidateRegion.id);
+      }
+
+      campDefinitions.forEach(function (definition) {
+        define({
+          key: 'camp:' + definition.id,
+          kind: 'camp-definition',
+          category: 'camp',
+          id: definition.id,
+          name: definition.id,
+          sprite: definition.sprite,
+          data: definition
+        }, candidateRegion.id);
+      });
+      chestDefinitions.forEach(function (definition) {
+        define({
+          key: 'chest:' + definition.id,
+          kind: 'chest-definition',
+          category: 'chest',
+          id: definition.id,
+          name: definition.id,
+          sprite: definition.sprite,
+          data: Object.assign({ runtimeMounted: false }, definition)
+        }, candidateRegion.id);
+      });
+    });
+
+    function attachInstances(keyPrefix, items, kind) {
+      var buckets = {};
+      (items || []).forEach(function (item) {
+        var id = item.defId || item.id || item.sprite;
+        if (id) (buckets[id] = buckets[id] || []).push(item);
+      });
+      Object.keys(buckets).sort().forEach(function (id) {
+        var first = buckets[id][0];
+        var entry = define({
+          key: keyPrefix + ':' + id,
+          kind: kind + '-definition',
+          category: keyPrefix,
+          id: id,
+          name: first.nameKey ? nameFromKey(first.nameKey, id) : id,
+          sprite: first.sprite || null,
+          data: first
+        }, region.id);
+        entry.count = buckets[id].length;
+        entry.positions = buckets[id].map(function (instance) { return contentPoint(instance, kind); });
+        entry.inRegion = true;
+      });
+    }
+
+    attachInstances('landmark', masters.landmarks, 'landmark');
+    attachInstances('resource', masters.nodes, 'resource');
+    attachInstances('curio', masters.curios, 'curio');
+    attachInstances('ecology', masters.ecology, 'ecology');
+    attachInstances('threat', layout.threats || [], 'threat');
+
+    var hazardEntry = catalogIndex['hazard-anchors:' + region.id];
+    if (hazardEntry) {
+      hazardEntry.count = (layout.hazardAnchors || []).length;
+      hazardEntry.positions = (layout.hazardAnchors || []).map(function (anchor, index) {
+        return contentPoint(Object.assign({ id: region.id + ':hazard-anchor:' + index }, anchor), 'hazard-anchor');
+      });
+    }
+
+    var propBuckets = {};
+    (masters.props || []).forEach(function (prop) {
+      var prefix = prop.campProp ? 'camp' : 'decoration';
+      var key = prefix + ':' + prop.sprite;
+      (propBuckets[key] = propBuckets[key] || []).push(prop);
+    });
+    Object.keys(propBuckets).forEach(function (key) {
+      var bucket = propBuckets[key];
+      var first = bucket[0];
+      var layer = propLayer(first);
+      var category = first.campProp ? 'camp' :
+        layer === 'decorBoss' ? 'decor-boss' :
+        layer === 'decorBlocker' ? 'decor-blocker' :
+        layer === 'decorWater' ? 'decor-water' : 'decor-ground';
+      var entry = define({
+        key: key,
+        kind: first.campProp ? 'camp-definition' : 'decoration-definition',
+        category: category,
+        id: first.sprite,
+        name: first.sprite,
+        sprite: first.sprite,
+        data: first
+      }, region.id);
+      entry.count = bucket.length;
+      entry.positions = bucket.map(function (instance) {
+        return contentPoint(instance, first.campProp ? 'camp' : 'decoration');
+      });
+      entry.inRegion = true;
+    });
+
+    function attachDetailDecoration(key, items, id) {
+      var entry = catalogIndex[key];
+      if (!entry) return;
+      entry.count = (items || []).length;
+      entry.positions = (items || []).map(function (instance, index) {
+        return contentPoint(Object.assign({ id: id + ':' + index }, instance), 'decoration');
+      });
+    }
+    attachDetailDecoration('decoration:tufts:' + region.id, masters.tufts, region.id + ':tuft');
+    attachDetailDecoration('decoration:flowers:' + region.id, masters.flowers, region.id + ':flower');
+
+    var materialCounts = {};
+    (layout.grid || []).forEach(function (material) {
+      materialCounts[material] = (materialCounts[material] || 0) + 1;
+    });
+    Object.keys(materialCounts).forEach(function (material) {
+      var entry = define({
+        key: 'material:' + material,
+        kind: 'terrain-material',
+        category: 'material',
+        id: material,
+        name: material,
+        sprite: null,
+        data: { mat: material }
+      }, region.id);
+      entry.count = materialCounts[material];
+      entry.inRegion = true;
+    });
+
+    var categoryOrder = {
+      monster: 0, boss: 1, npc: 2, creature: 3, summon: 4, object: 5,
+      resource: 6, chest: 7, landmark: 8, 'boss-lair': 9, curio: 10, ecology: 11,
+      threat: 12, 'hazard-definition': 13, 'hazard-anchor': 14, camp: 15,
+      'decor-blocker': 16, 'decor-ground': 17, 'decor-water': 18,
+      'decor-boss': 19, tuft: 20, flower: 21, material: 22
+    };
+    catalogItems.sort(function (a, b) {
+      return (categoryOrder[a.category] === undefined ? 99 : categoryOrder[a.category]) -
+        (categoryOrder[b.category] === undefined ? 99 : categoryOrder[b.category]) ||
+        a.id.localeCompare(b.id);
+    });
+    renderCatalog();
+  }
+
+  function categoryMatches(item, filter) {
+    if (filter === 'all') return true;
+    return item.category === filter;
+  }
+
+  function catalogCategoryLabel(category) {
+    var keys = {
+      monster: 'map.lab.monsterCategory',
+      boss: 'map.lab.bossCategory',
+      npc: 'map.lab.npcCategory',
+      creature: 'map.lab.creatureCategory',
+      summon: 'map.lab.summons',
+      object: 'map.lab.objects',
+      resource: 'map.lab.resources',
+      chest: 'map.lab.chests',
+      landmark: 'map.lab.landmarkCategory',
+      'boss-lair': 'map.lab.bossLairCategory',
+      curio: 'map.lab.curioCategory',
+      ecology: 'map.lab.ecologyCategory',
+      threat: 'map.lab.threatCategory',
+      'hazard-definition': 'map.lab.hazardDefinitionCategory',
+      'hazard-anchor': 'map.lab.hazardAnchorCategory',
+      camp: 'map.lab.campCategory',
+      'decor-blocker': 'map.lab.decorBlockerCategory',
+      'decor-ground': 'map.lab.decorGroundCategory',
+      'decor-water': 'map.lab.decorWaterCategory',
+      'decor-boss': 'map.lab.decorBossCategory',
+      tuft: 'map.lab.tuftCategory',
+      flower: 'map.lab.flowerCategory',
+      material: 'map.lab.materialCategory'
+    };
+    return keys[category] ? D.t(keys[category]) : category;
+  }
+
+  function renderCatalog() {
+    var host = document.getElementById('catalog-list');
+    if (!host) return;
+    var scope = document.getElementById('catalog-scope').value;
+    var search = document.getElementById('catalog-search').value.trim().toLowerCase();
+    var category = document.getElementById('catalog-category').value;
+    var scoped = catalogItems.filter(function (item) {
+      return scope === 'all' || item.inRegion;
+    });
+    var visible = scoped.filter(function (item) {
+      return categoryMatches(item, category) &&
+        (!search || (item.id + ' ' + item.name + ' ' + (item.subcategory || '') +
+          ' ' + (item.regions || []).join(' ')).toLowerCase().indexOf(search) >= 0);
+    });
+    var instanceCount = visible.reduce(function (sum, item) { return sum + (item.count || 0); }, 0);
+    document.getElementById('catalog-summary').textContent =
+      visible.length + ' / ' + scoped.length + ' ' + lt('catalog') + ' · ' +
+      instanceCount + ' ' + lt('instances') + ' · ' +
+      lt(scope === 'region' ? 'currentMapScope' : 'allMapsScope');
+    var groups = [];
+    visible.forEach(function (item) {
+      var group = groups.filter(function (entry) { return entry.category === item.category; })[0];
+      if (!group) {
+        group = { category: item.category, items: [] };
+        groups.push(group);
+      }
+      group.items.push(item);
+    });
+    host.innerHTML = groups.map(function (group) {
+      var groupInstances = group.items.reduce(function (sum, item) { return sum + (item.count || 0); }, 0);
+      var items = group.items.map(function (item) {
+        return '<button type="button" class="catalog-item' + (selected && selected.key === item.key ? ' active' : '') +
+          '" data-catalog-index="' + catalogItems.indexOf(item) + '">' +
+          '<canvas width="36" height="36" data-catalog-sprite="' + esc(item.sprite || '') + '"></canvas>' +
+          '<span class="catalog-copy"><strong>' + esc(item.name) + '</strong><small>' +
+          esc(item.id) + '</small></span><span class="catalog-count">×' + item.count + '</span></button>';
+      }).join('');
+      return '<section class="catalog-group" data-catalog-group="' + esc(group.category) + '">' +
+        '<header class="catalog-group-header"><strong>' + esc(catalogCategoryLabel(group.category)) +
+        '</strong><span>' + group.items.length + ' ' + esc(lt('definitions')) + ' · ' +
+        groupInstances + ' ' + esc(lt('instances')) + '</span></header>' +
+        '<div class="catalog-group-list">' + items + '</div></section>';
+    }).join('');
+    Array.prototype.forEach.call(host.querySelectorAll('[data-catalog-sprite]'), function (canvas) {
+      var sprite = canvas.getAttribute('data-catalog-sprite');
+      if (sprite) Game.assets.drawToDom(canvas, sprite, 'idle0');
+    });
+  }
+
+  function addIssue(type, message, item, severity) {
+    auditIssues.push({
+      id: type + ':' + auditIssues.length,
+      type: type,
+      severity: severity || 'error',
+      message: message,
+      x: item && Number.isFinite(item.x) ? item.x : null,
+      y: item && Number.isFinite(item.y) ? item.y : null,
+      target: item && item.id || null
+    });
+  }
+
+  function runAudit() {
+    auditIssues = [];
+    if (!validation.valid) addIssue('terrain-validation', (validation.errors || []).join(', ') || 'terrain validation failed');
+    var decorSprites = {};
+    (region.terrain.deco || []).forEach(function (definition) { decorSprites[definition.sprite] = true; });
+    (region.terrain.deco || []).forEach(function (definition) {
+      if (!(masters.props || []).some(function (prop) { return prop.sprite === definition.sprite; })) {
+        addIssue('decoration-coverage', 'configured decoration has no instance: ' + definition.sprite);
+      }
+    });
+    (masters.props || []).forEach(function (prop) {
+      if (!prop.campProp && prop.kind !== 'bossDecor' && !decorSprites[prop.sprite]) {
+        addIssue('decoration-definition', 'unregistered decoration sprite: ' + prop.sprite, prop);
+      }
+    });
+    (populationPlan.failures || []).forEach(function (failure) {
+      if (failure.required && failure.onFailure !== 'skipOptional') {
+        addIssue('population-required', failure.profileId + ': ' + failure.reason);
+      } else {
+        addIssue('population-capacity', failure.profileId + ': ' + failure.reason, null, 'warn');
+      }
+    });
+    var contentPoints = []
+      .concat(masters.nodes || [], masters.landmarks || [], masters.curios || [], masters.ecology || []);
+    for (var cp = 0; cp < contentPoints.length; cp++) {
+      for (var cq = cp + 1; cq < contentPoints.length; cq++) {
+        if (U.dist(contentPoints[cp].x, contentPoints[cp].y, contentPoints[cq].x, contentPoints[cq].y) < 8) {
+          addIssue('content-spacing',
+            (contentPoints[cp].id || contentPoints[cp].defId) + ' crowds ' +
+            (contentPoints[cq].id || contentPoints[cq].defId), contentPoints[cp]);
         }
       }
-    } finally { U.chance = originalChance; }
-    if (!chest) {
-      restoreAutoAfterQa();
-      setExplorationEvent(tr('spawnFailed'));
-      return null;
     }
-    Game.exploration.revealAt(chest.x, chest.y, { force: true, rid: Game.world.region.id });
-    Game.render.snapCamera(Game.world.hero.x, Game.world.hero.y);
-    setExplorationEvent(tr('spawned') + ' ' + (rare ? tr('rareChest') : tr('commonChest')) + ' · ' + tr('clickOpen'));
-    return chest;
+    actors.forEach(function (actor) {
+      var body = actor.components.body || {};
+      var radius = body.collisionRadius || 1;
+      if (actor.x < 0 || actor.y < 0 || actor.x > layout.world.w || actor.y > layout.world.h) {
+        addIssue('actor-bounds', actor.id + ' outside world', actor);
+      }
+      if (!Game.terrain.isWalkable(actor.x, actor.y, Math.min(6, radius))) {
+        addIssue('actor-walkability', actor.id + ' formation footpoint is not walkable', actor);
+      }
+      var sprite = actor.components.presentation.spriteId;
+      if (!Game.assets.has(sprite)) {
+        addIssue('actor-sprite', actor.id + ' sprite missing: ' + sprite, actor);
+      }
+    });
+    for (var i = 0; i < actors.length; i++) {
+      for (var j = i + 1; j < actors.length; j++) {
+        if (U.dist(actors[i].x, actors[i].y, actors[j].x, actors[j].y) < 1) {
+          addIssue('actor-overlap', actors[i].id + ' overlaps ' + actors[j].id, actors[i]);
+        }
+      }
+    }
+    for (var r = 0; r < populationPlan.reservations.length; r++) {
+      for (var s = r + 1; s < populationPlan.reservations.length; s++) {
+        var left = populationPlan.reservations[r], right = populationPlan.reservations[s];
+        if (U.dist(left.x, left.y, right.x, right.y) <
+            (left.occupancyRadius || 0) + (right.occupancyRadius || 0)) {
+          addIssue('reservation-overlap', left.slotId + ' overlaps ' + right.slotId, left);
+        }
+      }
+    }
+    var materialCounts = {};
+    (layout.grid || []).forEach(function (material) { materialCounts[material] = (materialCounts[material] || 0) + 1; });
+    if (Object.keys(materialCounts).length < 2) addIssue('material-distribution', 'only one material generated');
+    log('audit', auditIssues.length ? 'placement audit found issues' : 'placement audit passed', {
+      issues: auditIssues.length,
+      materials: materialCounts,
+      props: masters.props.length,
+      actors: actors.length,
+      contentDensityPerMegapixel: Math.round(
+        contentPoints.length / Math.max(1, layout.world.w * layout.world.h) * 1000000
+      )
+    }, auditIssues.length ? 'warn' : 'info');
+    renderIssues();
+    return copy(auditIssues);
   }
 
-  function updateRuntime(force) {
-    if (!Game.world.layout) return;
-    var now = performance.now();
-    if (!force && now - lastRuntimeUpdate < 200) return;
-    lastRuntimeUpdate = now;
-    var nodes = Game.world.layout.nodes;
-    var ready = nodes.filter(function (node) { return Game.environment.nodeReady(node); }).length;
-    var readiness = Game.exploration.readiness(Game.world.region.id);
-    var intent = Game.expeditionAI.intent();
-    document.getElementById('gather-runtime').textContent = D.t('map.ready', { ready: ready, total: nodes.length });
-    document.getElementById('discovery-runtime').textContent = readiness.total.toFixed(0) + ' / 100';
-    var chest = Game.environment.chests()[0];
-    document.getElementById('chest-runtime').textContent = chest
-      ? (chest.rare ? tr('rareChest') : tr('commonChest')) + ' · ' + Math.max(0, Math.ceil(chest.ttl - chest.age)) + 's'
-      : tr('none');
-    document.getElementById('runtime-count').textContent = D.t('map.entities', { count: Game.world.entities.length });
-    var area = Game.trade.areaById('qa-wanderer');
-    document.getElementById('dynamic-trade-status').textContent = area
-      ? tr('merchantActive') + ' · ' + Math.max(0, Math.ceil(area.expiresAt - Game.state.world.worldTime)) + 's'
-      : tr('merchantExpired');
-    setInspectorRuntime('strategy', translatedGameValue(
-      'explore.strategy.' + Game.expeditionAI.strategy(), Game.expeditionAI.strategy()));
-    setInspectorRuntime('intent', translatedGameValue('explore.intent.' + intent.id, intent.id) +
-      (intent.reason ? ' / ' + intent.reason : ''));
-    setInspectorRuntime('coverage', (readiness.coverage * 100).toFixed(1) + '%');
-    setInspectorRuntime('readiness', readiness.total.toFixed(0) + ' / 100');
-    setInspectorRuntime('complete', Game.exploration.isComplete(Game.world.region.id) ? tr('yes') : tr('no'));
+  function renderIssues() {
+    var host = document.getElementById('issues-panel');
+    if (!auditIssues.length) {
+      host.innerHTML = '<p class="empty-state">' + esc(lt('noIssues')) + '</p>';
+      return;
+    }
+    host.innerHTML = auditIssues.map(function (issue, index) {
+      return '<button type="button" class="issue-row' + (issueIndex === index ? ' active' : '') +
+        '" data-issue-index="' + index + '"><strong>' + esc(issue.type) + '</strong><span>' +
+        esc(issue.message + (Number.isFinite(issue.x) ? ' @ ' + Math.round(issue.x) + ', ' + Math.round(issue.y) : '')) +
+        '</span></button>';
+    }).join('');
+  }
+
+  function focusIssue(direction) {
+    if (!auditIssues.length) return null;
+    issueIndex = (issueIndex + direction + auditIssues.length) % auditIssues.length;
+    var issue = auditIssues[issueIndex];
+    if (Number.isFinite(issue.x)) setCamera(issue.x, issue.y, Math.max(1.7, Game.render.cam.zoom));
+    renderIssues();
+    showInspectorTab('issues');
+    return copy(issue);
+  }
+
+  function renderLogs() {
+    var host = document.getElementById('log-list');
+    if (!host) return;
+    host.innerHTML = logs.slice().reverse().map(function (entry) {
+      var time = entry.at.slice(11, 19);
+      return '<li class="log-row ' + esc(entry.level) + '"><time>' + time + '</time><b>' +
+        esc(entry.phase) + '</b><span>' + esc(entry.message) +
+        (entry.data === null ? '' : ' · ' + JSON.stringify(entry.data)) + '</span></li>';
+    }).join('');
+  }
+
+  function showInspectorTab(tab) {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-inspector-tab]'), function (button) {
+      button.classList.toggle('active', button.getAttribute('data-inspector-tab') === tab);
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-inspector-panel]'), function (panel) {
+      panel.classList.toggle('active', panel.getAttribute('data-inspector-panel') === tab);
+    });
+  }
+
+  function profileOptions() {
+    var profiles = Game.content.all('worldSpawnProfile').slice().sort(function (a, b) { return a.id.localeCompare(b.id); });
+    var select = document.getElementById('profile-select');
+    var previous = select.value;
+    select.innerHTML = profiles.map(function (profile) {
+      return '<option value="' + esc(profile.id) + '">' + esc(profile.id) + '</option>';
+    }).join('');
+    if (profiles.some(function (profile) { return profile.id === previous; })) select.value = previous;
+    candidateInspection = null;
+  }
+
+  function materializePlan() {
+    actors = [];
+    ['regular', 'npc', 'guardian', 'boss'].forEach(function (channel) {
+      var results = Game.population.mountChannel(region.id, channel, layout, {});
+      results.forEach(function (result) {
+        result.actors.forEach(function (actor) {
+          actor._labChannel = channel;
+          actor._labSlotId = result.slotId;
+          actors.push(actor);
+        });
+      });
+      log('materialize', channel + ' channel mounted', {
+        leases: results.length,
+        actors: results.reduce(function (sum, result) { return sum + result.actors.length; }, 0)
+      });
+    });
+    actorOrigins = {};
+    actorRng = {};
+    actors.forEach(function (actor) {
+      actorOrigins[actor.id] = {
+        x: actor.spawnX === undefined ? actor.x : actor.spawnX,
+        y: actor.spawnY === undefined ? actor.y : actor.spawnY,
+        dir: actor.dir,
+        state: actor.state
+      };
+      actorRng[actor.id] = U.seededRng(U.strSeed(region.id + ':' + layout.worldSeed + ':' + actor.id));
+    });
+    Game.world.entities = actors.slice();
+    Game.world.bossEnt = actors.filter(function (actor) { return actor.rank === 'boss'; })[0] || null;
+    Game.terrain.rebuildDynamicSpatial(actors);
+  }
+
+  function populationLimits() {
+    var regionProfile = Game.content.get('regionProfile', region.id);
+    var view = regionProfile && Game.content.populationView(regionProfile.populationProfileId);
+    return {
+      regular: (layout.threats || []).length,
+      npc: view && view.channels.npc && view.channels.npc.capacity || 0,
+      guardian: layout.guardian ? 1 : 0,
+      boss: 1,
+      rare: 0
+    };
+  }
+
+  function sceneMasters() {
+    masters = {
+      props: (layout.props || []).slice(),
+      nodes: (layout.nodes || []).slice(),
+      landmarks: (layout.landmarks || []).slice(),
+      curios: (layout.curios || []).slice(),
+      ecology: (layout.ecology || []).slice(),
+      tufts: (layout.tufts || []).slice(),
+      flowers: (layout.flowers || []).slice()
+    };
+  }
+
+  function propLayer(prop) {
+    if (prop.campProp) return 'camp';
+    if (prop.kind === 'bossDecor') return 'decorBoss';
+    if (prop.blockerProp) return 'decorBlocker';
+    var definition = (region.terrain.deco || []).filter(function (item) { return item.sprite === prop.sprite; })[0];
+    return definition && definition.placement === 'water' ? 'decorWater' : 'decorGround';
+  }
+
+  function applySceneLayers(remount) {
+    if (!layout) return;
+    layout.props = masters.props.filter(function (prop) { return layers[propLayer(prop)] !== false; });
+    layout.nodes = layers.resources === false ? [] : masters.nodes.slice();
+    layout.landmarks = layers.landmarks === false ? [] : masters.landmarks.slice();
+    layout.curios = layers.curios === false ? [] : masters.curios.slice();
+    layout.ecology = layers.ecology === false ? [] : masters.ecology.slice();
+    layout.tufts = layers.tufts === false ? [] : masters.tufts.slice();
+    layout.flowers = layers.flowers === false ? [] : masters.flowers.slice();
+    if (remount) Game.terrain.mount(layout, region);
+    Game.world.props = layout.props.concat(layout.nodes, layout.landmarks, layout.curios, layout.ecology);
+    Game.world.entities = layers.actors === false ? [] : actors.slice();
+    Game.terrain.rebuildDynamicSpatial(Game.world.entities);
+  }
+
+  function planSignature(plan) {
+    return {
+      ok: plan.ok,
+      reason: plan.reason,
+      regionId: plan.regionId,
+      populationId: plan.populationId,
+      layoutVersion: plan.layoutVersion,
+      contentFingerprint: plan.contentFingerprint,
+      context: plan.context,
+      slots: plan.slots,
+      reservations: plan.reservations,
+      failures: plan.failures
+    };
+  }
+
+  function expectedActorCoordinates(plan) {
+    var out = [];
+    (plan.slots || []).forEach(function (slot) {
+      var profile = Game.content.get('worldSpawnProfile', slot.profileId);
+      var pack = profile && profile.encounterPackId && Game.content.get('encounterPack', profile.encounterPackId);
+      var members = pack ? pack.members : [{
+        slotId: 'actor', archetypeId: profile && profile.actorRef && profile.actorRef.archetypeId
+      }];
+      members.forEach(function (member, index) {
+        var spacing = pack && pack.formation && pack.formation.spacing || 0;
+        var angle = members.length === 1 ? 0 : Math.PI * 2 * index / members.length;
+        out.push({
+          slotId: slot.id,
+          archetypeId: member.archetypeId,
+          x: slot.x + Math.cos(angle) * (index ? spacing : 0),
+          y: slot.y + Math.sin(angle) * (index ? spacing * 0.65 : 0)
+        });
+      });
+    });
+    return out.sort(function (left, right) {
+      return left.slotId.localeCompare(right.slotId) ||
+        left.archetypeId.localeCompare(right.archetypeId) ||
+        left.x - right.x || left.y - right.y;
+    });
+  }
+
+  function mountedActorCoordinates() {
+    return actors.map(function (actor) {
+      var origin = actorOrigins[actor.id] || actor;
+      return {
+        slotId: actor._labSlotId,
+        archetypeId: actor.blueprint.archetypeId,
+        x: origin.x,
+        y: origin.y
+      };
+    }).sort(function (left, right) {
+      return left.slotId.localeCompare(right.slotId) ||
+        left.archetypeId.localeCompare(right.archetypeId) ||
+        left.x - right.x || left.y - right.y;
+    });
+  }
+
+  function verifyDeterminism() {
+    if (!layout) return null;
+    var started = now();
+    var regenerated = Game.terrain.generate(region, layout.worldSeed, 3);
+    var terrainSnapshot = Game.terrain.snapshotV3(regenerated);
+    var previewContext = Object.assign({}, populationContext, { preview: true });
+    var previewPlan = Game.population.prepareRegion(region.id, regenerated, previewContext);
+    var expected = expectedActorCoordinates(previewPlan);
+    var currentCoordinates = mountedActorCoordinates();
+    var result = {
+      ok: true,
+      regionId: region.id,
+      seed: U.hex32(layout.worldSeed),
+      terrain: {
+        match: hash(terrainSnapshot) === generationRecord.terrainHash,
+        expectedHash: generationRecord.terrainHash,
+        actualHash: hash(terrainSnapshot)
+      },
+      population: {
+        match: hash(planSignature(previewPlan)) === generationRecord.populationHash,
+        expectedHash: generationRecord.populationHash,
+        actualHash: hash(planSignature(previewPlan))
+      },
+      actors: {
+        match: hash(expected) === generationRecord.actorCoordinateHash &&
+          hash(currentCoordinates) === generationRecord.actorCoordinateHash,
+        expectedHash: generationRecord.actorCoordinateHash,
+        actualHash: hash(expected),
+        mountedHash: hash(currentCoordinates)
+      },
+      elapsedMs: now() - started
+    };
+    result.ok = result.terrain.match && result.population.match && result.actors.match;
+    result.reportHash = hash(result);
+    log('determinism', result.ok ? 'terrain, population and actor coordinates match' : 'determinism mismatch', result, result.ok ? 'info' : 'error');
+    setStatus(result.ok ? lt('verified') + ' · ' + result.reportHash : lt('mismatch'));
+    return copy(result);
+  }
+
+  function resetPositions() {
+    actors.forEach(function (actor) {
+      var origin = actorOrigins[actor.id];
+      if (!origin) return;
+      actor.x = origin.x;
+      actor.y = origin.y;
+      actor.dir = origin.dir;
+      actor.state = origin.state;
+      actor.moving = false;
+      actor.moveOrder = null;
+      actor.navRoute = null;
+      actor.wanderT = 0.5 + (U.strSeed(actor.id + ':wander') % 1500) / 1000;
+      if (actor.components && actor.components.movement) {
+        actor.components.movement.intent = null;
+        actor.components.movement.path = null;
+        actor.components.movement.moving = false;
+      }
+      actorRng[actor.id] = U.seededRng(U.strSeed(region.id + ':' + layout.worldSeed + ':' + actor.id));
+    });
+    motionAccumulator = 0;
+    Game.terrain.rebuildDynamicSpatial(Game.world.entities);
+    setStatus(lt('reset'));
+    log('motion', 'actor positions reset', { actors: actors.length });
+    return actors.map(function (actor) { return { id: actor.id, x: actor.x, y: actor.y }; });
+  }
+
+  function setMotion(enabled) {
+    enabled = !!enabled;
+    if (!enabled && motion) resetPositions();
+    motion = enabled;
+    document.getElementById('motion-toggle').checked = motion;
+    log('motion', motion ? 'seeded ambient patrol enabled' : 'ambient patrol disabled', { fixedStepMs: 50 });
+    return motion;
+  }
+
+  function updateMotion(dt) {
+    if (!motion) return;
+    motionAccumulator += Math.min(dt, 0.2);
+    while (motionAccumulator >= 0.05) {
+      actors.forEach(function (actor) {
+        if (actor._labChannel !== 'regular' && actor._labChannel !== 'npc') return;
+        Game.world.updateAmbientActor(actor, 0.05, { rng: actorRng[actor.id] });
+      });
+      motionAccumulator -= 0.05;
+    }
+    Game.terrain.rebuildDynamicSpatial(Game.world.entities);
+  }
+
+  function currentSnapshot() {
+    if (!layout) return null;
+    return {
+      lab: 'map-generation',
+      noPlayer: !Game.world.hero && !actors.some(function (actor) { return actor.category === 'player'; }),
+      fogEnabled: false,
+      runtimeHazards: false,
+      regionId: region.id,
+      seed: layout.worldSeed >>> 0,
+      seedHex: U.hex32(layout.worldSeed),
+      layoutVersion: layout.version,
+      terrain: Game.terrain.snapshotV3(layout),
+      validation: copy(validation),
+      populationPlan: planSignature(populationPlan),
+      actors: actors.map(function (actor) {
+        return {
+          id: actor.id,
+          archetypeId: actor.blueprint.archetypeId,
+          category: actor.category,
+          rank: actor.rank,
+          channel: actor._labChannel,
+          slotId: actor._labSlotId,
+          x: actor.x,
+          y: actor.y,
+          spawnX: actorOrigins[actor.id] && actorOrigins[actor.id].x,
+          spawnY: actorOrigins[actor.id] && actorOrigins[actor.id].y,
+          spriteId: actor.components.presentation.spriteId
+        };
+      }),
+      catalogCount: catalogItems.length,
+      audit: { issues: copy(auditIssues), hash: hash(auditIssues) },
+      logs: logs.length,
+      camera: copy(Game.render.cam),
+      minimap: {
+        worldWidth: layout.world.w,
+        worldHeight: layout.world.h,
+        canvasWidth: minimap.width,
+        canvasHeight: minimap.height,
+        hasPlayerIcon: false,
+        viewport: {
+          x: (Game.render.cam.x - stageWrap.clientWidth / Game.render.cam.zoom / 2) / layout.world.w * minimap.width,
+          y: (Game.render.cam.y - stageWrap.clientHeight / Game.render.cam.zoom / 2) / layout.world.h * minimap.height,
+          width: stageWrap.clientWidth / Game.render.cam.zoom / layout.world.w * minimap.width,
+          height: stageWrap.clientHeight / Game.render.cam.zoom / layout.world.h * minimap.height
+        }
+      },
+      layers: copy(layers),
+      motion: motion,
+      selection: selected ? {
+        key: selected.key,
+        kind: selected.kind,
+        id: selected.id,
+        x: selected.x,
+        y: selected.y
+      } : null,
+      contentFingerprint: Game.content.fingerprint(),
+      reportHash: generationRecord && generationRecord.reportHash
+    };
+  }
+
+  function renderMetrics() {
+    if (!layout) return;
+    var sorted = frameSamples.slice().sort(function (a, b) { return a - b; });
+    var average = sorted.length ? sorted.reduce(function (sum, value) { return sum + value; }, 0) / sorted.length : 0;
+    var p95 = sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))] : 0;
+    var cam = Game.render.cam;
+    var viewLeft = cam.x - stageWrap.clientWidth / cam.zoom / 2;
+    var viewTop = cam.y - stageWrap.clientHeight / cam.zoom / 2;
+    var viewRight = cam.x + stageWrap.clientWidth / cam.zoom / 2;
+    var viewBottom = cam.y + stageWrap.clientHeight / cam.zoom / 2;
+    var visibleStatic = Game.terrain.spatialQuery(viewLeft - 48, viewTop - 76, viewRight + 48, viewBottom + 28, false) || [];
+    var visibleDynamic = Game.terrain.spatialQuery(viewLeft - 30, viewTop - 60, viewRight + 30, viewBottom + 30, true) || [];
+    spatialQueries += 2;
+    var values = [
+      [generationRecord.timings.generate.toFixed(1) + ' ms', lt('generation')],
+      [generationRecord.timings.bake.toFixed(1) + ' ms', lt('bake')],
+      [generationRecord.timings.population.toFixed(1) + ' ms', lt('population')],
+      [generationRecord.timings.materialize.toFixed(1) + ' ms', lt('materialize')],
+      [visibleStatic.length + visibleDynamic.length + ' / ' + (Game.world.props.length + Game.world.entities.length), 'drawable'],
+      [average.toFixed(2) + ' / ' + p95.toFixed(2), 'frame avg / P95'],
+      [(window.devicePixelRatio || 1).toFixed(2) + ' / ' + cam.zoom.toFixed(2), 'DPR / zoom'],
+      [spatialQueries, 'spatial queries'],
+      [actors.length, 'actors'],
+      [auditIssues.length, lt('issues')]
+    ];
+    document.getElementById('runtime-metrics').innerHTML = values.map(function (entry) {
+      return '<div class="metric"><strong>' + esc(entry[0]) + '</strong><span>' + esc(entry[1]) + '</span></div>';
+    }).join('');
+  }
+
+  function updateCameraStatus() {
+    if (!layout) return;
+    var cam = Game.render.cam;
+    document.getElementById('camera-status').textContent =
+      'x ' + Math.round(cam.x) + ' · y ' + Math.round(cam.y) + ' · ' + cam.zoom.toFixed(2) + '×';
+  }
+
+  function renderTabs() {
+    document.getElementById('region-tabs').innerHTML = regions.map(function (item, index) {
+      return '<button type="button" class="region-tab' + (index === currentIndex ? ' active' : '') +
+        '" data-region-index="' + index + '"' + (index === currentIndex ? ' aria-current="page"' : '') +
+        '><small>' + String(index + 1).padStart(2, '0') + ' / TIER ' + item.tier + '</small>' +
+        esc(regionName(item)) + '</button>';
+    }).join('');
+  }
+
+  function regenerate(options) {
+    options = options || {};
+    if (options.regionId) {
+      var found = regions.findIndex(function (item) { return item.id === options.regionId; });
+      if (found >= 0) currentIndex = found;
+    }
+    region = regions[currentIndex];
+    var requestedSeed = options.seed;
+    if (typeof requestedSeed === 'string') requestedSeed = parseSeed(requestedSeed);
+    if (!Number.isInteger(requestedSeed)) requestedSeed = seedValue();
+    if (!Number.isInteger(requestedSeed)) requestedSeed = U.randomSeed();
+    requestedSeed = requestedSeed >>> 0;
+    document.getElementById('runtime-status').textContent = lt('generating');
+    setStatus('');
+    log('registry', 'content registry ready', {
+      fingerprint: Game.content.fingerprint(),
+      actors: Game.content.all('actorArchetype').length,
+      spawnProfiles: Game.content.all('worldSpawnProfile').length
+    });
+    Game.population.reset(region.id);
+    Game.parties.reset();
+    Game.actors.reset();
+    Game.state.world.region = region.id;
+    Game.state.world.worldSeed = requestedSeed;
+    Game.state.world.layoutVersion = 3;
+    Game.state.world.worldTime = Game.F.BAL.dayLength * 0.25;
+    Game.state.settings.effects = false;
+    var timings = {};
+    var began = now();
+    layout = Game.terrain.generate(region, requestedSeed, 3);
+    timings.generate = now() - began;
+    log('terrain', 'terrain.generate complete', {
+      regionId: region.id, seed: U.hex32(requestedSeed), elapsedMs: timings.generate,
+      fallback: layout.generation && layout.generation.fallback || null
+    });
+    began = now();
+    validation = Game.terrain.validate(layout, region);
+    timings.validate = now() - began;
+    log('validate', validation.valid ? 'terrain validation passed' : 'terrain validation failed', {
+      elapsedMs: timings.validate, metrics: validation.metrics
+    }, validation.valid ? 'info' : 'error');
+    began = now();
+    Game.terrain.mount(layout, region);
+    timings.bake = now() - began;
+    log('bake', 'terrain mounted and baked', {
+      elapsedMs: timings.bake, props: layout.props.length, world: layout.world
+    });
+    sceneMasters();
+    Game.world.region = Object.assign({}, region, { world: layout.world });
+    Game.world.layout = layout;
+    Game.world.props = [];
+    Game.world.entities = [];
+    Game.world.groundLoot = [];
+    Game.world.hero = null;
+    Game.world.cinematic = null;
+    Game.world.bossEnt = null;
+    if (Game.particles) {
+      Game.particles.setEnabled(false);
+      Game.particles.initRegion(region);
+    }
+    var tier = region.tier || 1;
+    populationContext = {
+      tier: tier,
+      worldSeed: requestedSeed,
+      expeditionIndex: 0,
+      modifiers: [],
+      rewardMultiplier: 1,
+      channelLimits: populationLimits()
+    };
+    began = now();
+    populationPlan = Game.population.prepareRegion(region.id, layout, populationContext);
+    timings.population = now() - began;
+    log('population', 'PopulationMountPlan prepared', {
+      ok: populationPlan.ok, elapsedMs: timings.population,
+      slots: populationPlan.slots.length, failures: populationPlan.failures.length
+    }, populationPlan.ok ? 'info' : 'error');
+    began = now();
+    materializePlan();
+    timings.materialize = now() - began;
+    applySceneLayers(false);
+    miniTerrain = buildMiniTerrain();
+    selected = null;
+    probeState = null;
+    measureState = { a: null, b: null, path: null, report: null };
+    candidateInspection = null;
+    generationRecord = {
+      timings: timings,
+      terrainHash: hash(Game.terrain.snapshotV3(layout)),
+      populationHash: hash(planSignature(populationPlan)),
+      actorCoordinateHash: hash(expectedActorCoordinates(populationPlan))
+    };
+    runAudit();
+    generationRecord.reportHash = hash({
+      terrain: generationRecord.terrainHash,
+      population: generationRecord.populationHash,
+      actors: generationRecord.actorCoordinateHash,
+      audit: auditIssues
+    });
+    rebuildCatalog();
+    profileOptions();
+    rememberSeed(requestedSeed);
+    renderTabs();
+    renderSelection();
+    renderProbe();
+    document.getElementById('seed-input').value = U.hex32(requestedSeed);
+    document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
+    document.getElementById('stage-region-name').textContent = regionName(region);
+    document.getElementById('stage-region-id').textContent = 'region / ' + region.id + ' · layout v' + layout.version;
+    document.getElementById('runtime-status').textContent = lt('ready');
+    document.getElementById('runtime-count').textContent = actors.length + ' actors · ' + masters.props.length + ' props';
+    setCamera(options.keepCamera && options.camera ? options.camera.x : layout.camp.x,
+      options.keepCamera && options.camera ? options.camera.y : layout.camp.y,
+      options.keepCamera && options.camera ? options.camera.zoom : 1.45);
+    updateUrl();
+    renderMetrics();
+    log('renderer', 'renderer ready', { camera: copy(Game.render.cam), particles: false, fog: false, player: false });
+    return currentSnapshot();
+  }
+
+  function randomize() {
+    var seed = U.randomSeed();
+    regenerate({ seed: seed });
+    return seed;
+  }
+
+  function setLayer(name, enabled) {
+    if (!Object.prototype.hasOwnProperty.call(layers, name)) return false;
+    layers[name] = enabled !== false;
+    if (name === 'terrainMaterial' || name === 'liquid') {
+      Game.terrain.renderLayers = Game.terrain.renderLayers || {};
+      Game.terrain.renderLayers[name === 'terrainMaterial' ? 'material' : 'liquid'] = layers[name];
+    }
+    var input = document.querySelector('[data-layer="' + name + '"]');
+    if (input) input.checked = layers[name];
+    if (/^(camp|decor|tufts|flowers|landmarks|resources|curios|ecology|actors)/.test(name)) {
+      applySceneLayers(name !== 'actors');
+    }
+    log('renderer', 'layer changed', { layer: name, enabled: layers[name] });
+    return layers[name];
+  }
+
+  function handleToolPoint(point) {
+    point.x = clamp(point.x, 0, layout.world.w);
+    point.y = clamp(point.y, 0, layout.world.h);
+    if (tool === 'inspect') return inspectAt(point);
+    if (tool === 'measure') return measure(point);
+    return placementProbe(null, point);
+  }
+
+  function stagePointerDown(event) {
+    stagePointers[event.pointerId] = {
+      x: event.clientX, y: event.clientY,
+      lastX: event.clientX, lastY: event.clientY,
+      startX: event.clientX, startY: event.clientY,
+      startZoom: Game.render.cam.zoom,
+      moved: false
+    };
+    try { overlay.setPointerCapture(event.pointerId); } catch (_) {}
+    stageWrap.classList.add('is-panning');
+  }
+
+  function pointerPair() {
+    return Object.keys(stagePointers).map(function (id) { return stagePointers[id]; });
+  }
+
+  function stagePointerMove(event) {
+    var pointer = stagePointers[event.pointerId];
+    if (!pointer) return;
+    var previousX = pointer.x, previousY = pointer.y;
+    pointer.x = event.clientX; pointer.y = event.clientY;
+    if (U.dist(pointer.startX, pointer.startY, pointer.x, pointer.y) > 5) pointer.moved = true;
+    var points = pointerPair();
+    if (points.length === 1) {
+      var cam = Game.render.cam;
+      setCamera(cam.x - (pointer.x - previousX) / cam.zoom, cam.y - (pointer.y - previousY) / cam.zoom, cam.zoom);
+    } else if (points.length === 2) {
+      var first = points[0], second = points[1];
+      var currentDistance = Math.max(20, U.dist(first.x, first.y, second.x, second.y));
+      var oldDistance = Math.max(20, U.dist(first.lastX, first.lastY, second.lastX, second.lastY));
+      var centerX = (first.x + second.x) / 2;
+      var centerY = (first.y + second.y) / 2;
+      var rect = overlay.getBoundingClientRect();
+      zoomAt(centerX - rect.left, centerY - rect.top, Game.render.cam.zoom * currentDistance / oldDistance);
+      first.moved = second.moved = true;
+    }
+    pointer.lastX = pointer.x; pointer.lastY = pointer.y;
+  }
+
+  function stagePointerEnd(event) {
+    var pointer = stagePointers[event.pointerId];
+    if (!pointer) return;
+    var rect = overlay.getBoundingClientRect();
+    var clickPoint = screenToWorld(event.clientX - rect.left, event.clientY - rect.top);
+    var wasMoved = pointer.moved || Object.keys(stagePointers).length > 1;
+    delete stagePointers[event.pointerId];
+    if (!Object.keys(stagePointers).length) stageWrap.classList.remove('is-panning');
+    if (!wasMoved) handleToolPoint(clickPoint);
+  }
+
+  function zoomAt(screenX, screenY, nextZoom) {
+    var before = screenToWorld(screenX, screenY);
+    var cam = Game.render.cam;
+    nextZoom = clamp(nextZoom, 0.4, 3.4);
+    var nextX = before.x - (screenX - stageWrap.clientWidth / 2) / nextZoom;
+    var nextY = before.y - (screenY - stageWrap.clientHeight / 2) / nextZoom;
+    setCamera(nextX, nextY, nextZoom);
+  }
+
+  function miniWorldFromEvent(event) {
+    var rect = minimap.getBoundingClientRect();
+    return {
+      x: clamp((event.clientX - rect.left) / rect.width, 0, 1) * layout.world.w,
+      y: clamp((event.clientY - rect.top) / rect.height, 0, 1) * layout.world.h
+    };
+  }
+
+  function moveCameraFromMini(event, selectMarker) {
+    var point = miniWorldFromEvent(event);
+    setCamera(point.x, point.y, Game.render.cam.zoom);
+    if (selectMarker) {
+      var threshold = 12 / minimap.clientWidth * layout.world.w;
+      var nearest = nearestObject(point.x, point.y, threshold);
+      if (nearest) {
+        selectObject(nearest.item);
+        setCamera(nearest.item.x, nearest.item.y, Game.render.cam.zoom);
+        showInspectorTab('selection');
+      }
+    }
+  }
+
+  function exportPng() {
+    var stage = document.getElementById('stage');
+    var output = document.createElement('canvas');
+    output.width = stage.width;
+    output.height = stage.height;
+    var ctx = output.getContext('2d');
+    ctx.drawImage(stage, 0, 0);
+    ctx.drawImage(overlay, 0, 0, output.width, output.height);
+    output.toBlob(function (blob) {
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = 'map-lab-' + region.id + '-' + U.hex32(layout.worldSeed) + '.png';
+      link.click();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      setStatus(lt('png'));
+    }, 'image/png');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text);
+    }
+    var textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+    return Promise.resolve();
   }
 
   function bindEvents() {
-    Game.bus.on('gather:start', function (p) { setExplorationEvent(tr('gatherStart') + ' · ' + materialName(p.material)); });
-    Game.bus.on('gather:done', function (p) {
-      setExplorationEvent(tr('gatherDone') + ' · +' + p.count + ' ' + materialName(p.material));
-      restoreAutoAfterQa();
-    });
-    Game.bus.on('gather:interrupted', function () { setExplorationEvent(tr('interrupted')); restoreAutoAfterQa(); });
-    Game.bus.on('chest:opened', function (p) {
-      setExplorationEvent(tr('chestOpened') + ' · +' + p.gold + ' ' + tr('gold'));
-      restoreAutoAfterQa();
-    });
-    Game.bus.on('chest:expired', function () { setExplorationEvent(tr('chestExpired')); restoreAutoAfterQa(); });
-  }
-
-  function activateRegion(index) {
-    currentIndex = (index + regions.length) % regions.length;
-    var region = regions[currentIndex];
-    qaRestoreAuto = false;
-    Game.state.settings.controlMode = 'auto';
-    Game.state.world.region = region.id;
-    Game.state.world.layoutVersion = 3;
-    Game.state.world.mode = 'battle';
-    Game.state.world.deathsRow = 0;
-    Game.state.player.level = 1 + Math.max(0, region.tier - 1) * 9;
-    Game.state.player.exp = 0;
-    Game.state.player.skills = {};
-    Game.player.recalc();
-    Game.state.player.hp = Game.state.derived.maxHp;
-    Game.world.init(region.id);
-    updateUrl(region.id);
-    document.getElementById('seed-input').value = U.hex32(Game.state.world.worldSeed);
-    document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
-    document.getElementById('stage-region-name').textContent = regionName(region);
-    document.getElementById('stage-region-id').textContent = 'region / ' + region.id + ' · layout v' + Game.world.layout.version;
-    setExplorationEvent(regionName(region) + ' · ' + tr('regionReady') + ' · ' + Game.world.layout.nodes.length + ' ' + tr('resources'));
-    renderTabs();
-    renderInspector(region);
-    updateRuntime(true);
-  }
-
-  function setTimeMode(mode) {
-    timeMode = mode;
-    var dayLength = Game.F.BAL.dayLength;
-    if (mode === 'day') Game.state.world.worldTime = dayLength * 0.28;
-    if (mode === 'dusk') Game.state.world.worldTime = dayLength * 0.56;
-    if (mode === 'night') Game.state.world.worldTime = dayLength * 0.82;
-    Array.prototype.forEach.call(document.querySelectorAll('[data-time]'), function (button) {
-      button.classList.toggle('active', button.getAttribute('data-time') === mode);
-    });
-  }
-
-  function syncPauseUi() {
-    var button = document.getElementById('toggle-play');
-    button.textContent = paused ? '\u25b6' : '\u2161';
-    button.title = paused ? D.t('common.resume') : D.t('common.pause');
-    button.setAttribute('aria-label', button.title);
-    document.getElementById('runtime-status').textContent = paused ? D.t('common.paused') : D.t('map.runtime');
-  }
-
-  function bindControls() {
     document.getElementById('region-tabs').addEventListener('click', function (event) {
       var button = event.target.closest('[data-region-index]');
-      if (button) activateRegion(Number(button.getAttribute('data-region-index')));
+      if (!button) return;
+      currentIndex = Number(button.getAttribute('data-region-index'));
+      regenerate({ seed: seedValue() });
     });
-    document.getElementById('prev-region').addEventListener('click', function () { activateRegion(currentIndex - 1); });
-    document.getElementById('next-region').addEventListener('click', function () { activateRegion(currentIndex + 1); });
-    document.getElementById('toggle-play').addEventListener('click', function () {
-      paused = !paused;
-      syncPauseUi();
+    document.getElementById('prev-region').addEventListener('click', function () {
+      currentIndex = (currentIndex - 1 + regions.length) % regions.length;
+      regenerate({ seed: seedValue() });
     });
-    document.getElementById('effects-toggle').addEventListener('change', function () { Game.particles.setEnabled(this.checked); });
-    document.getElementById('spawn-dynamic-trade').addEventListener('click', function () {
-      var hero = Game.world.hero;
-      Game.trade.clearDynamic();
-      Game.trade.registerDynamic({
-        id: 'qa-wanderer', regionId: Game.world.region.id, kind: 'wander',
-        x: U.clamp(hero.x + 74, 40, Game.world.layout.world.w - 40),
-        y: U.clamp(hero.y + 22, Game.world.BOUND_TOP + 24, Game.world.layout.world.h - 24),
-        radius: 62, catalogs: ['camp-general'], priority: 30,
-        nameKey: 'tradeArea.generic', prop: { style: 'supply-cart' }
-      }, { ttl: 20 });
-      updateRuntime(true);
+    document.getElementById('next-region').addEventListener('click', function () {
+      currentIndex = (currentIndex + 1) % regions.length;
+      regenerate({ seed: seedValue() });
     });
-    document.getElementById('focus-gather').addEventListener('click', focusReadyNode);
-    document.getElementById('reset-gather').addEventListener('click', revealAllResources);
-    document.getElementById('spawn-common-chest').addEventListener('click', function () { spawnQaChest(false); });
-    document.getElementById('spawn-rare-chest').addEventListener('click', function () { spawnQaChest(true); });
+    document.getElementById('regenerate').addEventListener('click', function () { regenerate({ seed: seedValue() }); });
     document.getElementById('seed-form').addEventListener('submit', function (event) {
       event.preventDefault();
-      var input = document.getElementById('seed-input');
-      var seed = parseSeed(input.value);
+      var seed = seedValue();
       if (seed === null) {
-        input.setCustomValidity(tr('seedError'));
-        input.reportValidity();
+        document.getElementById('seed-input').setCustomValidity('1–8 hex digits');
+        document.getElementById('seed-input').reportValidity();
         return;
       }
-      input.setCustomValidity('');
-      Game.state.world.worldSeed = seed;
-      Game.state.world.exploration = {};
-      activateRegion(currentIndex);
+      document.getElementById('seed-input').setCustomValidity('');
+      regenerate({ seed: seed });
     });
-    document.querySelector('.segmented').addEventListener('click', function (event) {
-      var button = event.target.closest('[data-time]');
-      if (button) setTimeMode(button.getAttribute('data-time'));
+    document.getElementById('seed-prev').addEventListener('click', function () { regenerate({ seed: ((seedValue() || 0) - 1) >>> 0 }); });
+    document.getElementById('seed-next').addEventListener('click', function () { regenerate({ seed: ((seedValue() || 0) + 1) >>> 0 }); });
+    document.getElementById('seed-random').addEventListener('click', randomize);
+    document.addEventListener('click', function (event) {
+      var recent = event.target.closest('[data-recent-seed]');
+      if (recent) regenerate({ seed: parseSeed(recent.getAttribute('data-recent-seed')) });
     });
-    document.querySelector('.focus-actions').addEventListener('click', function (event) {
-      var button = event.target.closest('[data-focus]');
-      if (!button) return;
-      var focus = button.getAttribute('data-focus');
-      if (focus === 'camp') setHeroPosition(Game.world.layout.camp.x + 24, Game.world.layout.camp.y + 18);
-      if (focus === 'center') {
-        var landmark = Game.world.layout.landmarks[1] || Game.world.layout.landmarks[0];
-        setHeroPosition(landmark.x - 28, landmark.y + 12);
-      }
-      if (focus === 'boss') setHeroPosition(Game.world.layout.bossPoint.x - 48, Game.world.layout.bossPoint.y + 12);
+    document.getElementById('copy-link').addEventListener('click', function () {
+      var url = new URL(location.href);
+      url.searchParams.set('region', region.id);
+      url.searchParams.set('seed', U.hex32(layout.worldSeed));
+      copyText(url.href).then(function () { setStatus(lt('copied')); });
     });
-    document.querySelector('.strategy-actions').addEventListener('click', function (event) {
-      var button = event.target.closest('[data-strategy]');
-      if (!button) return;
-      Game.expeditionAI.setStrategy(button.getAttribute('data-strategy'));
-      Array.prototype.forEach.call(document.querySelectorAll('[data-strategy]'), function (item) {
-        item.classList.toggle('active', item === button);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-focus]'), function (button) {
+      button.addEventListener('click', function () { focus(button.getAttribute('data-focus')); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (button) {
+      button.addEventListener('click', function () {
+        tool = button.getAttribute('data-tool');
+        Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (other) {
+          other.classList.toggle('active', other === button);
+        });
+        probeState = null;
+        if (tool !== 'measure') measureState = { a: null, b: null, path: null, report: null };
+        renderProbe();
       });
-      renderInspector(Game.world.region);
     });
-    window.addEventListener('keydown', function (event) {
-      if (event.target && /input|textarea|select/i.test(event.target.tagName)) return;
-      if (event.key === '[') activateRegion(currentIndex - 1);
-      if (event.key === ']') activateRegion(currentIndex + 1);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-layer]'), function (input) {
+      layers[input.getAttribute('data-layer')] = input.checked;
+      input.addEventListener('change', function () { setLayer(input.getAttribute('data-layer'), input.checked); });
+    });
+    document.getElementById('profile-select').addEventListener('change', function () {
+      candidateInspection = Game.population.inspectCandidates(
+        this.value, layout, inferProfileChannel(this.value), populationContext,
+        populationPlan && populationPlan.reservations || []
+      );
+    });
+    document.getElementById('motion-toggle').addEventListener('change', function () { setMotion(this.checked); });
+    document.getElementById('clear-probe').addEventListener('click', function () {
+      probeState = null; candidateInspection = null;
+      measureState = { a: null, b: null, path: null, report: null };
+      renderProbe();
+    });
+    document.getElementById('issue-prev').addEventListener('click', function () { focusIssue(-1); });
+    document.getElementById('issue-next').addEventListener('click', function () { focusIssue(1); });
+    document.getElementById('verify-determinism').addEventListener('click', verifyDeterminism);
+    document.getElementById('reset-positions').addEventListener('click', resetPositions);
+    document.getElementById('export-png').addEventListener('click', exportPng);
+    document.getElementById('copy-report').addEventListener('click', function () {
+      copyText(JSON.stringify({ snapshot: currentSnapshot(), logs: logs }, null, 2))
+        .then(function () { setStatus(lt('copied')); });
+    });
+    document.getElementById('clear-log').addEventListener('click', function () {
+      logs = []; renderLogs(); setStatus(lt('logCleared'));
+    });
+    document.getElementById('catalog-search').addEventListener('input', renderCatalog);
+    document.getElementById('catalog-scope').addEventListener('change', renderCatalog);
+    document.getElementById('catalog-category').addEventListener('change', renderCatalog);
+    document.getElementById('catalog-list').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-catalog-index]');
+      if (!button) return;
+      var item = catalogItems[Number(button.getAttribute('data-catalog-index'))];
+      if (!item) return;
+      if (item.positions && item.positions.length) {
+        selectObject(item.positions[0]);
+        focus(item.positions[0]);
+      } else {
+        selectObject({
+          key: item.key, kind: item.kind, id: item.id, name: item.name,
+          sprite: item.sprite, data: item.data
+        });
+      }
+      showInspectorTab('selection');
+    });
+    document.getElementById('issues-panel').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-issue-index]');
+      if (!button) return;
+      issueIndex = Number(button.getAttribute('data-issue-index'));
+      var issue = auditIssues[issueIndex];
+      if (Number.isFinite(issue.x)) setCamera(issue.x, issue.y, Math.max(1.7, Game.render.cam.zoom));
+      renderIssues();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-inspector-tab]'), function (button) {
+      button.addEventListener('click', function () { showInspectorTab(button.getAttribute('data-inspector-tab')); });
+    });
+    overlay.addEventListener('pointerdown', stagePointerDown);
+    overlay.addEventListener('pointermove', stagePointerMove);
+    overlay.addEventListener('pointerup', stagePointerEnd);
+    overlay.addEventListener('pointercancel', stagePointerEnd);
+    overlay.addEventListener('wheel', function (event) {
+      event.preventDefault();
+      var rect = overlay.getBoundingClientRect();
+      zoomAt(event.clientX - rect.left, event.clientY - rect.top,
+        Game.render.cam.zoom * Math.exp(-clamp(event.deltaY, -240, 240) * 0.0016));
+    }, { passive: false });
+    minimap.addEventListener('pointerdown', function (event) {
+      miniDrag = false;
+      minimap.setPointerCapture(event.pointerId);
+      moveCameraFromMini(event, true);
+    });
+    minimap.addEventListener('pointermove', function (event) {
+      if (!minimap.hasPointerCapture(event.pointerId)) return;
+      miniDrag = true;
+      moveCameraFromMini(event, false);
+    });
+    minimap.addEventListener('pointerup', function (event) {
+      if (!miniDrag) moveCameraFromMini(event, true);
+      miniDrag = false;
+    });
+    window.addEventListener('resize', function () {
+      resizeOverlay();
+      setCamera(Game.render.cam.x, Game.render.cam.y, Game.render.cam.zoom);
+    });
+    window.addEventListener('demo:locale', function () {
+      renderTabs(); rebuildCatalog(); renderSelection(); renderProbe(); renderMetrics();
     });
   }
 
-  function frame(now) {
-    var dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
-    lastFrame = now;
-    if (!paused) {
-      if (timeMode === 'cycle') Game.state.world.worldTime = (Game.state.world.worldTime + dt) % Game.F.BAL.dayLength;
-      Game.terrain.update(dt);
-      Game.particles.update(dt);
-      Game.fx.update(dt);
-      Game.world.update(dt);
-      Game.trade.update();
-      Game.actionBubbles.update(dt);
+  function frame(timestamp) {
+    var dt = Math.min(0.1, Math.max(0, (timestamp - lastFrame) / 1000));
+    lastFrame = timestamp;
+    var began = now();
+    if (layout) {
+      updateMotion(dt);
+      if (Game.nav && Game.nav.update) Game.nav.update(2);
+      if (Game.terrain && Game.terrain.update) Game.terrain.update(dt);
+      if (Game.fx && Game.fx.update) Game.fx.update(dt);
+      Game.render.frame(dt);
+      drawOverlay();
+      drawMinimap();
+      updateCameraStatus();
+      if (timestamp - lastMetricsPaint > 800) {
+        renderMetrics();
+        lastMetricsPaint = timestamp;
+      }
     }
-    Game.render.frame(paused ? 0 : dt);
-    updateRuntime();
+    frameSamples.push(now() - began);
+    if (frameSamples.length > 240) frameSamples.shift();
     requestAnimationFrame(frame);
   }
 
-  D.init();
-  Game.content.finalize({ strict: true });
-  regions = Game.reg.all('region');
-  Game.ui.modals.init();
-  Game.state = Game.State.newGame();
-  Game.i18n.setLocale(D.locale());
-  Game.state.world.layoutVersion = 3;
-  var params = queryParams();
-  var querySeed = parseSeed(params.get('seed'));
-  if (querySeed !== null) Game.state.world.worldSeed = querySeed;
-  Game.state.world.regionOrder = Game.reg.ids('region');
-  Game.state.settings.autoAdvance = false;
-  Game.state.settings.autoEquip = false;
-  Game.state.settings.autoCampRest = false;
-  Game.state.settings.groundLoot = false;
-  Game.state.settings.expeditionStrategy = 'balanced';
-  Game.player.setClass('fighter');
-  Game.render.init(document.getElementById('stage'));
-  bindControls();
-  bindEvents();
-  var initialId = params.get('region') || location.hash.slice(1);
-  var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
-  activateRegion(initialIndex >= 0 ? initialIndex : 0);
-  window.addEventListener('demo:locale', function () {
-    renderTabs();
-    document.getElementById('stage-region-name').textContent = regionName(Game.world.region);
-    renderInspector(Game.world.region);
-    setExplorationEvent(Game.world.region.id + ' · ' + tr('regionReady'));
-    updateRuntime(true);
-  });
-  requestAnimationFrame(frame);
+  function init() {
+    D.init();
+    var audit = Game.content.finalize({ strict: true });
+    if (!audit.ok) throw new Error('[MapGenerationLab] content registry audit failed');
+    Game.state = Game.State.newGame();
+    Game.state.settings.lang = D.locale();
+    Game.state.settings.effects = false;
+    Game.i18n.setLocale(D.locale());
+    Game.render.init(document.getElementById('stage'));
+    if (Game.particles) Game.particles.setEnabled(false);
+    regions = Game.reg.all('region');
+    var params = new URLSearchParams(location.search);
+    var rid = params.get('region');
+    var found = regions.findIndex(function (item) { return item.id === rid; });
+    currentIndex = found >= 0 ? found : 0;
+    var seed = parseSeed(params.get('seed'));
+    bindEvents();
+    regenerate({ seed: seed === null ? 0x89ABCDEF : seed });
+    window.MapGenerationLab = {
+      regenerate: regenerate,
+      randomize: randomize,
+      catalog: function () { return copy(catalogItems); },
+      snapshot: currentSnapshot,
+      logs: function () { return copy(logs); },
+      focus: focus,
+      setCamera: setCamera,
+      setLayer: setLayer,
+      setMotion: setMotion,
+      probe: placementProbe,
+      inspect: inspectAt,
+      measure: measure,
+      verifyDeterminism: verifyDeterminism,
+      resetPositions: resetPositions
+    };
+    requestAnimationFrame(frame);
+  }
+
+  init();
 })();

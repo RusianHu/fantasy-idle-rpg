@@ -14,7 +14,7 @@
   - 正式内容为 5 职业、30 Talent、32 个常驻普通怪、1 个含三阶 Variant 的条件型噬宝匣、8 个 Boss、8 个区域召唤 Actor、16 个 EncounterProfile 与 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v16，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social`、按布局清理的 Hazard 发现/绝对冷却，以及噬宝匣判定序号/真箱保护计数）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、活动噬宝匣、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要；自动养成使用无副作用角色预览，并把该摘要合入确定性输出/生存/收益评分。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
-  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab，`tech-demos/map-effects` 为开放世界现场，`tech-demos/hazards` 为 Hazard 状态与特效 Lab；正式入口及四个工作台只加载同一个确定性 `content.generated.js`，Node 工具从 `*.pack.js` / `*.support.js` 文件系统真源独立校验产物。
+  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，复用正式 terrain、renderer、Population 与 Actor 链路，并提供交互小地图、检查/寻路/放置探针、按当前地图关联且完整分类的内容目录、审计、确定性复验和固定 50ms 巡游预览；`tech-demos/exploration-v3` 独立负责导航网格、长途路径与多 Seed 拓扑审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab。正式入口及四个工作台只加载同一个确定性 `content.generated.js`，Node 工具从 `*.pack.js` / `*.support.js` 文件系统真源独立校验产物。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）
@@ -106,7 +106,7 @@
   - 每区生成 14–18 个宏观中心、MST 主骨架、3–5 条环路与营地到 Boss 的低重叠替代路线；60–70% 可行走格全部归入主连通分量，必要路线净宽至少 48px。河流、悬崖、密林、塌方、熔岩、虚空和残墙提供真实硬阻挡。
   - 16px 导航格同时保存阻挡、材质、危险、宏观归属和阻挡距离。长途移动先固定为可随目标/token/策略变化即时打断的宏观航点行程，再逐段运行局部 A*；局部路径按 0.6s 刷新但未抵达当前航点时不得重新推断宏观下一站，避免分区边界往返。静态缓存区分失败结果，请求队列遵守 2ms 单帧预算且预算完成后下一帧立即接续；扫掠碰撞停滞会丢弃局部缓存并在同一宏观航段恢复。点触与键盘均使用分轴滑动及合法点投影，不允许直线穿墙兜底。
   - 地图面板在可见期间同步角色位置、迷雾、准备度与图鉴标记：角色覆盖层限频轻绘，迷雾/图鉴底图由聚合事件驱动并限频重绘；支持 `1×–3×` 按钮、连续滚轮/触控板和双指捏合缩放及单指拖动，缩放锚点保持稳定，到达边界后释放滚轮；离开面板或页面隐藏后停止绘制并注销监听，缩放与拖动期间禁止整面板或底图重建。
-  - 地表以 512px 形成 5×3 区块，视口与一圈预加载区使用 LRU；动态实体与交互物进入空间桶。区块材质保留微纹理、宽域色斑、花簇、边缘与营地地面；每图至少 550 个环境实体、至少 350 个大型阻挡外观，营地关键点强制干燥。迷雾为 32px Base64 bitset，约 80px 视野受硬阻挡遮挡，只有真实合法步行揭雾，未知迷雾完全遮蔽底层。
+  - 地表以 512px 形成 5×3 区块，视口与一圈预加载区使用 LRU；动态实体与交互物进入空间桶。区块材质保留微纹理、宽域色斑、花簇、边缘与营地地面；每图至少 550 个环境实体、至少 350 个大型阻挡外观，营地关键点强制干燥。迷雾为 32px Base64 bitset，约 120px 视野受硬阻挡遮挡，只有真实合法步行揭雾，未知迷雾完全遮蔽底层。
   - 每区注册 4 个地标、5 类资源与 16–22 个节点、3 件奇物、2 条稀有生态、6–9 个威胁领地、1 个守门精英和 1 个 Boss 巢穴。准备度达到 70 且发现巢穴后方可在巢穴实体处挑战 Boss；95% 揭雾并收齐全部图鉴视为区域 100%。自动采集要求节点已揭示，揭示后即可立即采集，枯竭节点使用独立地痕。
   - 永久世界与动态远征分层：远征异常、生态、威胁和词缀由 `worldSeed + regionId + expeditionIndex` 独立确定。`Game.expeditionAI` 提供安全/均衡/掠夺三种策略，仅使用已揭示情报，并具备局部重算、合法前沿投影和目标屏蔽三级恢复，前沿目标具备稳定 ID、可走净宽校验与失败屏蔽；导航层恢复同时覆盖“前往巢穴”等玩家长途指令。
   - Threat territory 的巡逻终点与 Encounter 入口统一受 pack anchor/leash 约束，并预留接敌边界余量；角色位于 leash 外时保持目标锁定并继续接近，不得创建会在首个固定 tick 立即 `leash` 结束的伪 Encounter。

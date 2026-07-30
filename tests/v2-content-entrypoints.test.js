@@ -28,6 +28,11 @@ for (const entrypoint of [
   'tech-demos/hazards/hazards.html'
 ]) {
   const html = read(entrypoint);
+  if (entrypoint.includes('map-effects')) {
+    assert.doesNotMatch(html, /js\/render\/combat_presentation\.js/,
+      `${entrypoint} deliberately excludes combat presentation`);
+    continue;
+  }
   assert.match(html, /js\/render\/effects\.js\?v=[^"]+"><\/script>\s*<script src="[^"]*js\/render\/combat_presentation\.js\?v=/,
     `${entrypoint} loads the production combat presentation adapter after FX`);
 }

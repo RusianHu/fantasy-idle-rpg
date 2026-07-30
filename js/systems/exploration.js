@@ -7,7 +7,7 @@
   var U = Game.util, bus = Game.bus, reg = Game.reg;
   var FOG_CELL = 32;
   var FOG_VERSION = 1;
-  var FOV_RADIUS = 80;
+  var FOV_RADIUS = 200;
   var FRONTIER_HORIZON = 520;
   var cache = {};
   var pendingFog = null;

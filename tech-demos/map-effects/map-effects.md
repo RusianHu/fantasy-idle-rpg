@@ -1,24 +1,25 @@
-# 开放世界现场技术验证
+# 地图生成、渲染与放置 Lab
 
-入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面通过当前 `Game.State.newGame()` 创建与正式存档隔离的 v15 QA 状态，固定使用 `layoutVersion:3`，并直接运行统一内容编译、Actor/Encounter、`terrain_v3 → exploration → expedition_ai → world → renderer` 生产链路。
+入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面固定使用 `layoutVersion:3`，按 `terrain.generate / validate / mount → Population.prepareRegion → Actor materialize → audit → renderer` 运行正式链路，但不调用 `Game.world.init()`。
 
 ## 验证范围
 
-- 八区 2400×1440 开放地图：宏观中心/环路、硬阻挡、48px 最小净宽、5×3 区块与 60–70% 可行走率。
-- 每区 4 地标、5 类资源与 16–22 节点、3 奇物、2 稀有生态、6–9 威胁领地、守门精英与 Boss 巢穴。
-- 永久迷雾、图鉴发现、准备度，以及安全/均衡/掠夺三种 `Game.expeditionAI` 策略。
-- 正式日夜、视差、环境粒子、角色/怪物/资源渲染、战斗与动作气泡。
-- 正式节点冷却/揭示门禁、普通/稀有宝箱落点与动态交易域 TTL。
+- 八区 2400×1440 地形、液体、导航、区块、装饰、营地、地标、资源、奇物、生态、威胁、Hazard 锚点及 Population Actor。
+- 无玩家、无迷雾、无存档读写；不创建战斗、运行时 Hazard、探索 AI、宝箱或交易状态。
+- 全图小地图支持点击和拖动镜头、视口框同步、地点/Actor/错误标记与对象聚焦。
+- 检查、正式导航测距、SpawnProfile 放置探针、放置审计、确定性复验及固定 50ms 的 Seeded 巡游预览。
 
-## QA 控制
+## 目录
 
-- 世界种子接受 1–8 位十六进制；区域、种子与语言同步到 URL，便于复现。
-- 营地/地标/Boss 巢穴镜头会把角色投影到合法可行走点并揭示附近迷雾。
-- 「定位成熟资源」进入手动 QA 状态并定位最近资源；「揭示附近资源」恢复并揭示本区全部资源。
-- 宝箱按钮只固定稀有判定，落点仍使用 `Game.environment.spawnChest()` 的正式合法性检查。
-- 临时游商使用 `Game.trade.registerDynamic(area,{ttl:20})`，到期通过生产更新链移除。
-- 右侧检查器只展示本次生成结果，包括验证报告、内容数量、实际资源目录、环境实体与当前 AI 状态。
+- 默认范围为“当前地图”；切换地图后自动重建区域关联。可切换到“全部地图定义”审查跨区注册表。
+- “全部类别”按类别分段，不把不同类型平铺在同一列表；选择分类后只显示一个精确 `category`。
+- 单位拆分为普通怪物、Boss、NPC、和平生物、召唤物和 Object。
+- 地图内容拆分为可采集资源、宝箱、普通地标、Boss 巢穴、奇物、生态、威胁、Hazard 定义、Hazard 锚点和营地组件。
+- 装饰拆分为阻挡、地表、水域、Boss 领地、草簇、花朵及地形材质。
+- 当前实例关联坐标并可聚焦；未挂载单位、召唤物、Hazard 和普通/稀有宝箱只显示正式定义与 `0` 实例，不向地图注入运行时对象。
 
-## 兼容边界
+## QA 接口
 
-v1/v2 生成器仍由自动测试保护，但不再作为本页默认现场。历史 900×520、3–5 节点与 v7 存档说明只属于兼容协议，不代表当前正式游戏。
+`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`verifyDeterminism` 和 `resetPositions`。
+
+长途导航、拓扑可视化和多 Seed 批量审计仍由 `tech-demos/exploration-v3` 独立负责。

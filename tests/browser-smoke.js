@@ -3529,131 +3529,215 @@ async function run() {
     await cdp.navigate(BASE + 'tech-demos/map-effects/map-effects.html?seed=89ABCDEF&region=lavacave');
     const demo = await cdp.evaluate(`(() => {
       const ids = [
-        'prev-region', 'toggle-play', 'next-region', 'seed-input',
-        'focus-gather', 'reset-gather', 'spawn-common-chest', 'spawn-rare-chest'
+        'prev-region', 'regenerate', 'next-region', 'seed-input',
+        'seed-random', 'profile-select', 'motion-toggle', 'verify-determinism'
       ];
       const within = ids.every((id) => {
         const r = document.getElementById(id).getBoundingClientRect();
         return r.left >= 0 && r.right <= innerWidth && r.width > 0;
       });
-      const segments = Array.from(document.querySelectorAll('[data-time]')).every((el) => {
-        const r = el.getBoundingClientRect();
-        return r.left >= 0 && r.right <= innerWidth;
-      });
       const canvas = document.getElementById('stage');
+      const minimap = document.getElementById('minimap');
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      const miniPixels = minimap.getContext('2d').getImageData(0, 0, minimap.width, minimap.height).data;
       const colors = new Set();
       const explorationIds = Object.keys(Game.EXPLORATION_SPRITES?.assets || {});
-      const region = Game.world.region;
-      const layout = Game.world.layout;
-      const mountPlan = Game.population.mountPlan();
-      const inspectorCount = (kind) => document.querySelectorAll('[data-inspector-kind="' + kind + '"]').length;
       for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1000 / 4) * 4)) {
         colors.add(pixels[i] + ',' + pixels[i + 1] + ',' + pixels[i + 2]);
       }
+      const miniPainted = Array.from(miniPixels).some((value, index) => index % 4 !== 3 && value !== 0);
+      const snapshot = MapGenerationLab.snapshot();
+      const catalog = MapGenerationLab.catalog();
+      const catalogScope = document.getElementById('catalog-scope');
+      const defaultCatalogScope = catalogScope.value;
+      const regionCatalogIndexes = Array.from(document.querySelectorAll('[data-catalog-index]'))
+        .map((button) => Number(button.dataset.catalogIndex));
+      const regionCatalog = regionCatalogIndexes.map((index) => catalog[index]);
+      const categoryValues = Array.from(document.getElementById('catalog-category').options)
+        .map((option) => option.value);
+      catalogScope.value = 'all';
+      catalogScope.dispatchEvent(new Event('change', { bubbles: true }));
+      const allCatalogCount = document.querySelectorAll('[data-catalog-index]').length;
+      catalogScope.value = 'region';
+      catalogScope.dispatchEvent(new Event('change', { bubbles: true }));
+      const regionGroupCategories = Array.from(document.querySelectorAll('[data-catalog-group]'))
+        .map((group) => group.dataset.catalogGroup);
+      const groupsAreExact = Array.from(document.querySelectorAll('[data-catalog-group]'))
+        .every((group) => Array.from(group.querySelectorAll('[data-catalog-index]'))
+          .every((button) => catalog[Number(button.dataset.catalogIndex)].category === group.dataset.catalogGroup));
+      const categorySelect = document.getElementById('catalog-category');
+      categorySelect.value = 'decor-blocker';
+      categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+      const exactDecorationFilter = Array.from(document.querySelectorAll('[data-catalog-index]'))
+        .every((button) => catalog[Number(button.dataset.catalogIndex)].category === 'decor-blocker') &&
+        document.querySelectorAll('[data-catalog-group]').length === 1;
+      categorySelect.value = 'all';
+      categorySelect.dispatchEvent(new Event('change', { bubbles: true }));
+      const actorDefinitions = Game.content.all('actorArchetype')
+        .filter((definition) => definition.category !== 'player');
       return {
         seed: document.getElementById('seed-input').value,
         region: Game.world.region.id,
         layoutVersion: Game.world.layout.version,
         world: [Game.world.layout.world.w, Game.world.layout.world.h],
-        strategyControls: document.querySelectorAll('[data-strategy]').length,
         v3TerrainLoaded: !!document.querySelector('script[src*="systems/terrain_v3.js"]'),
-        rects: Object.fromEntries(ids.concat(['toggle-play', 'next-region']).map((id) => {
+        rects: Object.fromEntries(ids.map((id) => {
           const r = document.getElementById(id).getBoundingClientRect();
           return [id, [r.left, r.top, r.right, r.bottom, r.width]];
         })),
-        segmentRects: Array.from(document.querySelectorAll('[data-time]')).map((el) => {
-          const r = el.getBoundingClientRect();
-          return [el.textContent, r.left, r.right, r.width];
-        }),
         within,
-        segments,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
         canvasColors: colors.size,
+        miniPainted,
         explorationAssetCount: explorationIds.length,
         explorationAssetsRegistered: explorationIds.every((id) => Game.assets.has(id)),
         explorationScriptCount: document.querySelectorAll('script[src*="sprites/exploration/"]').length,
-        registryDrivenInspector: {
-          regions: document.querySelectorAll('[data-region-index]').length === Game.reg.all('region').length,
-          resources: inspectorCount('resource') === region.exploration.resources.length,
-          landmarks: inspectorCount('landmark') === layout.landmarks.length,
-          curios: inspectorCount('curio') === layout.curios.length,
-          ecology: inspectorCount('ecology') === layout.ecology.length,
-          threats: inspectorCount('threat') === new Set(layout.threats.map((item) => item.defId)).size,
-          guardian: inspectorCount('guardian') === 1,
-          decorations: inspectorCount('decoration') === region.terrain.deco.length,
-          combat: inspectorCount('monster') === region.monsters.length && inspectorCount('boss') === 1,
-          mountPlan: !!mountPlan && mountPlan.regionId === region.id &&
-            inspectorCount('population-mount-plan') === 1 &&
-            inspectorCount('population-reservation') === mountPlan.reservations.length,
-          allDecorInstanced: region.terrain.deco.every((def) =>
-            layout.props.some((prop) => !prop.campProp && prop.sprite === def.sprite)),
-          noMissingInspectorKey: !document.getElementById('inspector').textContent.includes('map.inspector.'),
-          tierLevel: Game.state.player.level === 1 + Math.max(0, region.tier - 1) * 9
-        }
+        snapshot,
+        api: Object.keys(MapGenerationLab).sort(),
+        defaultCatalogScope,
+        regionCatalogCount: regionCatalog.length,
+        allCatalogCount,
+        regionCatalogOnly: regionCatalog.every((item) => item && item.inRegion),
+        currentActorsCataloged: snapshot.actors.every((actor) =>
+          catalog.some((item) => item.kind === 'actor-definition' &&
+            item.id === actor.archetypeId && item.inRegion)),
+        currentCatalogCategories: Array.from(new Set(regionCatalog.map((item) => item.category))),
+        regionGroupCategories,
+        groupsAreExact,
+        exactDecorationFilter,
+        categoryValues,
+        currentChestDefinitions: regionCatalog.filter((item) => item.category === 'chest')
+          .map((item) => [item.id, item.count]),
+        actorCatalogCount: catalog.filter((item) => item.kind === 'actor-definition').length,
+        registryActorCount: actorDefinitions.length,
+        playerCataloged: catalog.some((item) => item.id === 'adventurer'),
+        regionTabsMatch: document.querySelectorAll('[data-region-index]').length === Game.reg.all('region').length,
+        controlsTouchable: ids.every((id) => {
+          const control = document.getElementById(id);
+          const target = control.type === 'checkbox' ? control.closest('label') : control;
+          return target.getBoundingClientRect().height >= 44;
+        }),
+        noForbiddenSystems: [
+          'systems/combat.js', 'systems/hazards.js', 'systems/environment.js',
+          'systems/exploration.js', 'systems/expedition.js', 'systems/trade.js'
+        ].every((needle) => !Array.from(document.scripts).some((script) => script.src.includes(needle)))
       };
     })()`);
     assert.equal(demo.seed, '89ABCDEF');
     assert.equal(demo.region, 'lavacave');
     assert.equal(demo.layoutVersion, 3);
     assert.deepEqual(demo.world, [2400, 1440]);
-    assert.equal(demo.strategyControls, 3);
     assert.equal(demo.v3TerrainLoaded, true);
     assert.equal(demo.within, true, 'mobile QA toolbar controls fit viewport');
-    assert.equal(demo.segments, true, 'mobile QA segmented control fits viewport');
     assert.equal(demo.noHorizontalOverflow, true, 'mobile QA page has no horizontal overflow');
     assert.ok(demo.canvasColors > 20, 'QA canvas is nonblank: ' + JSON.stringify({ demo, errors: cdp.errors }));
+    assert.equal(demo.miniPainted, true, 'interactive minimap canvas is nonblank');
     assert.equal(demo.explorationAssetCount, 18, 'split exploration manifest covers every source cell');
     assert.equal(demo.explorationAssetsRegistered, true, 'all split exploration assets reach the production registry');
     assert.equal(demo.explorationScriptCount, 10, 'manifest and nine exploration groups load independently');
-    assert.ok(Object.values(demo.registryDrivenInspector).every(Boolean),
-      'live inspector catalogs must match registered and generated content: ' + JSON.stringify(demo.registryDrivenInspector));
-    const demoExploration = await cdp.evaluate(`(() => {
-      const W = Game.world;
-      const nodes = W.layout.nodes;
-      const focusButton = document.getElementById('focus-gather');
-      focusButton.click();
-      const nearest = Math.min(...nodes.map((node) => Game.util.dist(W.hero.x, W.hero.y, node.x, node.y)));
-      const rareButton = document.getElementById('spawn-rare-chest');
-      rareButton.click();
-      const rare = Game.environment.chests()[0];
-      const rareSpawned = !!rare && rare.rare && Game.environment.isLegalChestSpot(rare.x, rare.y);
-      const commonButton = document.getElementById('spawn-common-chest');
-      commonButton.click();
-      const common = Game.environment.chests()[0];
+    assert.equal(demo.snapshot.noPlayer, true);
+    assert.equal(demo.snapshot.fogEnabled, false);
+    assert.equal(demo.snapshot.runtimeHazards, false);
+    assert.equal(demo.snapshot.minimap.hasPlayerIcon, false);
+    assert.ok(demo.snapshot.actors.length > 0);
+    assert.equal(demo.defaultCatalogScope, 'region');
+    assert.equal(demo.regionCatalogOnly, true);
+    assert.ok(demo.regionCatalogCount < demo.allCatalogCount,
+      'current-map catalog is narrower than the complete cross-map registry');
+    assert.equal(demo.currentActorsCataloged, true);
+    for (const category of [
+      'monster', 'boss', 'npc', 'creature', 'summon', 'object',
+      'resource', 'chest', 'landmark', 'boss-lair', 'curio', 'ecology',
+      'threat', 'hazard-definition', 'hazard-anchor', 'camp',
+      'decor-blocker', 'decor-ground', 'decor-water', 'decor-boss',
+      'tuft', 'flower', 'material'
+    ]) assert.ok(demo.categoryValues.includes(category), `catalog exposes ${category} filter`);
+    for (const category of [
+      'monster', 'boss', 'summon', 'resource', 'chest', 'landmark', 'boss-lair',
+      'curio', 'ecology', 'threat', 'hazard-definition', 'hazard-anchor', 'camp',
+      'decor-blocker', 'decor-ground', 'decor-boss', 'material'
+    ]) assert.ok(demo.currentCatalogCategories.includes(category),
+      `lavacave current-map catalog contains ${category}`);
+    assert.deepEqual(demo.regionGroupCategories, demo.currentCatalogCategories,
+      'all-category view renders one ordered section per exact category');
+    assert.equal(demo.groupsAreExact, true,
+      'each category section contains only its own type');
+    assert.equal(demo.exactDecorationFilter, true,
+      'a decoration subtype filter cannot leak other decoration types');
+    assert.deepEqual(demo.currentChestDefinitions, [
+      ['chest_common', 0], ['chest_rare', 0]
+    ], 'chests remain definition-only in the no-runtime-chest Lab');
+    assert.equal(demo.actorCatalogCount, demo.registryActorCount);
+    assert.equal(demo.playerCataloged, false);
+    assert.equal(demo.regionTabsMatch, true);
+    assert.equal(demo.controlsTouchable, true);
+    assert.equal(demo.noForbiddenSystems, true);
+    for (const method of [
+      'catalog', 'focus', 'logs', 'measure', 'probe', 'randomize', 'regenerate',
+      'resetPositions', 'setCamera', 'setLayer', 'setMotion', 'snapshot',
+      'verifyDeterminism'
+    ]) assert.ok(demo.api.includes(method), `MapGenerationLab exposes ${method}`);
+
+    const mapDiagnostics = await cdp.evaluate(`(() => {
+      const before = MapGenerationLab.snapshot();
+      const camp = Game.world.layout.camp;
+      const boss = Game.world.layout.bossPoint;
+      const measure = MapGenerationLab.measure(camp, boss);
+      const verify = MapGenerationLab.verifyDeterminism();
+      MapGenerationLab.setCamera(camp.x, camp.y, 1);
+      const viewAtOne = MapGenerationLab.snapshot().minimap.viewport;
+      MapGenerationLab.setCamera(camp.x, camp.y, 2);
+      const viewAtTwo = MapGenerationLab.snapshot().minimap.viewport;
+      const plan = before.populationPlan;
+      const first = plan.slots[0];
+      const inspected = Game.population.inspectCandidates(
+        first.profileId, Game.world.layout, first.channel,
+        {
+          tier: Game.world.region.tier,
+          worldSeed: before.seed,
+          expeditionIndex: 0,
+          channelLimits: {
+            regular: Game.world.layout.threats.length,
+            npc: 1, guardian: 1, boss: 1, rare: 0
+          }
+        },
+        []
+      );
+      const chosen = inspected.candidates[inspected.chosenIndex]?.candidate;
+      const placedActor = before.actors.find((actor) => actor.slotId === first.id);
+      MapGenerationLab.setMotion(true);
+      MapGenerationLab.setMotion(false);
+      const reset = MapGenerationLab.snapshot();
       return {
-        nodeCount: nodes.length,
-        nearest,
-        rareSpawned,
-        commonSpawned: !!common && !common.rare && Game.environment.isLegalChestSpot(common.x, common.y),
-        touchable: [focusButton, document.getElementById('reset-gather'), rareButton, commonButton]
-          .every((button) => button.getBoundingClientRect().height >= 44),
-        status: document.getElementById('exploration-event').textContent
+        measure,
+        verify,
+        viewportRatio: viewAtOne.width / viewAtTwo.width,
+        candidateMatchesPlan: !!chosen &&
+          Math.abs(chosen.x - first.x) < 0.001 && Math.abs(chosen.y - first.y) < 0.001,
+        actorWalkable: reset.actors.every((actor) =>
+          Game.terrain.isWalkable(actor.x, actor.y, Math.min(6,
+            Game.actors.get(actor.id).components.body.collisionRadius || 1))),
+        actorReset: reset.actors.every((actor) =>
+          actor.x === actor.spawnX && actor.y === actor.spawnY),
+        noPlayer: !Game.world.hero && !reset.actors.some((actor) => actor.category === 'player'),
+        logsStructured: MapGenerationLab.logs().every((entry) =>
+          entry.at && entry.phase && entry.level && typeof entry.message === 'string')
       };
     })()`);
-    assert.ok(demoExploration.nodeCount >= 16 && demoExploration.nodeCount <= 22);
-    assert.ok(demoExploration.nearest <= 42, 'QA focus control positions the hero beside a mature node');
-    assert.equal(demoExploration.rareSpawned, true, 'QA can force the rare visual through production chest placement');
-    assert.equal(demoExploration.commonSpawned, true, 'QA can force the common visual through production chest placement');
-    assert.equal(demoExploration.touchable, true, 'exploration QA controls keep 44px touch targets');
-    const demoDynamicTrade = await cdp.evaluate(`(() => {
-      const button = document.getElementById('spawn-dynamic-trade');
-      const rect = button.getBoundingClientRect();
-      button.click();
-      const active = Game.trade.areaById('qa-wanderer');
-      const registered = !!active && active.kind === 'wander' && !!active.prop;
-      Game.state.world.worldTime += 21;
-      Game.trade.update();
-      return {
-        registered,
-        touchHeight: rect.height,
-        expired: !Game.trade.areaById('qa-wanderer'),
-        status: document.getElementById('dynamic-trade-status').textContent
-      };
-    })()`);
-    assert.equal(demoDynamicTrade.registered, true, 'QA stub calls the production dynamic trade API');
-    assert.ok(demoDynamicTrade.touchHeight >= 44, 'dynamic trade QA control keeps a touch target');
-    assert.equal(demoDynamicTrade.expired, true, 'QA dynamic trade area expires through the production TTL path');
+    assert.equal(mapDiagnostics.measure.found, true, 'path tool uses a production route');
+    assert.ok(mapDiagnostics.measure.pathLength >= mapDiagnostics.measure.straightDistance);
+    assert.equal(mapDiagnostics.verify.ok, true);
+    assert.equal(mapDiagnostics.verify.terrain.match, true);
+    assert.equal(mapDiagnostics.verify.population.match, true);
+    assert.equal(mapDiagnostics.verify.actors.match, true);
+    assert.ok(Math.abs(mapDiagnostics.viewportRatio - 2) < 0.05,
+      'minimap viewport shrinks in inverse proportion to main-map zoom');
+    assert.equal(mapDiagnostics.candidateMatchesPlan, true,
+      'production candidate inspection agrees with the prepared plan');
+    assert.equal(mapDiagnostics.actorWalkable, true);
+    assert.equal(mapDiagnostics.actorReset, true);
+    assert.equal(mapDiagnostics.noPlayer, true);
+    assert.equal(mapDiagnostics.logsStructured, true);
     assert.deepEqual(cdp.errors, [], 'browser runtime has no uncaught errors');
 
     const capture = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
@@ -4114,7 +4198,7 @@ async function run() {
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
-      desktopEnding, demo, demoDynamicTrade, unitsBubbleDemo,
+      desktopEnding, demo, mapDiagnostics, unitsBubbleDemo,
       mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
       unitsBubbleScreenshot,

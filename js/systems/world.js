@@ -1533,10 +1533,10 @@
 
     /* ---------------- 怪物 AI ---------------- */
     updateMonster: function (e, dt) {
-      e.flash = Math.max(0, e.flash - dt);
-      e.lungeT = Math.max(0, e.lungeT - dt);
-      e.animT += dt;
       if (e.hazardConcealed) {
+        e.flash = Math.max(0, e.flash - dt);
+        e.lungeT = Math.max(0, e.lungeT - dt);
+        e.animT += dt;
         e.moving = false;
         e.state = 'idle';
         return;
@@ -1545,6 +1545,9 @@
       var heroTargetable = hero && hero.state !== 'dead' && hero.state !== 'recover' &&
         Game.state.world.mode === 'battle' && Game.player.hasClass();
       if (e.encounterId && heroTargetable) {
+        e.flash = Math.max(0, e.flash - dt);
+        e.lungeT = Math.max(0, e.lungeT - dt);
+        e.animT += dt;
         var intent = e.components.movement.intent;
         if (intent) {
           e.state = 'walk';
@@ -1559,10 +1562,27 @@
         if (combatTarget) e.dir = U.dirOf(combatTarget.x - e.x, combatTarget.y - e.y);
         return;
       }
+      W.updateAmbientActor(e, dt);
+    },
+
+    /**
+     * 无战斗环境中的 Actor 巡游入口。正式世界与地图生成 Lab 共用同一
+     * 导航/领地/扫掠逻辑；Lab 可传入 seeded RNG，避免复制演示专用移动。
+     */
+    updateAmbientActor: function (e, dt, options) {
+      if (!e || !e.components || !e.components.transform) return false;
+      options = options || {};
+      e.flash = Math.max(0, e.flash - dt);
+      e.lungeT = Math.max(0, e.lungeT - dt);
+      e.animT += dt;
       e.engaged = false;
       if (e.state === 'fight') e.state = 'wander';
       var territoryRadius = W.monsterPatrolRadius(e);
-      W.wanderTick(e, dt, MONSTER_WANDER_SPEED, e.spawnX, e.spawnY, territoryRadius);
+      W.wanderTick(
+        e, dt, MONSTER_WANDER_SPEED, e.spawnX, e.spawnY, territoryRadius,
+        options.rng
+      );
+      return true;
     },
 
     /* ---------------- 移动辅助 ---------------- */
@@ -1620,17 +1640,20 @@
       return Game.nav.step(ent, tx, ty, speed, dt, token, W.moveDirect);
     },
 
-    wanderTick: function (ent, dt, speed, ax, ay, radius) {
+    wanderTick: function (ent, dt, speed, ax, ay, radius, rng) {
       ent.wanderT = (ent.wanderT || 0) - dt;
       var cx = ax !== undefined ? ax : ent.x;
       var cy = ay !== undefined ? ay : ent.y;
       var r = radius === undefined ? 90 : Math.max(0, radius);
+      var random = typeof rng === 'function'
+        ? function (min, max) { return min + (max - min) * rng(); }
+        : U.rand;
       var invalidTarget = !Number.isFinite(ent.wx) || !Number.isFinite(ent.wy) ||
         U.dist(ent.wx, ent.wy, cx, cy) > r + 0.01;
       if (ent.wanderT <= 0 || invalidTarget) {
-        ent.wanderT = U.rand(1.6, 4.2);
-        ent.wx = U.clamp(cx + U.rand(-r, r), 30, W.region.world.w - 30);
-        ent.wy = U.clamp(cy + U.rand(-r, r), BOUND_TOP + 16, W.region.world.h - 20);
+        ent.wanderT = random(1.6, 4.2);
+        ent.wx = U.clamp(cx + random(-r, r), 30, W.region.world.w - 30);
+        ent.wy = U.clamp(cy + random(-r, r), BOUND_TOP + 16, W.region.world.h - 20);
         var wanderDx = ent.wx - cx, wanderDy = ent.wy - cy;
         var wanderDistance = Math.sqrt(wanderDx * wanderDx + wanderDy * wanderDy);
         if (wanderDistance > r && wanderDistance > 0) {

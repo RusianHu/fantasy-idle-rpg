@@ -633,11 +633,12 @@ assert.ok(index.indexOf('js/systems/items.js') < index.indexOf('js/systems/comba
 assert.ok(index.indexOf('js/systems/environment.js') < index.indexOf('js/systems/world.js'));
 assert.ok(index.indexOf('js/ui/trade.js') > index.indexOf('js/ui/panels_main.js'));
 const demoHtml = read('tech-demos/map-effects/map-effects.html');
-assert.match(demoHtml, /spawn-dynamic-trade/);
-assert.ok(demoHtml.indexOf('js/systems/environment.js') < demoHtml.indexOf('js/systems/world.js'));
+assert.doesNotMatch(demoHtml, /spawn-dynamic-trade/);
+assert.doesNotMatch(demoHtml, /js\/systems\/environment\.js/);
+assert.doesNotMatch(demoHtml, /js\/systems\/trade\.js/);
 for (const control of [
-  'focus-gather', 'reset-gather', 'spawn-common-chest', 'spawn-rare-chest',
-  'gather-runtime', 'discovery-runtime', 'chest-runtime'
+  'minimap', 'profile-select', 'motion-toggle', 'probe-output',
+  'verify-determinism', 'reset-positions', 'catalog-list'
 ]) {
   assert.match(demoHtml, new RegExp(`id="${control}"`), `tech demo exposes ${control}`);
 }

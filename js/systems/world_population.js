@@ -375,28 +375,95 @@
       ? nav[field][y][x] : fallback;
   }
 
-  function legalPlacement(profile, point, layout, reservations) {
+  function inspectPlacement(profile, point, layout, reservations) {
     var placement = profile.placement || {};
     var offset = placement.offset || {};
+    reservations = reservations || [];
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
+      return {
+        ok: false,
+        profileId: profile.id,
+        point: point || null,
+        candidate: null,
+        checks: [],
+        failures: ['invalid-point']
+      };
+    }
     var candidate = Object.assign({}, point, {
       x: point.x + (Number(offset.x) || 0),
       y: point.y + (Number(offset.y) || 0)
     });
     var clearance = navValue(layout, candidate, 'distance', Infinity);
-    if (Number.isFinite(placement.minClearance) &&
-        clearance * ((layout.nav && layout.nav.cell) || 1) < placement.minClearance) return null;
+    var clearancePx = clearance * ((layout.nav && layout.nav.cell) || 1);
     var danger = navValue(layout, candidate, 'danger', 0);
-    if (Number.isFinite(placement.maxDanger) && danger > placement.maxDanger) return null;
-    if (Number.isFinite(placement.minCampDistance) && layout.camp &&
-        Game.util.dist(candidate.x, candidate.y, layout.camp.x, layout.camp.y) < placement.minCampDistance) return null;
+    var campDistance = layout.camp
+      ? Game.util.dist(candidate.x, candidate.y, layout.camp.x, layout.camp.y)
+      : Infinity;
     var radius = Number(placement.occupancyRadius) || 0;
-    if (reservations.some(function (reservation) {
+    var overlap = reservations.filter(function (reservation) {
       return Game.util.dist(candidate.x, candidate.y, reservation.x, reservation.y) <
         radius + reservation.occupancyRadius;
-    })) return null;
+    }).map(function (reservation) {
+      return reservation.slotId || reservation.id || null;
+    });
+    var checks = [
+      {
+        id: 'walkable',
+        enforced: false,
+        pass: navValue(layout, candidate, 'walkable', true) !== false,
+        actual: navValue(layout, candidate, 'walkable', true),
+        expected: true
+      },
+      {
+        id: 'minClearance',
+        enforced: Number.isFinite(placement.minClearance),
+        pass: !Number.isFinite(placement.minClearance) || clearancePx >= placement.minClearance,
+        actual: clearancePx,
+        expected: Number.isFinite(placement.minClearance) ? placement.minClearance : null
+      },
+      {
+        id: 'maxDanger',
+        enforced: Number.isFinite(placement.maxDanger),
+        pass: !Number.isFinite(placement.maxDanger) || danger <= placement.maxDanger,
+        actual: danger,
+        expected: Number.isFinite(placement.maxDanger) ? placement.maxDanger : null
+      },
+      {
+        id: 'minCampDistance',
+        enforced: Number.isFinite(placement.minCampDistance) && !!layout.camp,
+        pass: !Number.isFinite(placement.minCampDistance) || !layout.camp ||
+          campDistance >= placement.minCampDistance,
+        actual: campDistance,
+        expected: Number.isFinite(placement.minCampDistance) ? placement.minCampDistance : null
+      },
+      {
+        id: 'occupancy',
+        enforced: true,
+        pass: overlap.length === 0,
+        actual: overlap,
+        expected: []
+      }
+    ];
+    var failures = checks.filter(function (check) {
+      return check.enforced && !check.pass;
+    }).map(function (check) { return check.id; });
     candidate.occupancyRadius = radius;
     candidate.danger = danger;
-    return candidate;
+    candidate.clearance = clearancePx;
+    candidate.campDistance = campDistance;
+    return {
+      ok: failures.length === 0,
+      profileId: profile.id,
+      point: C.clone(point),
+      candidate: candidate,
+      checks: checks,
+      failures: failures
+    };
+  }
+
+  function legalPlacement(profile, point, layout, reservations) {
+    var inspection = inspectPlacement(profile, point, layout, reservations);
+    return inspection.ok ? inspection.candidate : null;
   }
 
   function prepareRegion(rid, layout, context) {
@@ -500,7 +567,10 @@
       reservations: reservations,
       failures: failures
     };
-    if (plan.ok) {
+    // Read-only tooling may request a deterministic preview without replacing
+    // the live plan or its slot runtime. The exact production allocator and
+    // placement predicates are still used, so Lab diagnostics cannot drift.
+    if (plan.ok && !context.preview) {
       activePlan = C.deepFreeze(C.clone(plan));
       slotRuntime = {};
       slots.forEach(function (slot) { slotRuntime[slot.id] = { state: 'planned', spawnId: null }; });
@@ -575,6 +645,43 @@
 
     prepareRegion: prepareRegion,
     materializeSlot: materializeSlot,
+    inspectPlacement: function (profileId, point, layout, reservations) {
+      var profile = Game.content.get('worldSpawnProfile', profileId);
+      if (!profile) return C.deepFreeze({
+        ok: false, profileId: profileId, point: point || null,
+        candidate: null, checks: [], failures: ['missing-profile']
+      });
+      return C.deepFreeze(C.clone(inspectPlacement(
+        profile, point, layout, reservations || activePlan && activePlan.reservations || []
+      )));
+    },
+    inspectCandidates: function (profileId, layout, channel, context, reservations) {
+      var profile = Game.content.get('worldSpawnProfile', profileId);
+      if (!profile || !layout) return C.deepFreeze({
+        ok: false, profileId: profileId, channel: channel || null,
+        reason: profile ? 'missing-layout' : 'missing-profile',
+        candidates: [], chosenIndex: -1
+      });
+      context = context || {};
+      var pool = candidatePool(profile, layout, channel || 'regular', context);
+      var occupied = reservations || activePlan && activePlan.reservations || [];
+      var candidates = pool.map(function (point) {
+        return inspectPlacement(profile, point, layout, occupied);
+      });
+      var chosenIndex = -1;
+      for (var ci = 0; ci < candidates.length; ci++) {
+        if (candidates[ci].ok) { chosenIndex = ci; break; }
+      }
+      return C.deepFreeze(C.clone({
+        ok: chosenIndex >= 0,
+        profileId: profileId,
+        channel: channel || 'regular',
+        selector: profile.placement && profile.placement.selector || null,
+        source: profile.placement && profile.placement.source || null,
+        candidates: candidates,
+        chosenIndex: chosenIndex
+      }));
+    },
     mountPlan: function () {
       if (!activePlan) return null;
       var plan = C.clone(activePlan);

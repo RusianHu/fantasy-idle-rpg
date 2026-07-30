@@ -68,7 +68,7 @@ css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 assets/sprite-source/ 采集物与探索宝箱的生成式母版及运行时预览
 assets/sprites/       可独立复用的透明运行时 PNG（exploration/ 按稳定 ID 拆分）
-tech-demos/           双语生产 QA：Actor/战斗、世界现场、Hazard 特效与生成器审计
+tech-demos/           双语生产 QA：Actor/战斗、地图生成与放置、Hazard 特效、拓扑/导航审计
 docs/content-authoring/ Actor 内容契约、示例与新增流程
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
@@ -89,6 +89,8 @@ js/
 **探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。八区 Boss 领地使用 `assets/sprite-source/boss-territories/` 的透明 ImageGen 母版；运行 `python tools\build-boss-landmarks.py` 重建 8 个主地标、24 个装饰精灵、运行时联系表和来源清单，提交前同样用 `--check` 校验。`*.generated.js` 不直接手改。
 
 **扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与四个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
+
+**地图 QA 分工**：`tech-demos/map-effects` 是无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，提供交互小地图、检查/寻路/放置探针、确定性复验、巡游预览和结构化报告；目录默认关联当前地图，并将单位、资源、宝箱定义、地标、奇物、生态、威胁、Hazard 锚点、营地、装饰与材质独立分类。它不启动存档、战斗、Hazard、探索 AI、宝箱或交易。`tech-demos/exploration-v3` 独立负责导航网格、长途路径、拓扑可视化和多 Seed 批量审计。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`。
 
@@ -185,7 +187,7 @@ node tests\cache-version.test.js
 
 除 `action-bubble-demo.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v16 与多 ActorRecord/RoutePlan/社交/Hazard/噬宝匣迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局、路径覆盖/扫掠触发/交互取消/伏击编队/渲染、噬宝匣保护概率/胜败事务、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例验证移动与桌面中英文、44px 触控、正式 Combat HUD、四个工作台、固定 tick Engagement、存档重开和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v16 与多 ActorRecord/RoutePlan/社交/Hazard/噬宝匣迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局、路径覆盖/扫掠触发/交互取消/伏击编队/渲染、噬宝匣保护概率/胜败事务、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例同时验证地图 Lab 无玩家/迷雾、目录注册表匹配、Population 放置一致性、正式导航、确定性哈希、小地图视口同步，以及移动/桌面中英文、44px 触控、四个工作台和无横向溢出。
 
 ---
 
