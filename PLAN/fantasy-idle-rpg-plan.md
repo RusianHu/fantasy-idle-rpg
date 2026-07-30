@@ -1,17 +1,18 @@
-  # 任务：制作一个 2D 网页挂机 RPG 游戏 "fantasy-idle-rpg" （日式中世纪奇幻风）
+  # Fantasy Idle RPG 主规划
 
-  ## 项目概述
-  请从零开发一个纯前端、可离线运行的 **2D 挂机放置类 RPG 网页游戏**，主题为 **日式中世纪奇幻（JRPG
-  风格：剑与魔法、骑士、魔物、公会、地下城）**。游戏以竖版手机端为第一优先适配目标，同时兼容桌面浏览器。最终交付一个可直
-  接双击打开或本地静态服务器运行的项目（纯 HTML/CSS/JS 或 Vite 构建均可，优先零依赖或轻依赖）。
+  ## 文档定位与项目概述
+  本文是已实现项目的当前产品、架构与质量合同，不是更新日志或待从零执行的任务书。未注明状态的条目描述当前必须维持的行为；
+  只有明确标为“历史兼容”“验收快照”或“面向未来”的内容不代表当前玩法已经上线。项目是纯前端、可离线运行的 **2D 挂机放置类
+  RPG 网页游戏**，主题为 **日式中世纪奇幻（JRPG 风格：剑与魔法、骑士、魔物、公会、地下城）**；竖版手机端优先并兼容桌面，
+  可直接双击打开或由静态服务器运行。
 
   ## 当前正式架构契约
-  - `PLAN/20260728-01-plan.md` 的 Actor、内容编译与固定时间轴规范已并入本规划；后文历史版本条目仅说明迁移来源，不得覆盖本节。
+  - 早期 Actor、内容编译与固定时间轴计划已合并到本文并删除；后文历史版本条目仅说明迁移来源，不得覆盖本节。
   - 正式战斗采用 50ms 整数 tick、Encounter seeded RNG、GCD/oGCD、队列、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、Threat 与 Effect DSL；不存在独立攻速倒计时或按冷却旁路施法。
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
   - 单位状态边界固定为：`ActorRecord` 持久化 HP 且同一 Record 最多绑定一个存活 `ActorInstance`，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取轻量 Vitals/完整诊断快照，或提交伤害、治疗、死亡/复活、Modifier source 替换与无损重算。刷新保留同 ID 资源、SpawnSpec、Status 与外部 Modifier；禁止从旧派生值和实时组件拼接状态或直接修改 Ledger。
   - 正式内容为 5 职业、30 Talent、32 个常驻普通怪、8 个 Boss、8 个区域召唤 Actor、16 个 EncounterProfile 与 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
-  - 存档当前为 v15，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social` 及按布局清理的 Hazard 发现/绝对冷却）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线、自动养成和战力比较复用同内容 fingerprint 下的 `CombatEstimator` 摘要。
+  - 存档当前为 v15，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social` 及按布局清理的 Hazard 发现/绝对冷却）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要；自动养成使用无副作用角色预览，并把该摘要合入确定性输出/生存/收益评分。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
   - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab，`tech-demos/map-effects` 为开放世界现场，`tech-demos/hazards` 为 Hazard 状态与特效 Lab；正式入口及四个工作台只加载同一个确定性 `content.generated.js`，Node 工具从 `*.pack.js` / `*.support.js` 文件系统真源独立校验产物。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
@@ -31,8 +32,9 @@
   视角）的 2D 平面场景，角色拥有 x/y 两轴坐标，**自动游走、索敌、走向怪物发起战斗**，怪物在场景中分散刷新；镜头平滑跟随
   角色移动，配合**多层背景视差 + 场景缩放**（如 Boss 登场镜头拉近、战斗时轻微推近）制造纵深与透视变化感。战斗结算逻辑仍
   按第 1 条的自动战斗规则进行，位移与演出不影响挂机数值。
-  3. **角色成长**：等级/经验曲线（指数增长）、基础属性（HP/攻击/防御/速度/暴击率/暴击伤害），升级自动成长 +
-  可分配属性点二选一实现，任选其一并说明理由。
+  - **环境机关循环**：隐藏 Hazard 按 `clueRadius > revealRadius > trigger 外接范围` 依次提供环境线索、揭示与形状扫掠触发，随后在 50ms tick 上经历 `dormant → warning → active → cooldown`；预警期离开范围则发出 avoided 并回到 dormant，命中统一提交 external Effect，伏击统一进入 ambush Engagement。已揭示危险参与策略导航，自动逃生必须避开本机关与相邻已揭示危险区；飞行和非玩家生态默认不触发地面机关。
+  3. **角色成长**：等级/经验曲线（指数增长）、基础属性（HP/攻击/防御/速度/暴击率/暴击伤害）均采用升级自动成长；不提供可分配
+  属性点，构筑差异由职业、Talent、装备与永久强化承担。
   4. **装备系统**：武器/护甲/饰品至少 3 个槽位；装备有稀有度（普通/精良/稀有/史诗/传说，用颜色区分：灰/绿/蓝/紫/橙）；支
   持随机词条、装备对比、一键出售低稀有度。
   5. **地图/区域推进**：至少 8 个风格递进的区域，经典内容顺序为：新手草原 → 迷雾森林 → 废弃矿坑 → 亡灵墓地 → 雪山隘口 →
@@ -50,9 +52,8 @@
   首杀固定奖励、成就奖励、分解传说装备；魔晶石消耗：商店永久增益、稀有装备。商店出售药水、装备、永久增益。
   **药水自动使用规则**：战斗中 HP 低于阈值（默认 30%，设置面板可调）时自动消耗背包中的药水，带短冷却防止连喝；
   无药水时仅靠自然恢复，不中断挂机。
-  8. **统计页（必须）与成就（可选加分项）**：基于事件总线的累计**统计计数器**——总击杀、Boss 击杀、总金币/经验、
-  装备掉落数、累计游玩与挂机时长等，做成独立统计页（放在角色或设置 Tab 内）展示；**成就**为统计计数器之上的
-  累计型达成（击杀 100 只怪等），达成给予金币/魔晶石奖励。
+  8. **统计与成就**：基于事件总线维护总击杀、Boss 击杀、总金币/经验、装备掉落数、累计游玩与挂机时长等统计计数器，并在独立
+  统计页展示；当前 22 个累计型成就消费这些计数器，达成后给予金币或魔晶石奖励。
   9. **挂机休息/扎营模式（必须）**：与战斗挂机并列的第二种挂机状态，可在战斗页一键「返回营地」。角色走到场景中的营地点，
   坐在篝火旁进入休息演出（打盹、呼吸起伏、偶尔 Zzz 气泡）；休息期间不战斗、不获得战利品，但 **HP
   快速恢复**，并按休息时长积累「休整」增益（如恢复后一段时间经验/掉率小幅加成，数值温和，防止取代战斗挂机），一键
@@ -67,7 +68,7 @@
 
   ### 掉落、采集与探索奖励
   - **地面掉落**：普通战斗的装备/药水以世界实体落地，金币即时入账；Boss、离线及非战斗入口直接入包。`settings.groundLoot` 默认开启，关闭时立即回收；支持接触、点击走近与自动 AI 拾取。单区至多 24 件、单件保留 60 秒；超限、超时、切区、休息、传送、死亡、存档前或页面隐藏时，均经既有入包事务回收，收益不得丢失。
-  - **采集与素材**：当前 v3 每区注册 5 类资源并确定性生成 16–22 个合法节点；16 个基础采集物与 2 个宝箱由透明母版编译为独立 PNG，另有 24 个 v3 区域资源精灵，均保留稳定 ID、来源哈希和轻量缺图回退。`gather.count:3–5` 只服务 v1/v2 兼容布局。采集耗时 1.2 秒并会被接敌中断；90–150 秒冷却由世界时钟驱动且支持离线恢复。素材是不占装备容量的计数字典，配方集中在 `formulas`，通过 `camp-exchange` 兑换药水、金币、装备箱和有上限的永久强化。
+  - **采集与素材**：当前 v3 每区注册 5 类资源并确定性生成 16–22 个合法节点；16 个基础采集物与 2 个宝箱由透明母版编译为独立 PNG，另有 24 个 v3 区域资源精灵，均保留稳定 ID、来源哈希和已登记的防御性回退。`gather.count:3–5` 与 90–150 秒冷却只服务 v1/v2 兼容布局。v3 采集耗时 1.2 秒并会被接敌中断；普通资源冷却 480–720 秒，稀有资源冷却 900–1500 秒，由世界时钟驱动并支持离线恢复。素材是不占装备容量的计数字典，配方集中在 `formulas`，通过 `camp-exchange` 兑换药水、金币、装备箱和有上限的永久强化。
   - **随机宝箱**：仅合法战斗位移累积发现进度且单帧封顶；传送、回营、休息、过场、死亡和原地站立均不计。同区至多一个宝箱，两次发现至少间隔 60 秒；宝箱 90 秒过期且不持久化。普通木铜箱产出金币/素材，稀有紫晶暗金箱追加装备和小概率魔晶石；两者使用资产注册表精灵，接敌会中断开箱但保留箱体。
 
   ## 远距回营与手动操控（必须）
@@ -134,7 +135,7 @@
   - **主动技能等级语义**：0 点以基础威力自动释放，第 N 点按 `base + per × N` 计算；被动按已投等级线性，上限 10。
   - **自动换装**：可持久化总开关默认开启。获得装备、等级/技能/永久强化变化、区域切换、读档/导入、选职业、重开开关或解除槽位锁定时，对未锁武器/护甲/饰品以**当前区域**重新优化；仅当综合效用严格提升 ≥0.1% 才替换，同分保留当前，空槽自动填充；稀有度无硬保护。
   - **槽位锁定**：武器/护甲/饰品各一锁定按钮，默认不锁；锁定槽（含空槽）不参与自动换装；手动穿戴不当场撤销，下次评估可替换未锁槽。
-  - **统一确定性评估器**：走无副作用角色预览，不改真实存档/HP/世界实体。输出侧含普攻、攻速、暴击、冷却、直接技能、DOT、单目标 AOE 基准与增益覆盖率；生存侧含当前区域 Boss 下有效生命、闪避、战斗回复、吸血、治疗、护盾，持续恢复最多抵消 80% 预期承伤；收益侧 `(经验 × 金币 × 掉落)^(1/3)`。最终效用三者对数加权（输出/生存/收益）：战士 45/50/5、盗贼 65/30/5、法师 65/30/5、牧师 45/50/5、游侠 55/30/15。
+  - **确定性混合评估器**：走无副作用角色预览，不改真实存档/HP/世界实体。解析评分计算普攻/技能/DOT/增益覆盖率、当前区域 Boss 下的有效生命/回复/治疗/护盾，以及 `(经验 × 金币 × 掉落)^(1/3)`；同内容 fingerprint 的 `CombatEstimator` 可用时，以其平均 DPS 替换解析输出，并用失败率修正生存评分。最终效用按职业对输出/生存/收益取对数加权：战士 45/50/5、盗贼 65/30/5、法师 65/30/5、牧师 45/50/5、游侠 55/30/15。
   - **背包与离线事务**：装备先进暂存完成评估再执行 100 件容量淘汰，防升级品满包被折现；被替换装备留背包，超容量沿用"最低稀有度、最旧、未装备优先折现"；离线批量只做一次最终协调与一次汇总提示，不逐件 Toast，不追溯改已算离线收益。
   - **旧档兼容**：存档升级 v4 后两开关默认开启、三槽不锁；有职业旧档首载执行"先优化装备 -> 花费可收益未分配技能点 -> 再优化装备"，无职业迁移档在职业选择后执行；聚合事件驱动 UI/即时保存/提示，禁事件/存档风暴。
 
@@ -159,13 +160,13 @@
   - `BUILD_ID` 与游戏内容版本、存档版本相互独立。每次发布只要任一 HTML/CSS/JS/字体变化，必须生成从未在线使用过的新 `BUILD_ID`；主入口、QA 页面、`Game.BUILD_ID`、字体 URL 和 `version.json` 必须同步，自动测试禁止漏标、混标或复用。
   - HTML 响应使用 `Cache-Control: no-cache, must-revalidate`；`version.json` 使用 `no-store`；带 `BUILD_ID` 的 CSS/JS/字体使用 `public, max-age=31536000, immutable`。不得依赖 `meta http-equiv` 替代服务器响应头，不得只给 CSS 单独加版本。
   - 长开移动标签页每 5 分钟、从后台恢复及 BFCache `pageshow` 时检查 `version.json`。发现新版仅显示 ≥44px 的中英文更新入口，不强制打断；确认后先将过场收束到安全态并保存，再重载。
-  - 发布必须使用项目路径专属 Nginx 规则，不修改同域其他项目的全局缓存；配置先 `nginx -t`、后 reload。部署产物须来自已测试提交，以临时目录解包并通过目录切换上线，保留可恢复备份。
+  - 发布必须使用项目路径专属 Nginx 规则，不修改同域其他项目的全局缓存；配置先 `nginx -t`、后 reload。线上目录当前是直接提供静态文件的 Git 工作树：通过项目 SSH 辅助脚本登录后，在保留 `.git`、分支和 GitHub 远端关联的前提下同步已测试提交；同步前记录旧 HEAD，失败或回归时按提交回退。不得用无仓库的临时解包目录覆盖站点。
   - 验收覆盖：全部入口的本地资源 URL 共用同一 `BUILD_ID`；HTML、`version.json`、CSS/JS/字体线上缓存头正确；旧版本 URL 与新版本 URL 可同时读取；390×844 中英文更新提示无溢出；`file://` 直开不发版本请求。
 
   ## 音频（本期缺省，仅预留接口与占位）
   - 本期**不实现实际发声**，但接口与触发点必须一次埋到位，未来补音频时零逻辑改动：
-    - 实现 `AudioManager` 占位模块，提供 `playSfx(id)`、`playBgm(id)`、`stopBgm()`、`setMuted(bool)`
-  等完整签名的**空实现**（内部仅 `console.debug` 记录调用，便于验证触发点正确）；
+    - `Game.audio` 占位模块提供 `playSfx(id)`、`playBgm(id)`、`stopBgm()`、`setMuted(kind, flag)` 等完整签名的**空实现**；
+  `kind` 为 `sfx` 或 `bgm`，内部仅以 `console.debug` 记录调用，便于验证触发点；
     - 全部音频触发通过**事件总线挂接**（如 `monster:killed → sfx_hit`、`player:levelup → sfx_levelup`、进入扎营 →
   `bgm_campfire`、Boss 登场 → `bgm_boss`），在对应事件处即刻埋好调用；
     - 音频资产走与图形一致的 **manifest 清单 +（ID → 文件路径）注册**，符合插件化架构，本期清单为空即可。
@@ -214,28 +215,21 @@
   菜单观感）、暗金+深蓝褐色调；中文界面字体优先使用像素字体（如「方舟像素 / Zpix / Fusion Pixel」，可本地内嵌
   woff2），加载失败降级为系统字体。
 
-  ## 图形资产（可选：如果你具备图形资产生成的 集成能力/mcp/skill 。否则就手动创建非平庸的高级的2d资产）
+  ## 图形资产（当前合同）
   - **整体美术风格锁定为像素风（Pixel Art），具体采用 16-bit（超任 SNES / 经典 JRPG）像素风格**：比 8-bit
   红白机风格色彩更丰富、细节更多（参考《最终幻想6》《时空之轮》的观感），全部素材全程保持一致，不得混入高清手绘/扁平矢量风。
   - 像素素材渲染时必须保持锐利：图片与 Canvas 均设置 `image-rendering: pixelated`，缩放只用整数倍，禁止插值模糊。
-  - 请**使用你可用的图形资产生成工具**生成游戏所需素材，存放于
-  `assets/` 目录并在游戏中引用，包括但不限于：
-    - 主角行走/战斗精灵图（至少 1 个职业，如剑士；**需含多方向行走帧动画**，4 方向即可，左右可镜像复用；另需**坐下休
-  息姿态**至少 1~2 帧，供扎营演出使用）；
-    - **篝火帧动画**（3~4 帧循环即可）与营地小物（帐篷/睡袋任选，可省略）；
-    - 每个区域至少 2 种普通怪 + 1 个 Boss 的贴图（普通怪至少含待机/移动 2 帧动画，Boss 可更精细）；
-    - 各区域**平面场景背景**：伪俯视视角的场景图或图块拼接（地表层 + 装饰层），并为视差准备 1~2 层远景层；
-    - 装备/道具图标（按稀有度可复用同图标+边框变色）；
-    - UI 面板、按钮、货币图标（小图标也可用 CDN 在线图标库补充）。
-  - 生成素材时注意尺寸合理（背景 ≤ 1080 宽，图标 128px 左右），控制总体积；生成失败的素材需提供纯 CSS/emoji
-  占位降级方案，不得让游戏白屏。
+  - **Hazard 视觉合同**：九类机关以区域材质、环境线索、离散地砖警戒符、像素战斗铭牌、逐类攻击动作、命中碎屑与冷却残留形成六阶段演出，禁止退化为通用平滑 HUD 圆环或大块透明覆盖。范围地面层位于实体下方，机关/铭牌/命中层位于迷雾上方；减少动态效果时移除震屏与密集粒子，但保留范围、方向、危险等级和伤害窗口。
+  - 正式资产由 `assets/` 中的来源母版、`assets/sprite-source/` 来源记录以及 `js/sprites/` 的程序化/编译像素模块共同维护；新增或重建资产必须保留稳定 ID、来源说明和可复现构建步骤，不依赖运行时 CDN。
+  - Actor 的正式 `spriteId` 必须指向已登记资产，缺失时由严格内容审计阻止启动；脚手架可显式引用已登记的 `actor_placeholder`，但应在内容验收前替换。`portraitId` 可选，缺失或不可用时战斗 HUD 依次回退到已登记战斗精灵和确定性像素剪影。
+  - 运行时色块/首字占位只用于旧档、下线内容和异常引用的防御性降级，不是绕过正式内容审计的“先无图上线”通道；UI 图标不得以 Emoji 或在线图标库替代项目像素资产。
 
   ## 模块化 / 插件化架构（当前基础与未来扩展）
   - **核心原则：引擎与内容分离，内容即数据**。引擎代码不写死任何具体区域/怪物/装备/技能，只面向「注册表 + 稳定字符串
   ID」编程。
   - **当前内容编译器与注册表**：正式内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义、Pack-local 中英文与条目，由编译器统一执行 schema/default、引用图、反向 Population 挂载、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。`js/data/packs/**/*.pack.js` 与 `*.support.js` 是文件系统真源；Support 只获得声明的 `authoring.read/write`、`rules.formula/handler` 能力，并通过版本化 `Game.contentAuthoring` 注册值或纯 factory，注册期/安装期改写其他 `Game` 表面均使构建失败。构建器在独立源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring、locales、挂载视图、fingerprint 和 `sourceSetHash`。`js/data/content/*.generated.js` 只是确定性校验/运行产物，禁止手改；正式入口和四个技术演示均只加载一个当前 `BUILD_ID` 的 `content.generated.js`，新增内容不修改 HTML 或手写清单。
   - **Actor 与世界生态合同**：ActorArchetype/Variant、Interaction/Engagement、EncounterPack、WorldSpawnProfile、WorldPopulationProfile 与 RegionProfile 使用稳定 ID 串成完整反向引用链。Population 决定通道和数量，并以不可变 `PopulationMountPlan` 按固定 channel 顺序完成槽位选择、坐标预留、放置失败与 delay/worldTime 重生调度；SpawnProfile 决定身份、放置与生命周期，EncounterPack 只描述可复用成员组。稳定 Spawn 使用 SpawnLease/generation，召唤使用确定性 ephemeral request key。外部攻击先入 EngagementCommand，并在固定 tick 通过 `EngagementDraft → CommitPlan → Game.encounters.startAtomic()` 原子提交 Variant、Relation、社交记忆、Encounter、join、target、ordinal 与 revision；完整 outbox 顺序为 `variant* → relation → started → joined* → committed`，提交后 opening Action 仍走正式 `requestAction()`。目标 DSL、多队伍/coalition、observer、投降/逃跑、奖励授权与版本化确定性 custom handler 统一由 Objective evaluator 决定。
-  - **召唤与 Hazard 合同**：区域召唤 Actor 不挂 Population，继承召唤者 faction/controller/team，以稳定 sequence 创建并挂载世界表现；`rewardAuthorized:false` 优先于队伍奖励资格，死亡、自毁或 Encounter 结束只清理一次且不产生经验、金币、掉落、讨伐或击杀统计。非 Actor `HazardProfile/HazardVisualProfile` 由独立 `Game.hazards` 管理确定性锚点、awareness、swept trigger、50ms phase、导航代价、外部 Effect 与 ambush Engagement；渲染层只消费 PresentationEvent，不参与命中判定，也不得在 world/renderer 中添加区域 ID 特判。
+  - **召唤与 Hazard 合同**：区域召唤 Actor 不挂 Population，继承召唤者 faction/controller/team，以稳定 sequence 创建并挂载世界表现；`rewardAuthorized:false` 优先于队伍奖励资格，死亡、自毁或 Encounter 结束只清理一次且不产生经验、金币、掉落、讨伐或击杀统计。非 Actor `HazardProfile/HazardVisualProfile` 由独立 `Game.hazards` 管理确定性锚点、awareness、swept trigger、50ms phase、导航代价、外部 Effect 与 ambush Engagement；VisualProfile 独占 glyph、材质/调色板和阶段表现参数，渲染层只读表现快照并监听 `hazard:*` 事件，不参与命中判定、反向写状态或按区域/profile ID 特判。
   - **单位作者入口**：新增单位以独立 `*.pack.js` 内容胶囊注册，通过 `WorldSpawnProfile.mountTo` 反向挂载 Population，不修改区域、引擎、HTML 或手写清单；Pack-local 中英文、内容引用与正式资产必须通过严格编译审计，生成产物禁止手改。
   - **Modifier / Status / Talent 合同**：内容 Modifier 必须显式声明已注册 `stat`、合法 `phase`、`operation` 与有限数值；`add/addPct` 按层线性累加，`multiply` 按层幂次相乘，`set` 不随层放大。`refresh/unique` 只允许一层，`stack` 声明正整数上限，周期效果按实例层数执行。Talent patch 只能指向已注册 Ability/Status 的现有数值路径，非法 stat、phase、operation、成本、层数、周期或 patch 在严格审计时阻止启动。
   - **事件总线（EventBus）**：引擎在关键节点广播事件（`monster:killed`、`player:levelup`、`item:dropped`、
@@ -251,9 +245,8 @@
   与数值，读档时查注册表还原；遇到已下线的 ID 优雅降级（装备折算金币、区域回退到最近有效区域），绝不崩溃。配合已有的
   版本号字段，迁移采用「版本号 + 迁移函数数组」流水线，逐版本升级旧存档。区域推进顺序同样只保存稳定 ID 数组，
   不保存注册表下标；所有依赖关卡阶位的系统统一通过路线位置查询有效 tier。
-  - **数值规则集中**：成长、经济和旧世界公式保留在 `data/formulas.js`；正式战斗公式与系数进入已审计的 combat rules / Pack 公式白名单，离线、自动加点、自动换装和战力统一消费 CombatEstimator 摘要，禁止复制一套近似战斗公式。
-  - **资产清单化**：素材经 manifest（资产 ID → 文件路径）间接引用，内容配置里只写资产
-  ID；素材缺失时自动落到占位渲染（色块+首字），保证新内容可以「先无图上线」。
+  - **数值规则集中**：成长、经济和旧世界公式保留在 `data/formulas.js`；正式战斗公式与系数进入已审计的 combat rules / Pack 公式白名单。离线结算消费 `CombatEstimator` 摘要，自动加点/换装由共享角色预览的解析评分结合该摘要；不得再复制第三套战斗模拟或让解析评分脱离正式 Stat/Talent/装备数据。
+  - **资产清单化**：素材经 manifest（资产 ID → 文件路径）间接引用，内容配置里只写资产 ID。正式 `spriteId` 必须通过严格审计；运行时占位只承担防御性降级。
   - 加载方式注意：因需支持「双击 file:// 直接可玩」，模块化用**按序加载的普通 `<script>` 标签 + 全局命名空间
   `Game.*`** 实现（ES Modules 在 file:// 协议下会被浏览器 CORS 拦截）；若最终选 Vite 构建路线则直接使用 ES Modules。
 
@@ -273,7 +266,7 @@
 
   ## 技术与质量要求
   - `tech-demos/` 演示页必须持续直连并适配当前生产版本，历史兼容协议仅由自动测试保护，不得作为默认演示或保留失效示例。即时性世界逻辑优先在确定性 Lab 中完成技术、时序与渲染验证，再以正式入口做集成冒烟。
-  - Actor / Combat Lab 必须从正式内容清单自动枚举 Actor、召唤物、Action、Talent、Status、Resource、AI、Faction 和 EncounterProfile；支持 1–4 友方、1–8 敌方、暂停/单 tick/倍速、正式 summon Action、稳定自毁、状态/驱散、打断、关系/控制器调整、深链与完整运行时检查。Hazard Lab 必须自动枚举当前区域 Hazard，支持聚焦、线索、揭示、触发、推进、实例重置与六阶段像素演出对照，并报告 awareness/phase、形状/朝向、冷却、策略代价与事件日志；各 Lab 均不得维护演示专用战斗或 Hazard 实现。
+  - Actor / Combat Lab 必须从正式内容清单自动枚举 Actor、召唤物、Action、Talent、Status、Resource、AI、Faction 和 EncounterProfile；支持 1–4 友方、1–8 敌方、暂停/单 tick/倍速、正式 summon Action、稳定自毁、状态/驱散、打断、关系/控制器调整、深链与完整运行时检查。Hazard Lab 必须自动枚举当前区域 Hazard，支持聚焦、线索、揭示、触发、推进与实例重置，以九类机关 × 六阶段对照验证材质、范围、方向、铭牌、命中/残留、降动态及中英文窄屏取景，并报告 awareness/phase、冷却、策略代价与完整 `hazard:*` 事件链；各 Lab 均不得维护演示专用战斗或 Hazard 实现。
   - 代码结构清晰：严格遵循上一节的模块化/插件化架构，数据配置（怪物表/装备表/区域表/技能表）与逻辑完全分离，便于扩展数值与内容。
   - 战斗逻辑严格由 50ms integer tick 和稳定 scheduler 驱动；`requestAnimationFrame` 仅负责渲染与有限追帧，页面不可见时按时间戳分片补偿，不依赖 `setInterval` 精度，也不把渲染帧率带入战斗结果。
   - **大数字处理**：指数成长曲线后期数值会很大，需在项目早期统一封装数字格式化函数（缩写单位随语言走，见 i18n 一节：

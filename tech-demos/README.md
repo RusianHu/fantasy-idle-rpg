@@ -12,7 +12,7 @@
 ## 维护约束
 
 - 优先加载正式注册表、系统和渲染模块；不得复制一套脱离生产代码的模拟实现。
-- 正式入口与四个工作台只加载一个当前 `BUILD_ID` 的 `js/data/content/content.generated.js`；不得直接加载 `*.pack.js`、`*.support.js` 或生成 manifest。
+- 正式入口与四个工作台只加载一个当前 `BUILD_ID` 的 `js/data/content/content.generated.js`；不得直接加载 `*.pack.js`、`*.support.js` 或内容侧 `js/data/content/manifest.generated.js`。生产使用的探索资产 manifest 不受此限制。
 - 新页面与现有页面平级，并登记到 `tech-demos/index.html`；页面专属 CSS/JS/说明文件放入同名子目录。
 - QA 文案使用 `demo-i18n.js`，游戏内容名称读取编译后的核心/Pack-local `Game.i18n` 查询层。
 - 页面不得读写正式存档；世界种子、区域、职业和交互状态仅存在于当前 QA 页面。
@@ -20,4 +20,4 @@
 
 ## 自动验证
 
-`tests/browser-smoke.js` 在移动与桌面视口验证正式入口和四个工作台的非空 Canvas、无横向溢出、44px 控件、双语、中立 Observe/Attack 二次确认与固定 tick Engagement 闭环；Hazard 单元测试另覆盖 clue/reveal、持续 active window、九类视觉符号、两层渲染与独立 Lab 生产入口。`tests/map-effects-inspector.test.js` 保证现场页逐类枚举正式 Region/Population/MountPlan/SpawnLease，且全部检查器键具备中英文。`tests/action-bubble-demo.test.js` 在 Lab 验证 29 个 Actor、18 个 Encounter、接敌不重叠、正式攻击 FX 与 PresentationEvent；`tests/unit-ecosystem-v14.test.js` 覆盖稳定生成、放置与重生、Relation/Engagement 原子性、Objective、奖励授权、Variant 与 v14 社交边界，其余确定性、4+8 性能与平衡矩阵由 `tests/v2-*.test.js` 覆盖。
+`tests/browser-smoke.js` 在移动与桌面视口验证正式入口和四个工作台的非空 Canvas、无横向溢出、44px 控件、双语、中立 Observe/Attack 二次确认与固定 tick Engagement 闭环；Hazard 单元测试另覆盖 clue/reveal、持续 active window、九类视觉符号、两层渲染与独立 Lab 生产入口。`tests/map-effects-inspector.test.js` 保证现场页逐类枚举正式 Region/Population/MountPlan/SpawnLease，且全部检查器键具备中英文。`tests/action-bubble-demo.test.js` 在 Lab 验证 53 个 Actor，以及由 16 个正式 Encounter 加 2 个 QA Encounter 组成的 18 个目录条目，并覆盖接敌不重叠、正式攻击 FX 与 PresentationEvent；`tests/unit-ecosystem-v14.test.js` 覆盖稳定生成、放置与重生、Relation/Engagement 原子性、Objective、奖励授权、Variant 与 v14 社交边界，其余确定性、4+8 性能与平衡矩阵由 `tests/v2-*.test.js` 覆盖。
