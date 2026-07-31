@@ -112,6 +112,14 @@ for (const region of regions) {
     assert.ok(first.guardian && first.bossLair);
     assert.equal(first.bossLair.sprite, `boss_lair_${region.id}`);
     assert.equal(first.bossLair.territory, bossLandmarkDef.territory);
+    assert.equal(first.bossLair.entrancePoint, first.bossSpawnPoint);
+    assert.equal(first.bossSpawnPoint.lairId, first.bossLair.id);
+    assert.ok(first.bossSpawnPoint.y > first.bossLair.y,
+      `${region.id}:${seed} boss entrance must depth-sort in front of the lair`);
+    assert.ok(Game.util.dist(
+      first.bossSpawnPoint.x, first.bossSpawnPoint.y,
+      first.bossLair.x, first.bossLair.y
+    ) <= 48, `${region.id}:${seed} boss entrance must remain attached to the lair`);
     assert.equal(first.bossArena, first.nav.bossArena);
     assert.ok(first.bossArena.rx >= 104 && first.bossArena.ry >= 54);
     assert.ok(first.bossArena.wallThickness >= 18);
@@ -121,6 +129,8 @@ for (const region of regions) {
     ][Math.floor(x / first.nav.cell)];
     assert.equal(arenaNavCell(first.bossArena.x, first.bossArena.y), 1,
       `${region.id}:${seed} boss room center must remain walkable`);
+    assert.equal(arenaNavCell(first.bossSpawnPoint.x, first.bossSpawnPoint.y), 1,
+      `${region.id}:${seed} boss entrance must remain walkable`);
     for (const door of first.bossArena.doors) {
       assert.equal(arenaNavCell(
         first.bossArena.x + Math.cos(door.angle) * first.bossArena.rx,

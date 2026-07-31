@@ -296,7 +296,10 @@
   }
 
   function defaultSlots(channel, layout) {
-    if (channel === 'boss') return [{ key: 'boss', x: layout.bossPoint.x, y: layout.bossPoint.y }];
+    if (channel === 'boss') {
+      var bossAnchor = layout.bossSpawnPoint || layout.bossPoint;
+      return bossAnchor ? [{ key: 'boss', x: bossAnchor.x, y: bossAnchor.y }] : [];
+    }
     if (channel === 'guardian') return layout.guardian ? [{
       key: layout.guardian.id || (regionId + ':guardian'), x: layout.guardian.x,
       y: layout.guardian.y, threat: layout.guardian
@@ -323,6 +326,7 @@
     var points = [];
     if (placement.selector === 'anchor') {
       var anchor = source === 'summoner' ? context.origin : layout[source];
+      if (!anchor && source === 'bossSpawnPoint') anchor = layout.bossPoint;
       var fixed = pointFrom(anchor, source === 'summoner' ? context.originKey || 'origin' : source, 'anchor');
       if (fixed) points.push(fixed);
     } else if (placement.selector === 'layoutEntity') {

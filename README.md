@@ -22,7 +22,7 @@
 
 | 系统 | 说明 |
 | --- | --- |
-| **开场体验** | 标题画面采用半俯视悬崖构图：全景先在半分辨率画布逐像素绘制，再以 2× 最近邻放大；四名队友在近岸营地围火、游侠在同侧河岸警戒上游，完整岩壁明确高台落差；远山曲流在崖口收束并与瀑布同轴，落入带浅滩、暗岸与河中岩石的横向河湾，视线继续跨过巨兽巢穴、不规则混生密林、多重雪山，最终落到山隘间极远的小比例魔王城；启动先展示无遮挡营地观景态，点击进入后才显示主操作，并可随时返回观景；纯空档使用独立的公会纹章「开始新游戏」特殊按钮，不套用档案槽位外壳，进行中档则显示远征档案、职业头像、等级、区域、游玩时长、路线进度、世界种子与「继续游戏」；选档前不启动主循环、不自动存档、不结算离线收益；确认后经传送光柱、符文与像素帘幕进入序章或世界 |
+| **开场体验** | 标题画面采用半俯视悬崖构图：全景先在半分辨率画布逐像素绘制，再以 2× 最近邻放大；四名公会成员在近岸营地围火、游侠在同侧河岸警戒上游，完整岩壁明确高台落差；远山曲流在崖口收束并与瀑布同轴，落入带浅滩、暗岸与河中岩石的横向河湾，视线继续跨过巨兽巢穴、不规则混生密林、多重雪山，最终落到山隘间极远的小比例魔王城；启动先展示无遮挡营地观景态，点击进入后才显示主操作，并可随时返回观景；纯空档使用独立的公会纹章「开始新游戏」特殊按钮，不套用档案槽位外壳，进行中档则显示远征档案、职业头像、等级、区域、游玩时长、路线进度、世界种子与「继续游戏」；选档前不启动主循环、不自动存档、不结算离线收益；确认后经传送光柱、符文与像素帘幕进入序章或世界 |
 | **职业系统** | DnD 风格五职业（战士/盗贼/法师/牧师/游侠），开局选择、永久生效；数值成长、攻击方式（近战/远程弹道）、技能组、精灵立绘、武器全面区分 |
 | **环境视觉** | 程序化多阶树冠大树（摇曳）、连续密度场草簇/花簇、烘焙色斑/裂纹/雪地反光、八区各 6 件专属 v3 地表装饰；普通装饰按生态适宜度、同类簇群、伴生锚点与八种形状语法形成岸带、行列、轨迹、环形和自然斑块。发光体光晕、林间光柱、道具软阴影、暗角与四层天气合成均执行视口剔除和降动态契约 |
 | 挂机战斗 | 50ms 整数 tick 的确定性自动时间轴：GCD/oGCD、队列窗口、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、威胁、护盾和治疗共用一条结算管线；普通遭遇为 1–3 人 pack，巡逻与接敌入口统一受共享 leash 约束，Boss 具备预警、阶段与有限增援 |
@@ -74,7 +74,7 @@ docs/content-authoring/ Actor 内容契约、示例与新增流程
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
   core/content/       Pack/schema/引用/公式编译、严格审计、深冻结与 fingerprint
-  core/               utils / eventbus / registry(只读兼容门面) / assets / save / loop / update
+  core/               utils / eventbus / registry(旧数据兼容注册表与投影门面) / assets / save / loop / update
   i18n/               i18n 核心 + zh-CN/en 主语言包与 Combat V2 语言包
   data/content/       自动生成的内容 manifest 与单一运行时 Bundle（禁止手改）
   data/packs/         自动发现的 *.pack.js 内容胶囊与 *.support.js 作者辅助
@@ -181,16 +181,23 @@ node tests\hazard-runtime.test.js
 node tests\hazard-layout.test.js
 node tests\hazard-detection-balance.test.js
 node tests\hazard-presentation.test.js
+node tests\chest-mimic.test.js
 node tests\action-bubble-demo.test.js
 node tests\decoration-ecology.test.js
 node tests\map-effects-inspector.test.js
+node tests\wandering-merchants.test.js
+node tests\weather-climate-system.test.js
+node tests\weather-climate-demo.test.js
+node tests\weather-climate-browser-smoke.test.js
 node tests\browser-smoke.js
 node tests\cache-version.test.js
 ```
 
-除 `action-bubble-demo.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
+除 `action-bubble-demo.test.js`、`weather-climate-browser-smoke.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v17 与多 ActorRecord/RoutePlan/社交/Hazard/噬宝匣/行商迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局及固定 roll 侦测分布、环境倍率、路径覆盖/扫掠触发/交互取消/伏击编队/渲染、噬宝匣保护概率/胜败事务、行商八槽确定性/信誉价格带/议价/债务/非致死结算、5 个职业各 10 分钟、8 个 Boss 阶段、16 个正式 Encounter、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。浏览器用例同时验证地图 Lab 无玩家/迷雾、目录注册表匹配、Population 放置一致性、正式导航、确定性哈希、小地图视口同步，以及移动/桌面中英文、44px 触控、六个工作台和无横向溢出。
+测试链同时保护旧世界与 V2：八区 384 次双向长途行程、已知分区循环种子、即时中断与队列接续，以及内容自动发现/双 VM/Support 能力隔离/schema/引用/i18n/资产/fingerprint、Modifier/Talent patch 非法内容拒绝、v1→v17 与多 ActorRecord/RoutePlan/社交/Hazard/噬宝匣/行商迁移、PopulationMountPlan/SpawnLease、Engagement 原子回滚、Relation/Variant/Objective/奖励授权、固定 tick Action/Effect/Threat、召唤继承/自毁/零奖励、96 张 Hazard 布局及固定 roll 侦测分布、环境倍率、路径覆盖/扫掠触发/交互取消/伏击编队/渲染、噬宝匣保护概率/胜败事务、行商八槽确定性/信誉价格带/议价/债务/非致死结算、5 个职业各 10 分钟、8 个 Boss 阶段、24 个正式 Encounter（含 8 个行商袭击）、4000 组首通样本、V1 宏观基线 ±10% 和 Lab 4+8 单步 P95 ≤2ms。
+
+**当前浏览器回归状态**：验收目标仍是正式入口和六个工作台的移动/桌面中英文、44px 触控与无横向溢出。`browser-smoke.js` 目前只逐页包含五个工作台，移动行商由 Node 领域测试覆盖；综合用例仍有过时的 Hub/Weather/内容数量断言及密林帧预算失败，不能视为当前全量通过。
 
 ---
 

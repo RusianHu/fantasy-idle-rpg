@@ -576,7 +576,7 @@
       ],
       intentionallyUnaffected: [
         'combat', 'movement', 'rewards', 'navigation', 'offline-estimation',
-        'save-schema-v16'
+        'save-schema-current'
       ],
       futureHooks: clone(FUTURE_HOOKS),
       lastDeterminism: clone(lastDeterminism)

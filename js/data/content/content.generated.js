@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "e3c771b3f7bdcaf8a9d07917ffbcb313be565b4c512e44e4e73254aa7052178a",
+  "sourceSetHash": "9f018691fc178cf980a5413fc3854339fc44909f5eb26f7843e94a1b581fecb8",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "a19b649330aca42127002f2df05035d6ccf782c622deebe0e404e9f6966e97f4"
+      "sha256": "7d46e3440340a29a0bd3bbe9e12a183b4515d0b8a8b054adf6471fa08d7e7608"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -43,7 +43,7 @@
     {
       "path": "js/data/packs/regions/factory.support.js",
       "kind": "support",
-      "sha256": "f577a1963c37d46391d0220f40f1c3d5775a0c95e45e2e7e362cbd9081bf3d1f"
+      "sha256": "c28e6eed2cbbe60961734eb958877fbf49e67a153249f0a791444f91ac4a18d8"
     },
     {
       "path": "js/data/packs/regions/forest.pack.js",
@@ -252,7 +252,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "01b9e5de"
+  "contentFingerprint": "c2e87e9a"
 });
 })();
 /* source: js/data/packs/regions/catalog.support.js */
@@ -1150,6 +1150,7 @@
     grassland: {
       sprite: 'boss_lair_grassland',
       radius: 126, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#416447', edge: '#91a85e', accent: '#65b9d4',
         marks: ['pools', 'stones']
@@ -1164,6 +1165,7 @@
     forest: {
       sprite: 'boss_lair_forest',
       radius: 132, squash: 0.66, decorCount: 10, approachClearance: 0.74,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#304c32', edge: '#778751', accent: '#55c4a8',
         marks: ['roots', 'wisps']
@@ -1178,6 +1180,7 @@
     mine: {
       sprite: 'boss_lair_mine',
       radius: 128, squash: 0.62, decorCount: 9, approachClearance: 0.68,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#494249', edge: '#8f7455', accent: '#4bc7dc',
         marks: ['rails', 'circuits']
@@ -1192,6 +1195,7 @@
     graveyard: {
       sprite: 'boss_lair_graveyard',
       radius: 130, squash: 0.64, decorCount: 10, approachClearance: 0.74,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#383440', edge: '#80758c', accent: '#a36cdb',
         marks: ['graves', 'candles']
@@ -1206,6 +1210,7 @@
     snowpass: {
       sprite: 'boss_lair_snowpass',
       radius: 138, squash: 0.62, decorCount: 9, approachClearance: 0.70,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#b8cad8', edge: '#f1f6fb', accent: '#72c4e3',
         marks: ['runes', 'cracks']
@@ -1220,6 +1225,7 @@
     lavacave: {
       sprite: 'boss_lair_lavacave',
       radius: 130, squash: 0.63, decorCount: 10, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#37282a', edge: '#91452d', accent: '#f07b2a',
         marks: ['cracks', 'sigil']
@@ -1234,6 +1240,7 @@
     skyruins: {
       sprite: 'boss_lair_skyruins',
       radius: 134, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#7c8392', edge: '#d9c99e', accent: '#60d2e3',
         marks: ['rings', 'runes']
@@ -1248,6 +1255,7 @@
     darkcastle: {
       sprite: 'boss_lair_darkcastle',
       radius: 140, squash: 0.62, decorCount: 11, approachClearance: 0.76,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#30263b', edge: '#744281', accent: '#c83e5c',
         marks: ['sigil', 'spikes']
@@ -1579,7 +1587,7 @@
         }],
         identity: { scope: 'regionStable', socialGroupId: 'social.' + spec.factionId },
         placement: channel === 'boss'
-          ? { selector: 'anchor', source: 'bossPoint', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 18 }
+          ? { selector: 'anchor', source: 'bossSpawnPoint', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 18 }
           : (channel === 'guardian'
             ? { selector: 'layoutEntity', source: 'guardian', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 14 }
             : { selector: 'layoutEntity', source: 'threat', required: false, onFailure: 'skipOptional', occupancyRadius: 10 }),

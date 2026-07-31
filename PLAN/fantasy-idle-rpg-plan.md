@@ -11,7 +11,7 @@
   - 正式战斗采用 50ms 整数 tick、Encounter seeded RNG、GCD/oGCD、队列、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、Threat 与 Effect DSL；不存在独立攻速倒计时或按冷却旁路施法。
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
   - 单位状态边界固定为：`ActorRecord` 持久化 HP 且同一 Record 最多绑定一个存活 `ActorInstance`，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取轻量 Vitals/完整诊断快照，或提交伤害、治疗、死亡/复活、Modifier source 替换与无损重算。刷新保留同 ID 资源、SpawnSpec、Status 与外部 Modifier；禁止从旧派生值和实时组件拼接状态或直接修改 Ledger。
-  - 正式内容为 5 职业、30 Talent、32 个常驻普通怪、1 个含三阶 Variant 的条件型噬宝匣、8 个 Boss、8 个区域召唤 Actor、16 个 EncounterProfile 与 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
+  - 正式内容为 5 职业、30 Talent、58 个 ActorArchetype（41 个普通/Boss/噬宝匣怪物、9 个召唤物、6 个 NPC、1 个玩家 Actor、1 个可战斗 object）、16 个区域基础 EncounterProfile 与 8 个行商袭击 EncounterProfile，以及 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v17，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social`、按布局清理的 Hazard 发现/绝对冷却、噬宝匣判定序号/真箱保护计数，以及行商信誉/债务、区域计时和锁定库存）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、活动噬宝匣、行商运行时 Actor、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要且不推进行商发现或会面倒计时；自动养成使用无副作用角色预览，并把该摘要合入确定性输出/生存/收益评分。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
   - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置 Lab；`tech-demos/exploration-v3` 负责导航网格、长途路径与多 Seed 拓扑审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；`tech-demos/merchants` 直接运行生产内容包、确定性库存和信誉/债务领域。正式入口及六个工作台只加载同一个确定性 `content.generated.js`。
@@ -42,7 +42,7 @@
   怪物强度、Boss 首杀奖励、药水价格、离线收益与推荐等级均按该区域在本档路线中的**推进位置**计算，而非绑定经典区域编号，
   保证随机路线仍按 1～8 阶平滑成长。**Boss 触发采用讨伐进度条**：击杀本区域普通怪积累进度（如 10 只）；讨伐条旁常驻紧凑的
   「讨伐 Boss」按钮与「自动讨伐」开关。自动讨伐默认开启，当前 v3 要求生命不低于 80% 时 Boss 自动登场；关闭后满进度待命，由按钮手动
-  发起且不受该生命安全线限制。v1/v2 的 60% 门槛只作为兼容行为保留。登场配合镜头拉近 + 震屏特效；挑战失败则 Boss 撤场、进度保留，可重新积攒再战。击败 Boss
+  发起且不受该生命安全线限制。v1/v2 的 60% 门槛只作为兼容行为保留。Boss 从巢穴贴图前沿声明的合法入口点登场，镜头拉近与震屏期间双方保持原地，未建立 Encounter 前 Boss 不进入环境巡游；挑战失败则 Boss 撤场、进度保留，可重新积攒再战。击败 Boss
   解锁下一区域。**「自动推进」开关（默认开启）**：开启时击败 Boss 自动进入下一区域，关闭则原地继续刷本区域；
   支持随时手动回退刷低级区域。**魔王城采用可失守的特殊准入规则**：角色在魔王城内战败并回营时，立即退回本档路线的上一
   区域营地并重新锁定魔王城；玩家须再次击败上一地区 Boss 才能重新解锁。该过程不撤销既有 Boss 首杀、奖励、成就或通关记录，
@@ -282,4 +282,4 @@
   - 数值需自洽：给出一份简短的数值设计说明（升级曲线、DPS 与区域怪物血量的匹配关系、离线收益公式）。
   - **世界交互回归**：`tests/v1_11.test.js` 必须链接旧回归，并覆盖 800 张采集节点布局、掉落概率与保底、物品校验矩阵、合法位移、冷却/离线、兑换域、AI 次序、自动回营、动态交易域及 v8→v9；浏览器覆盖 390×844 中英文、44px 触控、减少动态效果，以及拾取/采集/宝箱/交易/用药/回营全链路。
   - **开放探索回归**：`tests/v1_13.test.js` 覆盖八区 1,600 张完整 v3 布局、5,000 个拓扑模糊种子、黄金摘要、硬阻挡、视线、迷雾、准备度、远征稳定性、离线情报边界和资产来源；`tests/decoration-ecology.test.js` 另覆盖装饰适宜度、八种形状语法、同类富集、留白、配额、合法材质、生成来源与独立确定性快照；`tests/v1_13.balance.test.js` 覆盖五职业各 100 种子与三种 AI 策略。Hazard 另覆盖八区 96 张布局的锚点确定性、禁区、逃生净宽、固定 roll 分布、策略/视野/环境倍率和隐藏触发链；标准视野聚合发现率须保持均衡 22%–28%、安全 35%–45%、掠夺 12%–18%。浏览器覆盖 390×700、390×844、522×1320、桌面、中英文、点触/键盘、减少动态效果、关闭环境特效和性能指标。
-  - **Actor / Combat V2 与生态回归**：内容自动发现/双 VM/schema/引用/Pack-local i18n/资产/fingerprint、v1→v17 迁移、RoutePlan/社交/Hazard/噬宝匣/行商白名单清理、Population/SpawnLease/generation、Engagement 原子回滚与事件 outbox、Relation/Variant/Objective/奖励授权、固定 tick/RNG、Action/Effect/Status/Threat/Encounter、召唤继承/maxActive/selfDestruct/零奖励、Hazard 路线覆盖/扫掠触发/交互取消/外部 Effect/持久冷却/伏击编队/渲染、噬宝匣保护概率/奖励延迟/胜败清理，以及行商八槽确定性、信誉价格带、议价、债务、撤离/投降/抢掠必须通过。Lab 必须报告 external command、objective evaluation、Variant cleanup、CombatEvent、PresentationEvent、召唤、Hazard、噬宝匣与行商诊断；浏览器覆盖正式 Combat HUD、六个技术演示、移动/桌面中英文、44px 触控、固定 tick Engagement、存档重开和无横向溢出。
+  - **Actor / Combat V2 与生态回归**：内容自动发现/双 VM/schema/引用/Pack-local i18n/资产/fingerprint、v1→v17 迁移、RoutePlan/社交/Hazard/噬宝匣/行商白名单清理、Population/SpawnLease/generation、Engagement 原子回滚与事件 outbox、Relation/Variant/Objective/奖励授权、固定 tick/RNG、Action/Effect/Status/Threat/Encounter、召唤继承/maxActive/selfDestruct/零奖励、Hazard 路线覆盖/扫掠触发/交互取消/外部 Effect/持久冷却/伏击编队/渲染、噬宝匣保护概率/奖励延迟/胜败清理，以及行商八槽确定性、信誉价格带、议价、债务、撤离/投降/抢掠必须通过。Lab 必须报告 external command、objective evaluation、Variant cleanup、CombatEvent、PresentationEvent、召唤、Hazard、噬宝匣与行商诊断；浏览器验收目标为正式 Combat HUD、六个技术演示、移动/桌面中英文、44px 触控、固定 tick Engagement、存档重开和无横向溢出；截至当前快照，`browser-smoke.js` 尚未逐页接入移动行商，相关领域由 Node 测试覆盖。

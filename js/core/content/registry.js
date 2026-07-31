@@ -252,7 +252,7 @@
       ], type, def, 'placement', issues);
       if (['anchor', 'layoutEntity', 'candidate'].indexOf(placement.selector) < 0) issue(issues, 'spawn-placement-selector', { type: type, id: def.id, path: 'placement.selector' });
       var sourcesBySelector = {
-        anchor: ['camp', 'bossPoint', 'summoner'],
+        anchor: ['camp', 'bossPoint', 'bossSpawnPoint', 'summoner'],
         layoutEntity: ['guardian', 'threat', 'landmark', 'ecology'],
         candidate: ['spawnCandidates', 'corridorCandidates', 'walkableNav']
       };

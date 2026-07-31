@@ -466,7 +466,8 @@
       });
       var ent = bossResults[0] && bossResults[0].primary;
       if (!ent) return false;
-      ent.state = 'fight';
+      ent.state = 'entrance';
+      ent.moving = false;
       Array.prototype.push.apply(W.entities, bossResults[0].actors);
       W.bossEnt = ent;
 
@@ -1282,8 +1283,10 @@
       if (W.cinematic) {
         W.cinematic.t -= dt;
         if (W.cinematic.t <= 0) {
+          var entranceBoss = W.cinematic.ent;
           W.cinematic = null;
           if (hero.state === 'entrance') hero.state = 'idle';
+          if (entranceBoss && entranceBoss.state === 'entrance') entranceBoss.state = 'idle';
         }
       }
 
@@ -1527,6 +1530,14 @@
         e.animT += dt;
         e.moving = false;
         e.state = 'idle';
+        return;
+      }
+      if (e === W.bossEnt && !e.encounterId) {
+        e.flash = Math.max(0, e.flash - dt);
+        e.lungeT = Math.max(0, e.lungeT - dt);
+        e.animT += dt;
+        e.moving = false;
+        e.state = W.cinematic && W.cinematic.ent === e ? 'entrance' : 'idle';
         return;
       }
       var hero = W.hero;

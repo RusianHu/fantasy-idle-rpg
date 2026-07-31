@@ -209,7 +209,7 @@
         }],
         identity: { scope: 'regionStable', socialGroupId: 'social.' + spec.factionId },
         placement: channel === 'boss'
-          ? { selector: 'anchor', source: 'bossPoint', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 18 }
+          ? { selector: 'anchor', source: 'bossSpawnPoint', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 18 }
           : (channel === 'guardian'
             ? { selector: 'layoutEntity', source: 'guardian', required: true, onFailure: 'rejectRegionMount', occupancyRadius: 14 }
             : { selector: 'layoutEntity', source: 'threat', required: false, onFailure: 'skipOptional', occupancyRadius: 10 }),

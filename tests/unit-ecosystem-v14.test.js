@@ -397,6 +397,26 @@ assert.deepEqual(
   Array.from(mountPlanA.slots, (entry) => entry.id).sort()
 );
 
+const bossEntranceLayout = {
+  version: 3,
+  camp: { x: 0, y: 0 },
+  bossPoint: { x: 640, y: 320 },
+  bossSpawnPoint: { x: 640, y: 352 },
+  spawnCandidates: [], corridorCandidates: [], threats: [], guardian: null
+};
+const bossEntrancePlan = Game.population.prepareRegion('grassland', bossEntranceLayout, {
+  tier: 1, worldSeed: 0x10203040, expeditionIndex: 3,
+  channelLimits: { boss: 1, guardian: 0, npc: 0, rare: 0, regular: 0 }
+});
+assert.equal(bossEntrancePlan.ok, true);
+const bossEntranceSlot = bossEntrancePlan.slots.find((slot) => slot.channel === 'boss');
+assert.deepEqual(
+  [bossEntranceSlot.layoutSlotKey, bossEntranceSlot.x, bossEntranceSlot.y],
+  ['bossSpawnPoint', 640, 352],
+  'v3 Boss population must mount at the lair foreground entrance'
+);
+Game.population.prepareRegion('grassland', planLayout, planContext);
+
 // A higher-priority boss reservation can reject a required NPC while optional failures stay skippable.
 const blockedLayout = {
   version: 2,

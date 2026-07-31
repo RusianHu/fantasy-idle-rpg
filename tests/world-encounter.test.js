@@ -134,4 +134,28 @@ Game.util.rand = originalRand;
 assert.ok(Game.util.dist(monster.wx, monster.wy, monster.spawnX, monster.spawnY) <= 108.001,
   'stale targets are replanned and square samples are projected into the patrol radius');
 
+const entranceBoss = {
+  id: 'boss-entrance', kind: 'monster', boss: true,
+  x: 320, y: 240, spawnX: 320, spawnY: 240,
+  encounterId: null, state: 'entrance', moving: true,
+  flash: 0, lungeT: 0, animT: 0,
+  components: { transform: {}, vitals: { hp: 100, maxHp: 100 } }
+};
+let bossWandered = false;
+const originalWanderTick = W.wanderTick;
+W.wanderTick = () => { bossWandered = true; };
+W.bossEnt = entranceBoss;
+W.cinematic = { ent: entranceBoss, t: 1 };
+W.updateMonster(entranceBoss, 0.5);
+assert.deepEqual([entranceBoss.x, entranceBoss.y], [320, 240]);
+assert.equal(entranceBoss.state, 'entrance');
+assert.equal(entranceBoss.moving, false);
+assert.equal(bossWandered, false, 'Boss cannot patrol during its entrance cinematic');
+W.cinematic = null;
+W.updateMonster(entranceBoss, 0.5);
+assert.equal(entranceBoss.state, 'idle');
+assert.equal(bossWandered, false, 'summoned Boss guards the entrance until an Encounter starts');
+W.bossEnt = null;
+W.wanderTick = originalWanderTick;
+
 console.log('world encounter leash tests passed');

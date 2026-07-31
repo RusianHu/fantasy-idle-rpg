@@ -544,6 +544,13 @@
       bossLair: true, territory: lairDef.territory || null,
       approachAngle: approachAngle, shadow: true, large: true
     });
+    var entranceOffset = lairDef.territory && lairDef.territory.entranceOffset || {};
+    var entranceX = Number.isFinite(Number(entranceOffset.x)) ? Number(entranceOffset.x) : 0;
+    var entranceY = Number.isFinite(Number(entranceOffset.y)) ? Number(entranceOffset.y) : 24;
+    var bossSpawnPoint = project(nav, bossPoint.x + entranceX, bossPoint.y + entranceY, 2) ||
+      { x: bossPoint.x, y: bossPoint.y, gx: bossPoint.gx, gy: bossPoint.gy };
+    bossSpawnPoint.lairId = landmarks[3].id;
+    landmarks[3].entrancePoint = bossSpawnPoint;
 
     var resourceDefs = cfg.resources || [];
     var nodes = [];
@@ -624,7 +631,8 @@
     };
 
     return {
-      camp: camp, bossPoint: bossPoint, landmarks: landmarks, nodes: nodes,
+      camp: camp, bossPoint: bossPoint, bossSpawnPoint: bossSpawnPoint,
+      landmarks: landmarks, nodes: nodes,
       curios: curios, ecology: ecology, threats: threats, guardian: guardian
     };
   }
@@ -1624,6 +1632,7 @@
       world: { w: WORLD_W, h: WORLD_H },
       camp: content.camp,
       bossPoint: content.bossPoint,
+      bossSpawnPoint: content.bossSpawnPoint,
       bossLair: content.landmarks[3],
       bossArena: nav.bossArena,
       campSafeRadius: 120,

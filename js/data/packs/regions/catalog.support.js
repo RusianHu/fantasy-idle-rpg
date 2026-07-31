@@ -892,6 +892,7 @@
     grassland: {
       sprite: 'boss_lair_grassland',
       radius: 126, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#416447', edge: '#91a85e', accent: '#65b9d4',
         marks: ['pools', 'stones']
@@ -906,6 +907,7 @@
     forest: {
       sprite: 'boss_lair_forest',
       radius: 132, squash: 0.66, decorCount: 10, approachClearance: 0.74,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#304c32', edge: '#778751', accent: '#55c4a8',
         marks: ['roots', 'wisps']
@@ -920,6 +922,7 @@
     mine: {
       sprite: 'boss_lair_mine',
       radius: 128, squash: 0.62, decorCount: 9, approachClearance: 0.68,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#494249', edge: '#8f7455', accent: '#4bc7dc',
         marks: ['rails', 'circuits']
@@ -934,6 +937,7 @@
     graveyard: {
       sprite: 'boss_lair_graveyard',
       radius: 130, squash: 0.64, decorCount: 10, approachClearance: 0.74,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#383440', edge: '#80758c', accent: '#a36cdb',
         marks: ['graves', 'candles']
@@ -948,6 +952,7 @@
     snowpass: {
       sprite: 'boss_lair_snowpass',
       radius: 138, squash: 0.62, decorCount: 9, approachClearance: 0.70,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#b8cad8', edge: '#f1f6fb', accent: '#72c4e3',
         marks: ['runes', 'cracks']
@@ -962,6 +967,7 @@
     lavacave: {
       sprite: 'boss_lair_lavacave',
       radius: 130, squash: 0.63, decorCount: 10, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#37282a', edge: '#91452d', accent: '#f07b2a',
         marks: ['cracks', 'sigil']
@@ -976,6 +982,7 @@
     skyruins: {
       sprite: 'boss_lair_skyruins',
       radius: 134, squash: 0.64, decorCount: 9, approachClearance: 0.72,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#7c8392', edge: '#d9c99e', accent: '#60d2e3',
         marks: ['rings', 'runes']
@@ -990,6 +997,7 @@
     darkcastle: {
       sprite: 'boss_lair_darkcastle',
       radius: 140, squash: 0.62, decorCount: 11, approachClearance: 0.76,
+      entranceOffset: { x: 0, y: 24 },
       ground: {
         fill: '#30263b', edge: '#744281', accent: '#c83e5c',
         marks: ['sigil', 'spikes']
