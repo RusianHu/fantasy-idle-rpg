@@ -203,18 +203,21 @@
     var production = Game.expeditionAI && Game.expeditionAI.movementExpectation
       ? Game.expeditionAI.movementExpectation(shadowHero, intentId)
       : { expected: state === 'travel', source: state === 'travel' ? 'route-intent' : 'none' };
+    var productionExpected = !!production.expected;
+    var expected = productionExpected;
+    if (policy === 'legacy' && state === 'approach') expected = false;
     return {
-      production: !!production.expected,
-      expected: !!production.expected || (policy === 'guarded' && state === 'approach'),
-      source: production.expected ? production.source :
-        (policy === 'guarded' && state === 'approach' ? 'interaction-approach' : 'none')
+      production: productionExpected,
+      policy: expected,
+      expected: expected,
+      source: expected ? production.source : 'none'
     };
   }
 
   function run(layout, scenarioId, policy, base) {
     var scenario = SCENARIOS[scenarioId];
     if (!scenario) throw new Error('Unknown auto-route audit scenario: ' + scenarioId);
-    policy = policy === 'guarded' ? 'guarded' : 'current';
+    policy = policy === 'legacy' ? 'legacy' : 'current';
     base = base || baseline(layout);
     mount(layout);
 
@@ -239,12 +242,19 @@
     var reason = null;
     var actRemaining = 0;
     var combatRemaining = 0;
+    var movementWatchdog = Game.expeditionAI &&
+      Game.expeditionAI.createMovementWatchdog &&
+      Game.expeditionAI.createMovementWatchdog();
+    if (!movementWatchdog) {
+      throw new Error('Production movement watchdog is unavailable');
+    }
     var watchdogStill = 0;
     var watchdogStillMax = 0;
     var physicalStill = 0;
     var physicalStillMax = 0;
     var approachSeconds = 0;
     var coveredApproachSeconds = 0;
+    var policyCoveredApproachSeconds = 0;
     var resumeAt = null;
     var resumeLatency = null;
     var failedPathKey = null;
@@ -378,35 +388,41 @@
       if (state === 'approach') {
         approachSeconds += DT;
         if (expectation.production) coveredApproachSeconds += DT;
+        if (expectation.policy) policyCoveredApproachSeconds += DT;
         physicalStill = moved < 0.05 ? physicalStill + DT : 0;
         physicalStillMax = Math.max(physicalStillMax, physicalStill);
       } else {
         physicalStill = 0;
       }
-      watchdogStill = expectation.expected && moved < 0.6 ? watchdogStill + DT : 0;
+      var watchdog = movementWatchdog.update(
+        hero.x, hero.y, DT, expectation.expected
+      );
+      watchdogStill = watchdog.still;
       watchdogStillMax = Math.max(watchdogStillMax, watchdogStill);
 
-      if (policy === 'guarded' && state === 'approach') {
-        if (watchdogStill >= 0.75 && !softRecovery) {
+      if (policy === 'current' && state === 'approach') {
+        if (watchdog.action === 'route-reset') {
           softRecovery = true;
           Game.nav.clear(hero);
-          record('watchdog:route-reset', { still: +watchdogStill.toFixed(2) });
-        }
-        if (watchdogStill >= 2 && !cacheRecovery) {
-          cacheRecovery = true;
-          var pathKey = hero.navRoute && hero.navRoute.pathKey || failedPathKey;
-          if (pathKey && Object.prototype.hasOwnProperty.call(Game.nav.cache, pathKey)) {
-            delete Game.nav.cache[pathKey];
-            cacheInvalidations++;
-          }
-          Game.nav.clear(hero);
-          record('watchdog:cache-invalidated', {
-            still: +watchdogStill.toFixed(2), pathKey: pathKey || null
+          record('watchdog:route-reset', {
+            still: +watchdogStill.toFixed(2),
+            progress: +watchdog.progress.toFixed(2)
           });
         }
-        if (watchdogStill >= 6) {
+        if (watchdog.action === 'cache-recovery') {
+          cacheRecovery = true;
+          var pathKey = hero.navRoute && hero.navRoute.pathKey || failedPathKey;
+          if (Game.nav.recover(hero)) cacheInvalidations++;
+          record('watchdog:cache-invalidated', {
+            still: +watchdogStill.toFixed(2),
+            progress: +watchdog.progress.toFixed(2),
+            pathKey: pathKey || null
+          });
+        }
+        if (watchdog.action === 'cancel') {
           record('watchdog:interaction-cancelled', {
-            still: +watchdogStill.toFixed(2)
+            still: +watchdogStill.toFixed(2),
+            progress: +watchdog.progress.toFixed(2)
           });
           resume('route:resumed', { reason: 'stuck-fallback' });
         }
@@ -419,7 +435,7 @@
 
       if (state === 'approach' && physicalStill >= AUDIT_STALL_LIMIT) {
         terminal = 'stalled';
-        reason = expectation.production
+        reason = expectation.expected
           ? 'recovery-exhausted' : 'interaction-watchdog-unarmed';
         record('audit:stalled', {
           physicalStill: +physicalStill.toFixed(2),
@@ -445,7 +461,7 @@
       scenario: scenario.id,
       policy: policy,
       passed: terminal === 'reached',
-      expectedCurrentGap: !!scenario.injectFallback && policy === 'current',
+      expectedLegacyGap: !!scenario.injectFallback && policy === 'legacy',
       terminal: terminal,
       reason: reason,
       duration: +(tick * DT).toFixed(2),
@@ -462,6 +478,8 @@
       watchdog: {
         productionCoverage: approachSeconds
           ? +(coveredApproachSeconds / approachSeconds).toFixed(3) : 1,
+        policyCoverage: approachSeconds
+          ? +(policyCoveredApproachSeconds / approachSeconds).toFixed(3) : 1,
         maxStill: +watchdogStillMax.toFixed(2),
         maxPhysicalStill: +physicalStillMax.toFixed(2),
         softResets: softRecovery ? 1 : 0,
@@ -480,15 +498,25 @@
     };
   }
 
+  function isExpectedLegacyGap(run) {
+    return !!(run && !run.passed &&
+      run.reason === 'interaction-watchdog-unarmed' &&
+      run.interaction && run.interaction.triggered &&
+      run.navigation && run.navigation.fallbackCount >= 1 &&
+      run.logs && run.logs.some(function (entry) {
+        return entry.event === 'nav:fallback-observed';
+      }));
+  }
+
   function compare(layout, scenarioId, base) {
     base = base || baseline(layout);
+    var legacy = run(layout, scenarioId, 'legacy', base);
     var current = run(layout, scenarioId, 'current', base);
-    var guarded = run(layout, scenarioId, 'guarded', base);
     return {
       scenario: scenarioId,
-      reproduced: !current.passed && guarded.passed,
-      current: current,
-      guarded: guarded
+      reproduced: isExpectedLegacyGap(legacy) && current.passed,
+      legacy: legacy,
+      current: current
     };
   }
 
@@ -517,6 +545,7 @@
     baseline: baseline,
     run: run,
     compare: compare,
+    isExpectedLegacyGap: isExpectedLegacyGap,
     summarize: summarize
   };
 })();

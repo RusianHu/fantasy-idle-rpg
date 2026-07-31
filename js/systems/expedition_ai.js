@@ -8,9 +8,93 @@
   var U = Game.util, bus = Game.bus;
   var thinkT = 0;
   var current = { id: 'idle', target: null, distance: 0, danger: 0, reason: null };
-  var progress = { x: 0, y: 0, still: 0, blocked: {} };
+  var WATCHDOG_POLICY = {
+    sampleWindow: 0.25,
+    minProgress: 0.5,
+    routeResetAfter: 0.75,
+    cacheRecoveryAfter: 2,
+    cancelAfter: 6
+  };
+  var progress = { watchdog: createMovementWatchdog(), blocked: {} };
   var trace = [];
   var TRACE_LIMIT = 80;
+
+  function createMovementWatchdog() {
+    var state = {
+      x: null, y: null, sampleAge: 0,
+      still: 0, recoveryTier: 0, lastProgress: 0
+    };
+
+    function reset(x, y) {
+      state.x = Number.isFinite(x) ? x : null;
+      state.y = Number.isFinite(y) ? y : null;
+      state.sampleAge = 0;
+      state.still = 0;
+      state.recoveryTier = 0;
+      state.lastProgress = 0;
+    }
+
+    return {
+      reset: reset,
+      update: function (x, y, dt, expected) {
+        dt = Math.max(0, Number.isFinite(dt) ? dt : 0);
+        if (!expected || !Number.isFinite(x) || !Number.isFinite(y)) {
+          reset(x, y);
+          return { action: null, sampled: false, progress: 0, still: 0, recoveryTier: 0 };
+        }
+        if (state.x === null || state.y === null) {
+          reset(x, y);
+          return { action: null, sampled: false, progress: 0, still: 0, recoveryTier: 0 };
+        }
+
+        state.sampleAge += dt;
+        if (state.sampleAge + 1e-9 < WATCHDOG_POLICY.sampleWindow) {
+          return {
+            action: null, sampled: false, progress: state.lastProgress,
+            still: state.still, recoveryTier: state.recoveryTier
+          };
+        }
+
+        var elapsed = state.sampleAge;
+        var moved = U.dist(x, y, state.x, state.y);
+        state.x = x;
+        state.y = y;
+        state.sampleAge = 0;
+        state.lastProgress = moved;
+        if (moved >= WATCHDOG_POLICY.minProgress) {
+          state.still = 0;
+          state.recoveryTier = 0;
+          return {
+            action: null, sampled: true, progress: moved,
+            elapsed: elapsed, still: 0, recoveryTier: 0
+          };
+        }
+
+        state.still += elapsed;
+        var nextTier = state.still + 1e-9 >= WATCHDOG_POLICY.cancelAfter ? 3 :
+          (state.still + 1e-9 >= WATCHDOG_POLICY.cacheRecoveryAfter ? 2 :
+            (state.still + 1e-9 >= WATCHDOG_POLICY.routeResetAfter ? 1 : 0));
+        var action = null;
+        if (nextTier > state.recoveryTier) {
+          state.recoveryTier = nextTier;
+          action = nextTier === 3 ? 'cancel' :
+            (nextTier === 2 ? 'cache-recovery' : 'route-reset');
+        }
+        return {
+          action: action, sampled: true, progress: moved, elapsed: elapsed,
+          still: state.still, recoveryTier: state.recoveryTier
+        };
+      },
+      snapshot: function () {
+        return {
+          sampleAge: state.sampleAge,
+          still: state.still,
+          recoveryTier: state.recoveryTier,
+          lastProgress: state.lastProgress
+        };
+      }
+    };
+  }
 
   var STRATEGIES = {
     safe: { hp: 0.58, danger: 1.55, resource: 0.8, route: 1.35, engage: 42 },
@@ -86,8 +170,13 @@
   }
 
   function blocked(id) {
-    var now = Game.state.world.worldTime || 0;
-    return id && progress.blocked[id] > now;
+    var now = Game.state && Game.state.world ? Game.state.world.worldTime || 0 : 0;
+    if (!id || !progress.blocked[id]) return false;
+    if (progress.blocked[id] <= now) {
+      delete progress.blocked[id];
+      return false;
+    }
+    return true;
   }
 
   function visible(ent) {
@@ -172,7 +261,10 @@
 
   function nearbyMatureNode(hero) {
     if (!Game.environment) return null;
-    return Game.environment.nearestNode(hero.x, hero.y, 120);
+    return nearest(Game.world.layout.nodes || [], hero, function (node) {
+      return U.dist(hero.x, hero.y, node.x, node.y) <= 120 &&
+        Game.environment.autoNodeReady(node);
+    });
   }
 
   function preservedTravel(hero) {
@@ -199,11 +291,14 @@
     var aiMoveOrder = !!(hero && hero.moveOrder && hero.moveOrder.ai);
     var routeIntent = intentId === 'frontier' || intentId === 'discovery' ||
       intentId === 'boss';
+    var interactionApproach = !!(hero && hero.interactOrder &&
+      hero.interactOrder.phase !== 'act');
+    var inCombat = !!(hero && hero.target && !hero.target.dead);
     return {
-      expected: aiMoveOrder || routeIntent,
-      source: aiMoveOrder ? 'move-order' : (routeIntent ? 'route-intent' : 'none'),
-      interactionApproach: !!(hero && hero.interactOrder &&
-        hero.interactOrder.phase !== 'act')
+      expected: !inCombat && (interactionApproach || aiMoveOrder || routeIntent),
+      source: inCombat ? 'combat' : (interactionApproach ? 'interaction-approach' :
+        (aiMoveOrder ? 'move-order' : (routeIntent ? 'route-intent' : 'none'))),
+      interactionApproach: interactionApproach
     };
   }
 
@@ -368,18 +463,25 @@
     strategy: strategy,
     intent: function () { return current; },
     trace: function () { return trace.slice(); },
+    isTargetBlocked: blocked,
+    watchdogPolicy: WATCHDOG_POLICY,
+    createMovementWatchdog: createMovementWatchdog,
     movementExpectation: function (hero, intentId) {
       return movementExpectation(hero, intentId === undefined ? current.id : intentId);
     },
     diagnostics: function () {
       var hero = Game.world && Game.world.hero;
       var expectation = movementExpectation(hero, current.id);
+      var watchdog = progress.watchdog.snapshot();
       return {
         intent: current.id,
         target: current.target && (current.target.id || current.target.threatId ||
           current.target.mid) || null,
         thinkIn: thinkT,
-        still: progress.still,
+        still: watchdog.still,
+        recoveryTier: watchdog.recoveryTier,
+        watchdogSampleAge: watchdog.sampleAge,
+        watchdogProgress: watchdog.lastProgress,
         movementExpected: expectation.expected,
         movementSource: expectation.source,
         interactionApproach: expectation.interactionApproach,
@@ -389,11 +491,7 @@
     pause: function (reason) {
       var hero = Game.world && Game.world.hero;
       thinkT = 0;
-      progress.still = 0;
-      if (hero) {
-        progress.x = hero.x;
-        progress.y = hero.y;
-      }
+      progress.watchdog.reset(hero && hero.x, hero && hero.y);
       return emitIntent({
         id: 'interaction', target: null, distance: 0, danger: 0,
         reason: reason || 'interaction-pause'
@@ -446,30 +544,32 @@
         });
       }
 
-      var moved = U.dist(hero.x, hero.y, progress.x, progress.y);
       var moveExpectation = movementExpectation(hero, current.id);
-      if (moveExpectation.expected && moved < 0.6) progress.still += dt;
-      else progress.still = 0;
-      progress.x = hero.x; progress.y = hero.y;
+      var watchdog = progress.watchdog.update(
+        hero.x, hero.y, dt, moveExpectation.expected
+      );
 
-      if (progress.still >= 6) {
-        var tid = current.target && current.target.id;
+      if (watchdog.action === 'cancel') {
+        var interactionTarget = hero.interactOrder && hero.interactOrder.target;
+        var tid = interactionTarget && interactionTarget.id ||
+          (current.target && current.target.id);
         if (tid) progress.blocked[tid] = (Game.state.world.worldTime || 0) + 30;
+        if (Game.nav) Game.nav.recover(hero);
+        if (hero.interactOrder) Game.world.cancelInteraction('stuck-fallback');
         hero.moveOrder = null;
-        if (Game.nav) Game.nav.clear(hero);
-        progress.still = 0;
+        progress.watchdog.reset(hero.x, hero.y);
         thinkT = 0;
         replan(hero, 'stuck-fallback', true);
         return true;
       }
-      if (progress.still >= 2) {
+      if (watchdog.action === 'cache-recovery') {
         if (hero.moveOrder) {
           var projected = Game.terrain.projectPoint(hero.moveOrder.x, hero.moveOrder.y, 3);
           if (projected) { hero.moveOrder.x = projected.x; hero.moveOrder.y = projected.y; }
         }
-        if (Game.nav) Game.nav.clear(hero);
+        if (Game.nav) Game.nav.recover(hero);
         thinkT = 0;
-      } else if (progress.still >= 0.75) {
+      } else if (watchdog.action === 'route-reset') {
         if (Game.nav) Game.nav.clear(hero);
         thinkT = Math.min(thinkT, 0);
       }
@@ -490,7 +590,7 @@
     reset: function () {
       thinkT = 0;
       current = { id: 'idle', target: null, distance: 0, danger: 0, reason: null };
-      progress = { x: 0, y: 0, still: 0, blocked: {} };
+      progress = { watchdog: createMovementWatchdog(), blocked: {} };
       trace = [];
     }
   };

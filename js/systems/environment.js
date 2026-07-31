@@ -315,9 +315,10 @@
       return chest;
     },
 
-    nearestChest: function (x, y) {
+    nearestChest: function (x, y, predicate) {
       var best = null, dist = Infinity;
       for (var i = 0; i < chests.length; i++) {
+        if (predicate && !predicate(chests[i])) continue;
         var d = U.dist(x, y, chests[i].x, chests[i].y);
         if (d < dist) { dist = d; best = chests[i]; }
       }
@@ -335,12 +336,12 @@
       return ratio >= threshold;
     },
 
-    nearestNode: function (x, y, maxDistance) {
+    nearestNode: function (x, y, maxDistance, predicate) {
       var nodes = Game.world && Game.world.layout && Game.world.layout.nodes || [];
       var best = null, dist = Infinity;
       for (var i = 0; i < nodes.length; i++) {
         // v3 自动互动只能使用玩家已经亲眼发现且充分展示过的节点。
-        if (!Env.autoNodeReady(nodes[i])) continue;
+        if (!Env.autoNodeReady(nodes[i]) || (predicate && !predicate(nodes[i]))) continue;
         var d = U.dist(x, y, nodes[i].x, nodes[i].y);
         if (d <= maxDistance && d < dist) { dist = d; best = nodes[i]; }
       }

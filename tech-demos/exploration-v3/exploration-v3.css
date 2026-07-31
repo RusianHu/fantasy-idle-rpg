@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.16") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.17") format("woff2");
   font-display: swap;
 }
 :root {
@@ -61,8 +61,8 @@ aside input { min-height: 0; accent-color: #c4a950; }
 .event-table { width: 100%; border-collapse: collapse; font-size: 9px; line-height: 1.4; }
 .event-table th { position: sticky; top: 0; z-index: 1; padding: 7px 8px; color: #9ea79d; background: #171d18; border-bottom: 1px solid #485048; text-align: left; font-weight: normal; }
 .event-table td { padding: 6px 8px; color: #bec5bd; border-bottom: 1px solid #283029; vertical-align: top; }
-.event-table tr[data-policy="current"] td:nth-child(2) { color: #e78576; }
-.event-table tr[data-policy="guarded"] td:nth-child(2) { color: #86c99c; }
+.event-table tr[data-policy="legacy"] td:nth-child(2) { color: #e78576; }
+.event-table tr[data-policy="current"] td:nth-child(2) { color: #86c99c; }
 .event-table td:nth-child(1), .event-table td:nth-child(5) { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .audit-results pre { max-height: 300px; margin: 0; border: 0; border-left: 1px solid #3e463e; }
 pre { min-height: 92px; max-height: 240px; margin: 8px 0 0; padding: 10px; overflow: auto; color: #b7c0ba; background: #101511; border: 1px solid #343c35; font: 10px/1.55 Consolas, monospace; }

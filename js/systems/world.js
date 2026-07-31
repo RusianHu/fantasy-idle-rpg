@@ -629,9 +629,10 @@
       return count;
     },
 
-    nearestGroundLoot: function (x, y) {
+    nearestGroundLoot: function (x, y, predicate) {
       var best = null, distance = Infinity;
       for (var i = 0; i < W.groundLoot.length; i++) {
+        if (predicate && !predicate(W.groundLoot[i])) continue;
         var d = U.dist(x, y, W.groundLoot[i].x, W.groundLoot[i].y);
         if (d < distance) { distance = d; best = W.groundLoot[i]; }
       }
@@ -658,6 +659,8 @@
       if (W.bossEnt || hero.state === 'dead' || hero.state === 'recover' ||
           hero.state === 'entrance' || hero.state === 'warpOut' || hero.state === 'warpIn') return false;
       if (hero.target && !hero.target.dead && hero.target.hp > 0) return false;
+      if (!explicit && order.target && order.target.id && Game.expeditionAI &&
+          Game.expeditionAI.isTargetBlocked(order.target.id)) return false;
       if (order.type === 'gather' && W.layout && W.layout.version >= 3 && Game.exploration) {
         var gatherTarget = order.target;
         if (!gatherTarget || !Game.exploration.isRevealed(gatherTarget.x, gatherTarget.y)) return false;
@@ -768,20 +771,28 @@
     },
 
     chooseAmbientInteraction: function (hero) {
-      var loot = W.nearestGroundLoot(hero.x, hero.y);
+      var allowed = function (target) {
+        return !(target && target.id && Game.expeditionAI &&
+          Game.expeditionAI.isTargetBlocked(target.id));
+      };
+      var loot = W.nearestGroundLoot(hero.x, hero.y, allowed);
       if (loot && (W.controlMode() === 'auto' || loot.distance <= 26)) {
-        return W.startInteraction({ type: 'loot', target: loot.target }, false);
+        if (W.startInteraction({ type: 'loot', target: loot.target }, false)) return true;
       }
-      var chest = Game.environment && Game.environment.nearestChest(hero.x, hero.y);
+      var chest = Game.environment && Game.environment.nearestChest(
+        hero.x, hero.y, allowed
+      );
       if (chest && (W.controlMode() === 'auto' || chest.distance <= 26)) {
         if (W.controlMode() !== 'auto' || !Game.environment.autoChestReady ||
             Game.environment.autoChestReady(chest.target)) {
-          return W.startInteraction({ type: 'chest', target: chest.target }, false);
+          if (W.startInteraction({ type: 'chest', target: chest.target }, false)) return true;
         }
       }
       if (W.controlMode() === 'auto' && Game.environment) {
-        var node = Game.environment.nearestNode(hero.x, hero.y, 120);
-        if (node) return W.startInteraction({ type: 'gather', target: node.target }, false);
+        var node = Game.environment.nearestNode(hero.x, hero.y, 120, allowed);
+        if (node && W.startInteraction({ type: 'gather', target: node.target }, false)) {
+          return true;
+        }
       }
       return false;
     },

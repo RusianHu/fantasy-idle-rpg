@@ -49,7 +49,7 @@
   if (Game.autoRouteAudit.scenarios[query.get('scenario')]) {
     autoScenario.value = query.get('scenario');
   }
-  if (['compare', 'current', 'guarded'].indexOf(query.get('policy')) >= 0) {
+  if (['compare', 'legacy', 'current'].indexOf(query.get('policy')) >= 0) {
     autoPolicy.value = query.get('policy');
   }
 
@@ -211,7 +211,7 @@
       scenario: run.scenario,
       policy: run.policy,
       passed: run.passed,
-      expectedCurrentGap: run.expectedCurrentGap,
+      expectedLegacyGap: run.expectedLegacyGap,
       terminal: run.terminal,
       reason: run.reason,
       duration: run.duration,
@@ -227,12 +227,12 @@
 
   function compactAutoResult(result) {
     if (!result) return null;
-    if (result.current && result.guarded) {
+    if (result.legacy && result.current) {
       return {
         scenario: result.scenario,
         reproduced: result.reproduced,
-        current: compactAutoRun(result.current),
-        guarded: compactAutoRun(result.guarded)
+        legacy: compactAutoRun(result.legacy),
+        current: compactAutoRun(result.current)
       };
     }
     if (result.batch) return result;
@@ -247,8 +247,8 @@
   }
 
   function policyLabel(policy) {
-    return D.t(policy === 'guarded'
-      ? 'explore.policyGuarded' : 'explore.policyCurrent');
+    return D.t(policy === 'legacy'
+      ? 'explore.policyLegacy' : 'explore.policyCurrent');
   }
 
   function metric(root, label, value, tone) {
@@ -308,31 +308,31 @@
     metrics.innerHTML = '';
     latestAutoResult = result;
     var runs;
-    if (result.current && result.guarded) {
-      runs = [result.current, result.guarded];
+    if (result.legacy && result.current) {
+      runs = [result.legacy, result.current];
       latestAutoRun = result.current;
+      metric(metrics, D.t('explore.metricLegacy'),
+        D.t(result.legacy.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
+        result.legacy.passed ? 'pass' : 'fail');
       metric(metrics, D.t('explore.metricCurrent'),
         D.t(result.current.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
         result.current.passed ? 'pass' : 'fail');
-      metric(metrics, D.t('explore.metricGuarded'),
-        D.t(result.guarded.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
-        result.guarded.passed ? 'pass' : 'fail');
       metric(metrics, D.t('explore.metricCoverage'),
         Math.round(result.current.watchdog.productionCoverage * 100) + '%',
         result.current.watchdog.productionCoverage < 1 ? 'fail' : 'pass');
       metric(metrics, D.t('explore.metricPhysicalStill'),
-        result.current.watchdog.maxPhysicalStill.toFixed(2) + 's');
+        result.legacy.watchdog.maxPhysicalStill.toFixed(2) + 's');
       metric(metrics, D.t('explore.metricCacheReset'),
-        String(result.guarded.watchdog.cacheInvalidations));
+        String(result.current.watchdog.cacheInvalidations));
       metric(metrics, D.t('explore.metricResume'),
-        result.guarded.navigation.resumeLatency === null
-          ? '-' : result.guarded.navigation.resumeLatency.toFixed(2) + 's');
+        result.current.navigation.resumeLatency === null
+          ? '-' : result.current.navigation.resumeLatency.toFixed(2) + 's');
       autoStatus.textContent = D.t(result.reproduced
         ? 'explore.autoReproduced' :
-        (result.current.passed && result.guarded.passed
+        (result.current.passed
           ? 'explore.autoPassed' : 'explore.autoUnexpected'));
       autoStatus.setAttribute('data-state', result.reproduced ? 'fail' :
-        (result.current.passed && result.guarded.passed ? 'pass' : 'fail'));
+        (result.current.passed ? 'pass' : 'fail'));
     } else {
       runs = [result];
       latestAutoRun = result;
@@ -382,10 +382,10 @@
     metrics.innerHTML = '';
     metric(metrics, D.t('explore.metricSeeds'), batch.seeds + '/32',
       batch.seeds === 32 ? 'pass' : 'fail');
-    metric(metrics, D.t('explore.metricReproduced'), batch.reproduced + '/64',
-      batch.reproduced === 64 ? 'fail' : null);
-    metric(metrics, D.t('explore.metricRecovered'), batch.recovered + '/64',
-      batch.recovered === 64 ? 'pass' : 'fail');
+    metric(metrics, D.t('explore.metricLegacyGaps'), batch.legacyGaps + '/64',
+      batch.legacyGaps === 64 ? 'pass' : 'fail');
+    metric(metrics, D.t('explore.metricCurrentRecovered'), batch.currentRecovered + '/64',
+      batch.currentRecovered === 64 ? 'pass' : 'fail');
     metric(metrics, D.t('explore.metricNormal'), batch.normalPassed + '/128',
       batch.normalPassed === 128 ? 'pass' : 'fail');
     metric(metrics, D.t('explore.metricUnexpected'), String(batch.unexpected.length),
@@ -394,8 +394,8 @@
     autoStatus.textContent = batch.unexpected.length
       ? D.t('explore.autoBatchFailed', { count: batch.unexpected.length })
       : D.t('explore.autoBatchDone', {
-        reproduced: batch.reproduced,
-        recovered: batch.recovered
+        reproduced: batch.legacyGaps,
+        recovered: batch.currentRecovered
       });
     autoStatus.setAttribute('data-state', batch.unexpected.length ? 'fail' : 'pass');
     document.getElementById('auto-log').innerHTML = '';
@@ -414,7 +414,7 @@
         var baseSeed = normalizedSeed();
         var region = Game.reg.get('region', regionSelect.value);
         var batch = {
-          seeds: 0, reproduced: 0, recovered: 0,
+          seeds: 0, legacyGaps: 0, currentRecovered: 0,
           normalPassed: 0, longest: 0, unexpected: []
         };
         var normalScenarios = [
@@ -442,22 +442,23 @@
             fallbackScenarios.forEach(function (scenario) {
               var comparison = Game.autoRouteAudit.compare(layout, scenario, base);
               batch.longest = Math.max(
-                batch.longest, comparison.current.duration, comparison.guarded.duration
+                batch.longest, comparison.legacy.duration, comparison.current.duration
               );
-              if (!comparison.current.passed) batch.reproduced++;
+              if (comparison.reproduced) batch.legacyGaps++;
               else {
                 seedOk = false;
                 batch.unexpected.push({
                   seed: Game.util.hex32(seed), scenario: scenario,
-                  policy: 'current', reason: 'gap-not-reproduced'
+                  policy: 'legacy', reason: comparison.legacy.passed
+                    ? 'gap-not-reproduced' : comparison.legacy.reason
                 });
               }
-              if (comparison.guarded.passed) batch.recovered++;
+              if (comparison.current.passed) batch.currentRecovered++;
               else {
                 seedOk = false;
                 batch.unexpected.push({
                   seed: Game.util.hex32(seed), scenario: scenario,
-                  policy: 'guarded', reason: comparison.guarded.reason
+                  policy: 'current', reason: comparison.current.reason
                 });
               }
             });
@@ -687,8 +688,10 @@
   });
   window.addEventListener('demo:locale', function () {
     var selected = regionSelect.value;
+    var preservedBatch = latestAutoResult && latestAutoResult.batch;
     buildRegionOptions(selected);
     generate();
+    if (preservedBatch) renderAutoBatch(preservedBatch);
   });
   drawLegend();
   generate();

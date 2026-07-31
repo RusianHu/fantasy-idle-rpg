@@ -88,7 +88,10 @@
     macroCache: {},
     pending: {},
     queue: [],
-    diagnostics: { peakMs: 0, solved: 0, queued: 0, longRoutes: 0, recovered: 0 },
+    diagnostics: {
+      peakMs: 0, solved: 0, queued: 0, longRoutes: 0,
+      recovered: 0, invalidated: 0
+    },
 
     useLayout: function (layout) {
       N.layout = layout;
@@ -97,7 +100,10 @@
       N.macroCache = {};
       N.pending = {};
       N.queue = [];
-      N.diagnostics = { peakMs: 0, solved: 0, queued: 0, longRoutes: 0, recovered: 0 };
+      N.diagnostics = {
+        peakMs: 0, solved: 0, queued: 0, longRoutes: 0,
+        recovered: 0, invalidated: 0
+      };
       if (!window.EasyStar || !window.EasyStar.js) return false;
       var finder = new window.EasyStar.js();
       finder.setGrid(layout.nav.grid);
@@ -327,6 +333,32 @@
 
     clear: function (ent) {
       if (ent) ent.navRoute = null;
+    },
+
+    recover: function (ent) {
+      if (!ent) return false;
+      var route = ent.navRoute;
+      var key = route && route.pathKey;
+      var invalidated = false;
+      if (key) {
+        if (Object.prototype.hasOwnProperty.call(N.cache, key)) {
+          delete N.cache[key];
+          invalidated = true;
+        }
+        if (N.pending[key]) {
+          delete N.pending[key];
+          invalidated = true;
+        }
+        for (var i = N.queue.length - 1; i >= 0; i--) {
+          if (N.queue[i] && N.queue[i].key === key) {
+            N.queue.splice(i, 1);
+            invalidated = true;
+          }
+        }
+      }
+      ent.navRoute = null;
+      if (invalidated) N.diagnostics.invalidated++;
+      return invalidated;
     },
 
     clearAll: function (entities) {
