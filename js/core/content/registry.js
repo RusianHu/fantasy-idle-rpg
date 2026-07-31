@@ -509,7 +509,7 @@
     'modifyResource', 'modifyCooldown', 'modifyThreat', 'movement',
     'knockback', 'pull', 'summon', 'changeTeam', 'conditional',
     'sequence', 'repeat', 'triggerAbility', 'setCombo', 'markTarget',
-    'interrupt', 'selfDestruct'
+    'interrupt', 'selfDestruct', 'withdraw'
   ];
 
   function collectEffectRefs(type, def, effect, path, definitions, issues) {

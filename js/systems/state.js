@@ -182,6 +182,14 @@
             spawnVariants: {},
             memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
           },
+          merchants: {
+            version: 1,
+            guild: {
+              trust: 50, debtGold: 0, offenses: 0,
+              metProfileIds: [], lastLines: {}
+            },
+            regions: {}
+          },
           finalRegionLocked: false,
           deathsRow: 0
         },

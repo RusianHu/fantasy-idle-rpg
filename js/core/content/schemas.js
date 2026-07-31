@@ -11,7 +11,8 @@
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
     'actorVariant', 'encounterPack', 'worldSpawnProfile',
     'worldPopulationProfile', 'regionProfile', 'climateProfile', 'engagementPolicy',
-    'interactionProfile', 'hazardProfile', 'hazardVisualProfile'
+    'interactionProfile', 'merchantProfile', 'merchantStockPool',
+    'dialogueProfile', 'hazardProfile', 'hazardVisualProfile'
   ];
 
   var required = {
@@ -38,6 +39,12 @@
     climateProfile: ['id', 'regionId', 'exposure', 'factors', 'states', 'presentation'],
     engagementPolicy: ['id', 'manualAttack', 'autoAggro'],
     interactionProfile: ['id', 'actions'],
+    merchantProfile: [
+      'id', 'regionIds', 'spawnProfileId', 'stockPoolId',
+      'dialogueProfileId', 'presentation'
+    ],
+    merchantStockPool: ['id', 'materials', 'signatureAffixes'],
+    dialogueProfile: ['id', 'states'],
     hazardProfile: [
       'id', 'regionId', 'category', 'trigger', 'detection', 'lifecycle',
       'outcome', 'placement', 'visualProfileId', 'presentation'
@@ -76,6 +83,10 @@
       climateProfileId: 'climateProfile'
     },
     climateProfile: { regionId: 'regionProfile' },
+    merchantProfile: {
+      regionIds: 'regionProfile', spawnProfileId: 'worldSpawnProfile',
+      stockPoolId: 'merchantStockPool', dialogueProfileId: 'dialogueProfile'
+    },
     hazardProfile: {
       regionId: 'regionProfile', visualProfileId: 'hazardVisualProfile'
     }
@@ -140,6 +151,12 @@
       groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
     },
     interactionProfile: { schemaVersion: 1, actions: [] },
+    merchantProfile: { schemaVersion: 1, regionIds: [], presentation: {} },
+    merchantStockPool: {
+      schemaVersion: 1, materials: [], signatureAffixes: [],
+      staplePotionIds: ['potion_small', 'potion_large']
+    },
+    dialogueProfile: { schemaVersion: 1, states: {} },
     hazardProfile: {
       schemaVersion: 1,
       trigger: {

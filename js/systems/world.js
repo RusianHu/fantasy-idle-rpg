@@ -956,24 +956,10 @@
             Game.content.get('interactionProfile', interactionId);
           if (interaction && interaction.actions && interaction.actions.length &&
               Game.ui && Game.ui.modals && Game.ui.modals.actorActions) {
-            Game.ui.modals.actorActions(best, {
-              attack: function (target) {
-                var sourceKey = hero.actorRecordId
-                  ? { actorRecordId: hero.actorRecordId }
-                  : null;
-                var targetKey = Game.population && Game.population.stableKey(target);
-                if (!sourceKey || !targetKey || !Game.actors.get(target.id)) {
-                  Game.ui.modals.toast(Game.i18n.t('ui.actorTargetUnavailable'), 'warn');
-                  return;
-                }
-                Game.engagement.enqueue({
-                  sourceKey: sourceKey,
-                  targetKey: targetKey,
-                  kind: 'attack'
-                });
-                Game.ui.modals.toast(Game.i18n.t('ui.actorAttackQueued'));
-              }
-            });
+            Game.ui.modals.actorActions(
+              best,
+              Game.interactions ? Game.interactions.handlers(best) : {}
+            );
           }
           return;
         }
@@ -1319,6 +1305,7 @@
         W.updateMonster(e, dt);
       }
       Game.combat.update(dt);
+      if (Game.merchants) Game.merchants.update(dt);
       if (hero.components.vitals) {
         if (Game.units) Game.units.commit(hero);
         else Game.state.player.hp = hero.hp;
@@ -1608,6 +1595,7 @@
       var moved = U.dist(ox, oy, ent.x, ent.y);
       W.stepFx(ent, moved);
       if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(moved, dt);
+      if (ent.kind === 'hero' && Game.merchants) Game.merchants.recordHeroMovement(moved, dt);
       if (ent.kind === 'hero' && moved > 0.01 && Game.exploration) Game.exploration.revealAt(ent.x, ent.y);
       return moved;
     },
@@ -1632,6 +1620,7 @@
       W.clampToWorld(ent);
       W.stepFx(ent, step);
       if (ent.kind === 'hero' && Game.environment) Game.environment.recordHeroMovement(step, dt);
+      if (ent.kind === 'hero' && Game.merchants) Game.merchants.recordHeroMovement(step, dt);
       if (ent.kind === 'hero' && step > 0.01 && Game.exploration) Game.exploration.revealAt(ent.x, ent.y);
       return d - step;
     },

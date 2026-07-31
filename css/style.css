@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260731.5') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260731.6') format('woff2');
   font-display: swap;
 }
 
@@ -1577,6 +1577,43 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
 }
 .exchange-cost.missing { color: #ef9d90; border-color: #71423f; }
 .trade-sell-card .btn { flex: 0 0 auto; }
+.merchant-ledger {
+  margin: -1px 0 8px;
+  padding: 7px 9px;
+  display: grid;
+  gap: 4px;
+  background:
+    repeating-linear-gradient(0deg, #192038, #192038 5px, #171d34 5px, #171d34 6px);
+  border: 2px solid #3f6f6b;
+  box-shadow: inset 0 0 0 1px #78b4a22e;
+}
+.merchant-ledger-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: #aeb7c5;
+  font-size: 9px;
+}
+.merchant-ledger-row strong { color: #e8dfbd; font-weight: normal; text-align: right; }
+.merchant-trust.band-favored { color: #8ee0ae; }
+.merchant-trust.band-normal { color: #e8dfbd; }
+.merchant-trust.band-wary { color: #efb16f; }
+.merchant-trust.band-refused { color: #ed8c83; }
+.merchant-haggle {
+  margin-bottom: 9px;
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(90deg, #336b6429, transparent), #171a32;
+  border: 1px dashed #54877f;
+}
+.merchant-haggle .grow { min-width: 0; flex: 1; }
+.merchant-haggle .name { color: #a8d7c8; font-size: 10px; }
+.merchant-haggle .desc { margin-top: 2px; color: var(--ink-dim); font-size: 8px; line-height: 1.45; }
+.merchant-haggle .btn { flex: 0 0 auto; }
+.merchant-restitution { border-color: #7e4945; }
+.merchant-restitution .btn { width: 100%; margin-top: 8px; }
 
 @media (max-width: 360px) {
   .btn-potion { width: 102px; padding-left: 5px; padding-right: 5px; }
@@ -1745,6 +1782,55 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
 .actor-action-label {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+.merchant-dialogue-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.merchant-dialogue-head h3 { margin: 2px 0 0; text-align: left; }
+.merchant-dialogue-portrait {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  image-rendering: pixelated;
+  background: #11152d;
+  border: 2px solid #5b887e;
+  box-shadow: 0 0 0 2px #090b19;
+}
+.merchant-dialogue-kicker { color: #78baa9; font-size: 8px; letter-spacing: 1px; }
+.merchant-dialogue-line {
+  margin-top: 12px;
+  padding: 11px;
+  color: #ede5cd;
+  background: linear-gradient(135deg, #335d5422, transparent), #13172d;
+  border-left: 3px solid #5b9c8c;
+}
+.merchant-rob-choices {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.merchant-rob-choice {
+  width: 100%;
+  min-height: 38px;
+  color: #edb3a8;
+  border-color: #76504c;
+  white-space: normal;
+  line-height: 1.45;
+}
+.merchant-chip {
+  color: #b9e4d6;
+  border-color: #477c73;
+  background: linear-gradient(90deg, #315f573b, #171b34);
+}
+.merchant-chip-mark {
+  width: 7px;
+  height: 7px;
+  background: #74c8ae;
+  border: 1px solid #c2efdc;
+  transform: rotate(45deg);
+  box-shadow: 0 0 5px #74c8ae88;
 }
 
 /* 序章对话框 */

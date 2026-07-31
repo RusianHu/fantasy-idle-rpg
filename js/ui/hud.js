@@ -531,6 +531,20 @@
           U.esc(t(currentWeather.stateNameKey)) + '</div>';
       }
       var hero = W.hero;
+      var merchantEvent = Game.merchants && Game.merchants.activeEvent();
+      if (merchantEvent && merchantEvent.state === 'available') {
+        var merchantArea = Game.merchants.tradeAreas()[0];
+        var merchantDirection = merchantArea && hero
+          ? Game.trade.directionTo(merchantArea) : '';
+        chips += '<div class="buff-chip merchant-chip" aria-label="' +
+          U.esc(t('merchant.ui.hudAria', {
+            direction: merchantDirection ? t('direction.' + merchantDirection) : '',
+            time: Game.i18n.fmtTime(Math.ceil(merchantEvent.remainingSeconds))
+          })) + '"><span class="merchant-chip-mark" aria-hidden="true"></span>' +
+          U.esc(t('merchant.ui.hudChip', {
+            time: Game.i18n.fmtTime(Math.ceil(merchantEvent.remainingSeconds))
+          })) + '</div>';
+      }
       if (hero && hero.shield > 0) {
         chips += '<div class="buff-chip shield"><span class="buff-chip-mark"></span>' +
           Game.i18n.fmtNum(Math.ceil(hero.shield)) + '</div>';

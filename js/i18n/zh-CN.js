@@ -428,9 +428,60 @@
     tradeKind: {
       merchant: '营地补给', exchange: '素材兑换', wander: '游商', event: '活动摊位'
     },
+    merchant: {
+      ui: {
+        talk: '交谈',
+        trade: '查看货物',
+        roadGuild: '远路商会',
+        leave: '告辞',
+        openShop: '打开商店',
+        discovered: '发现移动行商：{name}',
+        expired: '远处的车铃渐渐消失，移动行商已经离开。',
+        escaped: '移动行商的烟幕散去，只留下一笔未清的账。',
+        attackQueued: '你拔出了武器。商会会记住这次选择。',
+        attackConfirm: '攻击「{name}」不会获得常规经验或掉落。行商会自卫、尝试逃跑，并向商会登记信誉损失与赔偿金。仍要攻击？',
+        trust: '商会信誉',
+        departure: '离开倒计时',
+        hudChip: '行商 {time}',
+        hudAria: '移动行商位于{direction}，将在 {time} 后离开',
+        debt: '待赔偿',
+        band: {
+          favored: '信赖',
+          normal: '正常',
+          wary: '戒备',
+          refused: '拒绝交易'
+        },
+        stock: '余 {n}',
+        soldOut: '售罄',
+        gearOfferDesc: '{rarity} · Lv.{level} · {affixes}',
+        bundleOfferDesc: '{item} 本次库存 {stock} 份。',
+        materialOfferDesc: '旅行途中整理的素材包。本次库存 {stock} 份。',
+        gotMaterial: '获得 {name} ×{n}',
+        haggleTitle: '重新拆箱',
+        haggleDesc: '支付 {fee} 金币，仅重排 4 个旅行货架；招牌与稀有藏品保持不变。购买前限一次。',
+        haggle: '议价 {fee}',
+        haggled: '已重排',
+        haggleDone: '普通货架已经重新摆放。',
+        haggleUnavailable: '本次会面已无法再次重排货架。',
+        tradeRefused: '商会拒绝交易',
+        restitutionDesc: '先支付全部赔偿金 {debt}，信誉将恢复到可以交易的最低水平。',
+        payRestitution: '支付 {debt}',
+        restitutionPaid: '赔偿已结清，商会恢复有限交易。',
+        surrenderTitle: '行商放下武器',
+        surrenderBody: '对方已失去继续作战的能力。这不是一次常规击杀，也没有经验或掉落。你可以放过行商，或抢走一件普通货物；当前待赔偿为 {debt}。',
+        spare: '收起武器并放行',
+        spared: '你选择了克制。当前待赔偿：{debt}',
+        robOffer: '抢走「{name}」· 新增赔偿 {debt}',
+        robConfirm: '抢走「{name}」会进一步损失信誉，并按展示价格的两倍追加赔偿。确定？',
+        robbed: '商会已登记抢夺。当前待赔偿：{debt}'
+      }
+    },
     direction: { north: '北侧', south: '南侧', east: '东侧', west: '西侧' },
     shopSec: {
-      consume: '补给', gear: '装备', perm: '强化', exchange: '以物换物', sell: '收购', other: '其他'
+      consume: '补给', gear: '装备', perm: '强化', exchange: '以物换物',
+      merchantStaple: '常备', merchantTravel: '旅途货架',
+      merchantSignature: '招牌藏品', merchantRare: '稀有藏品',
+      sell: '收购', other: '其他'
     },
 
     shop: {

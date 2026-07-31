@@ -13,6 +13,9 @@
     /** 当前交易地点实际提供的条目。 */
     offers: function (context) {
       context = context || Game.trade.current();
+      if (context && context.providerType === 'merchant' && Game.merchants) {
+        return Game.merchants.offers(context);
+      }
       var all = reg.all('shopItem');
       var out = [];
       for (var i = 0; i < all.length; i++) {
@@ -27,6 +30,11 @@
       if (!context.available) {
         return { ok: false, reason: context.reason || 'unavailable', context: context };
       }
+      if (def.dynamic && context.providerType === 'merchant' && Game.merchants) {
+        var merchantAccess = Game.merchants.canBuy(def, context);
+        merchantAccess.context = context;
+        return merchantAccess;
+      }
       if (!Game.trade.allows(def.catalogs, context)) {
         return { ok: false, reason: 'not-offered', context: context };
       }
@@ -36,6 +44,7 @@
     /** 单项当前价格 */
     price: function (def) {
       var s = Game.state;
+      if (def.dynamic && Number.isFinite(def.price)) return def.price;
       if (def.kind === 'potion') {
         return F.potionPrice(def.ref, Game.State.regionTier(s.world.region));
       }
@@ -52,10 +61,14 @@
     ownedCount: function (def) {
       if (def.kind === 'perm' || def.kind === 'exchange') return Game.state.player.perms[def.id] || 0;
       if (def.kind === 'potion') return Game.inv.potionCount(def.ref);
+      if (def.kind === 'material') return Game.inv.materialCount(def.materialId);
       return 0;
     },
 
     canBuy: function (def) {
+      if (def && def.dynamic && Game.merchants) {
+        return Game.merchants.canBuy(def).ok;
+      }
       if (!Shop.availability(def).ok) return false;
       var s = Game.state, p = s.player;
       if (def.kind === 'perm' && (p.perms[def.id] || 0) >= F.PERM_MAX) return false;
@@ -76,6 +89,11 @@
 
     /** 购买；返回 {ok, item?} */
     buy: function (sid) {
+      var merchantContext = Game.trade.current();
+      if (merchantContext.available && merchantContext.providerType === 'merchant' &&
+          Game.merchants) {
+        return Game.merchants.buy(sid, merchantContext);
+      }
       var def = reg.get('shopItem', sid);
       if (!def) return { ok: false };
       var access = Shop.availability(def);

@@ -130,14 +130,14 @@
     { id: 'r3', mult: 1.6, affixes: 3, weight: 6.5, sell: 5.0 },
     { id: 'r4', mult: 2.0, affixes: 4, weight: 1.5, sell: 12 }
   ];
-  F.rollRarity = function (luck) {
+  F.rollRarity = function (luck, rng) {
     var w = [], total = 0, i;
     for (i = 0; i < F.RARITY.length; i++) {
       var wt = F.RARITY[i].weight;
       if (i >= 3 && luck) wt *= luck; // 掉率加成偏向高稀有
       w.push(wt); total += wt;
     }
-    var r = Math.random() * total;
+    var r = (typeof rng === 'function' ? rng() : Math.random()) * total;
     for (i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return i; }
     return 0;
   };

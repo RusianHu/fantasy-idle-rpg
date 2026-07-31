@@ -108,8 +108,8 @@ const audit = Game.content.finalize({ strict: true });
 assert.equal(audit.ok, true);
 assert.equal(audit.counts.class, 5);
 assert.equal(audit.counts.talent, 30);
-assert.equal(audit.counts.actorArchetype, 54);
-assert.equal(audit.counts.encounterProfile, 16);
+assert.equal(audit.counts.actorArchetype, 58);
+assert.equal(audit.counts.encounterProfile, 24);
 
 [
   'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
@@ -416,8 +416,10 @@ for (let index = 0; index < regions.length; index++) {
   Game.encounters.remove(bossEncounter.id);
 }
 
-// All 16 production profiles preserve the legacy two-team termination projection.
-const compatibilityProfiles = Game.content.all('encounterProfile');
+// All production profiles preserve the legacy two-team termination projection.
+const compatibilityProfiles = Game.content.all('encounterProfile').filter(
+  (profile) => Array.isArray(profile.encounterPackIds)
+);
 assert.equal(compatibilityProfiles.length, 16);
 for (let profileIndex = 0; profileIndex < compatibilityProfiles.length; profileIndex++) {
   const profile = compatibilityProfiles[profileIndex];

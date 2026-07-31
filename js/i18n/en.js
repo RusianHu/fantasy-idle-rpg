@@ -432,11 +432,62 @@
       merchant: 'Camp Supply', exchange: 'Material Exchange',
       wander: 'Wandering Merchant', event: 'Event Stall'
     },
+    merchant: {
+      ui: {
+        talk: 'Talk',
+        trade: 'Browse Goods',
+        roadGuild: 'Roadfarers Guild',
+        leave: 'Leave',
+        openShop: 'Open Shop',
+        discovered: 'Wandering merchant discovered: {name}',
+        expired: 'The wagon bell fades into the distance. The merchant has departed.',
+        escaped: 'The smoke clears. The merchant is gone, but the account remains.',
+        attackQueued: 'You draw your weapon. The guild will remember this choice.',
+        attackConfirm: 'Attacking {name} grants no normal EXP or loot. The merchant will defend themselves, attempt to escape, and record lost trust and restitution with the guild. Attack anyway?',
+        trust: 'Guild Trust',
+        departure: 'Departure',
+        hudChip: 'Merchant {time}',
+        hudAria: 'Wandering merchant {direction}, departing in {time}',
+        debt: 'Restitution Due',
+        band: {
+          favored: 'Trusted',
+          normal: 'Regular',
+          wary: 'Wary',
+          refused: 'Trade Refused'
+        },
+        stock: '{n} left',
+        soldOut: 'Sold Out',
+        gearOfferDesc: '{rarity} · Lv.{level} · {affixes}',
+        bundleOfferDesc: '{item} {stock} bundles remain this visit.',
+        materialOfferDesc: 'A material bundle sorted on the road. {stock} remain this visit.',
+        gotMaterial: 'Obtained {name} ×{n}',
+        haggleTitle: 'Reopen the Crates',
+        haggleDesc: 'Pay {fee} gold to reroll only the four travel shelves. Signature and rare stock stay fixed. Once, before buying.',
+        haggle: 'Haggle {fee}',
+        haggled: 'Repacked',
+        haggleDone: 'The ordinary shelves have been repacked.',
+        haggleUnavailable: 'The shelves cannot be repacked again this visit.',
+        tradeRefused: 'The Guild Refuses Trade',
+        restitutionDesc: 'Pay the full {debt} restitution to restore the minimum trade standing.',
+        payRestitution: 'Pay {debt}',
+        restitutionPaid: 'Restitution paid. Limited trade has resumed.',
+        surrenderTitle: 'The Merchant Lowers Their Weapon',
+        surrenderBody: 'They can no longer fight. This is not a normal kill and grants no EXP or loot. Spare them, or steal one ordinary item. Current restitution due: {debt}.',
+        spare: 'Sheathe Your Weapon',
+        spared: 'You chose restraint. Restitution due: {debt}',
+        robOffer: 'Steal “{name}” · Add {debt} restitution',
+        robConfirm: 'Stealing “{name}” costs more trust and adds twice its displayed price to restitution. Continue?',
+        robbed: 'The theft was entered in the guild ledger. Restitution due: {debt}'
+      }
+    },
     direction: {
       north: 'to the north', south: 'to the south', east: 'to the east', west: 'to the west'
     },
     shopSec: {
-      consume: 'Supplies', gear: 'Gear', perm: 'Boons', exchange: 'Exchange', sell: 'Buyback', other: 'Other'
+      consume: 'Supplies', gear: 'Gear', perm: 'Boons', exchange: 'Exchange',
+      merchantStaple: 'Staples', merchantTravel: 'Travel Shelf',
+      merchantSignature: 'Signature', merchantRare: 'Rare Cabinet',
+      sell: 'Buyback', other: 'Other'
     },
 
     shop: {

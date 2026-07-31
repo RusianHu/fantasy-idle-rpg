@@ -18,20 +18,23 @@
     /* ---------------- 生成随机装备 ---------------- */
     genLoot: function (ilvl, opts) {
       opts = opts || {};
+      var random = typeof opts.rng === 'function' ? opts.rng : Math.random;
+      function rand(min, max) { return min + random() * (max - min); }
+      function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
       var slots = reg.ids('slot');
-      var base = opts.base || U.choice(slots);
-      var rar = opts.rar !== undefined ? opts.rar : F.rollRarity(opts.luck);
+      var base = opts.base || slots[randInt(0, slots.length - 1)];
+      var rar = opts.rar !== undefined ? opts.rar : F.rollRarity(opts.luck, random);
       if (opts.rarMin !== undefined && rar < opts.rarMin) rar = opts.rarMin;
       var nAffix = F.RARITY[rar].affixes;
       var pool = reg.all('affix').slice();
       var affixes = [];
       for (var i = 0; i < nAffix && pool.length; i++) {
-        var idx = U.randInt(0, pool.length - 1);
+        var idx = randInt(0, pool.length - 1);
         var a = pool.splice(idx, 1)[0];
-        affixes.push({ id: a.id, v: Inv.rollAffixValue(a, ilvl) });
+        affixes.push({ id: a.id, v: Inv.rollAffixValue(a, ilvl, random) });
       }
       return {
-        uid: 'i' + (uidSeq++),
+        uid: opts.allocateUid === false ? null : 'i' + (uidSeq++),
         base: base,
         ilvl: Math.max(1, Math.round(ilvl)),
         rar: rar,
@@ -39,10 +42,25 @@
       };
     },
 
-    rollAffixValue: function (a, ilvl) {
-      if (a.kind === 'pct') return +(U.rand(a.min, a.max)).toFixed(3);
-      var v = (a.base + a.perLv * ilvl) * U.rand(0.85, 1.15);
+    rollAffixValue: function (a, ilvl, rng) {
+      var random = typeof rng === 'function' ? rng : Math.random;
+      function rand(min, max) { return min + random() * (max - min); }
+      if (a.kind === 'pct') return +(rand(a.min, a.max)).toFixed(3);
+      var v = (a.base + a.perLv * ilvl) * rand(0.85, 1.15);
       return a.dec ? +v.toFixed(1) : Math.round(v);
+    },
+
+    materializePreview: function (preview) {
+      if (!preview) return null;
+      return {
+        uid: preview.uid || 'i' + (uidSeq++),
+        base: preview.base,
+        ilvl: Math.max(1, Math.round(preview.ilvl)),
+        rar: U.clamp(preview.rar | 0, 0, F.RARITY.length - 1),
+        affixes: (preview.affixes || []).map(function (affix) {
+          return { id: affix.id, v: Number(affix.v) || 0 };
+        })
+      };
     },
 
     /* ---------------- 属性折算 ---------------- */

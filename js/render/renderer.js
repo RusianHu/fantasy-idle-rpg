@@ -820,7 +820,7 @@
 
     /* ---------- 主帧绘制 ---------- */
     frame: function (dt) {
-      if (!ctx || !Game.world.region) return;
+      if (!ctx || !Game.world.region || cw <= 0 || ch <= 0) return;
       var W = Game.world, region = W.region;
       R.updateCamera(dt);
       if (Game.weatherRender) Game.weatherRender.update(dt);

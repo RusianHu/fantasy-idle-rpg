@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "8b475ccd54742c6e40a30caef45fc9d2bc594f142eb46c3ac167a40f88380dd8",
+  "sourceSetHash": "e3c771b3f7bdcaf8a9d07917ffbcb313be565b4c512e44e4e73254aa7052178a",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -104,6 +104,11 @@
       "path": "js/data/packs/world/meadow-fox.pack.js",
       "kind": "pack",
       "sha256": "1f3e4c06d177678e9a879e73000c6a152cdde711d91fc00fdb612dbe79ca2b1c"
+    },
+    {
+      "path": "js/data/packs/world/merchants.pack.js",
+      "kind": "pack",
+      "sha256": "33e096ce8e7d40c3291c9bf4a08cd2f18c0ac938ccdb763cc0caf2614ac7f7d8"
     }
   ],
   "supports": [
@@ -241,8 +246,12 @@
     {
       "id": "world.meadow-fox",
       "version": "1.0.0"
+    },
+    {
+      "id": "world.merchants",
+      "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "096f5c21"
+  "contentFingerprint": "01b9e5de"
 });
 })();

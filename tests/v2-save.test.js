@@ -92,7 +92,7 @@ function legacy(version) {
 
 const v11 = boot(legacy(11));
 const migrated = v11.Game.save.load();
-assert.equal(migrated.v, 16);
+assert.equal(migrated.v, 17);
 assert.equal(migrated.player, undefined);
 assert.equal(migrated.roster.actors['player-main'].talentRanks.ft_heavy, 3);
 v11.Game.save.applyLoaded(migrated);
@@ -101,7 +101,7 @@ assert.equal(v11.Game.state.player.skills.ft_tough, 2);
 assert.equal(v11.Game.state.inv.lockedSlots.weapon, true);
 assert.equal(Object.prototype.propertyIsEnumerable.call(v11.Game.state, 'player'), false);
 const serialized = v11.Game.save.serialize();
-assert.equal(serialized.v, 16);
+assert.equal(serialized.v, 17);
 assert.equal(serialized.player, undefined);
 assert.ok(serialized.roster && serialized.economy);
 assert.equal(v11.Game.routes.validate(serialized.world.routePlan).length, 0);
@@ -119,6 +119,17 @@ assert.deepEqual(
 assert.deepEqual(
   JSON.parse(JSON.stringify(serialized.world.chestMimic)),
   { rollOrdinal: 0, genuineOpenedSinceMimic: 0 }
+);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(serialized.world.merchants)),
+  {
+    version: 1,
+    guild: {
+      trust: 50, debtGold: 0, offenses: 0,
+      metProfileIds: [], lastLines: {}
+    },
+    regions: {}
+  }
 );
 
 // The serialized roster is a real persistence boundary, not a primary-only view.
@@ -159,7 +170,7 @@ assert.deepEqual(Object.keys(v11.Game.state.player.skills), []);
 // Full migration chain remains executable for the oldest supported save.
 const v1 = boot(legacy(1));
 const oldest = v1.Game.save.load();
-assert.equal(oldest.v, 16);
+assert.equal(oldest.v, 17);
 v1.Game.save.applyLoaded(oldest);
 assert.equal(v1.Game.state.roster.primaryActorId, 'player-main');
 assert.ok(v1.Game.State.normalizeRegionOrder(v1.Game.state.world.regionOrder).length >= 8);
@@ -170,9 +181,9 @@ v13Save.v = 13;
 v13Save.roster.actors['player-main'].variantId = 'removed.variant';
 delete v13Save.world.social;
 const v13 = boot(v13Save);
-const upgradedV16 = v13.Game.save.load();
-assert.equal(upgradedV16.v, 16);
-v13.Game.save.applyLoaded(upgradedV16);
+const upgradedV17 = v13.Game.save.load();
+assert.equal(upgradedV17.v, 17);
+v13.Game.save.applyLoaded(upgradedV17);
 assert.equal(v13.Game.state.roster.actors['player-main'].variantId, null);
 assert.deepEqual(
   JSON.parse(JSON.stringify(v13.Game.state.world.social)),
@@ -186,7 +197,7 @@ v14Save.v = 14;
 delete v14Save.world.hazards;
 const v14 = boot(v14Save);
 const hazardMigrated = v14.Game.save.load();
-assert.equal(hazardMigrated.v, 16);
+assert.equal(hazardMigrated.v, 17);
 assert.deepEqual(
   JSON.parse(JSON.stringify(hazardMigrated.world.hazards)),
   { layoutVersion: 3, regions: {} }
@@ -194,6 +205,132 @@ assert.deepEqual(
 assert.deepEqual(
   JSON.parse(JSON.stringify(hazardMigrated.world.chestMimic)),
   { rollOrdinal: 0, genuineOpenedSinceMimic: 0 }
+);
+
+// v17 adds the wandering-merchant persistence boundary without advancing
+// stock, discovery, or event expiry during migration.
+const v16Save = JSON.parse(JSON.stringify(serialized));
+v16Save.v = 16;
+delete v16Save.world.merchants;
+const v16 = boot(v16Save);
+const merchantMigrated = v16.Game.save.load();
+assert.equal(merchantMigrated.v, 17);
+v16.Game.save.applyLoaded(merchantMigrated);
+assert.equal(v16.Game.state.world.merchants.guild.trust, 50);
+assert.deepEqual(
+  JSON.parse(JSON.stringify(v16.Game.state.world.merchants.regions)),
+  {}
+);
+
+const merchantSave = JSON.parse(JSON.stringify(serialized));
+const merchantEventId = 'merchant:grassland:3:89ABCDEF';
+const merchantRoles = [
+  'staple', 'staple', 'travel', 'travel',
+  'travel', 'travel', 'signature', 'rare'
+];
+const merchantKinds = [
+  'potion', 'material', 'gear', 'potion',
+  'material', 'gear', 'gear', 'gear'
+];
+merchantSave.world.merchants = {
+  version: 1,
+  guild: {
+    trust: 77,
+    debtGold: 432,
+    offenses: 2,
+    metProfileIds: ['merchant.windbell_lia', 'merchant.removed'],
+    lastLines: {
+      'merchant.windbell_lia': 'merchant.dialogue.windbell_lia.return.0',
+      'merchant.removed': 'bad'
+    }
+  },
+  regions: {
+    grassland: {
+      ordinal: 3,
+      firstEncountered: true,
+      movementSeconds: 12,
+      targetSeconds: 180,
+      cooldownUntil: 600,
+      activeEvent: {
+        id: merchantEventId,
+        merchantProfileId: 'merchant.windbell_lia',
+        seed: 0x89ABCDEF,
+        x: 420,
+        y: 260,
+        anchorKey: 'candidate:merchant',
+        state: 'surrendered',
+        remainingSeconds: 144,
+        stockRevision: 2,
+        haggled: true,
+        purchasedAny: true,
+        purchaseRewarded: true,
+        offenseApplied: true,
+        offenseBaseDebt: 220,
+        offers: merchantKinds.map((kind, index) => {
+          const offer = {
+            id: `${merchantEventId}:offer:${index}`,
+            role: merchantRoles[index],
+            kind,
+            cur: 'gold',
+            basePrice: 100 + index,
+            quantity: 9,
+            maxQuantity: 2,
+            eligibleRobbery: true,
+            icon: 'icon_chest'
+          };
+          if (kind === 'potion') {
+            offer.ref = index === 0 ? 'potion_small' : 'potion_large';
+            offer.count = 1;
+          } else if (kind === 'material') {
+            offer.materialId = 'mushroom';
+            offer.count = 3;
+          } else {
+            offer.item = {
+              uid: 'forged-runtime-uid',
+              base: 'weapon',
+              ilvl: 9,
+              rar: 2,
+              affixes: []
+            };
+          }
+          return offer;
+        })
+      }
+    },
+    removed_region: {
+      ordinal: 99,
+      firstEncountered: true,
+      movementSeconds: 99,
+      targetSeconds: 1,
+      cooldownUntil: 999,
+      activeEvent: null
+    }
+  }
+};
+const merchantBoot = boot(merchantSave);
+merchantBoot.Game.save.applyLoaded(merchantSave);
+const normalizedMerchants = merchantBoot.Game.state.world.merchants;
+assert.equal(normalizedMerchants.guild.trust, 77);
+assert.equal(normalizedMerchants.guild.debtGold, 432);
+assert.deepEqual(Array.from(normalizedMerchants.guild.metProfileIds), [
+  'merchant.windbell_lia'
+]);
+assert.equal(normalizedMerchants.guild.lastLines['merchant.removed'], undefined);
+assert.equal(normalizedMerchants.regions.removed_region, undefined);
+assert.equal(normalizedMerchants.regions.grassland.activeEvent.state, 'surrendered');
+assert.equal(normalizedMerchants.regions.grassland.activeEvent.offers.length, 8);
+assert.equal(normalizedMerchants.regions.grassland.activeEvent.offers[0].quantity, 2);
+assert.equal(normalizedMerchants.regions.grassland.activeEvent.offers[7].eligibleRobbery, false);
+assert.equal(normalizedMerchants.regions.grassland.activeEvent.offers[7].item.uid, null);
+
+const corruptMerchantSave = JSON.parse(JSON.stringify(merchantSave));
+corruptMerchantSave.world.merchants.regions.grassland.activeEvent.offers[6].role = 'travel';
+const corruptMerchantBoot = boot(corruptMerchantSave);
+corruptMerchantBoot.Game.save.applyLoaded(corruptMerchantSave);
+assert.equal(
+  corruptMerchantBoot.Game.state.world.merchants.regions.grassland.activeEvent,
+  null,
+  'an incomplete or role-forged eight-slot event is discarded atomically'
 );
 
 const hazardSave = JSON.parse(JSON.stringify(serialized));
@@ -339,4 +476,4 @@ assert.equal(
   false
 );
 
-console.log('V2 save tests passed: v1/v11/v13/v14/v15 to v16 migration, Hazard/social/Mimic pruning, route plan, transient boundary.');
+console.log('V2 save tests passed: v1/v11/v13/v14/v15/v16 to v17 migration, Merchant/Hazard/social/Mimic pruning, route plan, transient boundary.');

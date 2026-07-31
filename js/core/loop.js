@@ -88,7 +88,12 @@
     /** 快进补偿（隐藏页返回的短间隙） */
     catchup: function (seconds) {
       var n = Math.min(seconds, CATCHUP_MAX) / SIM_STEP;
-      for (var i = 0; i < n; i++) step(SIM_STEP);
+      if (Game.merchants) Game.merchants.setCatchupPaused(true);
+      try {
+        for (var i = 0; i < n; i++) step(SIM_STEP);
+      } finally {
+        if (Game.merchants) Game.merchants.setCatchupPaused(false);
+      }
     },
 
     init: function () {
@@ -137,7 +142,10 @@
         'item:pickedUp', 'item:used', 'gather:done', 'chest:opened', 'camp:autoReturn',
         'region:relocked', 'landmark:discovered', 'resource:registered',
         'curio:found', 'curio:chosen', 'ecology:recorded', 'guardian:defeated',
-        'expedition:finished', 'commission:completed', 'region:completed100'];
+        'expedition:finished', 'commission:completed', 'region:completed100',
+        'merchant:discovered', 'merchant:stockChanged', 'merchant:assaultStarted',
+        'merchant:surrendered',
+        'merchant:assaultResolved', 'merchant:restitutionPaid', 'merchant:departed'];
       saveOn.forEach(function (evt) {
         Game.bus.on(evt, function () {
           // 轻微防抖：合并密集事件

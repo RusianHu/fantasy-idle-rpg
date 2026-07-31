@@ -259,6 +259,23 @@
         };
         data.v = 16;
       }
+    },
+    {
+      // v16 -> v17: add deterministic wandering-merchant discovery, stock,
+      // reputation and restitution state. Runtime Actors and Encounters remain transient.
+      from: 16,
+      fn: function (data) {
+        data.world = data.world || {};
+        data.world.merchants = {
+          version: 1,
+          guild: {
+            trust: 50, debtGold: 0, offenses: 0,
+            metProfileIds: [], lastLines: {}
+          },
+          regions: {}
+        };
+        data.v = 17;
+      }
     }
   ];
 
@@ -340,6 +357,143 @@
             normalized.expiresAtWorldTime <= worldTime) return;
         out.memories[kind][indexId] = normalized;
       });
+    });
+    return out;
+  }
+
+  function normalizeMerchantItem(item) {
+    if (!item || typeof item !== 'object') return null;
+    if (['weapon', 'armor', 'ring'].indexOf(item.base) < 0) return null;
+    var rarity = Math.max(0, Math.min(4, item.rar | 0));
+    var affixes = [];
+    (Array.isArray(item.affixes) ? item.affixes : []).slice(0, 4).forEach(function (affix) {
+      if (!affix || !Game.reg.has('affix', affix.id) || !Number.isFinite(Number(affix.v))) return;
+      affixes.push({ id: affix.id, v: Number(affix.v) });
+    });
+    return {
+      uid: null,
+      base: item.base,
+      ilvl: Math.max(1, Math.min(9999, item.ilvl | 0 || 1)),
+      rar: rarity,
+      affixes: affixes
+    };
+  }
+
+  function normalizeMerchantOffer(offer, eventId, index) {
+    if (!offer || typeof offer !== 'object' || typeof offer.id !== 'string' ||
+        offer.id !== eventId + ':offer:' + index) return null;
+    if (['potion', 'material', 'gear'].indexOf(offer.kind) < 0) return null;
+    var role = index < 2 ? 'staple' : (index < 6 ? 'travel' : (
+      index === 6 ? 'signature' : 'rare'
+    ));
+    var expectedKinds = ['potion', 'material', 'gear', 'potion', 'material', 'gear', 'gear', 'gear'];
+    if (offer.role !== role || offer.kind !== expectedKinds[index] || offer.cur !== 'gold') {
+      return null;
+    }
+    var maxQuantity = Math.max(1, Math.min(99, offer.maxQuantity | 0 || 1));
+    var normalized = {
+      id: offer.id.slice(0, 180),
+      role: role,
+      kind: offer.kind,
+      cur: 'gold',
+      basePrice: Math.max(0, Math.min(1e12, Math.round(Number(offer.basePrice) || 0))),
+      quantity: Math.max(0, Math.min(maxQuantity, offer.quantity | 0)),
+      maxQuantity: maxQuantity,
+      eligibleRobbery: role === 'staple' || role === 'travel',
+      icon: typeof offer.icon === 'string' ? offer.icon.slice(0, 80) : 'icon_chest'
+    };
+    if (offer.kind === 'potion') {
+      var expectedPotion = index === 0 ? 'potion_small' : 'potion_large';
+      if (offer.ref !== expectedPotion || !Game.reg.has('potion', offer.ref)) return null;
+      normalized.ref = offer.ref;
+      normalized.count = Math.max(1, Math.min(20, offer.count | 0 || 1));
+    } else if (offer.kind === 'material') {
+      if (!Game.reg.has('material', offer.materialId)) return null;
+      normalized.materialId = offer.materialId;
+      normalized.count = Math.max(1, Math.min(999, offer.count | 0 || 1));
+    } else {
+      normalized.item = normalizeMerchantItem(offer.item);
+      if (!normalized.item) return null;
+    }
+    return normalized;
+  }
+
+  function normalizeMerchants(saved) {
+    saved = saved && typeof saved === 'object' ? saved : {};
+    var guild = saved.guild && typeof saved.guild === 'object' ? saved.guild : {};
+    var out = {
+      version: 1,
+      guild: {
+        trust: Math.max(-100, Math.min(
+          100,
+          Number.isFinite(Number(guild.trust)) ? Number(guild.trust) : 50
+        )),
+        debtGold: Math.max(0, Math.min(1e12, Math.round(Number(guild.debtGold) || 0))),
+        offenses: Math.max(0, Math.min(9999, guild.offenses | 0)),
+        metProfileIds: [],
+        lastLines: {}
+      },
+      regions: {}
+    };
+    (Array.isArray(guild.metProfileIds) ? guild.metProfileIds : []).forEach(function (id) {
+      if (Game.content && Game.content.has('merchantProfile', id) &&
+          out.guild.metProfileIds.indexOf(id) < 0) out.guild.metProfileIds.push(id);
+    });
+    Object.keys(guild.lastLines || {}).forEach(function (profileId) {
+      if (!Game.content || !Game.content.has('merchantProfile', profileId)) return;
+      var key = guild.lastLines[profileId];
+      if (typeof key === 'string' && key.length <= 180) out.guild.lastLines[profileId] = key;
+    });
+    Object.keys(saved.regions || {}).sort().forEach(function (rid) {
+      if (!Game.reg.has('region', rid)) return;
+      var region = saved.regions[rid];
+      if (!region || typeof region !== 'object') return;
+      var normalizedRegion = {
+        ordinal: Math.max(0, Math.min(1e7, region.ordinal | 0)),
+        firstEncountered: !!region.firstEncountered,
+        movementSeconds: Math.max(0, Math.min(1e7, Number(region.movementSeconds) || 0)),
+        targetSeconds: Math.max(1, Math.min(1e7, Number(region.targetSeconds) || 60)),
+        cooldownUntil: Math.max(0, Number(region.cooldownUntil) || 0),
+        activeEvent: null
+      };
+      var event = region.activeEvent;
+      if (event && typeof event === 'object' && typeof event.id === 'string' &&
+          /^merchant:[a-z0-9_-]+:\d+:[0-9a-f]{8}$/i.test(event.id) &&
+          event.id.indexOf('merchant:' + rid + ':') === 0 &&
+          Game.content && Game.content.has('merchantProfile', event.merchantProfileId) &&
+          /^(available|assault|surrendered)$/.test(event.state || '')) {
+        var profile = Game.content.get('merchantProfile', event.merchantProfileId);
+        if (profile.regionIds.indexOf(rid) >= 0) {
+          var offers = [];
+          (Array.isArray(event.offers) ? event.offers : []).slice(0, 8).forEach(function (offer, index) {
+            var normalizedOffer = normalizeMerchantOffer(offer, event.id, index);
+            if (normalizedOffer) offers.push(normalizedOffer);
+          });
+          if (offers.length === 8 && event.offers.length === 8) {
+            normalizedRegion.activeEvent = {
+              id: event.id.slice(0, 160),
+              merchantProfileId: event.merchantProfileId,
+              seed: Number(event.seed) >>> 0,
+              x: Number(event.x) || 0,
+              y: Number(event.y) || 0,
+              anchorKey: typeof event.anchorKey === 'string' ? event.anchorKey.slice(0, 160) : null,
+              state: event.state,
+              remainingSeconds: Math.max(0, Math.min(3600, Number(event.remainingSeconds) || 0)),
+              stockRevision: Math.max(0, event.stockRevision | 0),
+              haggled: !!event.haggled,
+              purchasedAny: !!event.purchasedAny,
+              purchaseRewarded: !!event.purchaseRewarded,
+              offenseApplied: !!event.offenseApplied,
+              offenseBaseDebt: Math.max(
+                0,
+                Math.min(1e12, Math.round(Number(event.offenseBaseDebt) || 0))
+              ),
+              offers: offers
+            };
+          }
+        }
+      }
+      out.regions[rid] = normalizedRegion;
     });
     return out;
   }
@@ -430,6 +584,7 @@
           hazards: st.world.hazards,
           chestMimic: st.world.chestMimic,
           social: st.world.social,
+          merchants: st.world.merchants,
           finalRegionLocked: !!st.world.finalRegionLocked,
           deathsRow: st.world.deathsRow
         },
@@ -580,6 +735,7 @@
         data.world && data.world.social,
         Math.max(0, Number(st.world.worldTime) || 0)
       );
+      st.world.merchants = normalizeMerchants(data.world && data.world.merchants);
       st.world.routePlan = Game.routes.normalize(
         data.world && data.world.routePlan,
         data.world && data.world.regionOrder,

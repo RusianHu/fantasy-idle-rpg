@@ -13,7 +13,9 @@ for (const entrypoint of [
   'tech-demos/units/units.html',
   'tech-demos/map-effects/map-effects.html',
   'tech-demos/hazards/hazards.html',
-  'tech-demos/exploration-v3/exploration-v3.html'
+  'tech-demos/exploration-v3/exploration-v3.html',
+  'tech-demos/weather-climate/weather-climate.html',
+  'tech-demos/merchants/merchants.html'
 ]) {
   const html = read(entrypoint);
   assert.equal((html.match(/js\/data\/content\/content\.generated\.js\?v=/g) || []).length, 1,
@@ -40,7 +42,7 @@ const audit = JSON.parse(execFileSync(process.execPath, ['tools/audit-content.js
   cwd: ROOT, encoding: 'utf8'
 }));
 assert.equal(audit.ok, true);
-assert.equal(audit.packs.length, 17);
+assert.equal(audit.packs.length, 18);
 assert.match(audit.fingerprint, /^[0-9a-f]{8}$/);
 execFileSync(process.execPath, ['tools/build-content-bundle.js', '--check'], { cwd: ROOT, stdio: 'pipe' });
-console.log(`Content entrypoints passed: 5 consumers share one generated bundle / ${audit.fingerprint}.`);
+console.log(`Content entrypoints passed: 7 consumers share one generated bundle / ${audit.fingerprint}.`);

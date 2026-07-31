@@ -178,11 +178,11 @@ async function run() {
     })()`);
 
     assert.equal(diagnostics.catalog.complete, true);
-    assert.equal(diagnostics.catalog.actorCount, 54);
+    assert.equal(diagnostics.catalog.actorCount, 58);
     assert.equal(diagnostics.catalog.classCount, 5);
     assert.equal(diagnostics.catalog.monsterCount, 41);
     assert.equal(diagnostics.catalog.summonCount, 9);
-    assert.equal(diagnostics.catalog.encounterCount, 18);
+    assert.equal(diagnostics.catalog.encounterCount, 26);
     assert.match(diagnostics.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.ok(diagnostics.combatPresentation.adapter.records.some((record) =>
       ['combat:hit', 'combat:miss', 'combat:healed', 'combat:shielded'].includes(record.eventType)));

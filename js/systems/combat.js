@@ -643,6 +643,14 @@
           reason: 'selfDestruct'
         });
       }
+    } else if (effect.type === 'withdraw') {
+      if (source.encounterId) {
+        Game.encounters.leave(
+          source.encounterId,
+          source.id,
+          effect.reason === 'surrender' ? 'surrender' : 'escape'
+        );
+      }
     } else if (effect.type === 'changeTeam') {
       targets.forEach(function (target) {
         var previousTeamId = target.teamId;

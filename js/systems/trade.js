@@ -56,7 +56,12 @@
       catalogs: Array.isArray(def.catalogs) ? def.catalogs.slice() : [],
       priority: Number(def.priority) || 0,
       nameKey: def.nameKey || null,
-      prop: def.prop || null
+      prop: def.prop || null,
+      providerType: def.providerType || null,
+      providerId: def.providerId || null,
+      eventId: def.eventId || null,
+      offerSetId: def.offerSetId || null,
+      merchantProfileId: def.merchantProfileId || null
     };
   }
 
@@ -75,7 +80,9 @@
       context.reason || '',
       context.regionId || '',
       context.areaId || '',
-      context.catalogs.join(',')
+      context.catalogs.join(','),
+      context.providerType || '',
+      context.eventId || ''
     ].join('|');
   }
 
@@ -100,6 +107,16 @@
           resolved.dynamic = true;
           resolved.expiresAt = dyn.expiresAt;
           out.push(resolved);
+        }
+      }
+      if (Game.merchants && Game.merchants.tradeAreas) {
+        var merchantAreas = Game.merchants.tradeAreas();
+        for (var k = 0; k < merchantAreas.length; k++) {
+          var merchantArea = resolveArea(merchantAreas[k], layout);
+          if (merchantArea) {
+            merchantArea.dynamic = true;
+            out.push(merchantArea);
+          }
         }
       }
       return out;
@@ -139,7 +156,12 @@
           priority: area.priority,
           nameKey: area.nameKey,
           prop: area.prop,
-          dynamic: !!area.dynamic
+          dynamic: !!area.dynamic,
+          providerType: area.providerType || null,
+          providerId: area.providerId || null,
+          eventId: area.eventId || null,
+          offerSetId: area.offerSetId || null,
+          merchantProfileId: area.merchantProfileId || null
         };
         if (!nearest || distance < nearest.distance) nearest = candidate;
         if (distance > area.radius) continue;
@@ -158,6 +180,11 @@
         areaKind: active.kind,
         nameKey: active.nameKey,
         catalogs: active.catalogs.slice(),
+        providerType: active.providerType,
+        providerId: active.providerId,
+        eventId: active.eventId,
+        offerSetId: active.offerSetId,
+        merchantProfileId: active.merchantProfileId,
         distance: active.distance,
         radius: active.radius,
         nearest: nearest

@@ -78,6 +78,23 @@
         }
         M.toast(msg, 'gold', 3200);
       });
+      bus.on('merchant:discovered', function (p) {
+        var profile = Game.content.get('merchantProfile', p.merchantProfileId);
+        M.toast(t('merchant.ui.discovered', {
+          name: profile ? t(profile.presentation.nameKey) : t('tradeKind.wander')
+        }), 'gold', 4200);
+        if (Game.fx) Game.fx.ring(p.x, p.y - 16, 18, '#f0c860');
+      });
+      bus.on('merchant:surrendered', function (p) {
+        M.merchantSurrender(p);
+      });
+      bus.on('merchant:departed', function (p) {
+        if (p.reason === 'expired') M.toast(t('merchant.ui.expired'));
+        else if (p.reason === 'escaped') M.toast(t('merchant.ui.escaped'), 'warn', 4200);
+      });
+      bus.on('merchant:attackRejected', function () {
+        M.toast(t('ui.actorTargetUnavailable'), 'warn');
+      });
     },
 
     /* ---------------- 基础弹窗 ---------------- */
@@ -136,8 +153,20 @@
       c.appendChild(list);
       var api = M.show(c);
       (profile.actions || []).forEach(function (action) {
-        if (action.kind !== 'inspect' && action.kind !== 'attack') return;
-        var labelKey = action.kind === 'attack' ? 'ui.actorAttack' : 'ui.actorObserve';
+        if (['inspect', 'talk', 'trade', 'attack'].indexOf(action.kind) < 0) return;
+        var labelKeys = {
+          inspect: 'ui.actorObserve',
+          talk: 'merchant.ui.talk',
+          trade: 'merchant.ui.trade',
+          attack: 'ui.actorAttack'
+        };
+        var iconIds = {
+          inspect: 'icon_nav_map',
+          talk: 'icon_nav_char',
+          trade: 'icon_gold',
+          attack: 'icon_skill_strike'
+        };
+        var labelKey = labelKeys[action.kind];
         var button = U.el('button',
           'btn actor-action-btn' + (action.kind === 'attack' ? ' danger' : ''));
         button.type = 'button';
@@ -151,25 +180,117 @@
         button.appendChild(label);
         Game.assets.drawToDom(
           icon,
-          action.kind === 'attack' ? 'icon_skill_strike' : 'icon_nav_map',
+          iconIds[action.kind],
           'icon'
         );
         button.addEventListener('click', function () {
           api.close();
-          if (action.kind === 'inspect') {
-            if (handlers.observe) handlers.observe(actor);
-            return;
-          }
+          if (action.kind === 'inspect' && handlers.observe) return handlers.observe(actor);
+          if (action.kind === 'talk' && handlers.talk) return handlers.talk(actor);
+          if (action.kind === 'trade' && handlers.trade) return handlers.trade(actor);
           var submit = function () {
             if (handlers.attack) handlers.attack(actor);
           };
           if (action.requiresConfirmation) {
-            M.confirm(t('ui.actorAttackConfirm', { name: name }), submit);
+            var isMerchant = actor.tags &&
+              actor.tags.indexOf('wandering-merchant') >= 0;
+            M.confirm(t(isMerchant
+              ? 'merchant.ui.attackConfirm'
+              : 'ui.actorAttackConfirm', { name: name }), submit);
           } else {
             submit();
           }
         });
         list.appendChild(button);
+      });
+      return api;
+    },
+
+    merchantDialogue: function (dialogue, actor) {
+      if (!dialogue) return null;
+      var t = Game.i18n.t;
+      var c = U.el('div', 'merchant-dialogue');
+      c.innerHTML =
+        '<div class="merchant-dialogue-head">' +
+        '<canvas class="merchant-dialogue-portrait" width="48" height="48"></canvas>' +
+        '<div class="grow"><div class="merchant-dialogue-kicker">' +
+        t('merchant.ui.roadGuild') + '</div><h3>' +
+        U.esc(t(dialogue.nameKey)) + '</h3></div></div>' +
+        '<div class="modal-body merchant-dialogue-line">“' +
+        U.esc(dialogue.text) + '”</div>';
+      var portrait = c.querySelector('canvas');
+      Game.assets.drawToDom(portrait, dialogue.portraitId, 'icon');
+      var actions = U.el('div', 'modal-btns merchant-dialogue-actions');
+      var closeButton = U.el('button', 'btn', t('merchant.ui.leave'));
+      actions.appendChild(closeButton);
+      var event = Game.merchants && Game.merchants.activeEvent();
+      if (event && event.state === 'available') {
+        var tradeButton = U.el('button', 'btn gold', t('merchant.ui.openShop'));
+        actions.appendChild(tradeButton);
+        tradeButton.addEventListener('click', function () {
+          api.close();
+          Game.merchants.openTrade(actor);
+        });
+      }
+      c.appendChild(actions);
+      var api = M.show(c);
+      closeButton.addEventListener('click', function () { api.close(); });
+      return api;
+    },
+
+    merchantSurrender: function (payload) {
+      if (!payload || !Game.merchants) return null;
+      var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
+      var c = U.el('div', 'merchant-surrender');
+      c.innerHTML =
+        '<h3>' + t('merchant.ui.surrenderTitle') + '</h3>' +
+        '<div class="modal-body">' + t('merchant.ui.surrenderBody', {
+          debt: fmt(payload.debtGold)
+        }) + '</div>';
+      var choices = U.el('div', 'merchant-rob-choices');
+      (payload.eligibleOffers || []).forEach(function (offer) {
+        var name = offer.kind === 'gear'
+          ? Game.ui.itemName(offer.item)
+          : (offer.kind === 'potion'
+            ? t('shop.shop_' + offer.ref + '.name')
+            : t('material.' + offer.materialId));
+        var button = U.el(
+          'button',
+          'btn merchant-rob-choice',
+          t('merchant.ui.robOffer', {
+            name: name,
+            debt: fmt(offer.price * 2)
+          })
+        );
+        button.addEventListener('click', function () {
+          M.confirm(t('merchant.ui.robConfirm', { name: name }), function () {
+            var result = Game.merchants.resolveSurrender('rob', offer.id);
+            if (result.ok) {
+              api.close();
+              M.toast(t('merchant.ui.robbed', {
+                debt: fmt(result.debtGold)
+              }), 'warn', 4200);
+              if (Game.ui.tabs) Game.ui.tabs.queueRerender();
+            }
+          });
+        });
+        choices.appendChild(button);
+      });
+      c.appendChild(choices);
+      var actions = U.el('div', 'modal-btns');
+      var spare = U.el('button', 'btn gold', t('merchant.ui.spare'));
+      actions.appendChild(spare);
+      c.appendChild(actions);
+      var api = M.show(c, { dismissable: false });
+      spare.addEventListener('click', function () {
+        var result = Game.merchants.resolveSurrender('spare');
+        if (result.ok) {
+          api.close();
+          M.toast(t('merchant.ui.spared', {
+            debt: fmt(result.debtGold)
+          }), 'gold', 3800);
+          if (Game.ui.tabs) Game.ui.tabs.queueRerender();
+        }
       });
       return api;
     },
