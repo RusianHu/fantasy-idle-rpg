@@ -14,6 +14,7 @@
   var feed = [];
   var routeAudit = null;
   var mimicAudit = null;
+  var labEnvironmentVisibility = 1;
   var EVENT_TYPES = [
     'hazard:clue', 'hazard:revealed', 'hazard:warning', 'hazard:activated',
     'hazard:hit', 'hazard:avoided', 'hazard:escapeRequested', 'hazard:riskAccepted',
@@ -132,6 +133,7 @@
       (trigger.shape === 'cone' ? trigger.length : Math.max(trigger.width || 0, trigger.height || 0) / 2);
     var distance = Math.max(triggerRadius + 7, detection.revealRadius - 3);
     setHeroPosition(instance.x + distance, instance.y);
+    Game.hazards.forceReveal(instance.id, 'forced');
     Game.hazards.update(.05);
     callout(D.t('hazard.revealed') + ' · ' + profileName(instance.profile));
     syncPauseUi();
@@ -365,7 +367,8 @@
       '<div><span>' + U.esc(D.t('hazard.profileId')) + '</span><strong>' + U.esc(profile.id) + '</strong></div>' +
       '<div><span>' + U.esc(D.t('hazard.shape')) + '</span><strong>' + U.esc(shapeText(profile)) + '</strong></div>' +
       '<div><span>' + U.esc(D.t('hazard.detection')) + '</span><strong>' +
-        detection.clueRadius + ' / ' + detection.revealRadius + ' px</strong></div>' +
+        detection.clueRadius + ' / ' + detection.revealRadius + ' px · ' +
+        Math.round(detection.revealChance * 100) + '%</strong></div>' +
       '<div><span>' + U.esc(D.t('hazard.lifecycle')) + '</span><strong>' +
         (lifecycle.warningTicks * .05).toFixed(2) + 's / ' + (lifecycle.activeTicks * .05).toFixed(2) + 's</strong></div>' +
       '<p>' + U.esc(desc) + '</p>';
@@ -389,6 +392,18 @@
       return strategy.charAt(0).toUpperCase() + ':' +
         Game.hazards.navigationCost(instance.x, instance.y, strategy);
     }).join(' / ');
+    var detectionContext = Game.hazards.detectionContext(
+      instance.id, Game.world.hero && Game.world.hero.id);
+    document.getElementById('hazard-detection-check').textContent =
+      (detectionContext.effectiveChance * 100).toFixed(1) + '% / ' +
+      (detectionContext.roll * 100).toFixed(1) + '% · ' +
+      (detectionContext.detectable ? D.t('hazard.detectable') : D.t('hazard.concealedByRoll'));
+    document.getElementById('hazard-detection-sources').textContent = [
+      detectionContext.strategy + ' ×' + detectionContext.strategyMultiplier.toFixed(2),
+      'expedition:vision ×' + detectionContext.expeditionVision.toFixed(2)
+    ].concat(detectionContext.sources.map(function (source) {
+        return source.id + ' ×' + source.multiplier.toFixed(2);
+      })).join(' · ');
     document.getElementById('tick-status').textContent = 'tick ' + Game.hazards.tick();
   }
 
@@ -539,14 +554,29 @@
       inspection.interactions.forEach(function (entry) {
         var candidate = null;
         if (!revealed[entry.instanceId] && entry.reveal) {
-          candidate = {
-            type: 'reveal', distanceAlong: entry.reveal.distanceAlong,
-            point: entry.reveal.point, instanceId: entry.instanceId, profileId: entry.profileId
-          };
+          var detection = Game.hazards.detectionContext(
+            entry.instanceId, Game.world.hero && Game.world.hero.id);
+          if (detection.detectable) {
+            candidate = {
+              type: 'reveal', distanceAlong: entry.reveal.distanceAlong,
+              point: entry.reveal.point, instanceId: entry.instanceId,
+              profileId: entry.profileId, detection: detection
+            };
+          } else if (entry.trigger) {
+            candidate = {
+              type: 'warning', distanceAlong: entry.trigger.distanceAlong,
+              point: entry.trigger.point, instanceId: entry.instanceId,
+              profileId: entry.profileId, missed: true,
+              response: strategy === 'loot' ? 'risk' : 'escape',
+              detection: detection
+            };
+          }
         } else if (revealed[entry.instanceId] && entry.trigger) {
           candidate = {
             type: 'warning', distanceAlong: entry.trigger.distanceAlong,
-            point: entry.trigger.point, instanceId: entry.instanceId, profileId: entry.profileId
+            point: entry.trigger.point, instanceId: entry.instanceId,
+            profileId: entry.profileId, missed: false,
+            response: strategy === 'loot' ? 'risk' : 'escape'
           };
         }
         if (candidate && (!nextEvent || candidate.distanceAlong < nextEvent.distanceAlong)) {
@@ -592,8 +622,11 @@
         instance: instance,
         minDistance: Infinity,
         revealLinks: 0,
+        detectedLinks: 0,
+        missedLinks: 0,
         triggerLinks: 0,
         warningLinks: 0,
+        escapeLinks: 0,
         reroutedLinks: 0,
         interactionLinks: 0
       };
@@ -610,6 +643,12 @@
         }
         if (result.interactionCovered && pathEntry && pathEntry.reveal) stat.interactionLinks++;
         if (result.warningIds[instance.id]) stat.warningLinks++;
+        result.events.forEach(function (event) {
+          if (event.instanceId !== instance.id) return;
+          if (event.type === 'reveal') stat.detectedLinks++;
+          if (event.type === 'warning' && event.missed) stat.missedLinks++;
+          if (event.type === 'warning' && event.response === 'escape') stat.escapeLinks++;
+        });
         if (result.rerouted.some(function (entry) { return entry.instanceId === instance.id; })) {
           stat.reroutedLinks++;
         }
@@ -755,8 +794,10 @@
       summary.activePlacements + ' / ' + summary.placements;
     document.getElementById('audit-link-count').textContent = summary.links;
     document.getElementById('audit-baseline-count').textContent = summary.baselineCrossings;
+    document.getElementById('audit-detection-count').textContent = summary.detections;
     document.getElementById('audit-reroute-count').textContent = summary.reroutes;
-    document.getElementById('audit-warning-count').textContent = summary.warnings;
+    document.getElementById('audit-warning-count').textContent = summary.missedWarnings;
+    document.getElementById('audit-escape-count').textContent = summary.escapes;
     document.getElementById('audit-suppressed-count').textContent =
       summary.interactionCoverage;
     var verdictKey = summary.warnings ? 'hazard.auditVerdictWarning' :
@@ -772,7 +813,8 @@
       var className = 'is-clear';
       var rank = 4;
       if (warnings.length) {
-        text = D.t('hazard.auditLogWarning') + ' · ' +
+        text = D.t(warnings.some(function (event) { return event.missed; })
+          ? 'hazard.auditLogMissed' : 'hazard.auditLogWarning') + ' · ' +
           warnings.map(function (event) {
             return profileName(Game.content.get('hazardProfile', event.profileId));
           }).join(', ');
@@ -806,13 +848,18 @@
 
     var selected = selectedInstance();
     document.getElementById('placement-audit').innerHTML = routeAudit.instanceStats.map(function (stat, index) {
+      var detection = routeAudit.detectionContexts[stat.instance.id];
       return '<article class="' + (selected && stat.instance.id === selected.id ? 'is-selected' : '') + '">' +
         '<small>#' + String(index + 1).padStart(2, '0') + ' · ' + U.esc(stat.instance.id) + '</small>' +
         '<strong>' + U.esc(profileName(stat.instance.profile)) + '</strong>' +
         '<span>' + U.esc(auditStatus(stat)) + '</span>' +
         '<span>min ' + (stat.minDistance === null ? '—' : Math.round(stat.minDistance) + 'px') +
-        ' · reveal ' + stat.revealLinks + ' · trigger ' + stat.triggerLinks +
+        ' · roll ' + (detection.roll * 100).toFixed(1) + '%' +
+        ' / chance ' + (detection.effectiveChance * 100).toFixed(1) + '%' +
+        ' · reveal ' + stat.revealLinks + ' · detected ' + stat.detectedLinks +
+        ' · missed ' + stat.missedLinks + ' · trigger ' + stat.triggerLinks +
         ' · replan ' + stat.reroutedLinks + ' · warning ' + stat.warningLinks +
+        ' · escape ' + stat.escapeLinks +
         (stat.interactionLinks ? ' · interact ' + stat.interactionLinks : '') +
         (stat.instance.placement ? ' · planned ' +
           stat.instance.placement.triggerRouteIds.length + '/' +
@@ -830,6 +877,7 @@
     var scope = document.getElementById('audit-scope').value;
     var instances = Game.hazards.all();
     var originalStrategy = Game.state.settings.expeditionStrategy;
+    var detectionContexts = {};
     var originals = instances.map(function (instance) {
       return { instance: instance, awareness: instance.awareness, phase: instance.phase };
     });
@@ -838,6 +886,11 @@
     try {
       results = routes.map(function (definition) {
         return simulatePotentialRoute(definition, strategy);
+      });
+      Game.state.settings.expeditionStrategy = strategy;
+      instances.forEach(function (instance) {
+        detectionContexts[instance.id] = Game.hazards.detectionContext(
+          instance.id, Game.world.hero && Game.world.hero.id);
       });
     } finally {
       originals.forEach(function (saved) {
@@ -854,6 +907,21 @@
     var warnings = results.reduce(function (total, result) {
       return total + Object.keys(result.warningIds).length;
     }, 0);
+    var detections = results.reduce(function (total, result) {
+      return total + result.events.filter(function (event) {
+        return event.type === 'reveal';
+      }).length;
+    }, 0);
+    var missedWarnings = results.reduce(function (total, result) {
+      return total + result.events.filter(function (event) {
+        return event.type === 'warning' && event.missed;
+      }).length;
+    }, 0);
+    var escapes = results.reduce(function (total, result) {
+      return total + result.events.filter(function (event) {
+        return event.type === 'warning' && event.response === 'escape';
+      }).length;
+    }, 0);
     var reroutes = results.reduce(function (total, result) {
       return total + result.rerouted.length;
     }, 0);
@@ -864,17 +932,22 @@
       regionId: Game.world.region.id,
       seed: Game.state.world.worldSeed >>> 0,
       strategy: strategy,
+      environmentVisibility: labEnvironmentVisibility,
       scope: scope,
       routes: routes,
       results: results,
       instanceStats: auditInstanceStats(instances, results),
+      detectionContexts: detectionContexts,
       summary: {
         placements: instances.length,
         activePlacements: instances.filter(function (instance) { return !instance.disabled; }).length,
         links: routes.length,
         baselineCrossings: baselineCrossings,
+        detections: detections,
         reroutes: reroutes,
         warnings: warnings,
+        missedWarnings: missedWarnings,
+        escapes: escapes,
         interactionCoverage: interactionCoverage
       }
     };
@@ -1027,6 +1100,13 @@
     document.getElementById('run-route-audit').addEventListener('click', runRouteAudit);
     document.getElementById('audit-scope').addEventListener('change', runRouteAudit);
     document.getElementById('audit-strategy').addEventListener('change', runRouteAudit);
+    document.getElementById('audit-visibility').addEventListener('change', function () {
+      var value = Number(this.value);
+      labEnvironmentVisibility = Number.isFinite(value) ? U.clamp(value, 0, 4) : 1;
+      this.value = String(labEnvironmentVisibility);
+      updateRuntime(true);
+      runRouteAudit();
+    });
     document.getElementById('run-mimic-audit').addEventListener('click', runMimicAudit);
     document.getElementById('mimic-samples').addEventListener('change', runMimicAudit);
     document.getElementById('mimic-genuine-start').addEventListener('change', runMimicAudit);
@@ -1122,6 +1202,9 @@
   Game.render.init(document.getElementById('stage'));
   bindEvents();
   bindControls();
+  Game.hazards.registerDetectionModifierSource('lab:weather-visibility', function () {
+    return labEnvironmentVisibility;
+  });
   var initialId = params.get('region') || location.hash.slice(1);
   var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
   activateRegion(initialIndex >= 0 ? initialIndex : 0);
@@ -1141,6 +1224,10 @@
       });
     },
     snapshot: function () { return Game.hazards.snapshot(); },
+    detection: function (instanceId) {
+      return Game.hazards.detectionContext(
+        instanceId || selectedInstance().id, Game.world.hero && Game.world.hero.id);
+    },
     events: function () { return Game.hazards.events(); },
     select: function (id) {
       var select = document.getElementById('hazard-select');
@@ -1157,6 +1244,13 @@
     reset: resetHazard,
     audit: runRouteAudit,
     auditReport: function () { return routeAudit; },
+    visibility: function (value) {
+      var input = document.getElementById('audit-visibility');
+      if (value === undefined) return labEnvironmentVisibility;
+      input.value = String(value);
+      input.dispatchEvent(new Event('change'));
+      return labEnvironmentVisibility;
+    },
     mimicAudit: runMimicAudit,
     mimicReport: function () { return mimicAudit; },
     region: function (id) {

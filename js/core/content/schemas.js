@@ -143,7 +143,7 @@
         movementTypes: ['ground'], actorFilter: 'playerParty',
         sweep: true, retrigger: 'afterExit'
       },
-      detection: { clueRadius: 72, revealRadius: 48 },
+      detection: { clueRadius: 72, revealRadius: 48, revealChance: 1 },
       lifecycle: {
         revealTicks: 8, warningTicks: 20, activeTicks: 1,
         cooldownTicks: 600

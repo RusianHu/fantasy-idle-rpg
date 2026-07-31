@@ -315,10 +315,16 @@
           issue(issues, 'hazard-number', { type: type, id: def.id, path: 'trigger.' + field });
         }
       });
-      unexpectedFields(hazardDetection, ['clueRadius', 'revealRadius'], type, def, 'detection', issues);
+      unexpectedFields(hazardDetection, ['clueRadius', 'revealRadius', 'revealChance'], type, def, 'detection', issues);
       if (!Number.isFinite(hazardDetection.clueRadius) || !Number.isFinite(hazardDetection.revealRadius) ||
           hazardDetection.clueRadius < hazardDetection.revealRadius || hazardDetection.revealRadius <= 0) {
         issue(issues, 'hazard-detection', { type: type, id: def.id, path: 'detection' });
+      }
+      if (!Number.isFinite(hazardDetection.revealChance) ||
+          hazardDetection.revealChance < 0 || hazardDetection.revealChance > 1) {
+        issue(issues, 'hazard-detection-chance', {
+          type: type, id: def.id, path: 'detection.revealChance'
+        });
       }
       unexpectedFields(hazardLifecycle, [
         'revealTicks', 'warningTicks', 'activeTicks', 'cooldownTicks', 'ambushLock'

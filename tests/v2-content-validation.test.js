@@ -108,6 +108,59 @@ sandbox.Game.content.registerPack({
       }],
       completionPolicy: { mode: 'firstRequired', extra: true }
     }],
+    hazardProfile: [{
+      id: 'fixture.invalid.hazard',
+      regionId: 'grassland',
+      category: 'damageTrap',
+      trigger: {
+        mode: 'enter',
+        shape: 'circle',
+        radius: 24,
+        movementTypes: ['ground'],
+        actorFilter: 'playerParty',
+        sweep: true,
+        retrigger: 'afterExit'
+      },
+      detection: {
+        clueRadius: 96,
+        revealRadius: 64,
+        revealChance: 1.1
+      },
+      lifecycle: {
+        revealTicks: 8,
+        warningTicks: 24,
+        activeTicks: 8,
+        cooldownTicks: 600
+      },
+      placement: {
+        source: 'hazardAnchor',
+        count: [1, 1],
+        minCampDistance: 180,
+        minLandmarkDistance: 48,
+        minSpacing: 96,
+        requireWalkableEscape: true
+      },
+      outcome: {
+        type: 'applyEffects',
+        pulses: 1,
+        effects: [{
+          type: 'damage',
+          damageTypeId: 'piercing',
+          formulaId: 'combat.hazard_damage_v1',
+          params: { maxHpCoefficient: 0.06 },
+          canCrit: false,
+          canDodge: false,
+          defenseMode: 'resistanceOnly'
+        }]
+      },
+      presentation: {
+        nameKey: 'hazard.grassland.thorn_stakes.name',
+        descKey: 'hazard.grassland.thorn_stakes.desc',
+        warningKey: 'hazard.grassland.thorn_stakes.warning',
+        hitKey: 'hazard.grassland.thorn_stakes.hit'
+      },
+      visualProfileId: 'hazard.grassland.thorn_stakes.visual'
+    }],
     worldSpawnProfile: [
       {
         id: 'fixture.invalid.spawn-mount',
@@ -174,6 +227,7 @@ assert.ok(codes.has('modifier-stat'));
 assert.ok(codes.has('modifier-phase'));
 assert.ok(codes.has('modifier-operation'));
 assert.ok(codes.has('status-max-stacks'));
+assert.ok(codes.has('hazard-detection-chance'));
 assert.ok(audit.issues.some((entry) =>
   entry.type === 'status' && entry.path === 'periodic.0.damageTypeId'));
 for (const code of [

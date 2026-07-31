@@ -38,6 +38,8 @@ const summons = [
 
 assert.equal(Game.content.all('hazardProfile').length, 16);
 assert.equal(Game.content.all('hazardVisualProfile').length, 16);
+assert.equal(Game.contentSchemas.defaults.hazardProfile.detection.revealChance, 1,
+  'external Hazard content remains backward compatible by default');
 assert.equal(Game.content.all('hazardProfile').filter((profile) => profile.category === 'damageTrap').length, 8);
 assert.equal(Game.content.all('hazardProfile').filter((profile) => profile.category === 'ambushTrigger').length, 8);
 
@@ -82,6 +84,8 @@ for (const regionId of regions) {
   assert.deepEqual(Array.from(hazards, (profile) => profile.category).sort(), ['ambushTrigger', 'damageTrap']);
   for (const hazard of hazards) {
     assert.equal(hazard.regionId, regionId);
+    assert.equal(hazard.detection.revealChance, 0.25,
+      `${hazard.id} uses the production early-detection pressure target`);
     assert.equal(Game.content.has('actorArchetype', hazard.id), false, `${hazard.id} is not an Actor`);
     assert.ok(Game.content.get('hazardVisualProfile', hazard.visualProfileId));
     assert.ok(Game.i18n.t(hazard.presentation.nameKey));

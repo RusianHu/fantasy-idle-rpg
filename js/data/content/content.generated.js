@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "dd7fba42567f11c1f8bf5f5038390beee13290edc1bb8581a4a4d7f6c97f26c4",
+  "sourceSetHash": "401aead7ec4ba1bde9ae9137cc7203a8372b504f4451e0e69ed44c35f7b44698",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -38,7 +38,7 @@
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
       "kind": "pack",
-      "sha256": "e2e8037fc798aa8e548dd03b71bd8dab6555c10dfa8b99873fe62a24b06c84f2"
+      "sha256": "a2c445a70b109fb02aea248bebe1a04f49d20c04fd4acab0366b019b3e77fecd"
     },
     {
       "path": "js/data/packs/regions/factory.support.js",
@@ -48,37 +48,37 @@
     {
       "path": "js/data/packs/regions/forest.pack.js",
       "kind": "pack",
-      "sha256": "cb1fbdf1037ec2d48b6a8b8d3eec71d93cb6a3730aeacadbd602fb94a06b6d44"
+      "sha256": "fbf57be582abdcaad1adbdbc9eb8f5f7304c0c2a6d2c2d6f8d3482466a489d00"
     },
     {
       "path": "js/data/packs/regions/grassland.pack.js",
       "kind": "pack",
-      "sha256": "d8010764bf6c2f514504706578d95c161a9396b5f2b926dd688cb18ef4f9de8f"
+      "sha256": "11987795dc4758ebc1a711c79aba91323ee12074f4a56352b7c044eec27906ad"
     },
     {
       "path": "js/data/packs/regions/graveyard.pack.js",
       "kind": "pack",
-      "sha256": "06c752ab261718ef0e4f6dc96f9c82d91ac2e10da3b418ab27690959c8ba42ce"
+      "sha256": "e94b1dafbc5a77e76a90013fa81c3c806cb4c2c159d715a93f971be27ae613ed"
     },
     {
       "path": "js/data/packs/regions/lavacave.pack.js",
       "kind": "pack",
-      "sha256": "d2b483eda884b7858d5edf77d813e3a838f10e6e389f3034332c5137cc5004b6"
+      "sha256": "f8a7d313382125be2049f6e6138a2e227bbe916124020df4efe469c4c08a9de9"
     },
     {
       "path": "js/data/packs/regions/mine.pack.js",
       "kind": "pack",
-      "sha256": "ce394819bf23672f1e2dfff99cb1c7d50f84d0420d358cbdfac1da08052b9fa3"
+      "sha256": "a9b6ed73c7e486d5206bcbe4caa6656e2d3563fd31130750fb9772d22755ea1c"
     },
     {
       "path": "js/data/packs/regions/skyruins.pack.js",
       "kind": "pack",
-      "sha256": "0399d04fa94087d704c25845b31d53551e194ec1a3847c46c2630fcccc860ba5"
+      "sha256": "86f103055ee5a9eb8efa52d220f84e3078b41bed1157a1bca0d5a680de9640c1"
     },
     {
       "path": "js/data/packs/regions/snowpass.pack.js",
       "kind": "pack",
-      "sha256": "addaa37fb8122d6fc84e669c9315b16831029480f9cae167e840e45e7341a3fe"
+      "sha256": "c1dd11c2464e05a4e7f041845bc5b2477d0809659745ab8ba9bd45bac0d75511"
     },
     {
       "path": "js/data/packs/rules/combat-formulas.support.js",
@@ -243,7 +243,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "35426d72"
+  "contentFingerprint": "26a35012"
 });
 })();
 /* source: js/data/packs/regions/catalog.support.js */
@@ -2544,7 +2544,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.darkcastle.wall_lances', regionId: 'darkcastle', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'rect', width: 70, height: 28, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 10, cooldownTicks: 520 },
+        detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 10, cooldownTicks: 520 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.1 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'darkcastle.cursed', stacks: 1, firstPulseOnly: true }
@@ -2556,7 +2556,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.darkcastle.gate_ambush', regionId: 'darkcastle', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 120, revealRadius: 80 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 120, revealRadius: 80, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['darkcastle.solo-a', 'darkcastle.solo-b', 'darkcastle.solo-c', 'darkcastle.duo', 'darkcastle.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 56, minSpacing: 108, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.darkcastle.gate_ambush.name', descKey: 'hazard.darkcastle.gate_ambush.desc', warningKey: 'hazard.darkcastle.gate_ambush.warning', hitKey: 'hazard.darkcastle.gate_ambush.hit', ambushKey: 'hazard.darkcastle.gate_ambush.ambush' },
@@ -2728,7 +2728,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.forest.venom_darts', regionId: 'forest', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'rect', width: 58, height: 24, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 104, revealRadius: 70 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 14, cooldownTicks: 480 },
+        detection: { clueRadius: 104, revealRadius: 70, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 14, cooldownTicks: 480 },
         outcome: { type: 'applyEffects', pulses: 2, intervalTicks: 6, effects: [
           { type: 'damage', damageTypeId: 'poison', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'forest.poisoned', stacks: 1, firstPulseOnly: true }
@@ -2740,7 +2740,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.forest.thicket_ambush', regionId: 'forest', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 114, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 114, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['forest.solo-a', 'forest.solo-b', 'forest.solo-c', 'forest.solo-d', 'forest.duo', 'forest.duo-summoner', 'forest.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.forest.thicket_ambush.name', descKey: 'hazard.forest.thicket_ambush.desc', warningKey: 'hazard.forest.thicket_ambush.warning', hitKey: 'hazard.forest.thicket_ambush.hit', ambushKey: 'hazard.forest.thicket_ambush.ambush' },
@@ -2918,7 +2918,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.grassland.thorn_stakes', regionId: 'grassland', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'circle', radius: 24, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 96, revealRadius: 64 },
+        detection: { clueRadius: 96, revealRadius: 64, revealChance: 0.25 },
         lifecycle: { revealTicks: 8, warningTicks: 24, activeTicks: 8, cooldownTicks: 600 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'piercing', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.06 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
@@ -2931,7 +2931,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.grassland.roadside_ambush', regionId: 'grassland', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 74 },
+        detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 },
         lifecycle: { revealTicks: 6, warningTicks: 22, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['grassland.solo-a', 'grassland.solo-b', 'grassland.solo-c', 'grassland.duo', 'grassland.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
@@ -3121,7 +3121,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.graveyard.soul_seal', regionId: 'graveyard', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'circle', radius: 30, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 106, revealRadius: 70 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 22, cooldownTicks: 640 },
+        detection: { clueRadius: 106, revealRadius: 70, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 28, activeTicks: 22, cooldownTicks: 640 },
         outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 8, effects: [
           { type: 'damage', damageTypeId: 'necrotic', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.025 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'graveyard.withered', stacks: 1, firstPulseOnly: true }
@@ -3133,7 +3133,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.graveyard.grave_ambush', regionId: 'graveyard', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 116, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['graveyard.solo-a', 'graveyard.solo-b', 'graveyard.solo-c', 'graveyard.duo', 'graveyard.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.graveyard.grave_ambush.name', descKey: 'hazard.graveyard.grave_ambush.desc', warningKey: 'hazard.graveyard.grave_ambush.warning', hitKey: 'hazard.graveyard.grave_ambush.hit', ambushKey: 'hazard.graveyard.grave_ambush.ambush' },
@@ -3310,7 +3310,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.lavacave.flame_vent', regionId: 'lavacave', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'cone', length: 56, angleDeg: 72, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 108, revealRadius: 72 }, lifecycle: { revealTicks: 8, warningTicks: 26, activeTicks: 18, cooldownTicks: 440 },
+        detection: { clueRadius: 108, revealRadius: 72, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 26, activeTicks: 18, cooldownTicks: 440 },
         outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 5, effects: [
           { type: 'damage', damageTypeId: 'fire', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'lavacave.burning', stacks: 1, firstPulseOnly: true }
@@ -3322,7 +3322,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.lavacave.cinder_ambush', regionId: 'lavacave', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 116, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['lavacave.solo-a', 'lavacave.solo-b', 'lavacave.solo-c', 'lavacave.duo', 'lavacave.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.lavacave.cinder_ambush.name', descKey: 'hazard.lavacave.cinder_ambush.desc', warningKey: 'hazard.lavacave.cinder_ambush.warning', hitKey: 'hazard.lavacave.cinder_ambush.hit', ambushKey: 'hazard.lavacave.cinder_ambush.ambush' },
@@ -3497,7 +3497,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.mine.rockfall_plate', regionId: 'mine', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'circle', radius: 32, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 72 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 720 },
+        detection: { clueRadius: 112, revealRadius: 72, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 720 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'blunt', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'knockback', distance: 12 },
@@ -3510,7 +3510,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.mine.tunnel_ambush', regionId: 'mine', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 116, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['mine.solo-a', 'mine.solo-b', 'mine.solo-c', 'mine.duo', 'mine.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.mine.tunnel_ambush.name', descKey: 'hazard.mine.tunnel_ambush.desc', warningKey: 'hazard.mine.tunnel_ambush.warning', hitKey: 'hazard.mine.tunnel_ambush.hit', ambushKey: 'hazard.mine.tunnel_ambush.ambush' },
@@ -3691,7 +3691,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.skyruins.arc_grid', regionId: 'skyruins', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'rect', width: 60, height: 28, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 12, cooldownTicks: 600 },
+        detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 12, cooldownTicks: 600 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'lightning', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'skyruins.suppressed', stacks: 1, firstPulseOnly: true }
@@ -3703,7 +3703,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.skyruins.rift_ambush', regionId: 'skyruins', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 120, revealRadius: 78 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 120, revealRadius: 78, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['skyruins.solo-a', 'skyruins.solo-b', 'skyruins.solo-c', 'skyruins.duo', 'skyruins.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 54, minSpacing: 104, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.skyruins.rift_ambush.name', descKey: 'hazard.skyruins.rift_ambush.desc', warningKey: 'hazard.skyruins.rift_ambush.warning', hitKey: 'hazard.skyruins.rift_ambush.hit', ambushKey: 'hazard.skyruins.rift_ambush.ambush' },
@@ -3882,7 +3882,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.snowpass.icicle_fall', regionId: 'snowpass', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'rect', width: 28, height: 58, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 680 },
+        detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 680 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'frost', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.07 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'snowpass.chilled', stacks: 1, firstPulseOnly: true }
@@ -3894,7 +3894,7 @@ window.Game.contentSupport.installAll();
       {
         id: 'hazard.snowpass.whiteout_ambush', regionId: 'snowpass', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 120, revealRadius: 78 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 120, revealRadius: 78, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['snowpass.solo-a', 'snowpass.solo-b', 'snowpass.solo-c', 'snowpass.duo', 'snowpass.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 52, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.snowpass.whiteout_ambush.name', descKey: 'hazard.snowpass.whiteout_ambush.desc', warningKey: 'hazard.snowpass.whiteout_ambush.warning', hitKey: 'hazard.snowpass.whiteout_ambush.hit', ambushKey: 'hazard.snowpass.whiteout_ambush.ambush' },

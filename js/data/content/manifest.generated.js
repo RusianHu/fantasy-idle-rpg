@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "dd7fba42567f11c1f8bf5f5038390beee13290edc1bb8581a4a4d7f6c97f26c4",
+  "sourceSetHash": "401aead7ec4ba1bde9ae9137cc7203a8372b504f4451e0e69ed44c35f7b44698",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -38,7 +38,7 @@
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
       "kind": "pack",
-      "sha256": "e2e8037fc798aa8e548dd03b71bd8dab6555c10dfa8b99873fe62a24b06c84f2"
+      "sha256": "a2c445a70b109fb02aea248bebe1a04f49d20c04fd4acab0366b019b3e77fecd"
     },
     {
       "path": "js/data/packs/regions/factory.support.js",
@@ -48,37 +48,37 @@
     {
       "path": "js/data/packs/regions/forest.pack.js",
       "kind": "pack",
-      "sha256": "cb1fbdf1037ec2d48b6a8b8d3eec71d93cb6a3730aeacadbd602fb94a06b6d44"
+      "sha256": "fbf57be582abdcaad1adbdbc9eb8f5f7304c0c2a6d2c2d6f8d3482466a489d00"
     },
     {
       "path": "js/data/packs/regions/grassland.pack.js",
       "kind": "pack",
-      "sha256": "d8010764bf6c2f514504706578d95c161a9396b5f2b926dd688cb18ef4f9de8f"
+      "sha256": "11987795dc4758ebc1a711c79aba91323ee12074f4a56352b7c044eec27906ad"
     },
     {
       "path": "js/data/packs/regions/graveyard.pack.js",
       "kind": "pack",
-      "sha256": "06c752ab261718ef0e4f6dc96f9c82d91ac2e10da3b418ab27690959c8ba42ce"
+      "sha256": "e94b1dafbc5a77e76a90013fa81c3c806cb4c2c159d715a93f971be27ae613ed"
     },
     {
       "path": "js/data/packs/regions/lavacave.pack.js",
       "kind": "pack",
-      "sha256": "d2b483eda884b7858d5edf77d813e3a838f10e6e389f3034332c5137cc5004b6"
+      "sha256": "f8a7d313382125be2049f6e6138a2e227bbe916124020df4efe469c4c08a9de9"
     },
     {
       "path": "js/data/packs/regions/mine.pack.js",
       "kind": "pack",
-      "sha256": "ce394819bf23672f1e2dfff99cb1c7d50f84d0420d358cbdfac1da08052b9fa3"
+      "sha256": "a9b6ed73c7e486d5206bcbe4caa6656e2d3563fd31130750fb9772d22755ea1c"
     },
     {
       "path": "js/data/packs/regions/skyruins.pack.js",
       "kind": "pack",
-      "sha256": "0399d04fa94087d704c25845b31d53551e194ec1a3847c46c2630fcccc860ba5"
+      "sha256": "86f103055ee5a9eb8efa52d220f84e3078b41bed1157a1bca0d5a680de9640c1"
     },
     {
       "path": "js/data/packs/regions/snowpass.pack.js",
       "kind": "pack",
-      "sha256": "addaa37fb8122d6fc84e669c9315b16831029480f9cae167e840e45e7341a3fe"
+      "sha256": "c1dd11c2464e05a4e7f041845bc5b2477d0809659745ab8ba9bd45bac0d75511"
     },
     {
       "path": "js/data/packs/rules/combat-formulas.support.js",
@@ -243,6 +243,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "35426d72"
+  "contentFingerprint": "26a35012"
 });
 })();

@@ -112,7 +112,7 @@
       {
         id: 'hazard.mine.rockfall_plate', regionId: 'mine', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'circle', radius: 32, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 72 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 720 },
+        detection: { clueRadius: 112, revealRadius: 72, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 34, activeTicks: 12, cooldownTicks: 720 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'blunt', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'knockback', distance: 12 },
@@ -125,7 +125,7 @@
       {
         id: 'hazard.mine.tunnel_ambush', regionId: 'mine', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 116, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 26, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['mine.solo-a', 'mine.solo-b', 'mine.solo-c', 'mine.duo', 'mine.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 100, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.mine.tunnel_ambush.name', descKey: 'hazard.mine.tunnel_ambush.desc', warningKey: 'hazard.mine.tunnel_ambush.warning', hitKey: 'hazard.mine.tunnel_ambush.hit', ambushKey: 'hazard.mine.tunnel_ambush.ambush' },

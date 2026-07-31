@@ -95,9 +95,10 @@ a { color: var(--gold); text-decoration: none; }
 .instance-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
 .instance-controls select { min-width: 0; width: 100%; padding: 0 8px; }
 .instance-controls button { align-self: end; padding: 0 8px; }
-.runtime-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.runtime-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .runtime-grid div { min-width: 0; padding: 10px 12px; border-right: 1px solid var(--line); }
-.runtime-grid div:last-child { border-right: 0; }
+.runtime-grid div:nth-child(3n) { border-right: 0; }
+.runtime-grid div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
 .runtime-grid span, .runtime-grid strong { display: block; }
 .runtime-grid span { color: var(--muted); font-size: 10px; }
 .runtime-grid strong { margin-top: 4px; color: #fff3c8; font: 11px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
@@ -147,11 +148,11 @@ a { color: var(--gold); text-decoration: none; }
   flex-wrap: wrap;
 }
 .audit-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
-.audit-controls select { min-width: 150px; padding: 0 9px; }
+.audit-controls select, .audit-controls input { min-width: 150px; padding: 0 9px; }
 
 .audit-summary {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   border-bottom: 1px solid var(--line);
 }
 .audit-summary div {
@@ -160,7 +161,8 @@ a { color: var(--gold); text-decoration: none; }
   border-right: 1px solid var(--line);
   background: #171914;
 }
-.audit-summary div:last-child { border-right: 0; }
+.audit-summary div:nth-child(4n) { border-right: 0; }
+.audit-summary div:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
 .audit-summary span, .audit-summary strong { display: block; }
 .audit-summary span { color: var(--muted); font-size: 10px; }
 .audit-summary strong {
@@ -324,9 +326,9 @@ a { color: var(--gold); text-decoration: none; }
   .instance-controls { grid-template-columns: repeat(3, 1fr); }
   .instance-controls label { grid-column: 1 / -1; }
   #contact-sheet { max-height: none; }
-  .audit-summary { grid-template-columns: repeat(3, 1fr); }
-  .audit-summary div:nth-child(3n) { border-right: 0; }
-  .audit-summary div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
+  .audit-summary { grid-template-columns: repeat(4, 1fr); }
+  .audit-summary div:nth-child(4n) { border-right: 0; }
+  .audit-summary div:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
   .audit-grid { grid-template-columns: 1fr; }
   .route-map-wrap { border-right: 0; border-bottom: 1px solid var(--line); }
   .placement-audit { grid-template-columns: repeat(2, 1fr); }
@@ -347,15 +349,18 @@ a { color: var(--gold); text-decoration: none; }
   .toolbar form { width: 100%; display: grid; grid-template-columns: auto 1fr auto; }
   .instance-controls { grid-template-columns: repeat(2, 1fr); }
   .runtime-grid { grid-template-columns: repeat(2, 1fr); }
-  .runtime-grid div:nth-child(2) { border-right: 0; }
-  .runtime-grid div:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .runtime-grid div { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .runtime-grid div:nth-child(3n) { border-right: 1px solid var(--line); }
+  .runtime-grid div:nth-child(2n) { border-right: 0; }
+  .runtime-grid div:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
+  .runtime-grid div:nth-last-child(-n+2) { border-bottom: 0; }
   .profile-details { grid-template-columns: 1fr; }
   .profile-details p { grid-column: auto; }
   .route-audit-heading { align-items: stretch; }
   .audit-controls, .audit-controls label, .audit-controls button { width: 100%; }
   .audit-controls { display: grid; grid-template-columns: 1fr 1fr; }
   .audit-controls button { grid-column: 1 / -1; }
-  .audit-controls select { min-width: 0; width: 100%; }
+  .audit-controls select, .audit-controls input { min-width: 0; width: 100%; }
   .audit-summary { grid-template-columns: repeat(2, 1fr); }
   .audit-summary div { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
   .audit-summary div:nth-child(2n) { border-right: 0; }
@@ -373,6 +378,6 @@ a { color: var(--gold); text-decoration: none; }
 }
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.1") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.3") format("woff2");
   font-display: swap;
 }

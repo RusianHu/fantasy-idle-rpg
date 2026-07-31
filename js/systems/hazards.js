@@ -13,6 +13,13 @@
   var previousPositions = {};
   var eventLog = [];
   var MAX_EVENTS = 160;
+  var DETECTION_STRATEGY_MULTIPLIERS = {
+    safe: 1.6,
+    balanced: 1,
+    loot: 0.6
+  };
+  var detectionModifierSources = {};
+  var warnedDetectionSources = {};
 
   function clone(value) {
     return Game.contentCompiler.clone(value);
@@ -74,7 +81,7 @@
     return U.clamp((worldTick - instance.phaseSinceTick) / phaseDuration(instance), 0, 1);
   }
 
-  function reveal(instance, reason) {
+  function reveal(instance, reason, detection) {
     if (instance.awareness === 'revealed') return false;
     instance.awareness = 'revealed';
     instance.revealUntilTick = worldTick + Math.max(0, instance.profile.lifecycle.revealTicks || 0);
@@ -83,9 +90,127 @@
       saved.discoveredHazardIds.push(instance.id);
       saved.discoveredHazardIds.sort();
     }
-    emit(instance, 'hazard:revealed', { reason: reason || 'proximity' });
+    var payload = { reason: reason || 'proximity' };
+    if (detection) {
+      payload.detection = {
+        actorId: detection.actorId,
+        baseChance: detection.baseChance,
+        roll: detection.roll,
+        strategy: detection.strategy,
+        strategyMultiplier: detection.strategyMultiplier,
+        expeditionVision: detection.expeditionVision,
+        environmentMultiplier: detection.environmentMultiplier,
+        effectiveChance: detection.effectiveChance,
+        sources: clone(detection.sources)
+      };
+    }
+    emit(instance, 'hazard:revealed', payload);
     refreshNavigation();
     return true;
+  }
+
+  function warnDetectionSource(sourceId, reason, error) {
+    if (warnedDetectionSources[sourceId]) return;
+    warnedDetectionSources[sourceId] = true;
+    if (window.console && console.warn) {
+      console.warn('[Hazards] detection modifier source "' + sourceId + '" ' + reason,
+        error || '');
+    }
+  }
+
+  function strategyId() {
+    var configured = Game.state && Game.state.settings &&
+      Game.state.settings.expeditionStrategy;
+    return DETECTION_STRATEGY_MULTIPLIERS[configured] ? configured : 'balanced';
+  }
+
+  function providerContext(instance, actor, strategy) {
+    return {
+      instanceId: instance.id,
+      profileId: instance.profileId,
+      regionId: instance.regionId,
+      category: instance.profile.category,
+      position: { x: instance.x, y: instance.y },
+      region: Game.world && Game.world.region &&
+        Game.world.region.id === instance.regionId
+        ? Game.world.region
+        : Game.reg && Game.reg.get('region', instance.regionId),
+      actorId: actor && actor.id || null,
+      actor: actor || null,
+      strategy: strategy,
+      worldTick: worldTick,
+      worldTime: worldTime()
+    };
+  }
+
+  function sourceMultiplier(sourceId, provider, context) {
+    var value;
+    try {
+      value = provider(context);
+    } catch (error) {
+      warnDetectionSource(sourceId, 'threw and was ignored.', error);
+      return 1;
+    }
+    if (!Number.isFinite(value) || value < 0 || value > 4) {
+      warnDetectionSource(sourceId, 'returned an invalid multiplier and was ignored.');
+      return 1;
+    }
+    return value;
+  }
+
+  function detectionContext(instance, actor) {
+    if (typeof instance === 'string') instance = byId[instance];
+    if (!instance) return null;
+    if (typeof actor === 'string') {
+      actor = Game.actors && Game.actors.get ? Game.actors.get(actor) : null;
+    }
+    actor = actor || Game.world && Game.world.hero || null;
+    var strategy = strategyId();
+    var context = providerContext(instance, actor, strategy);
+    var sources = [];
+    var expeditionVision = 1;
+    try {
+      expeditionVision = Game.expedition && Game.expedition.currentModifier
+        ? Game.expedition.currentModifier(instance.regionId).vision
+        : 1;
+    } catch (error) {
+      warnDetectionSource('expedition:vision', 'threw and was ignored.', error);
+      expeditionVision = 1;
+    }
+    if (!Number.isFinite(expeditionVision) || expeditionVision < 0 || expeditionVision > 4) {
+      warnDetectionSource('expedition:vision',
+        'returned an invalid multiplier and was ignored.');
+      expeditionVision = 1;
+    }
+    Object.keys(detectionModifierSources).sort().forEach(function (sourceId) {
+      sources.push({
+        id: sourceId,
+        multiplier: sourceMultiplier(sourceId, detectionModifierSources[sourceId], context)
+      });
+    });
+    var environmentMultiplier = sources.reduce(function (product, source) {
+      return product * source.multiplier;
+    }, 1);
+    var configuredChance = instance.profile.detection.revealChance;
+    var baseChance = Number.isFinite(configuredChance)
+      ? U.clamp(configuredChance, 0, 1)
+      : 1;
+    var strategyMultiplier = DETECTION_STRATEGY_MULTIPLIERS[strategy];
+    var effectiveChance = U.clamp(
+      baseChance * strategyMultiplier * expeditionVision * environmentMultiplier, 0, 0.85);
+    return {
+      instanceId: instance.id,
+      actorId: actor && actor.id || null,
+      baseChance: baseChance,
+      roll: instance.detectionRoll,
+      strategy: strategy,
+      strategyMultiplier: strategyMultiplier,
+      expeditionVision: expeditionVision,
+      environmentMultiplier: environmentMultiplier,
+      effectiveChance: effectiveChance,
+      detectable: instance.detectionRoll < effectiveChance,
+      sources: sources
+    };
   }
 
   function setPhase(instance, phase, payload) {
@@ -334,6 +459,7 @@
         fallback: !!anchor.placementFallback
       },
       awareness: discovered ? 'revealed' : 'concealed',
+      detectionRoll: U.strSeed(id + '|hazard-detection-v1') / 4294967296,
       clueVisible: false,
       clueNotified: false,
       revealUntilTick: 0,
@@ -680,11 +806,14 @@
     instances.forEach(function (instance) {
       if (instance.disabled) return;
       var nearestDistance = Infinity;
-      var proximityActor = null;
+      var proximityActors = [];
       actors.forEach(function (actor) {
         var distance = U.dist(actor.x, actor.y, instance.x, instance.y);
         if (distance < nearestDistance) nearestDistance = distance;
-        if (!proximityActor && distance <= instance.profile.detection.revealRadius) proximityActor = actor;
+        if (movementAllowed(instance, actor) &&
+            distance <= instance.profile.detection.revealRadius) {
+          proximityActors.push(actor);
+        }
       });
       var clueVisible = nearestDistance <= instance.profile.detection.clueRadius;
       if (clueVisible && !instance.clueNotified && instance.awareness === 'concealed') {
@@ -694,7 +823,18 @@
         instance.clueNotified = false;
       }
       instance.clueVisible = clueVisible;
-      if (proximityActor) reveal(instance, 'proximity');
+      if (instance.awareness === 'concealed' && proximityActors.length) {
+        var successfulDetection = null;
+        proximityActors.forEach(function (actor) {
+          var detection = detectionContext(instance, actor);
+          if (!detection.detectable) return;
+          if (!successfulDetection ||
+              detection.effectiveChance > successfulDetection.effectiveChance) {
+            successfulDetection = detection;
+          }
+        });
+        if (successfulDetection) reveal(instance, 'proximity', successfulDetection);
+      }
 
       var crossing = actors.filter(function (actor) {
         return movementAllowed(instance, actor) && sweptContains(instance,
@@ -864,6 +1004,34 @@
     get: function (id) { return byId[id] || null; },
     events: function () { return eventLog.slice(); },
     tick: function () { return worldTick; },
+
+    registerDetectionModifierSource: function (sourceId, provider) {
+      if (typeof sourceId !== 'string' || !sourceId.trim() || typeof provider !== 'function') {
+        return false;
+      }
+      sourceId = sourceId.trim();
+      detectionModifierSources[sourceId] = provider;
+      delete warnedDetectionSources[sourceId];
+      return true;
+    },
+
+    unregisterDetectionModifierSource: function (sourceId) {
+      if (typeof sourceId !== 'string') return false;
+      sourceId = sourceId.trim();
+      if (!Object.prototype.hasOwnProperty.call(detectionModifierSources, sourceId)) return false;
+      delete detectionModifierSources[sourceId];
+      delete warnedDetectionSources[sourceId];
+      return true;
+    },
+
+    detectionContext: function (instanceId, actorId) {
+      return detectionContext(instanceId, actorId);
+    },
+
+    forceReveal: function (id, reason) {
+      var instance = byId[id];
+      return instance ? reveal(instance, reason || 'forced') : false;
+    },
 
     forceTrigger: function (id, actorId) {
       var instance = byId[id];

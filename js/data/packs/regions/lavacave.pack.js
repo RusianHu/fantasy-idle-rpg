@@ -112,7 +112,7 @@
       {
         id: 'hazard.lavacave.flame_vent', regionId: 'lavacave', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'cone', length: 56, angleDeg: 72, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 108, revealRadius: 72 }, lifecycle: { revealTicks: 8, warningTicks: 26, activeTicks: 18, cooldownTicks: 440 },
+        detection: { clueRadius: 108, revealRadius: 72, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 26, activeTicks: 18, cooldownTicks: 440 },
         outcome: { type: 'applyEffects', pulses: 3, intervalTicks: 5, effects: [
           { type: 'damage', damageTypeId: 'fire', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.03 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'lavacave.burning', stacks: 1, firstPulseOnly: true }
@@ -124,7 +124,7 @@
       {
         id: 'hazard.lavacave.cinder_ambush', regionId: 'lavacave', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 116, revealRadius: 76 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 116, revealRadius: 76, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 24, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['lavacave.solo-a', 'lavacave.solo-b', 'lavacave.solo-c', 'lavacave.duo', 'lavacave.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 48, minSpacing: 96, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.lavacave.cinder_ambush.name', descKey: 'hazard.lavacave.cinder_ambush.desc', warningKey: 'hazard.lavacave.cinder_ambush.warning', hitKey: 'hazard.lavacave.cinder_ambush.hit', ambushKey: 'hazard.lavacave.cinder_ambush.ambush' },

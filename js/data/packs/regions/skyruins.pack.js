@@ -117,7 +117,7 @@
       {
         id: 'hazard.skyruins.arc_grid', regionId: 'skyruins', category: 'damageTrap',
         trigger: { mode: 'enter', shape: 'rect', width: 60, height: 28, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 112, revealRadius: 74 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 12, cooldownTicks: 600 },
+        detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 }, lifecycle: { revealTicks: 8, warningTicks: 30, activeTicks: 12, cooldownTicks: 600 },
         outcome: { type: 'applyEffects', pulses: 1, effects: [
           { type: 'damage', damageTypeId: 'lightning', formulaId: 'combat.hazard_damage_v1', params: { maxHpCoefficient: 0.08 }, canCrit: false, canDodge: false, defenseMode: 'resistanceOnly' },
           { type: 'applyStatus', statusId: 'skyruins.suppressed', stacks: 1, firstPulseOnly: true }
@@ -129,7 +129,7 @@
       {
         id: 'hazard.skyruins.rift_ambush', regionId: 'skyruins', category: 'ambushTrigger',
         trigger: { mode: 'enter', shape: 'circle', radius: 42, movementTypes: ['ground'], actorFilter: 'playerParty', sweep: true, retrigger: 'afterExit' },
-        detection: { clueRadius: 120, revealRadius: 78 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
+        detection: { clueRadius: 120, revealRadius: 78, revealChance: 0.25 }, lifecycle: { revealTicks: 6, warningTicks: 28, activeTicks: 1, cooldownTicks: 3600, ambushLock: true },
         outcome: { type: 'startEncounter', encounterPackIds: ['skyruins.solo-a', 'skyruins.solo-b', 'skyruins.solo-c', 'skyruins.duo', 'skyruins.duo-mixed'] },
         placement: { source: 'threatTerritory', count: [1, 3], minCampDistance: 180, minLandmarkDistance: 54, minSpacing: 104, requireWalkableEscape: true, maxPerTerritory: 1 },
         presentation: { nameKey: 'hazard.skyruins.rift_ambush.name', descKey: 'hazard.skyruins.rift_ambush.desc', warningKey: 'hazard.skyruins.rift_ambush.warning', hitKey: 'hazard.skyruins.rift_ambush.hit', ambushKey: 'hazard.skyruins.rift_ambush.ambush' },

@@ -157,7 +157,9 @@ assert.equal(Game.hazards.get(avoidedThorn.id).phase, 'dormant');
 assert.ok(!Game.state.world.hazards.regions.grassland.discoveredHazardIds.includes(avoidedThorn.id));
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:reset'));
 
-// The expanded clue radius exposes only an environmental clue before reveal.
+// The expanded clue radius exposes only an environmental clue. The stable roll
+// narrowly fails balanced detection for this fixture, then succeeds when the
+// strategy improves to safe without rerolling the Hazard.
 hero.x = hero.components.transform.x = 392;
 hero.y = hero.components.transform.y = 240;
 Game.hazards.initRegion('grassland', damageLayout);
@@ -177,9 +179,92 @@ assert.equal(clueThorn.awareness, 'concealed');
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:clue'));
 hero.x = hero.components.transform.x = 360;
 advanceHazards(1);
+const balancedDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+assert.equal(balancedDetection.baseChance, 0.25);
+assert.equal(balancedDetection.roll,
+  Game.util.strSeed(clueThorn.id + '|hazard-detection-v1') / 4294967296);
+assert.equal(balancedDetection.strategy, 'balanced');
+assert.equal(balancedDetection.strategyMultiplier, 1);
+assert.ok(balancedDetection.roll >= balancedDetection.effectiveChance);
+assert.equal(clueThorn.awareness, 'concealed');
+assert.equal(Game.hazards.navigationCost(clueThorn.x, clueThorn.y, 'balanced'), 0);
+Game.state.settings.expeditionStrategy = 'safe';
+advanceHazards(1);
+const safeDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+assert.equal(safeDetection.roll, balancedDetection.roll, 'strategy changes never reroll a Hazard');
+assert.equal(safeDetection.strategyMultiplier, 1.6);
+assert.ok(safeDetection.roll < safeDetection.effectiveChance);
 assert.equal(clueThorn.awareness, 'revealed');
 assert.ok(Game.hazards.events().some((event) => event.type === 'hazard:revealed'));
+const proximityReveal = Game.hazards.events().find((event) =>
+  event.type === 'hazard:revealed' && event.instanceId === clueThorn.id);
+assert.equal(proximityReveal.reason, 'proximity');
+assert.equal(proximityReveal.detection.roll, balancedDetection.roll);
+assert.equal(proximityReveal.detection.expeditionVision, 1);
+assert.deepEqual(Array.from(proximityReveal.detection.sources), []);
 assert.equal(Game.hazards.snapshot()[0].clueVisible, true);
+Game.state.settings.expeditionStrategy = 'balanced';
+
+// Environment sources compose in stable ID order, accept zero, can be removed,
+// and isolate invalid or throwing providers without interrupting the fixed tick.
+assert.equal(Game.hazards.resetInstance(clueThorn.id), true);
+Game.expedition = { currentModifier: () => ({ vision: 0.5 }) };
+let fogDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+assert.equal(fogDetection.expeditionVision, 0.5);
+assert.equal(fogDetection.effectiveChance, 0.125);
+Game.expedition.currentModifier = () => ({ vision: 2 });
+const insightDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+assert.equal(insightDetection.expeditionVision, 2);
+assert.equal(insightDetection.effectiveChance, 0.5);
+delete Game.expedition;
+assert.equal(Game.hazards.registerDetectionModifierSource('weather:z', () => 0.5), true);
+let providerContextSeen = null;
+assert.equal(Game.hazards.registerDetectionModifierSource('weather:a', (context) => {
+  providerContextSeen = context;
+  return 2;
+}), true);
+let composedDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+assert.deepEqual(Array.from(composedDetection.sources, (source) => source.id),
+  ['weather:a', 'weather:z']);
+assert.equal(composedDetection.environmentMultiplier, 1);
+assert.equal(providerContextSeen.instanceId, clueThorn.id);
+assert.equal(providerContextSeen.region.id, 'grassland');
+assert.equal(providerContextSeen.actor, hero);
+assert.equal(providerContextSeen.strategy, 'balanced');
+assert.ok(Number.isFinite(providerContextSeen.worldTick));
+assert.ok(Number.isFinite(providerContextSeen.worldTime));
+assert.equal(Game.hazards.registerDetectionModifierSource('weather:blackout', () => 0), true);
+assert.equal(Game.hazards.detectionContext(clueThorn.id, hero.id).effectiveChance, 0);
+assert.equal(Game.hazards.unregisterDetectionModifierSource('weather:blackout'), true);
+const originalWarn = sandbox.console.warn;
+let providerWarnings = 0;
+sandbox.console.warn = () => { providerWarnings++; };
+Game.hazards.registerDetectionModifierSource('weather:invalid', () => 5);
+Game.hazards.registerDetectionModifierSource('weather:throwing', () => { throw new Error('fixture'); });
+composedDetection = Game.hazards.detectionContext(clueThorn.id, hero.id);
+Game.hazards.detectionContext(clueThorn.id, hero.id);
+sandbox.console.warn = originalWarn;
+assert.equal(providerWarnings, 2, 'each broken source warns at most once');
+assert.equal(composedDetection.environmentMultiplier, 1);
+['weather:a', 'weather:z', 'weather:invalid', 'weather:throwing'].forEach((sourceId) => {
+  assert.equal(Game.hazards.unregisterDetectionModifierSource(sourceId), true);
+});
+assert.equal(Game.hazards.unregisterDetectionModifierSource('weather:missing'), false);
+
+// A party uses the highest legal Actor-specific chance and reports that detector.
+const scout = spawnHero('hazard:scout', hero.x, hero.y);
+world.entities.push(scout);
+Game.hazards.registerDetectionModifierSource('party:scout', (context) =>
+  context.actorId === scout.id ? 2 : 1);
+advanceHazards(1);
+const partyReveal = Game.hazards.events().filter((event) =>
+  event.type === 'hazard:revealed' && event.instanceId === clueThorn.id).at(-1);
+assert.equal(partyReveal.detection.actorId, scout.id);
+assert.equal(Game.hazards.unregisterDetectionModifierSource('party:scout'), true);
+world.entities = world.entities.filter((actor) => actor.id !== scout.id);
+assert.equal(Game.hazards.resetInstance(clueThorn.id), true);
+assert.equal(Game.hazards.forceReveal(clueThorn.id, 'qa'), true);
+assert.equal(clueThorn.awareness, 'revealed');
 
 // A single 120px movement segment still crosses the trap and produces a warning.
 hero.x = hero.components.transform.x = 240;

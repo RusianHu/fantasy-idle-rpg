@@ -3405,11 +3405,150 @@ async function run() {
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 4, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 5, 'technical demo hub exposes every current workbench');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);
     assert.equal(demoHub.noHorizontalOverflow, true);
+
+    await cdp.navigate(BASE + 'tech-demos/weather-climate/weather-climate.html?seed=1234ABCD&region=forest&time=300&particle=snow&lang=en');
+    const weatherDemo = await cdp.evaluate(`(() => {
+      document.querySelector('[data-speed="0"]')?.click();
+      const saveBefore = {
+        main: localStorage.getItem('firpg_save'),
+        backup: localStorage.getItem('firpg_save_backup')
+      };
+      const stage = document.getElementById('stage');
+      const stagePixels = stage.getContext('2d').getImageData(0, 0, stage.width, stage.height).data;
+      let stageVisible = 0;
+      const colors = new Set();
+      for (let i = 0; i < stagePixels.length; i += Math.max(4, Math.floor(stagePixels.length / 2000 / 4) * 4)) {
+        if (stagePixels[i + 3]) stageVisible++;
+        colors.add(stagePixels[i] + ',' + stagePixels[i + 1] + ',' + stagePixels[i + 2]);
+      }
+      const phaseVisible = Array.from(document.querySelectorAll('.phase-grid canvas')).map((canvas) => {
+        const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        let visible = 0;
+        for (let i = 3; i < pixels.length; i += 128) if (pixels[i]) visible++;
+        return visible;
+      });
+      const methods = [
+        'regions', 'particlePresets', 'snapshot', 'report',
+        'setRegion', 'setSeed', 'setWorldTime', 'setParticlePreset',
+        'setEffects', 'setCamera', 'capturePhases', 'verifyDeterminism'
+      ];
+      const snapshot = WeatherClimateLab.snapshot();
+      const report = WeatherClimateLab.report();
+      const captures = WeatherClimateLab.capturePhases();
+      const determinism = WeatherClimateLab.verifyDeterminism();
+      DemoI18n.setLocale('zh-CN', false);
+      const zhTitle = document.querySelector('h1')?.textContent;
+      DemoI18n.setLocale('en', false);
+      const enTitle = document.querySelector('h1')?.textContent;
+      const saveAfter = {
+        main: localStorage.getItem('firpg_save'),
+        backup: localStorage.getItem('firpg_save_backup')
+      };
+      const sources = Array.from(document.scripts, (node) => node.src);
+      const params = new URL(location.href).searchParams;
+      return {
+        title: enTitle,
+        zhTitle,
+        stageVisible,
+        colors: colors.size,
+        phaseVisible,
+        captures,
+        determinism,
+        snapshot,
+        futureHooks: report.futureHooks,
+        regions: WeatherClimateLab.regions(),
+        presets: WeatherClimateLab.particlePresets(),
+        apiComplete: methods.every((method) => typeof WeatherClimateLab[method] === 'function'),
+        params: {
+          seed: params.get('seed'),
+          region: params.get('region'),
+          particle: params.get('particle'),
+          lang: params.get('lang')
+        },
+        linksCarryContext: ['map-lab-link', 'hazard-lab-link'].every((id) => {
+          const target = new URL(document.getElementById(id).href);
+          return target.searchParams.get('seed') === '1234ABCD' &&
+            target.searchParams.get('region') === 'forest' &&
+            target.searchParams.get('lang') === 'en';
+        }),
+        productionModulesOnly: !sources.some((src) =>
+          /(?:world_population|systems\\/world|systems\\/(?:combat|hazards|environment|exploration|expedition|trade)|(?:core|systems)\\/save)\\.js/.test(src)),
+        saveUnchanged: JSON.stringify(saveBefore) === JSON.stringify(saveAfter),
+        controlsTouchable: Array.from(document.querySelectorAll(
+          'button, select, input:not([type="checkbox"]), a, .effects-control'))
+          .every((el) => el.getBoundingClientRect().height >= 44),
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.equal(weatherDemo.title, 'Weather / Climate Rendering Prep Lab');
+    assert.match(weatherDemo.zhTitle, /天气 \/ 气候筹备型渲染 Lab/);
+    assert.ok(weatherDemo.stageVisible > 500);
+    assert.ok(weatherDemo.colors > 8);
+    assert.equal(weatherDemo.phaseVisible.length, 4);
+    assert.ok(weatherDemo.phaseVisible.every((visible) => visible > 100));
+    assert.equal(weatherDemo.captures.length, 4);
+    assert.ok(weatherDemo.captures.every((capture) => capture.hash));
+    assert.equal(weatherDemo.determinism.sameInputsMatch, true);
+    assert.equal(weatherDemo.determinism.timeChangesCanvas, true);
+    assert.equal(weatherDemo.determinism.seedChangesLayout, true);
+    assert.equal(weatherDemo.snapshot.productionWeatherSystem, false);
+    assert.equal(weatherDemo.snapshot.noPlayer, true);
+    assert.equal(weatherDemo.snapshot.fogEnabled, false);
+    assert.equal(weatherDemo.snapshot.saveWrites, false);
+    assert.equal(weatherDemo.snapshot.regionId, 'forest');
+    assert.equal(weatherDemo.snapshot.seedHex, '1234ABCD');
+    assert.equal(weatherDemo.snapshot.atmosphere.previewMode, 'snow');
+    assert.equal(weatherDemo.snapshot.atmosphere.activeParticle, 'snow');
+    assert.ok(weatherDemo.snapshot.worldTime >= 300 && weatherDemo.snapshot.worldTime < 310);
+    assert.equal(weatherDemo.regions.length, 8);
+    assert.deepEqual(weatherDemo.presets, [
+      'meadow', 'leaves', 'dust', 'wisps',
+      'snow', 'embers', 'cloudwisp', 'miasma'
+    ]);
+    assert.equal(weatherDemo.apiComplete, true);
+    assert.deepEqual(weatherDemo.params, {
+      seed: '1234ABCD', region: 'forest', particle: 'snow', lang: 'en'
+    });
+    assert.ok(Object.values(weatherDemo.futureHooks).every((value) => value === 'unconnected'));
+    assert.equal(weatherDemo.linksCarryContext, true);
+    assert.equal(weatherDemo.productionModulesOnly, true);
+    assert.equal(weatherDemo.saveUnchanged, true);
+    assert.equal(weatherDemo.controlsTouchable, true);
+    assert.equal(weatherDemo.noHorizontalOverflow, true);
+
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 1280, height: 900, deviceScaleFactor: 1, mobile: false
+    });
+    await cdp.navigate(BASE + 'tech-demos/weather-climate/weather-climate.html?seed=1234ABCD&region=forest&time=300&particle=region&lang=en');
+    const weatherDesktop = await cdp.evaluate(`(() => {
+      document.querySelector('[data-speed="0"]')?.click();
+      const canvas = document.getElementById('stage');
+      const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+      let visible = 0;
+      for (let i = 3; i < pixels.length; i += 128) if (pixels[i]) visible++;
+      const stageRect = document.getElementById('stage-wrap').getBoundingClientRect();
+      return {
+        visible,
+        width: stageRect.width,
+        regions: document.querySelectorAll('.region-tab').length,
+        phaseCanvases: document.querySelectorAll('.phase-grid canvas').length,
+        noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
+      };
+    })()`);
+    assert.ok(weatherDesktop.visible > 500);
+    assert.ok(weatherDesktop.width > 600);
+    assert.equal(weatherDesktop.regions, 8);
+    assert.equal(weatherDesktop.phaseCanvases, 4);
+    assert.equal(weatherDesktop.noHorizontalOverflow, true);
+
+    await cdp.send('Emulation.setDeviceMetricsOverride', {
+      width: 390, height: 844, deviceScaleFactor: 1, mobile: true
+    });
 
     await cdp.navigate(BASE + 'tech-demos/hazards/hazards.html?seed=1234ABCD&region=grassland&lang=en');
     const hazardDemo = await cdp.evaluate(`(() => {
@@ -3429,6 +3568,9 @@ async function run() {
       for (let i = 3; i < routePixels.length; i += 128) if (routePixels[i]) routeVisible++;
       for (let i = 3; i < mimicPixels.length; i += 64) if (mimicPixels[i]) mimicVisible++;
       const catalog = HazardEffectsLab.catalog();
+      const detection = HazardEffectsLab.detection();
+      const visibility = HazardEffectsLab.visibility(0.5);
+      const weatherDetection = HazardEffectsLab.detection();
       const triggered = HazardEffectsLab.trigger();
       const routeReport = HazardEffectsLab.auditReport();
       const mimicReport = HazardEffectsLab.mimicReport();
@@ -3445,13 +3587,18 @@ async function run() {
         sheetVisible,
         routeVisible,
         mimicVisible,
+        detection,
+        visibility,
+        weatherDetection,
         routeSummary: routeReport.summary,
+        routeEnvironmentVisibility: routeReport.environmentVisibility,
         mimicSamples: mimicReport.entries.length,
         mimicProtection: mimicReport.entries[0].eligible === false &&
           mimicReport.entries[1].eligible === false,
         mimicGapOk: mimicIndexes.every((index, ordinal) =>
           ordinal === 0 || index - mimicIndexes[ordinal - 1] >= 3),
-        controlsTouchable: Array.from(document.querySelectorAll('button, select, a'))
+        controlsTouchable: Array.from(document.querySelectorAll(
+          'button, select, input:not([type="checkbox"]), a'))
           .every((el) => el.getBoundingClientRect().height >= 44),
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
       };
@@ -3466,9 +3613,18 @@ async function run() {
     assert.ok(hazardDemo.sheetVisible > 100);
     assert.ok(hazardDemo.routeVisible > 100);
     assert.ok(hazardDemo.mimicVisible > 100);
+    assert.equal(hazardDemo.detection.baseChance, 0.25);
+    assert.equal(hazardDemo.visibility, 0.5);
+    assert.ok(hazardDemo.weatherDetection.effectiveChance < hazardDemo.detection.effectiveChance);
+    assert.ok(hazardDemo.weatherDetection.sources.some((source) =>
+      source.id === 'lab:weather-visibility' && source.multiplier === 0.5));
     assert.equal(hazardDemo.routeSummary.activePlacements, hazardDemo.routeSummary.placements);
     assert.ok(hazardDemo.routeSummary.links > 40);
     assert.ok(hazardDemo.routeSummary.baselineCrossings > 0);
+    assert.equal(hazardDemo.routeEnvironmentVisibility, 0.5);
+    assert.ok(hazardDemo.routeSummary.detections >= 0);
+    assert.ok(hazardDemo.routeSummary.missedWarnings >= 0);
+    assert.ok(hazardDemo.routeSummary.escapes >= 0);
     assert.equal(hazardDemo.mimicSamples, 24);
     assert.equal(hazardDemo.mimicProtection, true);
     assert.equal(hazardDemo.mimicGapOk, true);
@@ -4198,7 +4354,7 @@ async function run() {
       v111Checks, v111Screenshot,
       campStateScreenshots, englishCampFit, transitionChecks, transitionScreenshots,
       endingChecks, densityChecks, desktop, desktopTransition,
-      desktopEnding, demo, mapDiagnostics, unitsBubbleDemo,
+      desktopEnding, weatherDemo, weatherDesktop, demo, mapDiagnostics, unitsBubbleDemo,
       mainScreenshot, densityScreenshots, desktopScreenshot,
       desktopEndingScreenshot, screenshot, restartBefore, restartTitle, restartClassSelect,
       unitsBubbleScreenshot,
