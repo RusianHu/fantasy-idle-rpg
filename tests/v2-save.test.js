@@ -333,6 +333,37 @@ assert.equal(
   'an incomplete or role-forged eight-slot event is discarded atomically'
 );
 
+const forgedAvailableSave = JSON.parse(JSON.stringify(merchantSave));
+forgedAvailableSave.world.merchants.regions.grassland.activeEvent.state = 'available';
+const forgedAvailableBoot = boot(forgedAvailableSave);
+forgedAvailableBoot.Game.save.applyLoaded(forgedAvailableSave);
+assert.equal(
+  forgedAvailableBoot.Game.state.world.merchants.regions.grassland.activeEvent,
+  null,
+  'an available event carrying offense state is discarded atomically'
+);
+assert.equal(forgedAvailableBoot.Game.state.world.merchants.guild.debtGold, 432,
+  'discarding a forged active event preserves the guild ledger');
+
+const forgedSurrenderSave = JSON.parse(JSON.stringify(merchantSave));
+forgedSurrenderSave.world.merchants.regions.grassland.activeEvent.offenseApplied = false;
+forgedSurrenderSave.world.merchants.regions.grassland.activeEvent.offenseBaseDebt = 0;
+const forgedSurrenderBoot = boot(forgedSurrenderSave);
+forgedSurrenderBoot.Game.save.applyLoaded(forgedSurrenderSave);
+assert.equal(
+  forgedSurrenderBoot.Game.state.world.merchants.regions.grassland.activeEvent,
+  null,
+  'a surrendered event without a matching offense is discarded atomically'
+);
+
+const debtlessRefusalSave = JSON.parse(JSON.stringify(serialized));
+debtlessRefusalSave.world.merchants.guild.trust = 10;
+debtlessRefusalSave.world.merchants.guild.debtGold = 0;
+const debtlessRefusalBoot = boot(debtlessRefusalSave);
+debtlessRefusalBoot.Game.save.applyLoaded(debtlessRefusalSave);
+assert.equal(debtlessRefusalBoot.Game.state.world.merchants.guild.trust, 20,
+  'a debt-free save cannot remain permanently below the minimum trade standing');
+
 const hazardSave = JSON.parse(JSON.stringify(serialized));
 hazardSave.world.worldTime = 300;
 hazardSave.world.hazards = {

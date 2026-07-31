@@ -539,10 +539,10 @@
         chips += '<div class="buff-chip merchant-chip" aria-label="' +
           U.esc(t('merchant.ui.hudAria', {
             direction: merchantDirection ? t('direction.' + merchantDirection) : '',
-            time: Game.i18n.fmtTime(Math.ceil(merchantEvent.remainingSeconds))
+            time: Game.i18n.fmtDur(Math.ceil(merchantEvent.remainingSeconds))
           })) + '"><span class="merchant-chip-mark" aria-hidden="true"></span>' +
           U.esc(t('merchant.ui.hudChip', {
-            time: Game.i18n.fmtTime(Math.ceil(merchantEvent.remainingSeconds))
+            time: Game.i18n.fmtDur(Math.ceil(merchantEvent.remainingSeconds))
           })) + '</div>';
       }
       if (hero && hero.shield > 0) {

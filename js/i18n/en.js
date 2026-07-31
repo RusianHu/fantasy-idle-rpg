@@ -469,6 +469,8 @@
         haggleUnavailable: 'The shelves cannot be repacked again this visit.',
         tradeRefused: 'The Guild Refuses Trade',
         restitutionDesc: 'Pay the full {debt} restitution to restore the minimum trade standing.',
+        restitutionOutstanding: 'Guild Restitution Outstanding',
+        restitutionOptionalDesc: '{debt} restitution remains due. You may settle it now or continue trading at your current standing.',
         payRestitution: 'Pay {debt}',
         restitutionPaid: 'Restitution paid. Limited trade has resumed.',
         surrenderTitle: 'The Merchant Lowers Their Weapon',
@@ -476,7 +478,7 @@
         spare: 'Sheathe Your Weapon',
         spared: 'You chose restraint. Restitution due: {debt}',
         robOffer: 'Steal “{name}” · Add {debt} restitution',
-        robConfirm: 'Stealing “{name}” costs more trust and adds twice its displayed price to restitution. Continue?',
+        robConfirm: 'Stealing “{name}” costs more trust and adds twice its base price to restitution. Continue?',
         robbed: 'The theft was entered in the guild ledger. Restitution due: {debt}'
       }
     },
@@ -619,7 +621,8 @@
         idle: 'Surveying', survival: 'Returning safely', combat: 'In combat',
         'player-order': 'Following order', loot: 'Recovering loot', frontier: 'Exploring frontier',
         discovery: 'Investigating', gather: 'Gathering', guardian: 'Hunting guardian',
-        boss: 'Heading to lair', circuit: 'Gathering circuit', camp: 'Returning to camp'
+        boss: 'Heading to lair', circuit: 'Gathering circuit', camp: 'Returning to camp',
+        interaction: 'Focused interaction'
       },
       searchClues: 'Search Clues', viewReadiness: 'View Readiness', goLair: 'Go to Lair', challengeBoss: 'Challenge Boss',
       curioTitle: 'Expedition Curio Found', curioUnknown: 'Nameless Curio',

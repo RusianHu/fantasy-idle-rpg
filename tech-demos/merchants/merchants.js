@@ -3,6 +3,8 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var logs = [];
+  var retreatSequence = 0;
+  var auditEvidence = {};
   var regionIds = [
     'grassland', 'forest', 'mine', 'graveyard',
     'snowpass', 'lavacave', 'skyruins', 'darkcastle'
@@ -118,6 +120,7 @@
       return;
     }
     $('seed').setCustomValidity('');
+    auditEvidence = {};
     var existing = active();
     if (existing) Game.merchants.finishEvent('demo-reset');
     Game.population.reset($('region').value);
@@ -177,7 +180,10 @@
         '<canvas width="38" height="38"></canvas>' +
         '<div><div class="role">' + tr('role.' + offer.role) + '</div>' +
         '<h3>' + offerName(offer) + '</h3><p>' +
-        (hidden ? tr('cabinetHidden') : offerDetails(offer)) + '</p></div>' +
+        (hidden ? tr('cabinetHidden') : offerDetails(offer) +
+          (offer.eligibleRobbery ? '<br>' + tr('robberyDebt', {
+            debt: fmt(Game.merchants.robberyDebtFor(offer))
+          }) : '')) + '</p></div>' +
         '<div class="price">' + fmt(offer.price) + ' G<br>' +
         tr('stockLeft', { n: offer.quantity }) + '</div>';
       var button = document.createElement('button');
@@ -217,6 +223,66 @@
     $('restitution').disabled = !(data.debtGold > 0) ||
       Game.state.player.gold < data.debtGold;
   }
+  function recordCooldownEvidence() {
+    var state = Game.merchants.regionState(Game.state.world.region);
+    var constants = Game.merchants.constants;
+    var offenses = Game.merchants.guild().offenses;
+    var expected = constants.recurringCooldown + Math.min(
+      constants.maxOffenseCooldownSteps,
+      Math.max(1, offenses)
+    ) * constants.offenseCooldownStep;
+    var actual = Math.round(state.cooldownUntil - Game.state.world.worldTime);
+    auditEvidence.cooldownBounded = actual === expected &&
+      actual <= constants.recurringCooldown +
+        constants.maxOffenseCooldownSteps * constants.offenseCooldownStep;
+    auditEvidence.cooldownSeconds = actual;
+  }
+  function safetyChecks() {
+    var event = active();
+    var guild = Game.merchants.guild();
+    var robberyOffer = event && event.offers.filter(function (offer) {
+      return offer.quantity > 0 && offer.eligibleRobbery;
+    })[0];
+    if (robberyOffer) {
+      auditEvidence.robberyDebtStable = Game.merchants.robberyDebtFor(robberyOffer) ===
+        Math.max(2, Math.round(robberyOffer.basePrice) * 2);
+    }
+    var stableDebt = auditEvidence.robberyDebtStable;
+    var expectedDisabled = !(guild.debtGold > 0) ||
+      Game.state.player.gold < guild.debtGold;
+    return {
+      robberyDebtStable: {
+        pass: stableDebt === undefined ? null : !!stableDebt,
+        detail: robberyOffer ? Game.merchants.robberyDebtFor(robberyOffer) : null
+      },
+      robberyChoiceStrict: { pass: auditEvidence.robberyChoiceStrict === undefined
+        ? null : !!auditEvidence.robberyChoiceStrict },
+      restitutionAvailable: {
+        pass: $('restitution').disabled === expectedDisabled,
+        detail: guild.debtGold
+      },
+      cooldownBounded: {
+        pass: auditEvidence.cooldownBounded === undefined
+          ? null : !!auditEvidence.cooldownBounded,
+        detail: auditEvidence.cooldownSeconds || null
+      },
+      surrenderRecoverable: { pass: auditEvidence.surrenderRecoverable === undefined
+        ? null : !!auditEvidence.surrenderRecoverable },
+      retreatTerminates: { pass: auditEvidence.retreatTerminates === undefined
+        ? null : !!auditEvidence.retreatTerminates }
+    };
+  }
+  function renderSafetyAudit() {
+    var checks = safetyChecks();
+    $('safety-audit').innerHTML = Object.keys(checks).map(function (key) {
+      var check = checks[key];
+      var state = check.pass === null ? 'pending' : (check.pass ? 'pass' : 'fail');
+      return '<li class="' + state + '"><span>' + tr('audit.' + key) + '</span>' +
+        '<strong>' + tr('audit.' + state) +
+        (check.detail === null || check.detail === undefined ? '' : ' · ' + check.detail) +
+        '</strong></li>';
+    }).join('');
+  }
   function renderReport() {
     var snapshot = Game.merchants.inspect();
     var event = active();
@@ -236,7 +302,8 @@
             offer.role !== 'signature' && offer.role !== 'rare';
         }) : true,
         normalRewardsDisabled: true,
-        offlineDiscoveryDisabled: true
+        offlineDiscoveryDisabled: true,
+        defeatSafety: safetyChecks()
       },
       economy: {
         gold: Game.state.player.gold,
@@ -255,12 +322,14 @@
     renderHero(event);
     renderStock(event);
     renderLedger();
+    renderSafetyAudit();
     renderReport();
     $('haggle').disabled = !event || event.state !== 'available' ||
       event.haggled || event.purchasedAny ||
       Game.state.player.gold < Game.merchants.haggleFee() ||
       Game.merchants.trustBand() === 'refused';
     $('attack').disabled = !event || event.state !== 'available';
+    $('retreat').disabled = !event || event.state !== 'assault';
     $('surrender').disabled = !event || event.state !== 'assault';
     $('spare').disabled = !event || event.state !== 'surrendered';
     $('rob').disabled = !event || event.state !== 'surrendered';
@@ -286,13 +355,55 @@
       addLog('merchant:assaultStarted', result);
       render();
     });
+    $('retreat').addEventListener('click', function () {
+      var event = active();
+      if (!event || event.state !== 'assault') return;
+      var debtBefore = Game.merchants.guild().debtGold;
+      var actorId = Game.merchants.runtime().actorId;
+      var encounter = Game.encounters.start(
+        'encounter.merchant-assault.' + Game.state.world.region,
+        {
+          id: 'merchant-demo-retreat:' + (++retreatSequence),
+          seed: event.seed,
+          fullLog: true
+        }
+      );
+      var result = Game.encounters.end(encounter.id, 'retreat', {
+        reason: 'retreat', rewardAuthorizedActorIds: []
+      });
+      auditEvidence.retreatTerminates = !active() &&
+        !Game.actors.get(actorId) && Game.merchants.guild().debtGold === debtBefore &&
+        result && result.reason === 'retreat';
+      recordCooldownEvidence();
+      addLog('merchant:retreatAudit', {
+        ok: auditEvidence.retreatTerminates,
+        encounterId: encounter.id,
+        debtPreserved: Game.merchants.guild().debtGold === debtBefore
+      });
+      render();
+    });
     $('surrender').addEventListener('click', function () {
       var result = Game.merchants.debugForceSurrender();
+      var recovered = 0;
+      var onRecovered = function (payload) {
+        if (payload && payload.eventId === result.eventId) recovered++;
+      };
+      if (result.ok) {
+        Game.ui = Game.ui || {};
+        Game.ui.modals = Game.ui.modals || {};
+        Game.bus.on('merchant:surrendered', onRecovered);
+        Game.merchants.resetSurrenderPrompt(result.eventId);
+        Game.merchants.update(0);
+        Game.bus.off('merchant:surrendered', onRecovered);
+        auditEvidence.surrenderRecoverable = recovered === 1 &&
+          Game.merchants.runtime().surrenderPromptedEventId === result.eventId;
+      }
       addLog('merchant:surrendered', result);
       render();
     });
     $('spare').addEventListener('click', function () {
       var result = Game.merchants.resolveSurrender('spare');
+      if (result.ok) recordCooldownEvidence();
       addLog('merchant:spared', result);
       render();
     });
@@ -301,7 +412,13 @@
       var eligible = event && event.offers.filter(function (offer) {
         return offer.quantity > 0 && offer.eligibleRobbery;
       })[0];
+      var strict = Game.merchants.resolveSurrender('rob', 'merchant-demo:forged-offer');
+      var expectedDebt = Game.merchants.robberyDebtFor(eligible);
       var result = Game.merchants.resolveSurrender('rob', eligible && eligible.id);
+      auditEvidence.robberyChoiceStrict = strict.reason === 'offer';
+      auditEvidence.robberyDebtStable = result.ok && result.debtAdded === expectedDebt &&
+        expectedDebt === Math.max(2, Math.round(eligible.basePrice) * 2);
+      if (result.ok) recordCooldownEvidence();
       addLog('merchant:robbed', result);
       render();
     });

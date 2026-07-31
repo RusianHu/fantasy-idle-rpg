@@ -659,6 +659,24 @@
         profile, point, layout, reservations || activePlan && activePlan.reservations || []
       )));
     },
+    inspectPlacements: function (profileId, points, layout, reservations) {
+      var profile = Game.content.get('worldSpawnProfile', profileId);
+      if (!profile) return C.deepFreeze({
+        ok: false, profileId: profileId, reason: 'missing-profile', inspections: []
+      });
+      if (!layout) return C.deepFreeze({
+        ok: false, profileId: profileId, reason: 'missing-layout', inspections: []
+      });
+      var occupied = reservations || activePlan && activePlan.reservations || [];
+      var inspections = (points || []).map(function (point) {
+        return inspectPlacement(profile, point, layout, occupied);
+      });
+      return C.deepFreeze(C.clone({
+        ok: true,
+        profileId: profileId,
+        inspections: inspections
+      }));
+    },
     inspectCandidates: function (profileId, layout, channel, context, reservations) {
       var profile = Game.content.get('worldSpawnProfile', profileId);
       if (!profile || !layout) return C.deepFreeze({

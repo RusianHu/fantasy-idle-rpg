@@ -435,6 +435,7 @@
       },
       regions: {}
     };
+    if (out.guild.trust < 20 && out.guild.debtGold === 0) out.guild.trust = 20;
     (Array.isArray(guild.metProfileIds) ? guild.metProfileIds : []).forEach(function (id) {
       if (Game.content && Game.content.has('merchantProfile', id) &&
           out.guild.metProfileIds.indexOf(id) < 0) out.guild.metProfileIds.push(id);
@@ -470,7 +471,7 @@
             if (normalizedOffer) offers.push(normalizedOffer);
           });
           if (offers.length === 8 && event.offers.length === 8) {
-            normalizedRegion.activeEvent = {
+            var normalizedEvent = {
               id: event.id.slice(0, 160),
               merchantProfileId: event.merchantProfileId,
               seed: Number(event.seed) >>> 0,
@@ -490,6 +491,13 @@
               ),
               offers: offers
             };
+            var availableValid = normalizedEvent.state === 'available' &&
+              !normalizedEvent.offenseApplied && normalizedEvent.offenseBaseDebt === 0 &&
+              normalizedEvent.remainingSeconds > 0;
+            var offenseValid = /^(assault|surrendered)$/.test(normalizedEvent.state) &&
+              normalizedEvent.offenseApplied && normalizedEvent.offenseBaseDebt > 0 &&
+              out.guild.offenses > 0 && out.guild.debtGold >= normalizedEvent.offenseBaseDebt;
+            if (availableValid || offenseValid) normalizedRegion.activeEvent = normalizedEvent;
           }
         }
       }

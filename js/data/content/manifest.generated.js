@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "9f018691fc178cf980a5413fc3854339fc44909f5eb26f7843e94a1b581fecb8",
+  "sourceSetHash": "3f89e5fc4db86a8304666bfc7bbb89c70283dc54a3d8e7b493c03f394ad0dbd7",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -108,7 +108,7 @@
     {
       "path": "js/data/packs/world/merchants.pack.js",
       "kind": "pack",
-      "sha256": "33e096ce8e7d40c3291c9bf4a08cd2f18c0ac938ccdb763cc0caf2614ac7f7d8"
+      "sha256": "0ff57ab8ee437aa8855317472155e4df0366447e1ae8970533bae76db845f0c1"
     }
   ],
   "supports": [
@@ -252,6 +252,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "c2e87e9a"
+  "contentFingerprint": "444aede6"
 });
 })();

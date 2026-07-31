@@ -13,6 +13,22 @@
   var opened = false;
   var openedAreaId = null;
   var selectedSection = null;
+  var PAUSE_LEASE_ID = 'ui:trade';
+
+  function releasePause(reason) {
+    if (Game.interactions && Game.interactions.releasePause) {
+      Game.interactions.releasePause(PAUSE_LEASE_ID, reason || 'trade-inactive');
+    }
+  }
+
+  function pauseEligibility(context) {
+    if (!opened) return 'closed';
+    if (!UI.tabs || UI.tabs.current() !== 'trade') return 'tab-changed';
+    if (typeof document !== 'undefined' && document.hidden) return 'page-hidden';
+    if (!context || !context.available) return context && context.reason || 'unavailable';
+    if (openedAreaId && context.areaId !== openedAreaId) return 'area-changed';
+    return null;
+  }
 
   function areaName(area) {
     return area && area.nameKey
@@ -150,15 +166,17 @@
       '<strong class="merchant-trust band-' + band + '">' + Math.round(guild.trust) +
       ' · ' + t('merchant.ui.band.' + band) + '</strong></div>' +
       '<div class="merchant-ledger-row"><span>' + t('merchant.ui.departure') + '</span>' +
-      '<strong>' + Game.i18n.fmtTime(Math.ceil(event.remainingSeconds)) + '</strong></div>' +
+      '<strong>' + Game.i18n.fmtDur(Math.ceil(event.remainingSeconds)) + '</strong></div>' +
       '<div class="merchant-ledger-row"><span>' + t('merchant.ui.debt') + '</span>' +
       '<strong>' + fmt(guild.debtGold) + '</strong></div>');
     root.appendChild(status);
 
-    if (band === 'refused') {
+    if (guild.debtGold > 0) {
       var restitution = U.el('div', 'card merchant-restitution',
-        '<div class="name">' + t('merchant.ui.tradeRefused') + '</div>' +
-        '<div class="desc">' + t('merchant.ui.restitutionDesc', {
+        '<div class="name">' + t(band === 'refused'
+          ? 'merchant.ui.tradeRefused' : 'merchant.ui.restitutionOutstanding') + '</div>' +
+        '<div class="desc">' + t(band === 'refused'
+          ? 'merchant.ui.restitutionDesc' : 'merchant.ui.restitutionOptionalDesc', {
           debt: fmt(guild.debtGold)
         }) + '</div>');
       var pay = U.el('button', 'btn gold', t('merchant.ui.payRestitution', {
@@ -176,8 +194,8 @@
       });
       restitution.appendChild(pay);
       root.appendChild(restitution);
-      return;
     }
+    if (band === 'refused') return;
 
     var fee = Game.merchants.haggleFee();
     var haggle = U.el('div', 'merchant-haggle',
@@ -262,7 +280,30 @@
   var TradeUI = UI.trade = {
     init: function () {},
 
-    isOpen: function () { return opened; },
+    isOpen: function () {
+      return opened && UI.tabs && UI.tabs.current() === 'trade';
+    },
+
+    maintainPause: function (context) {
+      var reason = pauseEligibility(context || Game.trade.current());
+      if (reason) {
+        releasePause(reason);
+        return false;
+      }
+      if (!Game.interactions || !Game.interactions.acquirePause) return false;
+      Game.interactions.acquirePause(PAUSE_LEASE_ID, {
+        kind: 'trade-browsing',
+        scopes: ['autoExplore'],
+        context: {
+          areaId: context.areaId,
+          regionId: context.regionId,
+          providerType: context.providerType || null,
+          providerId: context.providerId || null,
+          eventId: context.eventId || null
+        }
+      });
+      return true;
+    },
 
     open: function (areaId) {
       var context = Game.trade.current();
@@ -271,10 +312,18 @@
       opened = true;
       openedAreaId = areaId;
       selectedSection = null;
-      return UI.tabs.open('trade', true);
+      if (!UI.tabs.open('trade', true)) {
+        opened = false;
+        openedAreaId = null;
+        releasePause('open-failed');
+        return false;
+      }
+      TradeUI.maintainPause(context);
+      return true;
     },
 
-    close: function () {
+    close: function (reason) {
+      releasePause(reason || 'closed');
       if (!opened) return false;
       opened = false;
       openedAreaId = null;

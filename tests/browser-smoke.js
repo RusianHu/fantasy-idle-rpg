@@ -2175,6 +2175,25 @@ async function run() {
       Game.ui.trade.open(area.id);
       const unifiedTradeOpen = Game.ui.tabs.current() === 'trade' &&
         !!document.querySelector('.trade-panel-head');
+      const pauseOrigin = { x: hero.x, y: hero.y };
+      hero.moveOrder = {
+        x: area.x + Math.min(24, area.radius * 0.5),
+        y: area.y,
+        id: 'smoke:auto-trade-drift',
+        ai: true
+      };
+      W.updateHero(hero, 0.25);
+      const tradePauseActive = Game.interactions.isPaused('autoExplore');
+      const tradeAutoMovePaused = Math.hypot(
+        hero.x - pauseOrigin.x,
+        hero.y - pauseOrigin.y
+      ) < 0.01 && !hero.moveOrder &&
+        Game.expeditionAI.intent().id === 'interaction';
+      Game.ui.tabs.open('inv');
+      Game.trade.update();
+      const tradePauseReleasedOnTab = !Game.interactions.isPaused('autoExplore') &&
+        !Game.ui.trade.isOpen();
+      Game.ui.trade.open(area.id);
       const exchangeTab = [...document.querySelectorAll('.trade-section-tabs .subtab')]
         .find((el) => el.textContent.trim() === Game.i18n.t('shopSec.exchange'));
       exchangeTab?.click();
@@ -2189,6 +2208,10 @@ async function run() {
       Game.ui.tabs.rerender();
       const tradeUnlockedOnReturn = !document.querySelector('.trade-lock-banner');
       Game.ui.trade.close();
+      const tradePauseReleasedOnClose = !Game.interactions.isPaused('autoExplore');
+      const merchantDialoguePauseContract = /ui:merchant-dialogue/.test(
+        Game.ui.modals.merchantDialogue.toString()
+      ) && typeof Game.ui.modals.updateInteractionPauses === 'function';
 
       // Material exchange domain engine path.
       Game.state.inv.materials.herb = Math.max(3, Game.inv.materialCount('herb'));
@@ -2264,7 +2287,10 @@ async function run() {
         proximityPicked, clickPickupOrdered, clickPicked, switchReclaimed,
         gatherCompleted, gatherInterrupted, chestOpened,
         tradeApproachOrdered, tradeHudVisible, unifiedTradeOpen,
+        tradePauseActive, tradeAutoMovePaused, tradePauseReleasedOnTab,
         exchangeOffersVisible, tradeLockedOnLeave, tradeUnlockedOnReturn,
+        tradePauseReleasedOnClose,
+        merchantDialoguePauseContract,
         exchangeOk: exchangeResult.ok, exchangeBlockedOutside,
         potionCardCount: potionCards.length, potionCardsTouchable, cooldownShared,
         autoCampStarted, autoCampResumed, autoCampSuppressed,
@@ -2282,9 +2308,14 @@ async function run() {
     assert.equal(v111Checks.tradeApproachOrdered, true);
     assert.equal(v111Checks.tradeHudVisible, true);
     assert.equal(v111Checks.unifiedTradeOpen, true);
+    assert.equal(v111Checks.tradePauseActive, true);
+    assert.equal(v111Checks.tradeAutoMovePaused, true);
+    assert.equal(v111Checks.tradePauseReleasedOnTab, true);
     assert.equal(v111Checks.exchangeOffersVisible, true);
     assert.equal(v111Checks.tradeLockedOnLeave, true);
     assert.equal(v111Checks.tradeUnlockedOnReturn, true);
+    assert.equal(v111Checks.tradePauseReleasedOnClose, true);
+    assert.equal(v111Checks.merchantDialoguePauseContract, true);
     assert.equal(v111Checks.exchangeOk, true);
     assert.equal(v111Checks.exchangeBlockedOutside, true);
     assert.equal(v111Checks.potionCardCount, 2);

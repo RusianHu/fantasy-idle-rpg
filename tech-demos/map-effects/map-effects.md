@@ -8,6 +8,7 @@
 - 无玩家、无迷雾、无存档读写；不创建战斗、运行时 Hazard、探索 AI、宝箱或交易状态。
 - 全图小地图支持点击和拖动镜头、视口框同步、地点/Actor/错误标记与对象聚焦。
 - 检查、正式导航测距、SpawnProfile 放置探针、放置审计、确定性复验及固定 50ms 的 Seeded 巡游预览。
+- 移动行商审计直接调用生产 `Game.merchants.inspectPlacement` 与 Population 批量预留检查；页面提供可移动的模拟玩家 QA 点、真实篷车装饰与行商 Actor，并叠加 32px 巡游圆、58px 固定交易圆及玩家到篷车连线。
 - 生产装饰生态报告：适宜度场、簇群中心、形状包络、方向轴、簇内关系、配额完成率、平均最近邻、同类富集与大尺度留白。
 - 目录选择任一地表装饰后，“装饰适宜度场 / 簇群与形状 / 簇内关系”诊断层会切换到该稳定 ID；普通检查探针同时报告该点的适宜度分数。
 
@@ -22,6 +23,6 @@
 
 ## QA 接口
 
-`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`verifyDeterminism`、`decorationReport` 和 `resetPositions`。确定性复验同时比较宏观地形、完整装饰生态、Population 计划与 Actor 坐标。
+`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`merchantAudit`、`verifyDeterminism`、`decorationReport` 和 `resetPositions`。`merchantAudit(point)` 可读取当前报告或以世界坐标重设 QA 点；确定性复验同时比较宏观地形、完整装饰生态、Population 计划、行商放置与 Actor 坐标。
 
 长途导航、拓扑可视化和多 Seed 批量审计仍由 `tech-demos/exploration-v3` 独立负责。

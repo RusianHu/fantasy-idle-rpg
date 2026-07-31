@@ -8,6 +8,40 @@
 
   var root = null;
   var deferredToasts = [];
+  var activePauseModals = [];
+
+  function removePauseModal(handle) {
+    var index = activePauseModals.indexOf(handle);
+    if (index >= 0) activePauseModals.splice(index, 1);
+  }
+
+  function maintainPauseModal(handle) {
+    if (!handle || handle.closed) return false;
+    if (!handle.mask || !handle.mask.isConnected) {
+      handle.close('disconnected');
+      return false;
+    }
+    var pause = handle.pause;
+    var valid = true;
+    if (pause.guard) {
+      try { valid = pause.guard() !== false; }
+      catch (e) { valid = false; }
+    }
+    if (!valid) {
+      handle.close('invalid');
+      return false;
+    }
+    if (!Game.interactions || !Game.interactions.acquirePause) return false;
+    var context = typeof pause.context === 'function'
+      ? pause.context() : pause.context;
+    Game.interactions.acquirePause(pause.id, {
+      kind: pause.kind || 'modal-interaction',
+      scopes: pause.scopes || ['autoExplore'],
+      ttl: pause.ttl,
+      context: context || null
+    });
+    return true;
+  }
 
   Game.ui = Game.ui || {};
   var M = Game.ui.modals = {
@@ -105,15 +139,45 @@
       box.appendChild(contentEl);
       mask.appendChild(box);
       root.appendChild(mask);
+      var closed = false;
+      var pauseHandle = null;
       var api = {
-        close: function () { if (mask.parentNode) mask.parentNode.removeChild(mask); }
+        close: function (reason) {
+          if (closed) return false;
+          closed = true;
+          if (pauseHandle) {
+            pauseHandle.closed = true;
+            removePauseModal(pauseHandle);
+            if (Game.interactions && Game.interactions.releasePause) {
+              Game.interactions.releasePause(pauseHandle.pause.id, reason || 'modal-closed');
+            }
+          }
+          if (mask.parentNode) mask.parentNode.removeChild(mask);
+          if (opts.onClose) opts.onClose(reason || 'modal-closed');
+          return true;
+        }
       };
+      if (opts.pause && typeof opts.pause.id === 'string' && opts.pause.id) {
+        pauseHandle = {
+          mask: mask,
+          pause: opts.pause,
+          close: api.close,
+          closed: false
+        };
+        activePauseModals.push(pauseHandle);
+        maintainPauseModal(pauseHandle);
+      }
       if (opts.dismissable !== false) {
         mask.addEventListener('click', function (e) {
           if (e.target === mask) api.close();
         });
       }
       return api;
+    },
+
+    updateInteractionPauses: function () {
+      activePauseModals.slice().forEach(maintainPauseModal);
+      return activePauseModals.length;
     },
 
     confirm: function (msg, onOk, onCancel) {
@@ -233,7 +297,34 @@
         });
       }
       c.appendChild(actions);
-      var api = M.show(c);
+      var api = M.show(c, {
+        pause: {
+          id: 'ui:merchant-dialogue',
+          kind: 'merchant-dialogue',
+          scopes: ['autoExplore'],
+          context: function () {
+            var active = Game.merchants && Game.merchants.activeEvent();
+            return {
+              actorId: actor && actor.id || null,
+              eventId: active && active.id || null,
+              merchantProfileId: dialogue.profileId,
+              regionId: Game.state && Game.state.world && Game.state.world.region || null
+            };
+          },
+          guard: function () {
+            var active = Game.merchants && Game.merchants.activeEvent();
+            var hero = Game.world && Game.world.hero;
+            var liveActor = actor && Game.actors && Game.actors.get
+              ? Game.actors.get(actor.id) : actor;
+            return !!(active && active.state === 'available' && actor && liveActor &&
+              !actor.dead && actor.merchantEventId === active.id &&
+              active.merchantProfileId === dialogue.profileId && hero &&
+              !hero.encounterId && hero.state !== 'dead' && hero.state !== 'recover' &&
+              !(Game.transitions && Game.transitions.isActive()) &&
+              !(Game.ending && Game.ending.isActive && Game.ending.isActive()));
+          }
+        }
+      });
       closeButton.addEventListener('click', function () { api.close(); });
       return api;
     },
@@ -257,10 +348,10 @@
         var button = U.el(
           'button',
           'btn merchant-rob-choice',
-          t('merchant.ui.robOffer', {
-            name: name,
-            debt: fmt(offer.price * 2)
-          })
+            t('merchant.ui.robOffer', {
+              name: name,
+              debt: fmt(offer.robberyDebt)
+            })
         );
         button.addEventListener('click', function () {
           M.confirm(t('merchant.ui.robConfirm', { name: name }), function () {
@@ -281,7 +372,35 @@
       var spare = U.el('button', 'btn gold', t('merchant.ui.spare'));
       actions.appendChild(spare);
       c.appendChild(actions);
-      var api = M.show(c, { dismissable: false });
+      var api = M.show(c, {
+        dismissable: false,
+        pause: {
+          id: 'ui:merchant-surrender',
+          kind: 'merchant-surrender',
+          scopes: ['autoExplore'],
+          context: function () {
+            return {
+              eventId: payload.eventId,
+              merchantProfileId: payload.merchantProfileId,
+              regionId: Game.state && Game.state.world && Game.state.world.region || null
+            };
+          },
+          guard: function () {
+            var event = Game.merchants && Game.merchants.activeEvent();
+            var hero = Game.world && Game.world.hero;
+            return !!(event && event.id === payload.eventId &&
+              event.state === 'surrendered' && hero && !hero.encounterId &&
+              hero.state !== 'dead' && hero.state !== 'recover' &&
+              !(Game.transitions && Game.transitions.isActive()) &&
+              !(Game.ending && Game.ending.isActive && Game.ending.isActive()));
+          }
+        },
+        onClose: function () {
+          if (Game.merchants && Game.merchants.resetSurrenderPrompt) {
+            Game.merchants.resetSurrenderPrompt(payload.eventId);
+          }
+        }
+      });
       spare.addEventListener('click', function () {
         var result = Game.merchants.resolveSurrender('spare');
         if (result.ok) {

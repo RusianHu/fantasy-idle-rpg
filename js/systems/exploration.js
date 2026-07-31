@@ -555,6 +555,11 @@
       });
       mark(layout.curios, rsd.curios, 'curio');
       if (rsd.guardian) icon('guardian', layout.guardian);
+      var merchantEvent = Game.merchants && Game.merchants.activeEvent &&
+        Game.merchants.activeEvent();
+      if (merchantEvent && merchantEvent.state === 'available') {
+        icon('merchant', merchantEvent);
+      }
       if (opts.hero !== false && Game.world && Game.world.hero) {
         icon('hero', Game.world.hero);
       }

@@ -13,6 +13,7 @@ const script = read('tech-demos/map-effects/map-effects.js');
 const messages = read('tech-demos/demo-i18n.js');
 const population = read('js/systems/world_population.js');
 const world = read('js/systems/world.js');
+const merchants = read('js/systems/merchants.js');
 const renderer = read('js/render/renderer.js');
 const terrain = read('js/systems/terrain_v3.js');
 
@@ -112,7 +113,8 @@ for (const call of [
   'Game.terrain.decorationField(', 'Game.terrain.decorSuitability(',
   'Game.population.prepareRegion(', 'Game.population.mountChannel(',
   'Game.render.frame(', 'Game.nav.solveImmediate(',
-  'Game.population.inspectPlacement(', 'Game.population.inspectCandidates('
+  'Game.population.inspectPlacement(', 'Game.population.inspectCandidates(',
+  'Game.merchants.inspectPlacement(', 'Game.merchants.configurePatrolActor('
 ]) {
   assert.ok(script.includes(call), `Lab uses production call ${call}`);
 }
@@ -128,6 +130,7 @@ for (const excluded of [
 for (const id of [
   'stage', 'stage-overlay', 'minimap', 'seed-input', 'seed-random',
   'profile-select', 'motion-toggle', 'probe-output', 'runtime-metrics',
+  'merchant-audit-metrics', 'merchant-audit-detail', 'focus-merchant',
   'decor-ecology-metrics', 'decor-pattern-summary',
   'catalog-scope', 'catalog-list', 'issues-panel', 'log-list'
 ]) {
@@ -138,6 +141,7 @@ for (const layer of [
   'decorBoss', 'tufts', 'flowers', 'camp', 'landmarks', 'resources', 'curios',
   'ecology', 'threats', 'actors', 'hazards', 'macro', 'nav', 'distance', 'danger',
   'decorHabitat', 'decorClusters', 'decorGroups',
+  'merchantAudit',
   'chunks', 'candidates', 'reservations', 'formations', 'spawnOrigins', 'ids'
 ]) {
   assert.match(html, new RegExp(`data-layer="${layer}"`), `Lab exposes ${layer} layer`);
@@ -146,7 +150,7 @@ for (const layer of [
 for (const method of [
   'regenerate', 'randomize', 'catalog', 'snapshot', 'logs', 'focus',
   'setCamera', 'setLayer', 'setMotion', 'probe', 'measure',
-  'verifyDeterminism', 'decorationReport', 'resetPositions'
+  'verifyDeterminism', 'decorationReport', 'resetPositions', 'merchantAudit'
 ]) {
   assert.match(script, new RegExp(`${method}:`), `MapGenerationLab exposes ${method}`);
 }
@@ -178,6 +182,8 @@ assert.match(script, /fogEnabled:\s*false/);
 assert.match(script, /runtimeHazards:\s*false/);
 assert.match(script, /fixedStepMs:\s*50/);
 assert.match(script, /Game\.mapIcons\.draw/);
+assert.match(script, /item\._labChannel === 'merchant'[\s\S]+Game\.mapIcons\.draw\(minimapCtx, 'merchant'/,
+  'the generator audit minimap previews the production merchant marker');
 assert.match(script, /setPointerCapture/);
 assert.match(script, /toBlob/);
 
@@ -185,12 +191,25 @@ assert.match(population, /inspectPlacement:/,
   'Population publishes side-effect-free placement inspection');
 assert.match(population, /inspectCandidates:/,
   'Population publishes production candidate inspection');
+assert.match(population, /inspectPlacements:/,
+  'Population publishes batch placement inspection for large nav candidate sets');
 assert.match(population, /!context\.preview/,
   'determinism preview cannot replace the active mount plan');
 assert.match(world, /updateAmbientActor:/,
   'Lab patrol preview reuses the production ambient movement entrypoint');
 assert.match(world, /options\.rng/,
   'production ambient movement accepts a seeded Lab RNG');
+assert.match(world, /merchantPatrolRadius/,
+  'production ambient movement honors the merchant wagon patrol radius');
+assert.match(merchants, /sourceTotal/,
+  'merchant audit reports the production nav candidate population');
+assert.match(merchants, /state\.activeEvent = event[\s\S]+merchant:discovered/,
+  'merchant discovery commits state before broadcasting only after materialization succeeds');
+assert.match(script,
+  /function rerunMerchantAudit[\s\S]+runAudit\(\);[\s\S]+refreshGenerationReportHash\(\);/,
+  'moving the merchant QA anchor refreshes both placement issues and the aggregate report hash');
+assert.ok(html.indexOf('js/systems/merchants.js') > html.indexOf('js/systems/world.js'),
+  'Map Generation Lab loads the production merchant domain after the world runtime');
 assert.match(renderer, /terrainLayers\.material !== false/);
 assert.match(renderer, /terrainLayers\.liquid !== false/);
 assert.match(terrain, /placementOf\(def\)/,

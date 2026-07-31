@@ -11,7 +11,10 @@ const context = { window: { Game: {} } };
 vm.runInNewContext(source, context, { filename: 'minimap_icons.js' });
 
 const icons = context.window.Game.mapIcons;
-const expected = ['camp', 'landmark', 'resource', 'curio', 'ecology', 'threat', 'guardian', 'lair', 'hero'];
+const expected = [
+  'camp', 'landmark', 'resource', 'curio', 'ecology',
+  'threat', 'guardian', 'lair', 'merchant', 'hero'
+];
 assert.deepEqual(Array.from(icons.types), expected);
 
 const signatures = new Set();
@@ -39,7 +42,9 @@ const drawMapSource = explorationSource.slice(
   explorationSource.indexOf('serializeFog: function')
 );
 assert.match(drawMapSource, /Game\.mapIcons\.draw\(/);
+assert.match(drawMapSource, /icon\('merchant', merchantEvent\)/,
+  'an active merchant meeting is drawn at the fixed wagon anchor');
 assert.doesNotMatch(drawMapSource, /\.arc\s*\(/,
   'production minimap location markers must not regress to circles');
 
-console.log('Minimap icon set OK: 9 hand-pixelled location silhouettes.');
+console.log('Minimap icon set OK: 10 hand-pixelled location silhouettes including the merchant wagon.');

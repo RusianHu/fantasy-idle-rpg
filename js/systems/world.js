@@ -73,6 +73,28 @@
       return HERO_SPEED * Game.expedition.currentModifier().move;
     },
 
+    isAutoExplorePaused: function () {
+      return !!(Game.interactions && Game.interactions.isPaused &&
+        Game.interactions.isPaused('autoExplore'));
+    },
+
+    actorTapDistance: function (actor, wx, wy) {
+      if (!actor || actor.dead || actor.hazardConcealed || actor.lifecycle !== 'active') {
+        return Infinity;
+      }
+      var spriteH = Math.max(0, Number(actor.spriteH) || 0);
+      var distance = Math.min(
+        U.dist(wx, wy, actor.x, actor.y),
+        U.dist(wx, wy, actor.x, actor.y - spriteH * 0.5)
+      );
+      return distance < Math.max(12, spriteH * 0.6) ? distance : Infinity;
+    },
+
+    isAutomaticCampMotionPaused: function (hero) {
+      return !!(W.autoCampCycle && hero && W.isAutoExplorePaused() &&
+        ['warpOut', 'warpIn', 'goCamp'].indexOf(hero.state) >= 0);
+    },
+
     isHostileActor: function (source, target) {
       return !!(source && target && target.components && target.components.vitals &&
         !target.hazardConcealed &&
@@ -88,7 +110,10 @@
     },
 
     monsterPatrolRadius: function (ent) {
-      var radius = ent && ent.territory && Number(ent.territory.radius) || 64;
+      var explicit = ent && Number(ent.merchantPatrolRadius);
+      var radius = Number.isFinite(explicit) && explicit >= 0
+        ? explicit
+        : (ent && ent.territory && Number(ent.territory.radius) || 64);
       if (!ent || !(ent.packLeashRadius > 0) ||
           !Number.isFinite(ent.packAnchorX) || !Number.isFinite(ent.packAnchorY)) return radius;
       var spawnX = Number.isFinite(ent.spawnX) ? ent.spawnX : ent.x;
@@ -433,6 +458,7 @@
       opts = opts || {};
       var manual = !!opts.manual;
       if (!manual && Game.state.settings.autoBoss === false) return false;
+      if (!manual && W.isAutoExplorePaused()) return false;
       if (Game.transitions && Game.transitions.isActive()) return false;
       if (W.bossEnt || Game.state.world.mode !== 'battle') return false;
       var region = W.region;
@@ -447,6 +473,8 @@
       if (!hero || hero.state === 'dead' || hero.state === 'recover') return false;
       // 玩家主动发起时尊重其挑战意愿；自动讨伐仍等生命恢复到安全线。
       if (!manual && Game.player.hpPct() < (W.layout.version >= 3 ? 0.8 : 0.6)) return false;
+      if (Game.merchants && Game.merchants.allowBossChallenge &&
+          !Game.merchants.allowBossChallenge(region.id)) return false;
 
       if (W.layout.version >= 3) {
         var lairDistance = U.dist(hero.x, hero.y, W.layout.bossPoint.x, W.layout.bossPoint.y);
@@ -884,12 +912,30 @@
       if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance') return;
       var sw = Game.state.world;
 
-      // 交易实体（≥30px 世界命中；三个入口共用 requestApproach）。
+      // 交易实体（≥30px 世界命中）；行商篷车复用存活 Actor 的正式交谈入口。
       if (Game.trade) {
         var areas = Game.trade.areas();
         for (var ai = 0; ai < areas.length; ai++) {
           if (!areas[ai].prop || U.dist(wx, wy, areas[ai].x, areas[ai].y) > 30) continue;
-          var approach = Game.trade.requestApproach(areas[ai].id, {
+          var area = areas[ai];
+          if (area.providerType === 'merchant') {
+            var merchantActor = Game.merchants && Game.merchants.actorForEvent
+              ? Game.merchants.actorForEvent(area.eventId) : null;
+            var merchantHandlers = merchantActor && Game.interactions && Game.interactions.handlers
+              ? Game.interactions.handlers(merchantActor) : null;
+            if (merchantActor && Number.isFinite(W.actorTapDistance(merchantActor, wx, wy)) &&
+                Game.ui && Game.ui.modals && Game.ui.modals.actorActions) {
+              Game.ui.modals.actorActions(merchantActor, merchantHandlers || {});
+              return;
+            }
+            if (merchantHandlers && merchantHandlers.talk) {
+              merchantHandlers.talk(merchantActor);
+            } else if (Game.ui && Game.ui.modals) {
+              Game.ui.modals.toast(Game.i18n.t('ui.actorTargetUnavailable'), 'warn');
+            }
+            return;
+          }
+          var approach = Game.trade.requestApproach(area.id, {
             open: true,
             source: 'world'
           });
@@ -941,13 +987,9 @@
       var best = null, bestD = 1e9;
       for (var i = 0; i < W.entities.length; i++) {
         var e = W.entities[i];
-        if (!e || e === hero || e.dead || e.hazardConcealed || e.lifecycle !== 'active') continue;
-        var d = Math.min(
-          U.dist(wx, wy, e.x, e.y),
-          U.dist(wx, wy, e.x, e.y - e.spriteH * 0.5)
-        );
-        var r = Math.max(12, e.spriteH * 0.6);
-        if (d < r && d < bestD) { bestD = d; best = e; }
+        if (!e || e === hero) continue;
+        var d = W.actorTapDistance(e, wx, wy);
+        if (Number.isFinite(d) && d < bestD) { bestD = d; best = e; }
       }
       if (best) {
         if (!W.isHostileActor(hero, best)) {
@@ -1237,6 +1279,7 @@
 
     updateAutoCamp: function (hero) {
       var s = Game.state, sw = s.world;
+      if (W.isAutoExplorePaused()) return;
       if (sw.mode === 'rest') {
         if (W.autoCampCycle && hero.state === 'sitting' &&
             sw.restBuffT >= F.BAL.restBuffCap - 0.001) {
@@ -1389,6 +1432,13 @@
       }
       // Boss 登场僵直
       if (hero.state === 'entrance') return;
+      // 有限暂停冻结已经启动的自动回营运动；玩家主动回营不受影响。
+      if (W.isAutomaticCampMotionPaused(hero)) {
+        if (Game.expeditionAI && Game.expeditionAI.pause) {
+          Game.expeditionAI.pause('deep-interaction');
+        }
+        return;
+      }
       // 远距回营传送：原地收束 → 营地外落地 → 短步行收尾
       if (hero.state === 'warpOut' || hero.state === 'warpIn') {
         W.updateCampTeleport(hero, dt);
@@ -1438,6 +1488,33 @@
           Game.nav.clear(hero);
           hero.state = 'walk';
           W.moveVector(hero, mv.x, mv.y, W.heroMoveSpeed(), dt);
+          return;
+        }
+      }
+
+      // 深度互动只暂停自动探索。显式点地、交互或点怪仍可接管；
+      // 已建立的 Encounter 继续由固定时间轴战斗系统负责。
+      if (W.controlMode() === 'auto' && W.isAutoExplorePaused() && !hero.encounterId) {
+        var explicitMove = hero.moveOrder && !hero.moveOrder.ai;
+        var explicitInteraction = hero.interactOrder && hero.interactOrder.explicit;
+        var explicitTarget = hero.target && hero.manualTarget;
+        if (!explicitMove && hero.moveOrder) hero.moveOrder = null;
+        if (!explicitInteraction && hero.interactOrder) {
+          W.cancelInteraction('interaction-pause');
+        }
+        if (!explicitTarget && hero.target) {
+          hero.target = null;
+          hero.manualTarget = false;
+          if (hero.components && hero.components.targeting) {
+            hero.components.targeting.currentTargetId = null;
+          }
+        }
+        if (!explicitMove && !explicitInteraction && !explicitTarget) {
+          if (Game.nav) Game.nav.clear(hero);
+          if (Game.expeditionAI && Game.expeditionAI.pause) {
+            Game.expeditionAI.pause('deep-interaction');
+          }
+          hero.state = 'idle';
           return;
         }
       }

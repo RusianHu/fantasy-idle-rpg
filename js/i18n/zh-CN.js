@@ -465,6 +465,8 @@
         haggleUnavailable: '本次会面已无法再次重排货架。',
         tradeRefused: '商会拒绝交易',
         restitutionDesc: '先支付全部赔偿金 {debt}，信誉将恢复到可以交易的最低水平。',
+        restitutionOutstanding: '商会赔偿尚未结清',
+        restitutionOptionalDesc: '仍有 {debt} 赔偿未结清。你可以现在清账，也可以按当前信誉继续交易。',
         payRestitution: '支付 {debt}',
         restitutionPaid: '赔偿已结清，商会恢复有限交易。',
         surrenderTitle: '行商放下武器',
@@ -472,7 +474,7 @@
         spare: '收起武器并放行',
         spared: '你选择了克制。当前待赔偿：{debt}',
         robOffer: '抢走「{name}」· 新增赔偿 {debt}',
-        robConfirm: '抢走「{name}」会进一步损失信誉，并按展示价格的两倍追加赔偿。确定？',
+        robConfirm: '抢走「{name}」会进一步损失信誉，并按基础货价的两倍追加赔偿。确定？',
         robbed: '商会已登记抢夺。当前待赔偿：{debt}'
       }
     },
@@ -613,7 +615,8 @@
         idle: '观察环境', survival: '生存回营', combat: '接敌战斗',
         'player-order': '执行指令', loot: '回收掉落', frontier: '探索未知',
         discovery: '调查记录', gather: '采集资源', guardian: '讨伐精英',
-        boss: '前往巢穴', circuit: '采集巡回', camp: '返回营地'
+        boss: '前往巢穴', circuit: '采集巡回', camp: '返回营地',
+        interaction: '专注互动'
       },
       searchClues: '搜寻线索', viewReadiness: '查看准备', goLair: '前往巢穴', challengeBoss: '挑战 Boss',
       curioTitle: '发现远征奇物', curioUnknown: '无名奇物',

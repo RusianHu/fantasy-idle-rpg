@@ -280,6 +280,9 @@
         }
       }
       var context = Trade.current();
+      if (Game.ui && Game.ui.trade && Game.ui.trade.maintainPause) {
+        Game.ui.trade.maintainPause(context);
+      }
       var next = signature(context);
       if (next !== lastSignature) {
         var previous = lastSignature;

@@ -12,12 +12,26 @@
 
   var EVENT_TTL = 360;
   var RECUR_COOLDOWN = 600;
+  var OFFENSE_COOLDOWN_STEP = 120;
+  var MAX_OFFENSE_COOLDOWN_STEPS = 3;
   var MOVE_SPEED_REF = 56;
+  var PATROL_RADIUS = 32;
+  var TRADE_RADIUS = 58;
+  var MIN_HERO_DISTANCE = 120;
+  var MAX_HERO_DISTANCE = 520;
+  var SPAWN_RETRY_SECONDS = 2;
+  var BOSS_GUARANTEE_HOLD_SECONDS = 1.5;
   var runtime = {
     regionId: null,
     eventId: null,
     actorId: null,
     spawnId: null,
+    materializeOrdinal: 0,
+    placementRetryUntil: 0,
+    materializeRetryUntil: 0,
+    bossGuaranteeUntil: 0,
+    lastPlacementAudit: null,
+    lastFailure: null,
     surrenderPromptedEventId: null,
     pendingAttack: {}
   };
@@ -88,6 +102,17 @@
     var rid = regionId || Game.state && Game.state.world && Game.state.world.region;
     var state = rid && regionState(rid);
     return state && state.activeEvent || null;
+  }
+
+  function actorForEvent(eventId) {
+    var event = activeEvent();
+    if (!event || (eventId && event.id !== eventId) ||
+        runtime.eventId !== event.id || !runtime.actorId ||
+        !Game.actors || !Game.actors.get) return null;
+    var actor = Game.actors.get(runtime.actorId);
+    if (!actor || actor.dead || actor.hp <= 0 || actor.lifecycle !== 'active' ||
+        actor.merchantEventId !== event.id) return null;
+    return actor;
   }
 
   function trustBand(value) {
@@ -244,6 +269,16 @@
     return out;
   }
 
+  function robberyDebtFor(offer) {
+    return offer ? Math.max(2, Math.round(Number(offer.basePrice) || 0) * 2) : 0;
+  }
+
+  function decoratedRobberyOffer(offer) {
+    var out = decoratedOffer(offer);
+    out.robberyDebt = robberyDebtFor(offer);
+    return out;
+  }
+
   function currentEventForTrade(context) {
     context = context || Game.trade && Game.trade.current();
     if (!context || !context.available || context.providerType !== 'merchant') return null;
@@ -359,32 +394,249 @@
     return { ok: true, fee: fee, offers: visibleOffers(context) };
   }
 
-  function legalPlacement(profile, seed) {
-    var world = Game.world, layout = world && world.layout, hero = world && world.hero;
-    if (!layout || !hero) return null;
-    var points = (layout.spawnCandidates || []).concat(layout.threats || []);
-    if (!points.length) return null;
-    var start = seed % points.length;
-    for (var i = 0; i < points.length; i++) {
-      var point = points[(start + i) % points.length];
-      var distance = U.dist(hero.x, hero.y, point.x, point.y);
-      if (distance < 120 || distance > 520) continue;
-      if (layout.camp && U.dist(point.x, point.y, layout.camp.x, layout.camp.y) <
-          Math.max(130, Number(layout.campSafeRadius) || 0)) continue;
-      if (layout.bossPoint && U.dist(point.x, point.y, layout.bossPoint.x, layout.bossPoint.y) <
-          Math.max(90, Number(layout.bossSafeRadius) || 0)) continue;
-      var inspected = Game.population.inspectPlacement(
-        profile.spawnProfileId,
-        { key: point.id || 'merchant:' + i, x: point.x, y: point.y },
-        layout
-      );
-      if (inspected.ok) return {
-        x: inspected.candidate.x,
-        y: inspected.candidate.y,
-        anchorKey: point.id || 'candidate:' + ((start + i) % points.length)
-      };
+  function worldTime() {
+    return Number(Game.state && Game.state.world && Game.state.world.worldTime) || 0;
+  }
+
+  function recordSpawnFailure(kind, reason, detail, eventId) {
+    runtime.lastFailure = {
+      kind: kind,
+      reason: reason || 'unknown',
+      eventId: eventId || null,
+      atWorldTime: worldTime(),
+      detail: detail || null
+    };
+    bus.emit('merchant:spawnFailed', clone(runtime.lastFailure));
+  }
+
+  function placementSourcePoints(spawnProfile, layout) {
+    var placement = spawnProfile && spawnProfile.placement || {};
+    var source = placement.source;
+    var points = [];
+    var nav = layout && layout.nav;
+    if (source === 'walkableNav' && nav && nav.grid && nav.cell) {
+      nav.grid.forEach(function (row, y) {
+        row.forEach(function (walkable, x) {
+          if (!walkable) return;
+          points.push({
+            key: 'nav:' + x + ':' + y,
+            x: x * nav.cell + nav.cell / 2,
+            y: y * nav.cell + nav.cell / 2,
+            navX: x,
+            navY: y
+          });
+        });
+      });
+      return points;
     }
-    return null;
+    var fallback = layout && layout[source] || layout && layout.spawnCandidates || [];
+    var seen = {};
+    fallback.forEach(function (point, index) {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return;
+      var key = point.id || source + ':' + index;
+      var coordinateKey = point.x + ':' + point.y;
+      if (seen[coordinateKey]) return;
+      seen[coordinateKey] = true;
+      points.push({ key: key, x: point.x, y: point.y });
+    });
+    return points;
+  }
+
+  function incrementCount(counts, key) {
+    counts[key] = (counts[key] || 0) + 1;
+  }
+
+  function placementAudit(options) {
+    options = options || {};
+    var rid = options.regionId || Game.state && Game.state.world && Game.state.world.region;
+    var profile = options.profile || profileForRegion(rid);
+    var spawnProfile = profile && Game.content.get('worldSpawnProfile', profile.spawnProfileId);
+    var layout = options.layout || Game.world && Game.world.layout;
+    var hero = options.heroPoint || Game.world && Game.world.hero;
+    var seed = Number(options.seed) >>> 0;
+    var full = options.full !== false;
+    var report = {
+      ok: false,
+      reason: null,
+      regionId: rid || null,
+      merchantProfileId: profile && profile.id || null,
+      spawnProfileId: spawnProfile && spawnProfile.id || null,
+      selector: spawnProfile && spawnProfile.placement && spawnProfile.placement.selector || null,
+      source: spawnProfile && spawnProfile.placement && spawnProfile.placement.source || null,
+      seed: seed,
+      heroPoint: hero && { x: hero.x, y: hero.y } || null,
+      constraints: null,
+      sourceTotal: 0,
+      distanceEligible: 0,
+      inspectedCount: 0,
+      validCount: 0,
+      failureCounts: {},
+      candidates: [],
+      chosenIndex: -1,
+      chosen: null
+    };
+    if (!profile || !spawnProfile) {
+      report.reason = profile ? 'missing-spawn-profile' : 'missing-merchant-profile';
+      return report;
+    }
+    if (!layout) {
+      report.reason = 'missing-layout';
+      return report;
+    }
+    if (!hero || !Number.isFinite(hero.x) || !Number.isFinite(hero.y)) {
+      report.reason = 'missing-hero-point';
+      return report;
+    }
+    if (!Game.population || !Game.population.inspectPlacement) {
+      report.reason = 'missing-population-inspector';
+      return report;
+    }
+    var placement = spawnProfile.placement || {};
+    var minCampDistance = Math.max(
+      Number(placement.minCampDistance) || 0,
+      (Number(layout.campSafeRadius) || 0) + PATROL_RADIUS
+    );
+    var minBossDistance = Math.max(
+      90,
+      (Number(layout.bossSafeRadius) || 0) + PATROL_RADIUS
+    );
+    report.constraints = {
+      minHeroDistance: MIN_HERO_DISTANCE,
+      maxHeroDistance: MAX_HERO_DISTANCE,
+      minCampDistance: minCampDistance,
+      minBossDistance: minBossDistance,
+      minClearance: Number(placement.minClearance) || 0,
+      maxDanger: Number.isFinite(placement.maxDanger) ? placement.maxDanger : null,
+      occupancyRadius: Number(placement.occupancyRadius) || 0,
+      patrolRadius: PATROL_RADIUS,
+      tradeRadius: TRADE_RADIUS
+    };
+    var points = placementSourcePoints(spawnProfile, layout);
+    report.sourceTotal = points.length;
+    var eligible = [];
+    points.forEach(function (point) {
+      var heroDistance = U.dist(hero.x, hero.y, point.x, point.y);
+      if (heroDistance < MIN_HERO_DISTANCE || heroDistance > MAX_HERO_DISTANCE) {
+        incrementCount(report.failureCounts, 'heroDistance');
+        return;
+      }
+      var campDistance = layout.camp
+        ? U.dist(point.x, point.y, layout.camp.x, layout.camp.y)
+        : Infinity;
+      if (campDistance < minCampDistance) {
+        incrementCount(report.failureCounts, 'campPatrol');
+        return;
+      }
+      var bossDistance = layout.bossPoint
+        ? U.dist(point.x, point.y, layout.bossPoint.x, layout.bossPoint.y)
+        : Infinity;
+      if (bossDistance < minBossDistance) {
+        incrementCount(report.failureCounts, 'bossPatrol');
+        return;
+      }
+      eligible.push(Object.assign({}, point, {
+        heroDistance: heroDistance,
+        campDistance: campDistance,
+        bossDistance: bossDistance,
+        rank: U.strSeed([seed, rid, point.key, 'merchant-placement'].join('|'))
+      }));
+    });
+    report.distanceEligible = eligible.length;
+    eligible.sort(function (left, right) {
+      return left.rank - right.rank || left.key.localeCompare(right.key);
+    });
+    var reservations = options.reservations;
+    var inspections;
+    if (full && Game.population.inspectPlacements) {
+      inspections = Game.population.inspectPlacements(
+        spawnProfile.id,
+        eligible,
+        layout,
+        reservations
+      ).inspections;
+    } else {
+      inspections = [];
+      for (var pi = 0; pi < eligible.length; pi++) {
+        inspections.push(Game.population.inspectPlacement(
+          spawnProfile.id,
+          eligible[pi],
+          layout,
+          reservations
+        ));
+        if (!full && inspections[inspections.length - 1].ok) break;
+      }
+    }
+    inspections.forEach(function (inspection) {
+      var point = inspection.point || {};
+      var entry = clone(inspection);
+      entry.heroDistance = point.heroDistance;
+      entry.campDistance = point.campDistance;
+      entry.bossDistance = point.bossDistance;
+      report.inspectedCount++;
+      if (entry.ok) report.validCount++;
+      else (entry.failures || []).forEach(function (failure) {
+        incrementCount(report.failureCounts, failure);
+      });
+      report.candidates.push(entry);
+      if (report.chosenIndex < 0 && entry.ok) {
+        report.chosenIndex = report.candidates.length - 1;
+        report.chosen = {
+          x: entry.candidate.x,
+          y: entry.candidate.y,
+          anchorKey: point.key || 'merchant-nav',
+          navX: point.navX,
+          navY: point.navY,
+          heroDistance: point.heroDistance,
+          campDistance: point.campDistance,
+          bossDistance: point.bossDistance,
+          clearance: entry.candidate.clearance,
+          danger: entry.candidate.danger,
+          occupancyRadius: entry.candidate.occupancyRadius
+        };
+      }
+    });
+    report.ok = !!report.chosen;
+    report.reason = report.ok ? null : 'no-legal-placement';
+    return report;
+  }
+
+  function placementAuditSummary(report) {
+    return report && clone({
+      ok: report.ok,
+      reason: report.reason,
+      regionId: report.regionId,
+      merchantProfileId: report.merchantProfileId,
+      spawnProfileId: report.spawnProfileId,
+      selector: report.selector,
+      source: report.source,
+      seed: report.seed,
+      sourceTotal: report.sourceTotal,
+      distanceEligible: report.distanceEligible,
+      inspectedCount: report.inspectedCount,
+      validCount: report.validCount,
+      failureCounts: report.failureCounts,
+      constraints: report.constraints,
+      chosen: report.chosen
+    });
+  }
+
+  function legalPlacement(profile, seed) {
+    var report = placementAudit({ profile: profile, seed: seed, full: false });
+    runtime.lastPlacementAudit = placementAuditSummary(report);
+    return { placement: report.chosen, report: report };
+  }
+
+  function configurePatrolActor(actor, anchor) {
+    if (!actor || !anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) return false;
+    actor.spawnX = anchor.x;
+    actor.spawnY = anchor.y;
+    actor.merchantWagonX = anchor.x;
+    actor.merchantWagonY = anchor.y;
+    actor.merchantPatrolRadius = PATROL_RADIUS;
+    actor.wanderT = 0;
+    actor.wx = anchor.x;
+    actor.wy = anchor.y;
+    return true;
   }
 
   function closeRuntime(reason) {
@@ -402,35 +654,49 @@
   }
 
   function materializeEvent(event) {
-    if (!event || event.state !== 'available' || !Game.world || !Game.world.layout) return null;
+    if (!event || event.state !== 'available' || !Game.world || !Game.world.layout) {
+      return { ok: false, reason: 'unavailable' };
+    }
     if (runtime.eventId === event.id && runtime.actorId) {
-      return Game.actors.get(runtime.actorId);
+      var existing = Game.actors.get(runtime.actorId);
+      if (existing) return { ok: true, actor: existing, reused: true };
     }
     closeRuntime('merchant-remount');
     var profile = Game.content.get('merchantProfile', event.merchantProfileId);
+    if (!profile) return { ok: false, reason: 'missing-profile' };
+    var requestOrdinal = ++runtime.materializeOrdinal;
     var result = Game.population.materialize(profile.spawnProfileId, {
       regionId: Game.state.world.region,
       populationId: 'merchant-runtime',
       layoutSlotKey: event.anchorKey || event.id,
-      spawnRequestKey: event.id,
+      spawnRequestKey: event.id + ':mount:' + requestOrdinal,
       x: event.x,
       y: event.y,
       tier: Game.State.regionTier(Game.state.world.region),
       rewardMultiplier: 0
     });
-    if (!result.ok) return null;
+    if (!result.ok || !result.primary || !result.lease) {
+      recordSpawnFailure('materialize', result.reason || 'materialize-failed', null, event.id);
+      runtime.materializeRetryUntil = worldTime() + SPAWN_RETRY_SECONDS;
+      return { ok: false, reason: result.reason || 'materialize-failed' };
+    }
     var actor = result.primary;
     actor.merchantEventId = event.id;
     actor.merchantProfileId = event.merchantProfileId;
-    actor.spawnX = event.x;
-    actor.spawnY = event.y;
-    actor.wanderT = 999999;
+    configurePatrolActor(actor, event);
+    if (!Game.world.attachActor(actor, 'merchant-event')) {
+      Game.population.close(result.lease.spawnId, 'merchant-attach-failed', { despawn: true });
+      recordSpawnFailure('materialize', 'attach-failed', null, event.id);
+      runtime.materializeRetryUntil = worldTime() + SPAWN_RETRY_SECONDS;
+      return { ok: false, reason: 'attach-failed' };
+    }
     runtime.regionId = Game.state.world.region;
     runtime.eventId = event.id;
     runtime.actorId = actor.id;
     runtime.spawnId = result.lease.spawnId;
-    Game.world.attachActor(actor, 'merchant-event');
-    return actor;
+    runtime.materializeRetryUntil = 0;
+    runtime.lastFailure = null;
+    return { ok: true, actor: actor, lease: result.lease };
   }
 
   function discover(options) {
@@ -445,8 +711,23 @@
       Game.state.world.expedition && Game.state.world.expedition.index || 0,
       'wandering-merchant'
     ].join('|'));
-    var placement = options.placement || legalPlacement(profile, seed);
-    if (!placement) return { ok: false, reason: 'placement' };
+    var placementResult = options.placement
+      ? { placement: options.placement, report: null }
+      : legalPlacement(profile, seed);
+    var placement = placementResult.placement;
+    if (!placement) {
+      runtime.placementRetryUntil = worldTime() + SPAWN_RETRY_SECONDS;
+      recordSpawnFailure(
+        'placement',
+        placementResult.report && placementResult.report.reason || 'placement-failed',
+        placementAuditSummary(placementResult.report)
+      );
+      return {
+        ok: false,
+        reason: 'placement',
+        audit: placementAuditSummary(placementResult.report)
+      };
+    }
     var eventId = 'merchant:' + rid + ':' + ordinal + ':' + U.hex32(seed);
     var event = {
       id: eventId,
@@ -465,16 +746,22 @@
       offenseBaseDebt: 0,
       offers: generateStock(eventId, profile, seed, 1)
     };
+    var materialized = materializeEvent(event);
+    if (!materialized.ok) {
+      runtime.placementRetryUntil = worldTime() + SPAWN_RETRY_SECONDS;
+      return { ok: false, reason: 'materialize', detail: materialized.reason };
+    }
     state.ordinal = ordinal;
     state.firstEncountered = true;
     state.movementSeconds = 0;
     state.activeEvent = event;
-    materializeEvent(event);
+    runtime.placementRetryUntil = 0;
+    runtime.lastFailure = null;
     bus.emit('merchant:discovered', {
       rid: rid, eventId: event.id, merchantProfileId: profile.id,
       x: event.x, y: event.y, remainingSeconds: event.remainingSeconds
     });
-    return { ok: true, event: event, actor: Game.actors.get(runtime.actorId) };
+    return { ok: true, event: event, actor: materialized.actor };
   }
 
   function finishEvent(reason) {
@@ -488,13 +775,18 @@
     closeRuntime('merchant-' + (reason || 'closed'));
     state.activeEvent = null;
     state.movementSeconds = 0;
-    state.cooldownUntil = (Number(Game.state.world.worldTime) || 0) + RECUR_COOLDOWN;
+    var offenseSteps = event.offenseApplied
+      ? Math.min(MAX_OFFENSE_COOLDOWN_STEPS, Math.max(1, guild().offenses | 0))
+      : 0;
+    var cooldownSeconds = RECUR_COOLDOWN + offenseSteps * OFFENSE_COOLDOWN_STEP;
+    state.cooldownUntil = (Number(Game.state.world.worldTime) || 0) + cooldownSeconds;
     state.targetSeconds = targetFor(rid, state.ordinal, true);
     bus.emit('merchant:departed', {
       rid: rid,
       eventId: event.id,
       merchantProfileId: event.merchantProfileId,
-      reason: reason || 'departed'
+      reason: reason || 'departed',
+      cooldownSeconds: cooldownSeconds
     });
     return true;
   }
@@ -518,7 +810,19 @@
     if (state.activeEvent || Game.state.world.worldTime < state.cooldownUntil) return false;
     state.movementSeconds += Math.min(moved / MOVE_SPEED_REF, 0.25);
     if (state.movementSeconds < state.targetSeconds) return false;
+    if (worldTime() < runtime.placementRetryUntil) return false;
     return discover().ok;
+  }
+
+  function allowBossChallenge(regionId) {
+    var rid = regionId || Game.state.world.region;
+    var state = regionState(rid);
+    if (!state) return true;
+    if (state.firstEncountered) return worldTime() >= runtime.bossGuaranteeUntil;
+    var result = discover({ regionId: rid });
+    if (!result.ok) return true;
+    runtime.bossGuaranteeUntil = worldTime() + BOSS_GUARANTEE_HOLD_SECONDS;
+    return false;
   }
 
   function dialogueState(actor, forcedState) {
@@ -655,16 +959,19 @@
       return offer.quantity > 0 && offer.cur === 'gold' && offer.eligibleRobbery;
     });
     var offer = offerId && offerById(event, offerId);
-    if (!offer || eligible.indexOf(offer) < 0) offer = eligible[0];
+    if (offerId && (!offer || eligible.indexOf(offer) < 0)) {
+      return { ok: false, reason: 'offer' };
+    }
+    if (!offer) offer = eligible[0];
     if (!offer) return { ok: false, reason: 'no-loot' };
-    var displayedPrice = Math.max(1, Math.round(offer.basePrice * priceMultiplier()));
+    var robberyDebt = robberyDebtFor(offer);
     var reward = grantOffer(offer, 'merchant-robbery');
     offer.quantity--;
     guild().trust = U.clamp(guild().trust - 15, -100, 100);
-    guild().debtGold += displayedPrice * 2;
+    guild().debtGold += robberyDebt;
     var robbed = Object.assign(reward, {
       choice: 'rob', trust: guild().trust,
-      debtAdded: displayedPrice * 2,
+      debtAdded: robberyDebt,
       debtGold: guild().debtGold,
       offerId: offer.id
     });
@@ -698,7 +1005,7 @@
       id: 'merchant-trade:' + event.id,
       kind: 'wander',
       anchor: { x: event.x, y: event.y },
-      radius: 58,
+      radius: TRADE_RADIUS,
       catalogs: ['merchant-event'],
       priority: 80,
       nameKey: profile.presentation.nameKey,
@@ -712,6 +1019,7 @@
   }
 
   function enterRegion(regionId) {
+    if (runtime.regionId !== regionId) runtime.surrenderPromptedEventId = null;
     closeRuntime('merchant-region');
     runtime.regionId = regionId;
     var event = activeEvent(regionId);
@@ -729,10 +1037,27 @@
       merchantProfileId: event.merchantProfileId,
       eligibleOffers: event.offers.filter(function (offer) {
         return offer.quantity > 0 && offer.cur === 'gold' && offer.eligibleRobbery;
-      }).map(decoratedOffer),
+      }).map(decoratedRobberyOffer),
       trust: guild().trust,
       debtGold: guild().debtGold
     };
+  }
+
+  function resetSurrenderPrompt(eventId) {
+    if (!eventId || runtime.surrenderPromptedEventId === eventId) {
+      runtime.surrenderPromptedEventId = null;
+      return true;
+    }
+    return false;
+  }
+
+  function canPromptSurrender() {
+    var hero = Game.world && Game.world.hero;
+    return Game.entryState === 'active' && hero && hero.state !== 'dead' &&
+      hero.state !== 'recover' && !hero.encounterId &&
+      !(Game.transitions && Game.transitions.isActive()) &&
+      !(Game.ending && Game.ending.isActive && Game.ending.isActive()) &&
+      Game.ui && Game.ui.modals;
   }
 
   function update(dt) {
@@ -741,7 +1066,7 @@
     if (!event) return;
     if (event.state === 'surrendered') {
       if (runtime.surrenderPromptedEventId !== event.id &&
-          Game.entryState === 'active' && Game.ui && Game.ui.modals) {
+          canPromptSurrender()) {
         runtime.surrenderPromptedEventId = event.id;
         bus.emit('merchant:surrendered', surrenderPayload(event));
       }
@@ -759,7 +1084,7 @@
           return;
         }
       }
-      if (!runtime.actorId) materializeEvent(event);
+      if (!runtime.actorId && worldTime() >= runtime.materializeRetryUntil) materializeEvent(event);
       return;
     }
     if (event.state !== 'assault') return;
@@ -815,25 +1140,50 @@
     var event = activeEvent();
     if (!event || event.state !== 'assault' || payload.sourceActorId !== runtime.actorId ||
         !payload.payload || payload.payload.reason !== 'escape') return;
-    var outcome = payload.encounterId && Game.encounters.checkEnd(payload.encounterId);
-    if (outcome && outcome.done) {
-      Game.encounters.end(payload.encounterId, 'merchant-escaped', outcome);
+    if (payload.encounterId) {
+      Game.encounters.end(payload.encounterId, 'merchant-escaped', {
+        done: true,
+        status: 'failure',
+        reason: 'merchant-escaped',
+        rewardAuthorizedActorIds: []
+      });
     }
     closeRuntime('merchant-escaped');
     finishEvent('escaped');
+  }
+
+  function onEncounterEnded(payload) {
+    var event = activeEvent();
+    if (!event || event.state !== 'assault' || !payload || !payload.encounterId) return;
+    var encounter = Game.encounters && Game.encounters.get(payload.encounterId);
+    if (!encounter || encounter.profileId !==
+        'encounter.merchant-assault.' + Game.state.world.region) return;
+    var reason = payload.payload && payload.payload.reason;
+    if (reason === 'merchant-escaped') return;
+    if (reason === 'retreat') finishEvent('escaped-on-retreat');
+    else if (reason === 'travel' || reason === 'region-change') finishEvent('escaped-on-travel');
+    else if (reason === 'player-defeated') finishEvent('escaped-on-defeat');
+    else finishEvent('escaped-on-encounter-end');
   }
 
   var Merchants = Game.merchants = {
     constants: {
       eventTtl: EVENT_TTL,
       recurringCooldown: RECUR_COOLDOWN,
-      movementSpeedRef: MOVE_SPEED_REF
+      offenseCooldownStep: OFFENSE_COOLDOWN_STEP,
+      maxOffenseCooldownSteps: MAX_OFFENSE_COOLDOWN_STEPS,
+      movementSpeedRef: MOVE_SPEED_REF,
+      patrolRadius: PATROL_RADIUS,
+      tradeRadius: TRADE_RADIUS,
+      minHeroDistance: MIN_HERO_DISTANCE,
+      maxHeroDistance: MAX_HERO_DISTANCE
     },
     state: rootState,
     guild: guild,
     regionState: regionState,
     profileForRegion: profileForRegion,
     activeEvent: activeEvent,
+    actorForEvent: actorForEvent,
     trustBand: trustBand,
     priceMultiplier: priceMultiplier,
     tradeAreas: tradeAreas,
@@ -846,8 +1196,13 @@
     openTrade: openTrade,
     attack: attack,
     resolveSurrender: resolveSurrender,
+    robberyDebtFor: robberyDebtFor,
     payRestitution: payRestitution,
+    resetSurrenderPrompt: resetSurrenderPrompt,
     recordHeroMovement: recordHeroMovement,
+    allowBossChallenge: allowBossChallenge,
+    inspectPlacement: function (options) { return clone(placementAudit(options)); },
+    configurePatrolActor: configurePatrolActor,
     discover: discover,
     finishEvent: finishEvent,
     enterRegion: enterRegion,
@@ -902,6 +1257,7 @@
   bus.on('engagement:rejected', onRejected);
   bus.on('combat:hit', onCombatHit);
   bus.on('encounter:left', onEncounterLeft);
+  bus.on('encounter:ended', onEncounterEnded);
   bus.on('player:death', function () {
     var event = activeEvent();
     if (event && event.state === 'assault') finishEvent('escaped-on-defeat');

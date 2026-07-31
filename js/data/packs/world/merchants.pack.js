@@ -127,8 +127,9 @@
         socialGroupId: 'social.merchant-guild'
       },
       placement: {
-        selector: 'candidate', source: 'spawnCandidates', required: false,
-        onFailure: 'skipOptional', minCampDistance: 140, occupancyRadius: 12
+        selector: 'candidate', source: 'walkableNav', required: false,
+        onFailure: 'skipOptional', minClearance: 48, maxDanger: 0.72,
+        minCampDistance: 140, occupancyRadius: 28
       },
       lifecycle: {
         activation: 'scripted', unload: 'despawn',

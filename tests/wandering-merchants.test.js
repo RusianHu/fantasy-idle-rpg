@@ -8,6 +8,20 @@ const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(ROOT, file), 'utf8');
 
+const i18nSource = read('js/i18n/i18n.js');
+const i18nMethods = new Set(
+  [...i18nSource.matchAll(/^\s{4}([A-Za-z][A-Za-z0-9_]*): function\s*\(/gm)]
+    .map((match) => match[1])
+);
+for (const file of ['js/ui/hud.js', 'js/ui/trade.js']) {
+  const source = read(file);
+  const directCalls = [...source.matchAll(/Game\.i18n\.([A-Za-z][A-Za-z0-9_]*)\s*\(/g)]
+    .map((match) => match[1]);
+  for (const method of directCalls) {
+    assert.ok(i18nMethods.has(method), `${file} calls registered Game.i18n.${method}()`);
+  }
+}
+
 function boot(seed = 0x1234ABCD) {
   const sandbox = {
     console, window: null,
@@ -83,6 +97,7 @@ function boot(seed = 0x1234ABCD) {
         y: context.y,
         hp: 100,
         maxHp: 100,
+        lifecycle: 'active',
         state: 'idle',
         components: {
           actionState: { state: 'idle' },
@@ -297,6 +312,23 @@ assert.deepEqual(
 
 const h = deterministicA;
 let event = h.Game.merchants.activeEvent();
+const liveMerchant = h.Game.merchants.actorForEvent(event.id);
+assert.ok(liveMerchant, 'active event resolves its live merchant actor');
+assert.equal(liveMerchant.id, h.Game.merchants.runtime().actorId);
+assert.equal(h.Game.merchants.actorForEvent('merchant:wrong-event'), null);
+liveMerchant.dead = true;
+assert.equal(h.Game.merchants.actorForEvent(event.id), null, 'dead merchant cannot own caravan dialogue');
+liveMerchant.dead = false;
+liveMerchant.lifecycle = 'defeated';
+assert.equal(h.Game.merchants.actorForEvent(event.id), null, 'inactive merchant cannot own caravan dialogue');
+liveMerchant.lifecycle = 'active';
+liveMerchant.hp = 0;
+assert.equal(h.Game.merchants.actorForEvent(event.id), null, 'zero-HP merchant cannot own caravan dialogue');
+liveMerchant.hp = 100;
+liveMerchant.merchantEventId = 'merchant:stale-event';
+assert.equal(h.Game.merchants.actorForEvent(event.id), null, 'stale merchant/event bindings are rejected');
+liveMerchant.merchantEventId = event.id;
+assert.equal(h.Game.merchants.actorForEvent(event.id), liveMerchant);
 assert.equal(event.offers.length, 8);
 assert.deepEqual(
   event.offers.reduce((out, offer) => {
@@ -366,15 +398,26 @@ assert.equal(violence.Game.merchants.guild().debtGold, baseDebt);
 assert.equal(violence.Game.merchants.debugForceSurrender().ok, true);
 assert.equal(event.state, 'surrendered');
 const robberyOffer = event.offers.find((offer) => offer.eligibleRobbery);
-const robberyPrice = Math.round(
-  robberyOffer.basePrice * violence.Game.merchants.priceMultiplier()
+const robberyDebt = violence.Game.merchants.robberyDebtFor(robberyOffer);
+violence.Game.merchants.debugSetTrust(75);
+const favoredRobberyDebt = violence.Game.merchants.robberyDebtFor(robberyOffer);
+violence.Game.merchants.debugSetTrust(25);
+assert.equal(
+  violence.Game.merchants.robberyDebtFor(robberyOffer),
+  favoredRobberyDebt,
+  'robbery restitution is based on base price and cannot inherit trust discounts'
+);
+assert.deepEqual(
+  plain(violence.Game.merchants.resolveSurrender('rob', 'merchant-offer:forged')),
+  { ok: false, reason: 'offer' },
+  'an explicit invalid robbery choice cannot silently fall back to another offer'
 );
 const robbed = violence.Game.merchants.resolveSurrender('rob', robberyOffer.id);
 assert.equal(robbed.ok, true);
 assert.equal(violence.Game.merchants.guild().trust, 10);
 assert.equal(
   violence.Game.merchants.guild().debtGold,
-  baseDebt + robberyPrice * 2
+  baseDebt + robberyDebt
 );
 assert.equal(violence.Game.merchants.activeEvent(), null);
 const restitution = violence.Game.merchants.payRestitution();
@@ -392,6 +435,10 @@ assert.equal(
   mercy.Game.merchants.guild().debtGold,
   Math.ceil(mercy.Game.F.gearBoxPrice(mercy.Game.state.player.level) / 2)
 );
+assert.equal(mercy.Game.merchants.trustBand(), 'wary');
+assert.equal(mercy.Game.merchants.payRestitution().ok, true,
+  'restitution remains payable even when trust already permits limited trade');
+assert.equal(mercy.Game.merchants.guild().debtGold, 0);
 
 const escapeCombat = bootCombatMerchant();
 escapeCombat.Game.units.setHp(
@@ -411,11 +458,62 @@ escapeCombat.Game.combat.advanceToTick(
 );
 assert.equal(escapeCombat.Game.merchants.activeEvent(), null);
 assert.equal(escapeCombat.encounter.lifecycle, 'ended');
+assert.equal(escapeCombat.encounter.result.reason, 'merchant-escaped', JSON.stringify({
+  result: escapeCombat.encounter.result,
+  runtime: escapeCombat.Game.merchants.runtime(),
+  eventLog: escapeCombat.encounter.eventLog.slice(-5)
+}));
 assert.deepEqual(
   plain(escapeCombat.encounter.result.rewardAuthorizedActorIds),
   [],
   'escape encounter never authorizes ordinary combat rewards'
 );
+
+const retreatCombat = bootCombatMerchant(0x51A7E);
+const retreatDebt = retreatCombat.Game.merchants.guild().debtGold;
+const retreatActorId = retreatCombat.merchant.id;
+retreatCombat.Game.encounters.end(retreatCombat.encounter.id, 'retreat');
+assert.equal(retreatCombat.Game.merchants.activeEvent(), null,
+  'retreating from a merchant assault terminates the merchant event');
+assert.equal(retreatCombat.Game.actors.get(retreatActorId), null,
+  'retreat cleanup closes the merchant population lease');
+assert.equal(
+  retreatCombat.Game.world.entities.some((actor) => actor.id === retreatActorId),
+  false,
+  'retreat cleanup detaches the merchant runtime actor'
+);
+assert.equal(retreatCombat.Game.merchants.guild().debtGold, retreatDebt,
+  'retreat does not erase assault restitution');
+
+const repeatOffense = boot(0x0FF3CE);
+const expectedCooldowns = [720, 840, 960, 960];
+expectedCooldowns.forEach((seconds, index) => {
+  assert.equal(repeatOffense.Game.merchants.debugCommitAssault().ok, true);
+  assert.equal(repeatOffense.Game.merchants.finishEvent('qa-repeat-offense'), true);
+  assert.equal(
+    repeatOffense.Game.merchants.regionState('grassland').cooldownUntil -
+      repeatOffense.Game.state.world.worldTime,
+    seconds,
+    `offense ${index + 1} applies the bounded recurring cooldown`
+  );
+  if (index < expectedCooldowns.length - 1) {
+    assert.equal(repeatOffense.Game.merchants.debugForceDiscover().ok, true);
+  }
+});
+
+const recoverablePrompt = boot(0x5A77E);
+recoverablePrompt.Game.merchants.debugCommitAssault();
+recoverablePrompt.Game.merchants.debugForceSurrender();
+let recoveredPromptCount = 0;
+recoverablePrompt.Game.bus.on('merchant:surrendered', () => { recoveredPromptCount++; });
+recoverablePrompt.Game.state.world.region = 'forest';
+recoverablePrompt.Game.merchants.enterRegion('forest');
+recoverablePrompt.Game.state.world.region = 'grassland';
+recoverablePrompt.Game.merchants.enterRegion('grassland');
+recoverablePrompt.Game.ui = { modals: {} };
+recoverablePrompt.Game.merchants.update(0.05);
+assert.equal(recoveredPromptCount, 1,
+  'returning to a surrendered event can recover its mandatory decision prompt');
 
 const lethalCombat = bootCombatMerchant(0xBADC0DE);
 const lethalGold = lethalCombat.Game.state.player.gold;
@@ -480,6 +578,44 @@ assert.deepEqual(
   plain(lethalCombat.encounter.result.rewardAuthorizedActorIds),
   [],
   'surrender grants no ordinary encounter reward'
+);
+
+const worldSource = read('js/systems/world.js');
+const tradeUiSource = read('js/ui/trade.js');
+const merchantDemoSource = read('tech-demos/merchants/merchants.js');
+assert.match(tradeUiSource, /if \(guild\.debtGold > 0\)/,
+  'the trade ledger exposes restitution for every trust band with debt');
+assert.match(tradeUiSource, /if \(band === 'refused'\) return;/,
+  'only refused standing hides the remaining merchant controls and shelves');
+assert.match(merchantDemoSource, /Game\.encounters\.start\(/,
+  'the Merchant Lab retreat audit creates a production Encounter');
+assert.match(merchantDemoSource, /Game\.encounters\.end\(encounter\.id, 'retreat'/,
+  'the Merchant Lab retreat audit exercises the production end listener');
+assert.match(merchantDemoSource, /merchant-demo:forged-offer/,
+  'the Merchant Lab audits strict robbery offer selection');
+const merchantCaravanStart = worldSource.indexOf("if (area.providerType === 'merchant')");
+const normalTradeStart = worldSource.indexOf(
+  'var approach = Game.trade.requestApproach',
+  merchantCaravanStart
+);
+assert.ok(merchantCaravanStart >= 0 && normalTradeStart > merchantCaravanStart,
+  'world tap handling separates merchant caravans from ordinary trade props');
+const merchantCaravanBranch = worldSource.slice(merchantCaravanStart, normalTradeStart);
+assert.match(merchantCaravanBranch, /Game\.merchants\.actorForEvent\(area\.eventId\)/);
+assert.match(
+  merchantCaravanBranch,
+  /Game\.interactions\.handlers\(merchantActor\)/,
+  'merchant caravan resolves the live actor interaction handlers'
+);
+assert.match(
+  merchantCaravanBranch,
+  /merchantHandlers\.talk\(merchantActor\)/,
+  'merchant caravan enters the formal dialogue path'
+);
+assert.doesNotMatch(
+  merchantCaravanBranch,
+  /requestApproach/,
+  'merchant caravan never falls back to opening trade directly'
 );
 
 console.log('wandering-merchants.test.js: all assertions passed');

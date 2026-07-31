@@ -356,6 +356,19 @@
     strategy: strategy,
     intent: function () { return current; },
     trace: function () { return trace.slice(); },
+    pause: function (reason) {
+      var hero = Game.world && Game.world.hero;
+      thinkT = 0;
+      progress.still = 0;
+      if (hero) {
+        progress.x = hero.x;
+        progress.y = hero.y;
+      }
+      return emitIntent({
+        id: 'interaction', target: null, distance: 0, danger: 0,
+        reason: reason || 'interaction-pause'
+      });
+    },
     replan: function (reason) {
       return Game.world && Game.world.hero ? replan(Game.world.hero, reason, true) : current;
     },
@@ -363,6 +376,11 @@
     update: function (hero, dt) {
       if (!hero || !Game.world.layout || Game.world.layout.version < 3) return false;
       if (Game.world.controlMode() !== 'auto' || Game.state.world.mode !== 'battle') return false;
+      if (Game.interactions && Game.interactions.isPaused &&
+          Game.interactions.isPaused('autoExplore')) {
+        AI.pause('deep-interaction');
+        return true;
+      }
       thinkT -= dt;
 
       if (!hero.target && Game.world.contactThreat) {

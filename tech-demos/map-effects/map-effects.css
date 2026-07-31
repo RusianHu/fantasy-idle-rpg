@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.8") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.15") format("woff2");
   font-display: swap;
 }
 
@@ -360,6 +360,69 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   background: #a8d2a0;
 }
 
+.merchant-audit-panel {
+  min-width: 0;
+  margin-top: 12px;
+  border: 1px solid #66583d;
+  background:
+    linear-gradient(135deg, rgba(210, 169, 82, .10), transparent 46%),
+    var(--surface);
+}
+.merchant-audit-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+.merchant-audit-metric {
+  min-width: 0;
+  padding: 10px 11px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.merchant-audit-metric:last-child { border-right: 0; }
+.merchant-audit-metric strong {
+  display: block;
+  overflow: hidden;
+  margin-bottom: 3px;
+  color: #e3c46a;
+  font: 15px/1.1 Consolas, monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.merchant-audit-metric strong.pass { color: var(--green); }
+.merchant-audit-metric strong.fail { color: #ef8d76; }
+.merchant-audit-metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.4;
+}
+.merchant-audit-detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+.merchant-audit-detail {
+  min-height: 46px;
+  padding: 9px 11px;
+  color: #d8d5c4;
+  font: 9px/1.55 Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+.merchant-audit-detail-row button {
+  min-width: 112px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  color: #171711;
+  background: var(--gold);
+}
+.merchant-audit-detail-row button:disabled {
+  color: #777666;
+  background: var(--surface-2);
+  cursor: default;
+}
+
 .map-dock {
   display: grid;
   grid-template-columns: minmax(280px, .9fr) minmax(300px, 1.1fr);
@@ -644,6 +707,7 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   .map-dock { grid-template-columns: 1fr; }
   .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ecology-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .merchant-audit-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .metric { border-bottom: 1px solid var(--line); }
   .ecology-metric { border-bottom: 1px solid var(--line); }
   .runtime-actions button { flex-basis: calc(50% - 6px); }
@@ -655,6 +719,9 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   .stage-wrap { aspect-ratio: 390 / 300; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ecology-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .merchant-audit-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .merchant-audit-detail-row { grid-template-columns: 1fr; }
+  .merchant-audit-detail-row button { border-top: 1px solid var(--line); border-left: 0; }
   .catalog-filters { grid-template-columns: 1fr; }
   .log-row { grid-template-columns: 50px 66px minmax(0, 1fr); }
 }

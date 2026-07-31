@@ -248,12 +248,20 @@
           if (subscribed) return;
           subscribed = true;
           Game.bus.on('readiness:changed', onMapStateChanged);
+          Game.bus.on('merchant:discovered', onMapStateChanged);
+          Game.bus.on('merchant:assaultStarted', onMapStateChanged);
+          Game.bus.on('merchant:departed', onMapStateChanged);
         }
 
         function pause() {
           if (liveFrame) cancelAnimationFrame(liveFrame);
           liveFrame = 0;
-          if (subscribed) Game.bus.off('readiness:changed', onMapStateChanged);
+          if (subscribed) {
+            Game.bus.off('readiness:changed', onMapStateChanged);
+            Game.bus.off('merchant:discovered', onMapStateChanged);
+            Game.bus.off('merchant:assaultStarted', onMapStateChanged);
+            Game.bus.off('merchant:departed', onMapStateChanged);
+          }
           subscribed = false;
         }
 

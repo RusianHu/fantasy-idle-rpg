@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.8") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260731.15") format("woff2");
   font-display: swap;
 }
 :root {
@@ -139,6 +139,20 @@ h2 { margin-bottom: 8px; color: #ead487; font-size: 18px; font-weight: normal; }
 .ledger-panel dd { margin: 0; color: #e9ddaf; text-align: right; }
 .ledger-panel button { width: 100%; }
 .action-stack { display: grid; gap: 7px; margin-top: 13px; }
+.safety-panel > p { color: var(--muted); font-size: 10px; line-height: 1.55; }
+.safety-panel ul { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
+.safety-panel li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed #425047;
+  color: #c8d0ca;
+  font: 9px/1.45 Consolas, monospace;
+}
+.safety-panel li strong { color: var(--muted); font-weight: normal; }
+.safety-panel li.pass strong { color: var(--green); }
+.safety-panel li.fail strong { color: var(--danger); }
 .report-panel pre { max-height: 360px; overflow: auto; margin: 0; padding: 10px; color: #b8d8ca; background: #0d1310; font: 10px/1.5 Consolas, monospace; white-space: pre-wrap; }
 .log-panel ol { max-height: 260px; overflow: auto; margin: 0; padding-left: 24px; color: #b8c0ba; font: 9px/1.6 Consolas, monospace; }
 .log-panel li { padding: 3px 0; border-bottom: 1px dotted #39443e; overflow-wrap: anywhere; }

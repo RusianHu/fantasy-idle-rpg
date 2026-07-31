@@ -22,6 +22,12 @@
   var measureState = { a: null, b: null, path: null, report: null };
   var probeState = null;
   var candidateInspection = null;
+  var merchantAudit = null;
+  var merchantQaPoint = null;
+  var merchantActorId = null;
+  var merchantSpawnId = null;
+  var merchantRequestOrdinal = 0;
+  var merchantPatrolMax = 0;
   var issueIndex = -1;
   var motion = false;
   var motionAccumulator = 0;
@@ -67,7 +73,13 @@
       instances: '当前实例', currentMapScope: '当前地图', allMapsScope: '全部地图定义',
       decorInstances: '生态装饰', decorClusters: '簇群中心', decorDefinitions: '装饰类型',
       decorNearest: '平均最近邻', decorEnrichment: '同类富集倍数', decorCoverage: '配额完成率',
-      habitatViable: '适宜区域', habitatNone: '选择装饰后显示适宜度场'
+      habitatViable: '适宜区域', habitatNone: '选择装饰后显示适宜度场',
+      merchantHint: '点击主地图设置模拟玩家位置，并用正式行商放置规则重新审计。',
+      merchantProfile: '行商档案', merchantSource: '候选来源', merchantEligible: '距离内候选',
+      merchantValid: '合法候选', merchantClearance: '篷车净宽', merchantPatrol: '巡游约束',
+      merchantPass: '通过', merchantFail: '失败', merchantNoPlacement: '没有合法篷车位置',
+      merchantQa: '模拟玩家', merchantWagon: '篷车锚点', merchantRejected: '拒绝分布',
+      merchantMoved: '已更新模拟玩家位置'
     },
     en: {
       ready: 'Generation complete', generating: 'Generating', none: 'No object selected',
@@ -84,7 +96,13 @@
       instances: 'current instances', currentMapScope: 'current map', allMapsScope: 'all map definitions',
       decorInstances: 'ecology props', decorClusters: 'cluster centers', decorDefinitions: 'decor types',
       decorNearest: 'mean nearest', decorEnrichment: 'same-type enrichment', decorCoverage: 'quota coverage',
-      habitatViable: 'viable habitat', habitatNone: 'select a decoration to inspect habitat'
+      habitatViable: 'viable habitat', habitatNone: 'select a decoration to inspect habitat',
+      merchantHint: 'Click the map to move the simulated player and rerun production merchant placement.',
+      merchantProfile: 'merchant profile', merchantSource: 'candidate source', merchantEligible: 'range candidates',
+      merchantValid: 'legal candidates', merchantClearance: 'wagon clearance', merchantPatrol: 'patrol contract',
+      merchantPass: 'Pass', merchantFail: 'Fail', merchantNoPlacement: 'No legal wagon placement',
+      merchantQa: 'simulated player', merchantWagon: 'wagon anchor', merchantRejected: 'rejections',
+      merchantMoved: 'Simulated player position updated'
     }
   };
 
@@ -506,6 +524,34 @@
         drawCircle(item, item.occupancyRadius || 10, '#c9a95b', 'rgba(201,169,91,.06)');
       });
     }
+    if (layers.merchantAudit && merchantAudit) {
+      if (merchantQaPoint) {
+        drawCircle(merchantQaPoint, 7, '#68c9c4', 'rgba(104,201,196,.18)');
+      }
+      if (merchantAudit.chosen) {
+        drawCircle(
+          merchantAudit.chosen,
+          merchantAudit.constraints.tradeRadius,
+          'rgba(226,191,94,.72)',
+          'rgba(226,191,94,.035)'
+        );
+        drawCircle(
+          merchantAudit.chosen,
+          merchantAudit.constraints.patrolRadius,
+          '#83c77f',
+          'rgba(131,199,127,.07)'
+        );
+        if (merchantQaPoint) {
+          drawWorldLine([merchantQaPoint, merchantAudit.chosen], 'rgba(104,201,196,.48)', 1, [4, 3]);
+        }
+        var merchantActor = merchantActorId && actors.filter(function (actor) {
+          return actor.id === merchantActorId;
+        })[0];
+        if (merchantActor) {
+          drawWorldLine([merchantAudit.chosen, merchantActor], 'rgba(131,199,127,.62)', 1, [2, 2]);
+        }
+      }
+    }
     if (layers.formations && populationPlan) {
       populationPlan.slots.forEach(function (slot) {
         var members = actors.filter(function (actor) { return actor._labSlotId === slot.id; })
@@ -585,6 +631,10 @@
     };
     var point = miniPoint(item);
     if (item.kind === 'actor') {
+      if (item._labChannel === 'merchant') {
+        Game.mapIcons.draw(minimapCtx, 'merchant', point.x, point.y, { size: 14 });
+        return;
+      }
       minimapCtx.fillStyle = item.rank === 'boss' ? '#f08b57' : (item.category === 'npc' ? '#6fd3c4' : '#e0cb6d');
       minimapCtx.fillRect(Math.round(point.x - 2), Math.round(point.y - 2), item.rank === 'boss' ? 6 : 4, item.rank === 'boss' ? 6 : 4);
       return;
@@ -770,7 +820,11 @@
   function renderProbe() {
     var host = document.getElementById('probe-output');
     if (!probeState) {
-      host.innerHTML = '<p class="empty-state">' + esc(tool === 'inspect' ? lt('inspectHint') : tool === 'measure' ? lt('measureHint') : lt('placementHint')) + '</p>';
+      host.innerHTML = '<p class="empty-state">' + esc(
+        tool === 'inspect' ? lt('inspectHint') :
+          (tool === 'measure' ? lt('measureHint') :
+            (tool === 'merchant' ? lt('merchantHint') : lt('placementHint')))
+      ) + '</p>';
       return;
     }
     if (probeState.tool === 'inspect') {
@@ -801,6 +855,17 @@
           row('max danger', probeState.maxDanger.toFixed(3)) +
           row('solve', probeState.solveMs.toFixed(2) + ' ms') + '</dl>';
       }
+      return;
+    }
+    if (probeState.tool === 'merchant') {
+      host.innerHTML = '<dl>' +
+        row(lt('merchantQa'), Math.round(probeState.point.x) + ', ' + Math.round(probeState.point.y)) +
+        row(lt('merchantProfile'), merchantAudit && merchantAudit.merchantProfileId || '—') +
+        row(lt('merchantSource'), merchantAudit && merchantAudit.source || '—') +
+        row('result', probeState.ok ? lt('merchantPass') : lt('merchantFail'), probeState.ok) +
+        row(lt('merchantWagon'), merchantAudit && merchantAudit.chosen
+          ? Math.round(merchantAudit.chosen.x) + ', ' + Math.round(merchantAudit.chosen.y)
+          : '—') + '</dl>';
       return;
     }
     var checks = (probeState.checks || []).map(function (check) {
@@ -1376,7 +1441,7 @@
       }
     });
     (masters.props || []).forEach(function (prop) {
-      if (!prop.campProp && prop.kind !== 'bossDecor' && !decorSprites[prop.sprite]) {
+      if (!prop.campProp && !prop.merchantAuditProp && prop.kind !== 'bossDecor' && !decorSprites[prop.sprite]) {
         addIssue('decoration-definition', 'unregistered decoration sprite: ' + prop.sprite, prop);
       }
     });
@@ -1408,7 +1473,7 @@
           'warn');
       });
       (masters.props || []).forEach(function (prop) {
-        if (prop.campProp || prop.kind === 'bossDecor' || prop.blockerProp) return;
+        if (prop.campProp || prop.merchantAuditProp || prop.kind === 'bossDecor' || prop.blockerProp) return;
         if (!prop.decorGroup || !prop.decorPattern || !prop.decorRole) {
           addIssue('decoration-provenance',
             prop.sprite + ' lacks cluster / grammar provenance', prop);
@@ -1422,6 +1487,10 @@
         addIssue('population-capacity', failure.profileId + ': ' + failure.reason, null, 'warn');
       }
     });
+    if (!merchantAudit || !merchantAudit.ok || !merchantAudit.chosen) {
+      addIssue('merchant-placement', merchantAudit && merchantAudit.reason || 'merchant audit missing',
+        merchantQaPoint, 'error');
+    }
     var contentPoints = []
       .concat(masters.nodes || [], masters.landmarks || [], masters.curios || [], masters.ecology || []);
     for (var cp = 0; cp < contentPoints.length; cp++) {
@@ -1535,6 +1604,155 @@
     candidateInspection = null;
   }
 
+  function defaultMerchantQaPoint(targetLayout) {
+    targetLayout = targetLayout || layout;
+    if (!targetLayout) return null;
+    var camp = targetLayout.camp;
+    var points = targetLayout.corridor && targetLayout.corridor.points || [];
+    var best = null;
+    points.forEach(function (point) {
+      var distance = U.dist(camp.x, camp.y, point.x, point.y);
+      var score = Math.abs(distance - 260);
+      if (!best || score < best.score) best = { x: point.x, y: point.y, score: score };
+    });
+    return best ? { x: best.x, y: best.y } : { x: camp.x, y: camp.y };
+  }
+
+  function merchantPlacementSeed(targetLayout) {
+    targetLayout = targetLayout || layout;
+    return U.strSeed([
+      targetLayout && targetLayout.worldSeed || 0,
+      targetLayout && targetLayout.regionId || region && region.id,
+      'map-generation-lab-merchant'
+    ].join('|'));
+  }
+
+  function merchantAuditSignature(report) {
+    return report && {
+      ok: report.ok,
+      reason: report.reason,
+      merchantProfileId: report.merchantProfileId,
+      spawnProfileId: report.spawnProfileId,
+      selector: report.selector,
+      source: report.source,
+      seed: report.seed,
+      heroPoint: report.heroPoint,
+      constraints: report.constraints,
+      sourceTotal: report.sourceTotal,
+      distanceEligible: report.distanceEligible,
+      inspectedCount: report.inspectedCount,
+      validCount: report.validCount,
+      failureCounts: report.failureCounts,
+      chosen: report.chosen
+    };
+  }
+
+  function removeMerchantAuditRuntime() {
+    if (merchantSpawnId && Game.population.lease(merchantSpawnId)) {
+      Game.population.close(merchantSpawnId, 'merchant-audit-refresh', { despawn: true });
+    }
+    if (merchantActorId) {
+      actors = actors.filter(function (actor) { return actor.id !== merchantActorId; });
+      delete actorOrigins[merchantActorId];
+      delete actorRng[merchantActorId];
+    }
+    merchantActorId = null;
+    merchantSpawnId = null;
+    merchantPatrolMax = 0;
+    if (masters.props) {
+      masters.props = masters.props.filter(function (prop) { return !prop.merchantAuditProp; });
+    }
+  }
+
+  function prepareMerchantAudit(point, targetLayout, plan) {
+    targetLayout = targetLayout || layout;
+    plan = plan || populationPlan;
+    merchantQaPoint = point || defaultMerchantQaPoint(targetLayout);
+    merchantAudit = Game.merchants.inspectPlacement({
+      regionId: targetLayout.regionId || region.id,
+      seed: merchantPlacementSeed(targetLayout),
+      layout: targetLayout,
+      heroPoint: merchantQaPoint,
+      reservations: plan && plan.reservations,
+      full: true
+    });
+    if (targetLayout === layout && masters.props && merchantAudit.chosen) {
+      masters.props.push({
+        id: 'merchant-audit-wagon',
+        kind: 'merchantAudit',
+        sprite: 'trade_wagon_wander',
+        x: merchantAudit.chosen.x,
+        y: merchantAudit.chosen.y,
+        scale: 1,
+        merchantAuditProp: true
+      });
+    }
+    log('merchant', merchantAudit.ok ? 'merchant placement audit passed' : 'merchant placement audit failed',
+      merchantAuditSignature(merchantAudit), merchantAudit.ok ? 'info' : 'error');
+    return merchantAudit;
+  }
+
+  function mountMerchantAuditActor(registerRuntime) {
+    if (!merchantAudit || !merchantAudit.chosen) return null;
+    var profile = Game.content.get('merchantProfile', merchantAudit.merchantProfileId);
+    if (!profile) return null;
+    var result = Game.population.materialize(profile.spawnProfileId, {
+      regionId: region.id,
+      populationId: 'map-generation-lab-merchant',
+      layoutSlotKey: merchantAudit.chosen.anchorKey,
+      spawnRequestKey: [
+        'map-generation-lab', region.id, layout.worldSeed, ++merchantRequestOrdinal
+      ].join(':'),
+      x: merchantAudit.chosen.x,
+      y: merchantAudit.chosen.y,
+      tier: region.tier || 1,
+      rewardMultiplier: 0
+    });
+    if (!result.ok || !result.primary) {
+      log('merchant', 'merchant audit actor materialization failed', result, 'error');
+      return null;
+    }
+    var actor = result.primary;
+    Game.merchants.configurePatrolActor(actor, merchantAudit.chosen);
+    actor.merchantProfileId = profile.id;
+    actor._labChannel = 'merchant';
+    actor._labSlotId = 'merchant-audit';
+    actors.push(actor);
+    merchantActorId = actor.id;
+    merchantSpawnId = result.lease.spawnId;
+    if (registerRuntime) {
+      actorOrigins[actor.id] = {
+        x: actor.spawnX, y: actor.spawnY, dir: actor.dir, state: actor.state
+      };
+      actorRng[actor.id] = U.seededRng(U.strSeed(
+        region.id + ':' + layout.worldSeed + ':' + actor.id
+      ));
+      applySceneLayers(true);
+    }
+    return actor;
+  }
+
+  function rerunMerchantAudit(point) {
+    removeMerchantAuditRuntime();
+    prepareMerchantAudit(point, layout, populationPlan);
+    mountMerchantAuditActor(true);
+    if (generationRecord) {
+      generationRecord.merchantPlacementHash = hash(merchantAuditSignature(merchantAudit));
+      generationRecord.actorCoordinateHash = hash(expectedActorCoordinates(populationPlan, merchantAudit));
+    }
+    runAudit();
+    refreshGenerationReportHash();
+    probeState = {
+      tool: 'merchant',
+      point: copy(merchantQaPoint),
+      ok: !!merchantAudit.ok
+    };
+    renderProbe();
+    renderMerchantAudit();
+    setStatus(lt('merchantMoved'));
+    return copy(merchantAuditSignature(merchantAudit));
+  }
+
   function materializePlan() {
     actors = [];
     ['regular', 'npc', 'guardian', 'boss'].forEach(function (channel) {
@@ -1551,6 +1769,7 @@
         actors: results.reduce(function (sum, result) { return sum + result.actors.length; }, 0)
       });
     });
+    mountMerchantAuditActor(false);
     actorOrigins = {};
     actorRng = {};
     actors.forEach(function (actor) {
@@ -1592,6 +1811,7 @@
   }
 
   function propLayer(prop) {
+    if (prop.merchantAuditProp) return 'merchantAudit';
     if (prop.campProp) return 'camp';
     if (prop.kind === 'bossDecor') return 'decorBoss';
     if (prop.blockerProp) return 'decorBlocker';
@@ -1610,7 +1830,9 @@
     layout.flowers = layers.flowers === false ? [] : masters.flowers.slice();
     if (remount) Game.terrain.mount(layout, region);
     Game.world.props = layout.props.concat(layout.nodes, layout.landmarks, layout.curios, layout.ecology);
-    Game.world.entities = layers.actors === false ? [] : actors.slice();
+    Game.world.entities = layers.actors === false ? [] : actors.filter(function (actor) {
+      return actor._labChannel !== 'merchant' || layers.merchantAudit !== false;
+    });
     Game.terrain.rebuildDynamicSpatial(Game.world.entities);
   }
 
@@ -1629,7 +1851,13 @@
     };
   }
 
-  function expectedActorCoordinates(plan) {
+  function productionDecorationSnapshot(targetLayout) {
+    return Game.terrain.decorationSnapshot(Object.assign({}, targetLayout, {
+      props: (targetLayout.props || []).filter(function (prop) { return !prop.merchantAuditProp; })
+    }));
+  }
+
+  function expectedActorCoordinates(plan, merchantReport) {
     var out = [];
     (plan.slots || []).forEach(function (slot) {
       var profile = Game.content.get('worldSpawnProfile', slot.profileId);
@@ -1648,6 +1876,17 @@
         });
       });
     });
+    if (merchantReport && merchantReport.chosen) {
+      var merchantProfile = Game.content.get('merchantProfile', merchantReport.merchantProfileId);
+      var spawnProfile = merchantProfile && Game.content.get('worldSpawnProfile', merchantProfile.spawnProfileId);
+      var actorRef = spawnProfile && spawnProfile.actorRef;
+      if (actorRef) out.push({
+        slotId: 'merchant-audit',
+        archetypeId: actorRef.archetypeId,
+        x: merchantReport.chosen.x,
+        y: merchantReport.chosen.y
+      });
+    }
     return out.sort(function (left, right) {
       return left.slotId.localeCompare(right.slotId) ||
         left.archetypeId.localeCompare(right.archetypeId) ||
@@ -1676,10 +1915,18 @@
     var started = now();
     var regenerated = Game.terrain.generate(region, layout.worldSeed, 3);
     var terrainSnapshot = Game.terrain.snapshotV3(regenerated);
-    var decorationSnapshot = Game.terrain.decorationSnapshot(regenerated);
+    var decorationSnapshot = productionDecorationSnapshot(regenerated);
     var previewContext = Object.assign({}, populationContext, { preview: true });
     var previewPlan = Game.population.prepareRegion(region.id, regenerated, previewContext);
-    var expected = expectedActorCoordinates(previewPlan);
+    var previewMerchant = Game.merchants.inspectPlacement({
+      regionId: region.id,
+      seed: merchantPlacementSeed(regenerated),
+      layout: regenerated,
+      heroPoint: merchantQaPoint || defaultMerchantQaPoint(regenerated),
+      reservations: previewPlan.reservations,
+      full: true
+    });
+    var expected = expectedActorCoordinates(previewPlan, previewMerchant);
     var currentCoordinates = mountedActorCoordinates();
     var result = {
       ok: true,
@@ -1700,6 +1947,11 @@
         expectedHash: generationRecord.populationHash,
         actualHash: hash(planSignature(previewPlan))
       },
+      merchantPlacement: {
+        match: hash(merchantAuditSignature(previewMerchant)) === generationRecord.merchantPlacementHash,
+        expectedHash: generationRecord.merchantPlacementHash,
+        actualHash: hash(merchantAuditSignature(previewMerchant))
+      },
       actors: {
         match: hash(expected) === generationRecord.actorCoordinateHash &&
           hash(currentCoordinates) === generationRecord.actorCoordinateHash,
@@ -1710,7 +1962,7 @@
       elapsedMs: now() - started
     };
     result.ok = result.terrain.match && result.decorationEcology.match &&
-      result.population.match && result.actors.match;
+      result.population.match && result.merchantPlacement.match && result.actors.match;
     result.reportHash = hash(result);
     log('determinism', result.ok ? 'terrain, population and actor coordinates match' : 'determinism mismatch', result, result.ok ? 'info' : 'error');
     setStatus(result.ok ? lt('verified') + ' · ' + result.reportHash : lt('mismatch'));
@@ -1737,6 +1989,7 @@
       actorRng[actor.id] = U.seededRng(U.strSeed(region.id + ':' + layout.worldSeed + ':' + actor.id));
     });
     motionAccumulator = 0;
+    merchantPatrolMax = 0;
     Game.terrain.rebuildDynamicSpatial(Game.world.entities);
     setStatus(lt('reset'));
     log('motion', 'actor positions reset', { actors: actors.length });
@@ -1757,8 +2010,14 @@
     motionAccumulator += Math.min(dt, 0.2);
     while (motionAccumulator >= 0.05) {
       actors.forEach(function (actor) {
-        if (actor._labChannel !== 'regular' && actor._labChannel !== 'npc') return;
+        if (actor._labChannel !== 'regular' && actor._labChannel !== 'npc' &&
+            actor._labChannel !== 'merchant') return;
         Game.world.updateAmbientActor(actor, 0.05, { rng: actorRng[actor.id] });
+        if (actor._labChannel === 'merchant' && merchantAudit && merchantAudit.chosen) {
+          merchantPatrolMax = Math.max(merchantPatrolMax, U.dist(
+            actor.x, actor.y, merchantAudit.chosen.x, merchantAudit.chosen.y
+          ));
+        }
       });
       motionAccumulator -= 0.05;
     }
@@ -1779,6 +2038,8 @@
       terrain: Game.terrain.snapshotV3(layout),
       validation: copy(validation),
       populationPlan: planSignature(populationPlan),
+      merchantAudit: merchantAuditSignature(merchantAudit),
+      merchantPatrolMax: merchantPatrolMax,
       actors: actors.map(function (actor) {
         return {
           id: actor.id,
@@ -1873,6 +2134,48 @@
     summary.innerHTML = chips.join('');
   }
 
+  function renderMerchantAudit() {
+    var host = document.getElementById('merchant-audit-metrics');
+    var detail = document.getElementById('merchant-audit-detail');
+    var focusButton = document.getElementById('focus-merchant');
+    if (!host || !detail || !focusButton) return;
+    if (!merchantAudit) {
+      host.innerHTML = '';
+      detail.textContent = lt('merchantNoPlacement');
+      focusButton.disabled = true;
+      return;
+    }
+    var chosen = merchantAudit.chosen;
+    var patrolRadius = merchantAudit.constraints && merchantAudit.constraints.patrolRadius || 0;
+    var patrolPass = !!chosen && merchantPatrolMax <= patrolRadius + 0.5;
+    var values = [
+      [merchantAudit.ok ? lt('merchantPass') : lt('merchantFail'), lt('merchantProfile'), merchantAudit.ok],
+      [merchantAudit.source || '—', lt('merchantSource')],
+      [merchantAudit.distanceEligible + ' / ' + merchantAudit.sourceTotal, lt('merchantEligible')],
+      [merchantAudit.validCount + ' / ' + merchantAudit.inspectedCount, lt('merchantValid'), merchantAudit.validCount > 0],
+      [chosen ? chosen.clearance.toFixed(0) + ' px' : '—', lt('merchantClearance'), !!chosen],
+      [merchantPatrolMax.toFixed(1) + ' / ' + patrolRadius + ' px', lt('merchantPatrol'), patrolPass]
+    ];
+    host.innerHTML = values.map(function (entry) {
+      return '<div class="merchant-audit-metric"><strong' +
+        (entry[2] === undefined ? '' : ' class="' + (entry[2] ? 'pass' : 'fail') + '"') + '>' +
+        esc(entry[0]) + '</strong><span>' + esc(entry[1]) + '</span></div>';
+    }).join('');
+    var rejected = Object.keys(merchantAudit.failureCounts || {}).sort(function (left, right) {
+      return merchantAudit.failureCounts[right] - merchantAudit.failureCounts[left];
+    }).slice(0, 5).map(function (key) {
+      return key + ':' + merchantAudit.failureCounts[key];
+    }).join(' · ');
+    detail.textContent = chosen
+      ? lt('merchantQa') + ' ' + Math.round(merchantAudit.heroPoint.x) + ',' + Math.round(merchantAudit.heroPoint.y) +
+        ' · ' + lt('merchantWagon') + ' ' + Math.round(chosen.x) + ',' + Math.round(chosen.y) +
+        ' · danger ' + chosen.danger.toFixed(3) + ' · reservations ' +
+        ((merchantAudit.failureCounts && merchantAudit.failureCounts.occupancy) || 0) +
+        ' · ' + lt('merchantRejected') + ' ' + (rejected || '—')
+      : lt('merchantNoPlacement') + ' · ' + lt('merchantRejected') + ' ' + (rejected || '—');
+    focusButton.disabled = !chosen;
+  }
+
   function renderMetrics() {
     if (!layout) return;
     var sorted = frameSamples.slice().sort(function (a, b) { return a - b; });
@@ -1901,6 +2204,7 @@
     document.getElementById('runtime-metrics').innerHTML = values.map(function (entry) {
       return '<div class="metric"><strong>' + esc(entry[0]) + '</strong><span>' + esc(entry[1]) + '</span></div>';
     }).join('');
+    renderMerchantAudit();
   }
 
   function updateCameraStatus() {
@@ -1938,6 +2242,11 @@
       actors: Game.content.all('actorArchetype').length,
       spawnProfiles: Game.content.all('worldSpawnProfile').length
     });
+    merchantAudit = null;
+    merchantQaPoint = null;
+    merchantActorId = null;
+    merchantSpawnId = null;
+    merchantPatrolMax = 0;
     Game.population.reset(region.id);
     Game.parties.reset();
     Game.actors.reset();
@@ -1997,10 +2306,11 @@
       ok: populationPlan.ok, elapsedMs: timings.population,
       slots: populationPlan.slots.length, failures: populationPlan.failures.length
     }, populationPlan.ok ? 'info' : 'error');
+    prepareMerchantAudit(null, layout, populationPlan);
     began = now();
     materializePlan();
     timings.materialize = now() - began;
-    applySceneLayers(false);
+    applySceneLayers(true);
     miniTerrain = buildMiniTerrain();
     selected = null;
     probeState = null;
@@ -2009,18 +2319,13 @@
     generationRecord = {
       timings: timings,
       terrainHash: hash(Game.terrain.snapshotV3(layout)),
-      decorationHash: hash(Game.terrain.decorationSnapshot(layout)),
+      decorationHash: hash(productionDecorationSnapshot(layout)),
       populationHash: hash(planSignature(populationPlan)),
-      actorCoordinateHash: hash(expectedActorCoordinates(populationPlan))
+      actorCoordinateHash: hash(expectedActorCoordinates(populationPlan, merchantAudit)),
+      merchantPlacementHash: hash(merchantAuditSignature(merchantAudit))
     };
     runAudit();
-    generationRecord.reportHash = hash({
-      terrain: generationRecord.terrainHash,
-      decoration: generationRecord.decorationHash,
-      population: generationRecord.populationHash,
-      actors: generationRecord.actorCoordinateHash,
-      audit: auditIssues
-    });
+    refreshGenerationReportHash();
     rebuildCatalog();
     profileOptions();
     rememberSeed(requestedSeed);
@@ -2028,6 +2333,7 @@
     renderSelection();
     renderProbe();
     renderDecorationEcology();
+    renderMerchantAudit();
     document.getElementById('seed-input').value = U.hex32(requestedSeed);
     document.getElementById('stage-index').textContent = String(currentIndex + 1).padStart(2, '0');
     document.getElementById('stage-region-name').textContent = regionName(region);
@@ -2041,6 +2347,19 @@
     renderMetrics();
     log('renderer', 'renderer ready', { camera: copy(Game.render.cam), particles: false, fog: false, player: false });
     return currentSnapshot();
+  }
+
+  function refreshGenerationReportHash() {
+    if (!generationRecord) return null;
+    generationRecord.reportHash = hash({
+      terrain: generationRecord.terrainHash,
+      decoration: generationRecord.decorationHash,
+      population: generationRecord.populationHash,
+      actors: generationRecord.actorCoordinateHash,
+      merchant: generationRecord.merchantPlacementHash,
+      audit: auditIssues
+    });
+    return generationRecord.reportHash;
   }
 
   function randomize() {
@@ -2058,7 +2377,7 @@
     }
     var input = document.querySelector('[data-layer="' + name + '"]');
     if (input) input.checked = layers[name];
-    if (/^(camp|decor|tufts|flowers|landmarks|resources|curios|ecology|actors)/.test(name)) {
+    if (/^(camp|decor|tufts|flowers|landmarks|resources|curios|ecology|actors|merchantAudit)/.test(name)) {
       applySceneLayers(name !== 'actors');
     }
     log('renderer', 'layer changed', { layer: name, enabled: layers[name] });
@@ -2070,6 +2389,7 @@
     point.y = clamp(point.y, 0, layout.world.h);
     if (tool === 'inspect') return inspectAt(point);
     if (tool === 'measure') return measure(point);
+    if (tool === 'merchant') return rerunMerchantAudit(point);
     return placementProbe(null, point);
   }
 
@@ -2260,6 +2580,10 @@
     document.getElementById('issue-next').addEventListener('click', function () { focusIssue(1); });
     document.getElementById('verify-determinism').addEventListener('click', verifyDeterminism);
     document.getElementById('reset-positions').addEventListener('click', resetPositions);
+    document.getElementById('focus-merchant').addEventListener('click', function () {
+      if (!merchantAudit || !merchantAudit.chosen) return;
+      setCamera(merchantAudit.chosen.x, merchantAudit.chosen.y, Math.max(1.8, Game.render.cam.zoom));
+    });
     document.getElementById('export-png').addEventListener('click', exportPng);
     document.getElementById('copy-report').addEventListener('click', function () {
       copyText(JSON.stringify({ snapshot: currentSnapshot(), logs: logs }, null, 2))
@@ -2328,7 +2652,7 @@
     });
     window.addEventListener('demo:locale', function () {
       renderTabs(); rebuildCatalog(); renderSelection(); renderProbe();
-      renderMetrics(); renderDecorationEcology();
+      renderMetrics(); renderDecorationEcology(); renderMerchantAudit();
       if (region) {
         document.getElementById('stage-region-name').textContent = regionName(region);
         document.getElementById('runtime-status').textContent = lt('ready');
@@ -2390,6 +2714,9 @@
       probe: placementProbe,
       inspect: inspectAt,
       measure: measure,
+      merchantAudit: function (point) {
+        return point ? rerunMerchantAudit(point) : copy(merchantAuditSignature(merchantAudit));
+      },
       verifyDeterminism: verifyDeterminism,
       decorationReport: function () {
         return copy({

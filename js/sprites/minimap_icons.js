@@ -156,6 +156,27 @@
         '.............'
       ]
     },
+    merchant: {
+      pal: {
+        t: '#4faeb0', h: '#98e1d5', c: '#efe0b8',
+        g: '#e2b85b', w: '#865b3d', d: '#3e3340', l: '#fff0a0'
+      },
+      rows: [
+        '.....g.......',
+        '....ggg......',
+        '...ttttt.....',
+        '..tccccct....',
+        '.tccccccct...',
+        '.thcccccht...',
+        '.ggggggggg...',
+        '.wwwwwwwww...',
+        '.wlwwwwwlw...',
+        '..ddddddd....',
+        '.dd.....dd...',
+        '.dhd...dhd...',
+        '..d.....d....'
+      ]
+    },
     hero: {
       pal: { c: '#496a83', h: '#7bb6c6', f: '#e3bf91', w: '#fff3d2', g: '#d7b75c', d: '#694e57' },
       rows: [
