@@ -7,14 +7,26 @@
   var seedInput = document.getElementById('seed');
   var auditButton = document.getElementById('audit');
   var auditStatus = document.getElementById('audit-status');
+  var autoScenario = document.getElementById('auto-scenario');
+  var autoPolicy = document.getElementById('auto-policy');
+  var runAutoButton = document.getElementById('run-auto');
+  var auditAutoButton = document.getElementById('audit-auto');
+  var autoStatus = document.getElementById('auto-status');
   var D = DemoI18n;
   var latest = null;
   var latestRoute = null;
+  var latestBaseReport = null;
+  var latestAutoResult = null;
+  var latestAutoRun = null;
 
   Game.content.finalize({ strict: true });
   D.init();
   Game.i18n.setLocale(D.locale());
-  Game.state = { settings: { expeditionStrategy: 'balanced' } };
+  Game.state = {
+    settings: { expeditionStrategy: 'balanced' },
+    world: { worldTime: 0, region: 'grassland' },
+    inv: { potions: {} }
+  };
 
   function regionName(region) {
     return Game.i18n.t('region.' + region.id + '.name');
@@ -34,6 +46,12 @@
   var query = new URLSearchParams(location.search);
   buildRegionOptions(query.get('region'));
   if (/^[0-9a-f]{1,8}$/i.test(query.get('seed') || '')) seedInput.value = query.get('seed').toUpperCase();
+  if (Game.autoRouteAudit.scenarios[query.get('scenario')]) {
+    autoScenario.value = query.get('scenario');
+  }
+  if (['compare', 'current', 'guarded'].indexOf(query.get('policy')) >= 0) {
+    autoPolicy.value = query.get('policy');
+  }
 
   function markerSize() {
     var cssWidth = Math.max(1, canvas.getBoundingClientRect().width);
@@ -119,6 +137,35 @@
       ctx.restore();
     }
 
+    if (document.getElementById('show-auto-route').checked && latestAutoRun &&
+        latestAutoRun.samples.length) {
+      var stateColors = {
+        travel: '#7ee0c2', approach: '#f0cf6d', act: '#cf8ddb',
+        combat: '#ef705e', reached: '#86c99c'
+      };
+      ctx.save();
+      ctx.lineWidth = Math.max(2, Math.round(2 * canvas.width /
+        Math.max(1, canvas.getBoundingClientRect().width)));
+      ctx.setLineDash([]);
+      for (var ai = 1; ai < latestAutoRun.samples.length; ai++) {
+        var previous = latestAutoRun.samples[ai - 1];
+        var sample = latestAutoRun.samples[ai];
+        ctx.strokeStyle = stateColors[sample.state] || '#b8c0b9';
+        ctx.beginPath();
+        ctx.moveTo(previous.x * sx, previous.y * sy);
+        ctx.lineTo(sample.x * sx, sample.y * sy);
+        ctx.stroke();
+      }
+      if (latestAutoRun.target) {
+        ctx.strokeStyle = latestAutoRun.passed ? '#86c99c' : '#ef705e';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(latestAutoRun.target.x * sx, latestAutoRun.target.y * sy, 9, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     if (document.getElementById('show-content').checked) {
       marks([layout.camp], 'camp', sx, sy);
       marks(layout.landmarks, function (point) { return point.bossLair ? 'lair' : 'landmark'; }, sx, sy);
@@ -156,6 +203,276 @@
       element.className = 'metric';
       element.innerHTML = '<span>' + key + '</span><strong>' + values[key] + '</strong>';
       root.appendChild(element);
+    });
+  }
+
+  function compactAutoRun(run) {
+    return {
+      scenario: run.scenario,
+      policy: run.policy,
+      passed: run.passed,
+      expectedCurrentGap: run.expectedCurrentGap,
+      terminal: run.terminal,
+      reason: run.reason,
+      duration: run.duration,
+      remaining: run.remaining,
+      interaction: run.interaction,
+      watchdog: run.watchdog,
+      navigation: run.navigation,
+      transitions: run.transitions,
+      target: run.target,
+      logs: run.logs
+    };
+  }
+
+  function compactAutoResult(result) {
+    if (!result) return null;
+    if (result.current && result.guarded) {
+      return {
+        scenario: result.scenario,
+        reproduced: result.reproduced,
+        current: compactAutoRun(result.current),
+        guarded: compactAutoRun(result.guarded)
+      };
+    }
+    if (result.batch) return result;
+    return compactAutoRun(result);
+  }
+
+  function renderFullReport() {
+    if (!latestBaseReport) return;
+    var report = Object.assign({}, latestBaseReport);
+    if (latestAutoResult) report.autoNavigation = compactAutoResult(latestAutoResult);
+    document.getElementById('report').textContent = JSON.stringify(report, null, 2);
+  }
+
+  function policyLabel(policy) {
+    return D.t(policy === 'guarded'
+      ? 'explore.policyGuarded' : 'explore.policyCurrent');
+  }
+
+  function metric(root, label, value, tone) {
+    var item = document.createElement('div');
+    item.className = 'auto-metric';
+    if (tone) item.setAttribute('data-tone', tone);
+    var name = document.createElement('span');
+    var strong = document.createElement('strong');
+    name.textContent = label;
+    strong.textContent = value;
+    item.appendChild(name);
+    item.appendChild(strong);
+    root.appendChild(item);
+  }
+
+  function navLabel(nav) {
+    if (!nav) return '-';
+    if (nav.fallback) return 'fallback';
+    if (nav.pending) return 'pending';
+    return nav.legs ? ((nav.leg + 1) + '/' + nav.legs) : 'local';
+  }
+
+  function renderAutoLogs(runs) {
+    var root = document.getElementById('auto-log');
+    root.innerHTML = '';
+    var rows = [];
+    runs.forEach(function (run) {
+      run.logs.forEach(function (entry) {
+        rows.push({ policy: run.policy, entry: entry });
+      });
+    });
+    rows.sort(function (a, b) {
+      return a.entry.t - b.entry.t || a.policy.localeCompare(b.policy);
+    });
+    rows.slice(0, 160).forEach(function (row) {
+      var tr = document.createElement('tr');
+      tr.setAttribute('data-policy', row.policy);
+      [
+        row.entry.t.toFixed(2) + 's',
+        policyLabel(row.policy),
+        row.entry.event,
+        row.entry.state,
+        row.entry.distance.toFixed(1),
+        navLabel(row.entry.nav)
+      ].forEach(function (value) {
+        var td = document.createElement('td');
+        td.textContent = value;
+        tr.appendChild(td);
+      });
+      root.appendChild(tr);
+    });
+  }
+
+  function renderAutoResult(result) {
+    var metrics = document.getElementById('auto-metrics');
+    var report = document.getElementById('auto-report');
+    metrics.innerHTML = '';
+    latestAutoResult = result;
+    var runs;
+    if (result.current && result.guarded) {
+      runs = [result.current, result.guarded];
+      latestAutoRun = result.current;
+      metric(metrics, D.t('explore.metricCurrent'),
+        D.t(result.current.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
+        result.current.passed ? 'pass' : 'fail');
+      metric(metrics, D.t('explore.metricGuarded'),
+        D.t(result.guarded.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
+        result.guarded.passed ? 'pass' : 'fail');
+      metric(metrics, D.t('explore.metricCoverage'),
+        Math.round(result.current.watchdog.productionCoverage * 100) + '%',
+        result.current.watchdog.productionCoverage < 1 ? 'fail' : 'pass');
+      metric(metrics, D.t('explore.metricPhysicalStill'),
+        result.current.watchdog.maxPhysicalStill.toFixed(2) + 's');
+      metric(metrics, D.t('explore.metricCacheReset'),
+        String(result.guarded.watchdog.cacheInvalidations));
+      metric(metrics, D.t('explore.metricResume'),
+        result.guarded.navigation.resumeLatency === null
+          ? '-' : result.guarded.navigation.resumeLatency.toFixed(2) + 's');
+      autoStatus.textContent = D.t(result.reproduced
+        ? 'explore.autoReproduced' :
+        (result.current.passed && result.guarded.passed
+          ? 'explore.autoPassed' : 'explore.autoUnexpected'));
+      autoStatus.setAttribute('data-state', result.reproduced ? 'fail' :
+        (result.current.passed && result.guarded.passed ? 'pass' : 'fail'));
+    } else {
+      runs = [result];
+      latestAutoRun = result;
+      metric(metrics, D.t('explore.metricVerdict'),
+        D.t(result.passed ? 'explore.verdictPass' : 'explore.verdictFail'),
+        result.passed ? 'pass' : 'fail');
+      metric(metrics, D.t('explore.metricTerminal'), result.terminal);
+      metric(metrics, D.t('explore.metricCoverage'),
+        Math.round(result.watchdog.productionCoverage * 100) + '%',
+        result.watchdog.productionCoverage < 1 ? 'fail' : 'pass');
+      metric(metrics, D.t('explore.metricPhysicalStill'),
+        result.watchdog.maxPhysicalStill.toFixed(2) + 's');
+      metric(metrics, D.t('explore.metricFallbacks'),
+        String(result.navigation.fallbackCount));
+      metric(metrics, D.t('explore.metricDuration'), result.duration.toFixed(2) + 's');
+      autoStatus.textContent = D.t(result.passed
+        ? 'explore.autoPassed' : 'explore.autoFailed');
+      autoStatus.setAttribute('data-state', result.passed ? 'pass' : 'fail');
+    }
+    renderAutoLogs(runs);
+    report.textContent = JSON.stringify(compactAutoResult(result), null, 2);
+    renderFullReport();
+    draw();
+  }
+
+  function runAutoAudit() {
+    if (!latest) return;
+    autoStatus.textContent = D.t('explore.autoRunning');
+    autoStatus.setAttribute('data-state', 'running');
+    var base = Game.autoRouteAudit.baseline(latest);
+    var scenario = autoScenario.value;
+    var policy = autoPolicy.value;
+    var result = policy === 'compare'
+      ? Game.autoRouteAudit.compare(latest, scenario, base)
+      : Game.autoRouteAudit.run(latest, scenario, policy, base);
+    if (location.protocol !== 'file:') {
+      var url = new URL(location.href);
+      url.searchParams.set('scenario', scenario);
+      url.searchParams.set('policy', policy);
+      history.replaceState(null, '', url.href);
+    }
+    renderAutoResult(result);
+  }
+
+  function renderAutoBatch(batch) {
+    var metrics = document.getElementById('auto-metrics');
+    metrics.innerHTML = '';
+    metric(metrics, D.t('explore.metricSeeds'), batch.seeds + '/32',
+      batch.seeds === 32 ? 'pass' : 'fail');
+    metric(metrics, D.t('explore.metricReproduced'), batch.reproduced + '/64',
+      batch.reproduced === 64 ? 'fail' : null);
+    metric(metrics, D.t('explore.metricRecovered'), batch.recovered + '/64',
+      batch.recovered === 64 ? 'pass' : 'fail');
+    metric(metrics, D.t('explore.metricNormal'), batch.normalPassed + '/128',
+      batch.normalPassed === 128 ? 'pass' : 'fail');
+    metric(metrics, D.t('explore.metricUnexpected'), String(batch.unexpected.length),
+      batch.unexpected.length ? 'fail' : 'pass');
+    metric(metrics, D.t('explore.metricLongest'), batch.longest.toFixed(2) + 's');
+    autoStatus.textContent = batch.unexpected.length
+      ? D.t('explore.autoBatchFailed', { count: batch.unexpected.length })
+      : D.t('explore.autoBatchDone', {
+        reproduced: batch.reproduced,
+        recovered: batch.recovered
+      });
+    autoStatus.setAttribute('data-state', batch.unexpected.length ? 'fail' : 'pass');
+    document.getElementById('auto-log').innerHTML = '';
+    document.getElementById('auto-report').textContent = JSON.stringify(batch, null, 2);
+    latestAutoResult = { batch: batch };
+    renderFullReport();
+  }
+
+  function auditAutoSeeds() {
+    runAutoButton.disabled = true;
+    auditAutoButton.disabled = true;
+    autoStatus.textContent = D.t('explore.autoBatchRunning');
+    autoStatus.setAttribute('data-state', 'running');
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        var baseSeed = normalizedSeed();
+        var region = Game.reg.get('region', regionSelect.value);
+        var batch = {
+          seeds: 0, reproduced: 0, recovered: 0,
+          normalPassed: 0, longest: 0, unexpected: []
+        };
+        var normalScenarios = [
+          'gather-resume', 'chest-resume', 'gather-threat', 'chest-expiry'
+        ];
+        var fallbackScenarios = ['gather-fallback', 'chest-fallback'];
+        try {
+          for (var i = 0; i < 32; i++) {
+            var seed = (baseSeed + Math.imul(i + 1, 0x9e3779b1)) >>> 0;
+            var layout = Game.terrain.generate(region, seed, 3);
+            var base = Game.autoRouteAudit.baseline(layout);
+            var seedOk = base.reached;
+            normalScenarios.forEach(function (scenario) {
+              var run = Game.autoRouteAudit.run(layout, scenario, 'current', base);
+              batch.longest = Math.max(batch.longest, run.duration);
+              if (run.passed) batch.normalPassed++;
+              else {
+                seedOk = false;
+                batch.unexpected.push({
+                  seed: Game.util.hex32(seed), scenario: scenario,
+                  policy: 'current', reason: run.reason
+                });
+              }
+            });
+            fallbackScenarios.forEach(function (scenario) {
+              var comparison = Game.autoRouteAudit.compare(layout, scenario, base);
+              batch.longest = Math.max(
+                batch.longest, comparison.current.duration, comparison.guarded.duration
+              );
+              if (!comparison.current.passed) batch.reproduced++;
+              else {
+                seedOk = false;
+                batch.unexpected.push({
+                  seed: Game.util.hex32(seed), scenario: scenario,
+                  policy: 'current', reason: 'gap-not-reproduced'
+                });
+              }
+              if (comparison.guarded.passed) batch.recovered++;
+              else {
+                seedOk = false;
+                batch.unexpected.push({
+                  seed: Game.util.hex32(seed), scenario: scenario,
+                  policy: 'guarded', reason: comparison.guarded.reason
+                });
+              }
+            });
+            if (seedOk) batch.seeds++;
+          }
+          renderAutoBatch(batch);
+        } finally {
+          if (latest) {
+            Game.terrain.layout = latest;
+            Game.nav.useLayout(latest);
+          }
+          runAutoButton.disabled = false;
+          auditAutoButton.disabled = false;
+        }
+      }, 20);
     });
   }
 
@@ -220,6 +537,7 @@
     var seed = normalizedSeed();
     seedInput.value = Game.util.hex32(seed);
     var region = Game.reg.get('region', regionSelect.value);
+    Game.state.world.region = region.id;
     var started = performance.now();
     latest = Game.terrain.generate(region, seed, 3);
     var report = Game.terrain.validate(latest, region);
@@ -236,7 +554,7 @@
       routeLegs: latestRoute.legs.length,
       navigationMs: latestRoute.navigationMs.toFixed(1)
     }, report.metrics));
-    document.getElementById('report').textContent = JSON.stringify({
+    latestBaseReport = {
       seed: Game.util.hex32(seed),
       region: region.id,
       layoutVersion: latest.version,
@@ -284,7 +602,9 @@
           return out;
         }, {})
       }
-    }, null, 2);
+    };
+    latestAutoResult = null;
+    renderFullReport();
     if (location.protocol !== 'file:') {
       var url = new URL(location.href);
       url.searchParams.set('seed', Game.util.hex32(seed));
@@ -293,6 +613,7 @@
       history.replaceState(null, '', url.href);
     }
     draw();
+    runAutoAudit();
     return report;
   }
 
@@ -357,9 +678,11 @@
 
   document.getElementById('generate').addEventListener('click', generate);
   auditButton.addEventListener('click', auditSeeds);
+  runAutoButton.addEventListener('click', runAutoAudit);
+  auditAutoButton.addEventListener('click', auditAutoSeeds);
   regionSelect.addEventListener('change', generate);
   seedInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') generate(); });
-  ['show-distance', 'show-graph', 'show-route', 'show-content', 'show-chunks'].forEach(function (id) {
+  ['show-distance', 'show-graph', 'show-route', 'show-auto-route', 'show-content', 'show-chunks'].forEach(function (id) {
     document.getElementById(id).addEventListener('change', draw);
   });
   window.addEventListener('demo:locale', function () {

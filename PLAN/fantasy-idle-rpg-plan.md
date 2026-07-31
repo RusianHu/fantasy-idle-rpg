@@ -14,7 +14,7 @@
   - 正式内容为 5 职业、30 Talent、58 个 ActorArchetype（41 个普通/Boss/噬宝匣怪物、9 个召唤物、6 个 NPC、1 个玩家 Actor、1 个可战斗 object）、16 个区域基础 EncounterProfile 与 8 个行商袭击 EncounterProfile，以及 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v17，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social`、按布局清理的 Hazard 发现/绝对冷却、噬宝匣判定序号/真箱保护计数，以及行商信誉/债务、区域计时和锁定库存）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、活动噬宝匣、行商运行时 Actor、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要且不推进行商发现或会面倒计时；自动养成使用无副作用角色预览，并把该摘要合入确定性输出/生存/收益评分。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
-  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置及移动行商选点、篷车锚定、巡游边界 Lab；`tech-demos/exploration-v3` 负责导航网格、长途路径与多 Seed 拓扑审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；`tech-demos/merchants` 直接运行生产内容包、确定性库存和信誉/债务领域。正式入口及六个工作台只加载同一个确定性 `content.generated.js`。
+  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置及移动行商选点、篷车锚定、巡游边界 Lab；`tech-demos/exploration-v3` 负责导航网格、长途路径、自动交互中断/失败缓存故障注入、结构化事件日志与多 Seed 审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；`tech-demos/merchants` 直接运行生产内容包、确定性库存和信誉/债务领域。正式入口及六个工作台只加载同一个确定性 `content.generated.js`。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）

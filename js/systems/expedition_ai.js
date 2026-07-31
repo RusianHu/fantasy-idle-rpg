@@ -195,6 +195,18 @@
     };
   }
 
+  function movementExpectation(hero, intentId) {
+    var aiMoveOrder = !!(hero && hero.moveOrder && hero.moveOrder.ai);
+    var routeIntent = intentId === 'frontier' || intentId === 'discovery' ||
+      intentId === 'boss';
+    return {
+      expected: aiMoveOrder || routeIntent,
+      source: aiMoveOrder ? 'move-order' : (routeIntent ? 'route-intent' : 'none'),
+      interactionApproach: !!(hero && hero.interactOrder &&
+        hero.interactOrder.phase !== 'act')
+    };
+  }
+
   function visibleMissing(kind, list, hero) {
     var rs = Game.exploration.regionState(Game.state.world.region);
     var bucket = rs.discovered[kind] || {};
@@ -356,6 +368,24 @@
     strategy: strategy,
     intent: function () { return current; },
     trace: function () { return trace.slice(); },
+    movementExpectation: function (hero, intentId) {
+      return movementExpectation(hero, intentId === undefined ? current.id : intentId);
+    },
+    diagnostics: function () {
+      var hero = Game.world && Game.world.hero;
+      var expectation = movementExpectation(hero, current.id);
+      return {
+        intent: current.id,
+        target: current.target && (current.target.id || current.target.threatId ||
+          current.target.mid) || null,
+        thinkIn: thinkT,
+        still: progress.still,
+        movementExpected: expectation.expected,
+        movementSource: expectation.source,
+        interactionApproach: expectation.interactionApproach,
+        blocked: Object.assign({}, progress.blocked)
+      };
+    },
     pause: function (reason) {
       var hero = Game.world && Game.world.hero;
       thinkT = 0;
@@ -417,9 +447,8 @@
       }
 
       var moved = U.dist(hero.x, hero.y, progress.x, progress.y);
-      var expectsMove = (hero.moveOrder && hero.moveOrder.ai) ||
-        current.id === 'frontier' || current.id === 'discovery' || current.id === 'boss';
-      if (expectsMove && moved < 0.6) progress.still += dt;
+      var moveExpectation = movementExpectation(hero, current.id);
+      if (moveExpectation.expected && moved < 0.6) progress.still += dt;
       else progress.still = 0;
       progress.x = hero.x; progress.y = hero.y;
 

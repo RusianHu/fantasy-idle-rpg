@@ -91,7 +91,7 @@ js/
 
 **扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与六个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
 
-**地图 QA 分工**：`tech-demos/map-effects` 是无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，提供交互小地图、检查/寻路/放置探针、确定性复验、巡游预览和结构化报告；目录默认关联当前地图，并将单位、资源、宝箱定义、地标、奇物、生态、威胁、Hazard 锚点、营地、装饰与材质独立分类。地表装饰同时枚举双语名称、稳定 ID、当前实例数与放置语法；选择装饰后可叠加查看适宜度热区、簇群椭圆、方向轴与簇内关系，并审计配额完成率、平均最近邻、同类富集和留白。它不启动存档、战斗、Hazard、探索 AI、宝箱或交易。`tech-demos/exploration-v3` 独立负责导航网格、长途路径、拓扑可视化和多 Seed 批量审计。
+**地图 QA 分工**：`tech-demos/map-effects` 是无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，提供交互小地图、检查/寻路/放置探针、确定性复验、巡游预览和结构化报告；目录默认关联当前地图，并将单位、资源、宝箱定义、地标、奇物、生态、威胁、Hazard 锚点、营地、装饰与材质独立分类。地表装饰同时枚举双语名称、稳定 ID、当前实例数与放置语法；选择装饰后可叠加查看适宜度热区、簇群椭圆、方向轴与簇内关系，并审计配额完成率、平均最近邻、同类富集和留白。它不启动存档、战斗、Hazard、探索 AI、宝箱或交易。`tech-demos/exploration-v3` 独立负责导航网格、长途路径、自动交互中断/失败缓存故障注入、结构化事件日志和多 Seed 批量审计。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`；移动行商由 `Game.merchants.tradeAreas()` 投影持久事件，动态商品通过同一商店能力边界完成校验、扣款与发货，并在正式区域地图以代码网格绘制的青金篷车图标标记固定交易锚点。点击篷车会解析同事件的存活行商 Actor 并先进入交谈，商店只由交谈动作继续打开。交易面板及行商交谈窗以短 TTL 续租 `autoExplore` 暂停，只抑制自动移动、索敌、回营与自动 Boss 触发；关闭、切页、离域/目标失效或调用方失联后自动释放，手动指令、世界时钟、环境与既有战斗不受影响。
 
