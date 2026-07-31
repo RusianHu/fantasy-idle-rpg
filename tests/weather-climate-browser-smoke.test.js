@@ -157,7 +157,8 @@ async function run() {
     });
     await cdp.navigate(
       BASE + 'tech-demos/weather-climate/weather-climate.html?' +
-      'seed=1234ABCD&region=forest&time=300&particle=snow&lang=en'
+      'seed=1234ABCD&region=forest&time=300&particle=snow&mode=forced&' +
+      'front=volatile&intensity=0.85&lang=en'
     );
 
     const mobile = await cdp.evaluate(`(() => {
@@ -217,8 +218,8 @@ async function run() {
       };
     })()`);
 
-    assert.equal(mobile.title, 'Weather / Climate Rendering Prep Lab');
-    assert.match(mobile.zhTitle, /天气 \/ 气候筹备型渲染 Lab/);
+    assert.equal(mobile.title, 'Weather / Climate Lab');
+    assert.match(mobile.zhTitle, /天气 \/ 气候 Lab/);
     assert.ok(mobile.visible > 500);
     assert.ok(mobile.colors > 8);
     assert.ok(mobile.phaseVisible.every((visible) => visible > 100));
@@ -226,23 +227,168 @@ async function run() {
     assert.equal(mobile.determinism.sameInputsMatch, true);
     assert.equal(mobile.determinism.timeChangesCanvas, true);
     assert.equal(mobile.determinism.seedChangesLayout, true);
-    assert.equal(mobile.snapshot.productionWeatherSystem, false);
+    assert.equal(mobile.determinism.crossRegionFrontMatches, true);
+    assert.equal(mobile.determinism.crossRegionMicroclimateDiffers, true);
+    assert.equal(mobile.snapshot.productionWeatherSystem, true);
     assert.equal(mobile.snapshot.noPlayer, true);
     assert.equal(mobile.snapshot.fogEnabled, false);
     assert.equal(mobile.snapshot.saveWrites, false);
     assert.equal(mobile.snapshot.regionId, 'forest');
     assert.equal(mobile.snapshot.seedHex, '1234ABCD');
     assert.equal(mobile.snapshot.atmosphere.previewMode, 'snow');
+    assert.equal(mobile.snapshot.weather.mode, 'forced');
+    assert.equal(mobile.snapshot.weather.front, 'volatile');
+    assert.equal(mobile.snapshot.weather.exposure, 'canopy');
+    assert.ok(mobile.snapshot.weather.render.p95FrameCostMs <= 2,
+      'weather layer P95 stays within 2ms: ' +
+      JSON.stringify(mobile.snapshot.weather.render));
+    assert.ok(mobile.snapshot.performance.p95Ms <= 16.7,
+      'Weather Lab total frame P95 stays within 16.7ms: ' +
+      JSON.stringify(mobile.snapshot.performance));
     assert.equal(mobile.regions.length, 8);
     assert.deepEqual(mobile.presets, [
       'meadow', 'leaves', 'dust', 'wisps',
       'snow', 'embers', 'cloudwisp', 'miasma'
     ]);
     assert.ok(Object.values(mobile.futureHooks)
-      .every((value) => value === 'unconnected'));
+      .every((value) => value !== 'unconnected'));
     assert.equal(mobile.saveUnchanged, true);
     assert.equal(mobile.controlsTouchable, true);
     assert.equal(mobile.noHorizontalOverflow, true);
+
+    const climateMatrix = await cdp.evaluate(`(() => {
+      const ids = [
+        'grassland', 'forest', 'mine', 'graveyard',
+        'snowpass', 'lavacave', 'skyruins', 'darkcastle'
+      ];
+      const rows = ids.map((id) => {
+        WeatherClimateLab.setRegion(id);
+        WeatherClimateLab.setWeatherFront('volatile');
+        WeatherClimateLab.setWeatherIntensity(0.9);
+        Game.render.frame(0);
+        const snapshot = WeatherClimateLab.snapshot();
+        return {
+          id,
+          exposure: snapshot.weather.exposure,
+          precipitation: snapshot.weather.precipitation,
+          lightning: snapshot.weather.lightning,
+          celestialVisibility: snapshot.weather.celestialVisibility,
+          tintInfluence: snapshot.weather.tintInfluence,
+          canvasHash: snapshot.canvas.hash
+        };
+      });
+      WeatherClimateLab.setRegion('grassland');
+      WeatherClimateLab.setWeatherFront('volatile');
+      WeatherClimateLab.setEffects(false);
+      WeatherClimateLab.triggerLightning();
+      Game.render.frame(0);
+      const effectsOff = WeatherClimateLab.snapshot().weather.render;
+      WeatherClimateLab.setEffects(true);
+      WeatherClimateLab.setReducedMotion(true);
+      WeatherClimateLab.triggerLightning();
+      Game.render.frame(0);
+      const reducedMotion = WeatherClimateLab.snapshot().weather.render;
+      WeatherClimateLab.setReducedMotion(false);
+
+      function motionSample(regionId, front) {
+        WeatherClimateLab.setRegion(regionId);
+        WeatherClimateLab.setWeatherFront(front);
+        WeatherClimateLab.setWeatherIntensity(0.9);
+        WeatherClimateLab.setWorldTime(312);
+        const before = Game.weatherRender.inspectPrecipitation({
+          left: 0, top: 0, right: 256, bottom: 256
+        });
+        WeatherClimateLab.setWorldTime(312.1);
+        const after = Game.weatherRender.inspectPrecipitation({
+          left: 0, top: 0, right: 256, bottom: 256
+        });
+        const afterById = new Map(after.points.map((point) => [point.id, point]));
+        const deltas = before.points.flatMap((point) => {
+          const next = afterById.get(point.id);
+          return next ? [((next.y - point.y) % before.fieldSize +
+            before.fieldSize) % before.fieldSize] : [];
+        });
+        return {
+          type: before.type,
+          coordinateSpace: before.coordinateSpace,
+          speedRange: before.speedRange,
+          averageFall: deltas.reduce((sum, value) => sum + value, 0) /
+            Math.max(1, deltas.length)
+        };
+      }
+
+      WeatherClimateLab.setRegion('grassland');
+      WeatherClimateLab.setWeatherFront('volatile');
+      WeatherClimateLab.setWeatherIntensity(0.9);
+      WeatherClimateLab.setWorldTime(312);
+      const anchoredA = Game.weatherRender.inspectPrecipitation({
+        left: 0, top: 0, right: 256, bottom: 256
+      });
+      const anchoredB = Game.weatherRender.inspectPrecipitation({
+        left: 40, top: 30, right: 296, bottom: 286
+      });
+      const anchoredBById = new Map(anchoredB.points.map((point) => [point.id, point]));
+      const shared = anchoredA.points.filter((point) => anchoredBById.has(point.id));
+      const coordinatesStable = shared.every((point) => {
+        const other = anchoredBById.get(point.id);
+        return point.x === other.x && point.y === other.y;
+      });
+      const rainMotion = motionSample('grassland', 'volatile');
+      const snowMotion = motionSample('snowpass', 'wet');
+      return {
+        rows,
+        effectsOff,
+        reducedMotion,
+        precipitationField: {
+          sharedPoints: shared.length,
+          coordinatesStable,
+          rainMotion,
+          snowMotion
+        }
+      };
+    })()`);
+    assert.equal(new Set(climateMatrix.rows.map((row) => row.canvasHash)).size, 8,
+      'eight volatile microclimates render distinct canvases');
+    for (const id of ['grassland', 'graveyard', 'skyruins', 'darkcastle']) {
+      const row = climateMatrix.rows.find((entry) => entry.id === id);
+      assert.equal(row.precipitation.type, 'rain', `${id} renders storm rain`);
+      assert.ok(row.precipitation.density > 0, `${id} storm rain is visible`);
+      assert.equal(row.lightning, true, `${id} exposes lightning`);
+    }
+    const forest = climateMatrix.rows.find((row) => row.id === 'forest');
+    assert.equal(forest.precipitation.type, 'rain');
+    assert.ok(forest.precipitation.density > 0 &&
+      forest.precipitation.density < 0.9, 'forest canopy attenuates rain');
+    const snowpass = climateMatrix.rows.find((row) => row.id === 'snowpass');
+    assert.equal(snowpass.precipitation.type, 'snow');
+    assert.equal(snowpass.lightning, true);
+    for (const id of ['mine', 'lavacave']) {
+      const row = climateMatrix.rows.find((entry) => entry.id === id);
+      assert.equal(row.exposure, 'underground');
+      assert.equal(row.precipitation.density, 0);
+      assert.equal(row.lightning, false);
+      assert.equal(row.celestialVisibility, 0);
+      assert.equal(row.tintInfluence, 0);
+    }
+    assert.equal(climateMatrix.effectsOff.lightningActive, false);
+    assert.equal(climateMatrix.reducedMotion.lightningActive, false);
+    assert.ok(climateMatrix.precipitationField.sharedPoints > 20,
+      'shifted camera views share world precipitation points');
+    assert.equal(climateMatrix.precipitationField.coordinatesStable, true,
+      'camera bounds only cull precipitation; world coordinates stay fixed');
+    assert.equal(climateMatrix.precipitationField.rainMotion.coordinateSpace, 'world');
+    assert.equal(climateMatrix.precipitationField.rainMotion.type, 'rain');
+    assert.equal(climateMatrix.precipitationField.snowMotion.type, 'snow');
+    assert.ok(
+      climateMatrix.precipitationField.rainMotion.speedRange[0] >
+        climateMatrix.precipitationField.snowMotion.speedRange[1] * 4,
+      'rain speed range is clearly faster than snow'
+    );
+    assert.ok(
+      climateMatrix.precipitationField.rainMotion.averageFall >
+        climateMatrix.precipitationField.snowMotion.averageFall * 4,
+      'observed rain fall distance is clearly faster than snow'
+    );
 
     await cdp.send('Emulation.setDeviceMetricsOverride', {
       width: 1280,
@@ -284,8 +430,16 @@ async function run() {
     console.log('weather-climate-browser-smoke.test.js: mobile and desktop QA passed');
   } finally {
     if (!chrome.killed) chrome.kill();
-    await delay(100);
-    fs.rmSync(profile, { recursive: true, force: true });
+    let removed = false;
+    for (let attempt = 0; attempt < 12 && !removed; attempt++) {
+      await delay(100);
+      try {
+        fs.rmSync(profile, { recursive: true, force: true });
+        removed = true;
+      } catch (error) {
+        if (attempt === 11) throw error;
+      }
+    }
   }
 }
 

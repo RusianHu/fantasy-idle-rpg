@@ -15,11 +15,11 @@
     { id: 'night', ratio: 0.80, canvasId: 'phase-night' }
   ];
   var FUTURE_HOOKS = {
-    timeline: 'unconnected',
-    weatherState: 'unconnected',
-    intensity: 'unconnected',
-    visibilityProvider: 'unconnected',
-    renderLayer: 'unconnected'
+    timeline: 'production',
+    weatherState: 'production',
+    intensity: 'production',
+    visibilityProvider: 'weather:visibility',
+    renderLayer: 'production-four-layer'
   };
   var regions = [];
   var region = null;
@@ -29,6 +29,11 @@
   var requestedSeed = 0x1234ABCD;
   var particlePreset = 'region';
   var effectsEnabled = true;
+  var weatherMode = 'timeline';
+  var forcedFront = 'volatile';
+  var forcedIntensity = 0.8;
+  var forcedTransition = 1;
+  var reducedMotion = false;
   var playbackSpeed = 1;
   var frameSamples = [];
   var lastFrameAt = performance.now();
@@ -121,6 +126,11 @@
     Game.state.world.worldSeed = requestedSeed >>> 0;
     Game.terrain.mount(layout, region);
     if (Game.terrain.rebuildDynamicSpatial) Game.terrain.rebuildDynamicSpatial([]);
+    Game.weather.enterRegion(region.id, {
+      worldSeed: requestedSeed,
+      worldTime: Game.state.world.worldTime
+    });
+    applyWeatherPreview();
   }
 
   function generateLayout(seed) {
@@ -139,6 +149,60 @@
     Game.particles.initRegion(shallowParticleRegion());
     document.getElementById('effects-toggle').checked = effectsEnabled;
     document.getElementById('particle-badge').textContent = currentParticleId();
+  }
+
+  function applyWeatherPreview() {
+    if (!Game.weather || !Game.state) return null;
+    if (weatherMode === 'forced') {
+      Game.weather.setPreview({
+        mode: 'forced',
+        front: forcedFront,
+        intensity: forcedIntensity,
+        transitionProgress: forcedTransition
+      });
+    } else {
+      Game.weather.clearPreview();
+    }
+    if (Game.weatherRender) Game.weatherRender.setReducedMotion(reducedMotion);
+    return Game.weather.current();
+  }
+
+  function renderWeatherBoards() {
+    var data = Game.weather.inspect();
+    if (!data) return;
+    document.getElementById('front-board').innerHTML = data.fronts.map(function (item) {
+      return '<div class="front-card' + (item.front === data.front ? ' active' : '') + '">' +
+        '<b>' + U.esc(item.front) + '</b><span>' +
+        U.esc(Game.i18n.t(item.state.nameKey)) + '</span><small>' +
+        item.visibility.toFixed(2) + '× · ' + item.intensity[0].toFixed(2) +
+        '–' + item.intensity[1].toFixed(2) + '</small></div>';
+    }).join('');
+    var rows = regions.map(function (item) {
+      var regionProfile = Game.content.get('regionProfile', item.id);
+      var climate = Game.content.get('climateProfile', regionProfile.climateProfileId);
+      return '<tr><td>' + U.esc(regionName(item)) + '</td><td>' +
+        U.esc(climate.exposure) + '</td><td>' +
+        climate.factors.precipitation.toFixed(2) + '</td><td>' +
+        climate.factors.celestial.toFixed(2) + '</td><td>' +
+        climate.factors.tint.toFixed(2) + '</td></tr>';
+    }).join('');
+    document.querySelector('#exposure-audit tbody').innerHTML = rows;
+  }
+
+  function updateWeatherUi() {
+    var current = Game.weather.current();
+    if (!current) return;
+    document.getElementById('weather-mode').value = weatherMode;
+    document.getElementById('weather-front').value = forcedFront;
+    document.getElementById('weather-intensity').value = forcedIntensity;
+    document.getElementById('intensity-output').textContent = forcedIntensity.toFixed(2);
+    document.getElementById('weather-transition').value = forcedTransition;
+    document.getElementById('transition-output').textContent =
+      Math.round(forcedTransition * 100) + '%';
+    document.getElementById('reduced-motion').checked = reducedMotion;
+    document.getElementById('weather-state-badge').textContent =
+      current.front.toUpperCase() + ' · ' + Game.i18n.t(current.stateNameKey);
+    renderWeatherBoards();
   }
 
   function setCamera(target) {
@@ -179,11 +243,12 @@
   }
 
   function updateHeader() {
+    var climate = Game.content.get('climateProfile', 'climate.' + region.id);
     document.getElementById('region-index').textContent =
       String(regionIndex + 1).padStart(2, '0');
     document.getElementById('region-name').textContent = regionName(region);
     document.getElementById('region-meta').textContent =
-      region.id + ' · ' + region.particles + ' · layout v3';
+      region.id + ' · ' + climate.exposure + ' · ' + region.particles + ' · layout v3';
     document.getElementById('seed-input').value = seedHex(requestedSeed);
     renderRegionTabs();
     renderParticleOptions();
@@ -195,6 +260,10 @@
     params.set('region', region.id);
     params.set('time', String(Math.round(Game.state.world.worldTime)));
     params.set('particle', particlePreset);
+    params.set('mode', weatherMode);
+    params.set('front', forcedFront);
+    params.set('state', Game.weather.current().stateId);
+    params.set('intensity', forcedIntensity.toFixed(2));
     params.set('lang', D.locale());
     if (location.protocol !== 'file:') {
       history.replaceState(null, '', location.pathname + '?' + params.toString());
@@ -229,6 +298,7 @@
     setCamera(options.camera || 'camp');
     Game.render.frame(0);
     capturePhases();
+    updateWeatherUi();
     renderDiagnostics();
     syncUrlAndLinks();
     return snapshot();
@@ -255,6 +325,7 @@
 
   function setWorldTime(value) {
     Game.state.world.worldTime = normalizeTime(value);
+    Game.weather.update(0, Game.state.world.worldTime);
     updateTimeUi();
     Game.render.frame(0);
     syncUrlAndLinks();
@@ -273,7 +344,54 @@
   function setEffects(value) {
     effectsEnabled = !!value;
     applyParticles();
+    Game.bus.emit('settings:changed', { key: 'effects', value: effectsEnabled });
+    Game.weather.update(0, Game.state.world.worldTime);
     return effectsEnabled;
+  }
+
+  function setWeatherMode(value) {
+    if (['timeline', 'forced'].indexOf(value) < 0) return false;
+    weatherMode = value;
+    applyWeatherPreview();
+    updateWeatherUi();
+    syncUrlAndLinks();
+    return weatherMode;
+  }
+
+  function setWeatherFront(value) {
+    if (Game.weather.constants.fronts.indexOf(value) < 0) return false;
+    forcedFront = value;
+    if (weatherMode !== 'forced') weatherMode = 'forced';
+    applyWeatherPreview();
+    updateWeatherUi();
+    syncUrlAndLinks();
+    return clone(Game.weather.current());
+  }
+
+  function setWeatherIntensity(value) {
+    value = Number(value);
+    if (!Number.isFinite(value)) return false;
+    forcedIntensity = U.clamp(value, 0, 1);
+    applyWeatherPreview();
+    updateWeatherUi();
+    syncUrlAndLinks();
+    return forcedIntensity;
+  }
+
+  function setTransitionProgress(value) {
+    value = Number(value);
+    if (!Number.isFinite(value)) return false;
+    forcedTransition = U.clamp(value, 0, 1);
+    applyWeatherPreview();
+    updateWeatherUi();
+    return forcedTransition;
+  }
+
+  function setReducedMotion(value) {
+    reducedMotion = !!value;
+    Game.weatherRender.setReducedMotion(reducedMotion);
+    updateWeatherUi();
+    return reducedMotion;
   }
 
   function formatClock(value) {
@@ -291,6 +409,12 @@
     var ratio = Math.round(Game.daynight.phase() * 100);
     document.getElementById('phase-badge').textContent =
       phaseLabel(time).toUpperCase() + ' · ' + ratio + '%';
+    var currentWeather = Game.weather && Game.weather.current();
+    if (currentWeather) {
+      document.getElementById('weather-state-badge').textContent =
+        currentWeather.front.toUpperCase() + ' · ' +
+        Game.i18n.t(currentWeather.stateNameKey);
+    }
     Array.prototype.forEach.call(document.querySelectorAll('[data-speed]'), function (button) {
       button.classList.toggle('active', Number(button.dataset.speed) === playbackSpeed);
     });
@@ -353,12 +477,16 @@
   function snapshot() {
     if (!layout) return null;
     var canvas = canvasStats(stage);
+    var currentWeather = Game.weather.inspect();
+    var renderWeather = Game.weatherRender.diagnostics();
     return {
-      lab: 'weather-climate-preparation',
-      productionWeatherSystem: false,
+      lab: 'weather-climate-production',
+      productionWeatherSystem: true,
       noPlayer: Game.world.hero === null,
       fogEnabled: false,
       saveWrites: false,
+      populationStarted: false,
+      combatStarted: false,
       regionId: region.id,
       seed: requestedSeed >>> 0,
       seedHex: seedHex(requestedSeed),
@@ -374,6 +502,30 @@
         phase: Number(Game.daynight.phase().toFixed(5)),
         phaseId: phaseId(Game.state.world.worldTime),
         nightFactor: Number(Game.daynight.nightFactor().toFixed(5))
+      },
+      weather: {
+        mode: weatherMode,
+        front: currentWeather.front,
+        previousFront: currentWeather.previousFront,
+        stateId: currentWeather.stateId,
+        stateNameKey: currentWeather.stateNameKey,
+        kind: currentWeather.kind,
+        intensity: Number(currentWeather.intensity.toFixed(4)),
+        transitionProgress: Number(currentWeather.transitionProgress.toFixed(4)),
+        visibilityMultiplier: Number(currentWeather.visibilityMultiplier.toFixed(4)),
+        wind: Number(currentWeather.wind.toFixed(4)),
+        wetness: Number(currentWeather.wetness.toFixed(4)),
+        cloudCover: Number(currentWeather.cloudCover.toFixed(4)),
+        fogDensity: Number(currentWeather.fogDensity.toFixed(4)),
+        precipitation: clone(currentWeather.precipitation),
+        lightning: currentWeather.lightning,
+        exposure: currentWeather.exposure,
+        celestialVisibility: Number(currentWeather.celestialVisibility.toFixed(4)),
+        tintInfluence: Number(currentWeather.tintInfluence.toFixed(4)),
+        nextSwitchIn: Number(currentWeather.nextSwitchIn.toFixed(3)),
+        nextLightningAt: currentWeather.nextLightningAt,
+        lightningSequence: currentWeather.lightningSequence.slice(),
+        render: renderWeather
       },
       atmosphere: {
         registeredParticle: region.particles,
@@ -407,22 +559,24 @@
   function report() {
     return {
       snapshot: snapshot(),
-      existingCapabilities: [
-        'daynight-tint-stars-moon',
-        'region-particle-primitives',
-        'sky-parallax-rays',
-        'terrain-wind-sampling',
-        'terrain-step-feedback',
-        'effects-toggle'
+      productionCapabilities: [
+        'deterministic-300s-fronts',
+        '24s-linear-transition',
+        'eight-climate-profiles',
+        'rain-snow-ash-steam-fog-motes',
+        'wet-surface-response',
+        'deterministic-lightning',
+        'weather-visibility-provider',
+        'daynight-exposure-controls'
       ],
-      partialCapabilities: [
-        'fixed-region-snow-dust-embers-miasma',
-        'parallax-fog-band',
-        'hazard-lab-environment-provider'
+      degradationContracts: [
+        'effects-off-static-sky-and-hud',
+        'reduced-motion-no-fast-particles-flash-shake',
+        'underground-no-celestial-external-rain-lightning'
       ],
-      unimplemented: [
-        'rain', 'lightning', 'weather-scheduler', 'climate-profile',
-        'surface-accumulation', 'production-gameplay-link'
+      intentionallyUnaffected: [
+        'combat', 'movement', 'rewards', 'navigation', 'offline-estimation',
+        'save-schema-v16'
       ],
       futureHooks: clone(FUTURE_HOOKS),
       lastDeterminism: clone(lastDeterminism)
@@ -438,14 +592,14 @@
     if (!layout) return;
     var data = snapshot();
     var metrics = [
-      [data.daynight.phase.toFixed(3), D.t('weather.metricPhase')],
-      [data.daynight.nightFactor.toFixed(3), D.t('weather.metricNight')],
-      [data.atmosphere.activeParticle, D.t('weather.metricParticle')],
-      [data.atmosphere.parallaxLayers, D.t('weather.metricParallax')],
-      [data.atmosphere.rays ? 'yes' : 'no', D.t('weather.metricRays')],
-      [data.atmosphere.windSamples.join(' / '), D.t('weather.metricWind')],
-      [data.atmosphere.skyTop + ' → ' + data.atmosphere.skyBottom,
-        D.t('weather.metricColors')],
+      [data.weather.front + ' / ' + data.weather.stateId, 'Front / regional state'],
+      [data.weather.intensity.toFixed(3), 'Weather intensity'],
+      [data.weather.visibilityMultiplier.toFixed(3) + '×', 'Hazard visibility'],
+      [data.weather.wind.toFixed(3), 'Weather wind'],
+      [data.weather.wetness.toFixed(3), 'Surface wetness'],
+      [data.weather.nextSwitchIn.toFixed(1) + 's', 'Next front switch'],
+      [data.weather.exposure + ' · ' + data.weather.celestialVisibility.toFixed(2),
+        'Exposure / celestial'],
       [data.canvas.visible + ' px · ' + data.performance.averageMs +
         ' / ' + data.performance.p95Ms + ' ms',
         D.t('weather.metricFrame')]
@@ -466,6 +620,7 @@
     Game.particles.setEnabled(false);
     PHASES.forEach(function (phase) {
       Game.state.world.worldTime = phase.ratio * dayLength();
+      Game.weather.update(0, Game.state.world.worldTime);
       Game.render.frame(0);
       var target = document.getElementById(phase.canvasId);
       var context = target.getContext('2d');
@@ -479,6 +634,7 @@
       });
     });
     Game.state.world.worldTime = originalTime;
+    Game.weather.update(0, originalTime);
     effectsEnabled = originalEffects;
     applyParticles();
     Game.render.frame(0);
@@ -494,12 +650,21 @@
     Game.render.snapCamera(layout.camp.x, layout.camp.y);
     Game.render.cam.zoom = 2;
     Game.render.frame(0);
+    var weatherInspect = Game.weather.inspect();
     return {
       layoutHash: layoutHash(layout),
       camera: clone(Game.render.cam),
       daynight: {
         phase: Game.daynight.phase(),
         nightFactor: Game.daynight.nightFactor()
+      },
+      weather: {
+        front: weatherInspect.front,
+        stateId: weatherInspect.stateId,
+        intensity: weatherInspect.intensity,
+        transitionProgress: weatherInspect.transitionProgress,
+        visibilityMultiplier: weatherInspect.visibilityMultiplier,
+        lightningSequence: weatherInspect.lightningSequence
       },
       canvasHash: canvasStats(stage).hash
     };
@@ -512,21 +677,31 @@
     var first = deterministicStaticPass();
     var second = deterministicStaticPass();
     Game.state.world.worldTime = normalizeTime(originalTime + dayLength() / 2);
+    Game.weather.update(0, Game.state.world.worldTime);
     Game.render.frame(0);
     var alternateTimeHash = canvasStats(stage).hash;
     var alternateSeed = Game.terrain.generate(region, (requestedSeed + 1) >>> 0, 3);
     var alternateSeedHash = layoutHash(alternateSeed);
+    var grassWeather = Game.weather.sample({
+      worldSeed: requestedSeed, worldTime: originalTime, regionId: 'grassland'
+    });
+    var mineWeather = Game.weather.sample({
+      worldSeed: requestedSeed, worldTime: originalTime, regionId: 'mine'
+    });
     var same = JSON.stringify(first) === JSON.stringify(second);
     lastDeterminism = {
       sameInputsMatch: same,
       timeChangesCanvas: alternateTimeHash !== second.canvasHash,
       seedChangesLayout: alternateSeedHash !== second.layoutHash,
+      crossRegionFrontMatches: grassWeather.front === mineWeather.front,
+      crossRegionMicroclimateDiffers: grassWeather.stateId !== mineWeather.stateId,
       first: first,
       second: second,
       alternateTimeHash: alternateTimeHash,
       alternateSeedLayoutHash: alternateSeedHash
     };
     Game.state.world.worldTime = originalTime;
+    Game.weather.update(0, originalTime);
     effectsEnabled = originalEffects;
     mountWorld(layout);
     Game.render.snapCamera(originalCamera.x, originalCamera.y);
@@ -535,7 +710,9 @@
     Game.render.frame(0);
     renderDiagnostics();
     var passed = lastDeterminism.sameInputsMatch &&
-      lastDeterminism.timeChangesCanvas && lastDeterminism.seedChangesLayout;
+      lastDeterminism.timeChangesCanvas && lastDeterminism.seedChangesLayout &&
+      lastDeterminism.crossRegionFrontMatches &&
+      lastDeterminism.crossRegionMicroclimateDiffers;
     document.getElementById('verify-status').textContent =
       passed ? D.t('weather.verifyPassed') : D.t('weather.verifyFailed');
     return clone(lastDeterminism);
@@ -567,6 +744,32 @@
     document.getElementById('effects-toggle').addEventListener('change', function () {
       setEffects(this.checked);
     });
+    document.getElementById('weather-mode').addEventListener('change', function () {
+      setWeatherMode(this.value);
+    });
+    document.getElementById('weather-front').addEventListener('change', function () {
+      setWeatherFront(this.value);
+    });
+    document.getElementById('weather-intensity').addEventListener('input', function () {
+      setWeatherIntensity(this.value);
+    });
+    document.getElementById('weather-transition').addEventListener('input', function () {
+      setTransitionProgress(this.value);
+    });
+    document.getElementById('reduced-motion').addEventListener('change', function () {
+      setReducedMotion(this.checked);
+    });
+    document.getElementById('trigger-lightning').addEventListener('click', function () {
+      Game.weather.triggerLightning();
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-weather-layer]'), function (input) {
+      input.addEventListener('change', function () {
+        var next = {};
+        next[input.dataset.weatherLayer] = input.checked;
+        Game.weatherRender.setLayers(next);
+        renderDiagnostics();
+      });
+    });
     document.getElementById('time-slider').addEventListener('input', function () {
       playbackSpeed = 0;
       setWorldTime(this.value);
@@ -594,6 +797,7 @@
       Game.i18n.setLocale(D.locale());
       updateHeader();
       updateTimeUi();
+      updateWeatherUi();
       renderDiagnostics();
       syncUrlAndLinks();
     });
@@ -609,6 +813,7 @@
           Game.state.world.worldTime + dt * playbackSpeed
         );
       }
+      Game.weather.update(dt, Game.state.world.worldTime);
       Game.terrain.update(dt);
       Game.particles.update(dt);
       Game.fx.update(dt);
@@ -643,6 +848,7 @@
         region: 'grassland'
       }
     };
+    Game.weather.init();
     Game.render.init(stage);
     regions = Game.reg.all('region');
     var params = new URLSearchParams(location.search);
@@ -656,6 +862,26 @@
     var requestedParticle = params.get('particle');
     if (requestedParticle === 'region' || PARTICLE_PRESETS.indexOf(requestedParticle) >= 0) {
       particlePreset = requestedParticle;
+    }
+    if (['timeline', 'forced'].indexOf(params.get('mode')) >= 0) {
+      weatherMode = params.get('mode');
+    }
+    if (Game.weather.constants.fronts.indexOf(params.get('front')) >= 0) {
+      forcedFront = params.get('front');
+    }
+    var requestedState = params.get('state');
+    if (requestedState) {
+      var requestedProfile = Game.content.get('climateProfile',
+        'climate.' + regions[regionIndex].id);
+      Game.weather.constants.fronts.some(function (front) {
+        if (requestedProfile.states[front].id !== requestedState) return false;
+        forcedFront = front;
+        return true;
+      });
+    }
+    var urlIntensity = Number(params.get('intensity'));
+    if (Number.isFinite(urlIntensity) && params.has('intensity')) {
+      forcedIntensity = U.clamp(urlIntensity, 0, 1);
     }
     bindEvents();
     regenerate({ seed: requestedSeed, camera: 'camp' });
@@ -674,6 +900,13 @@
       setWorldTime: setWorldTime,
       setParticlePreset: setParticlePreset,
       setEffects: setEffects,
+      setWeatherMode: setWeatherMode,
+      setWeatherFront: setWeatherFront,
+      setWeatherIntensity: setWeatherIntensity,
+      setTransitionProgress: setTransitionProgress,
+      setReducedMotion: setReducedMotion,
+      setRenderLayers: Game.weatherRender.setLayers,
+      triggerLightning: Game.weather.triggerLightning,
       setCamera: setCamera,
       capturePhases: capturePhases,
       verifyDeterminism: verifyDeterminism

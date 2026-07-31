@@ -267,7 +267,15 @@
       };
       return visual;
     });
+    if (!catalogRegion.climate) {
+      throw new Error('[RegionFactory] missing climate profile: ' + spec.regionId);
+    }
+    var climateProfile = JSON.parse(JSON.stringify(catalogRegion.climate));
+    climateProfile.id = 'climate.' + spec.regionId;
+    climateProfile.regionId = spec.regionId;
     var regionProjection = JSON.parse(JSON.stringify(catalogRegion));
+    delete regionProjection.climate;
+    regionProjection.climateProfileId = climateProfile.id;
     regionProjection.monsters = normals.map(function (monster) { return monster.id; });
     regionProjection.summons = summons.map(function (summon) { return summon.id; });
     regionProjection.hazards = hazards.map(function (hazard) { return hazard.id; });
@@ -326,9 +334,11 @@
           offlineEligible: true,
           offlineRepresentative: offline
         }],
+        climateProfile: [climateProfile],
         regionProfile: [{
           id: spec.regionId, tier: catalogRegion.tier,
           populationProfileId: 'population.' + spec.regionId,
+          climateProfileId: climateProfile.id,
           hazardProfileIds: hazardProfiles.map(function (hazard) { return hazard.id; }),
           projection: regionProjection
         }],

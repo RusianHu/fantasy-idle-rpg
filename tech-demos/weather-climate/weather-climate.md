@@ -1,26 +1,28 @@
-# 天气 / 气候筹备型渲染 Lab
+# Weather / Climate Lab
 
-入口：`weather-climate.html?seed=1234ABCD&region=forest&time=300&particle=region&lang=zh-CN`。
+入口：
 
-本页不是天气系统。它不新增气候 Profile、天气状态、调度器、正式特效或玩法倍率，只把现有生产环境渲染能力集中到一个无存档 QA 页面：
+`weather-climate.html?seed=1234ABCD&region=forest&time=300&particle=region&mode=forced&front=volatile&state=muffledStorm&intensity=0.85&lang=zh-CN`
 
-- `terrain.generate / validate / mount` 生成并挂载正式 v3 地图。
-- `renderer.frame` 绘制正式天空、视差、地形、装饰与光照合成。
-- `daynight` 使用 Lab 内世界时间验证黎明、白昼、黄昏、夜晚。
-- `particles` 验证八区登记的现有氛围原语与统一特效开关。
-- `terrain.windAt` 提供正式风动采样诊断。
+本页是生产天气系统的无存档 QA 契约，直接加载 `climateProfile`、`Game.weather`、`Game.weatherRender`、正式地形、昼夜和环境粒子：
 
-粒子选择器中的跨区原语预览只将未冻结的浅拷贝传给 `Game.particles.initRegion`，不会改写区域注册表，也不代表该区域已经拥有对应天气。
+- 时间线模式验证 300 秒全局天气锋、24 秒过渡、强度与雷击序列。
+- 强制模式验证五类天气锋、区域微气候、任意强度和过渡进度。
+- 四层开关分别隔离云幕、湿润地表、世界降水与屏幕雷光。
+- 减少动态模拟验证无快速粒子、闪屏和震动的降级表现。
+- 五天气锋对照板和八区暴露表审计区域映射、外部降水、星月与昼夜色调。
+- 结构化报告公开可见度、风力、湿润度、下一次切换、雷击序列与天气层帧耗时。
 
-页面不会调用 `Game.world.init()`，不会加载或启动 Population、战斗、运行时 Hazard、探索 AI、宝箱、交易与离线收益。与天气相关的 Hazard 环境倍率继续由 `tech-demos/hazards` 独立验证。
+页面不会调用 `Game.world.init()`，也不会启动 Population、战斗、探索、交易、离线结算或存档。跨区粒子选择器仍只向 `Game.particles.initRegion` 传递区域浅拷贝。
 
 ## QA 接口
 
 `window.WeatherClimateLab` 暴露：
 
-- `regions()`、`particlePresets()`
-- `snapshot()`、`report()`
-- `setRegion()`、`setSeed()`、`setWorldTime()`、`setParticlePreset()`、`setEffects()`、`setCamera()`
-- `capturePhases()`、`verifyDeterminism()`
+- `regions()`、`particlePresets()`、`snapshot()`、`report()`
+- `setRegion()`、`setSeed()`、`setWorldTime()`、`setParticlePreset()`、`setEffects()`
+- `setWeatherMode()`、`setWeatherFront()`、`setWeatherIntensity()`、`setTransitionProgress()`
+- `setRenderLayers()`、`setReducedMotion()`、`triggerLightning()`
+- `setCamera()`、`capturePhases()`、`verifyDeterminism()`
 
-报告中的 `futureHooks` 固定为 `unconnected`，仅用于标记未来可能接入的时间线、天气状态、强度、可见度 Provider 与渲染层。
+`futureHooks` 保留为兼容报告字段，但所有条目均指向生产天气实现。

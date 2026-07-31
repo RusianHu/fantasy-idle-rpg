@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "401aead7ec4ba1bde9ae9137cc7203a8372b504f4451e0e69ed44c35f7b44698",
+  "sourceSetHash": "8b475ccd54742c6e40a30caef45fc9d2bc594f142eb46c3ac167a40f88380dd8",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "088c55e0f1eb813af2a6ba882e8d922a0047eb8e489a2e1b3e0216691294e0f5"
+      "sha256": "a19b649330aca42127002f2df05035d6ccf782c622deebe0e404e9f6966e97f4"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -43,7 +43,7 @@
     {
       "path": "js/data/packs/regions/factory.support.js",
       "kind": "support",
-      "sha256": "acaa0af0309079c8b8fcba0d94d0423c7a054e02136be47f1aee745721e0a62b"
+      "sha256": "f577a1963c37d46391d0220f40f1c3d5775a0c95e45e2e7e362cbd9081bf3d1f"
     },
     {
       "path": "js/data/packs/regions/forest.pack.js",
@@ -243,6 +243,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "26a35012"
+  "contentFingerprint": "096f5c21"
 });
 })();

@@ -42,6 +42,7 @@
       return;
     }
     st.world.worldTime += dt;
+    if (Game.weather) Game.weather.update(dt, st.world.worldTime);
     Game.terrain.update(dt);
     if (Game.transitions) Game.transitions.update(dt);
     if (!Game.transitions || !Game.transitions.blocksWorld()) {

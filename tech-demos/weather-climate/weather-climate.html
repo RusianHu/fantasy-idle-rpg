@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#111713">
-<meta name="build-id" content="20260731.3">
+<meta name="build-id" content="20260731.5">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111713'/%3E%3Cpath d='M2 11h12v2H2zM4 8h8v2H4zM6 5h4v2H6z' fill='%23d4b65f'/%3E%3C/svg%3E">
-<title data-demo-page-title="weather.pageTitle">天气 / 气候筹备型渲染 Lab · 幻境远征</title>
-<link rel="stylesheet" href="weather-climate.css?v=20260731.3">
+<title data-demo-page-title="weather.pageTitle">Weather / Climate Lab · 幻境远征</title>
+<link rel="stylesheet" href="weather-climate.css?v=20260731.5">
 </head>
 <body>
 <div class="app-shell">
   <header class="topbar">
     <div>
-      <p class="eyebrow">FANTASY IDLE RPG / ATMOSPHERE BASELINE / WX-PREP-01</p>
-      <h1 data-demo-i18n="weather.title">天气 / 气候筹备型渲染 Lab</h1>
-      <p class="subtitle" data-demo-i18n="weather.subtitle">集中验证现有昼夜、区域氛围、风动与正式场景合成；本页不实现天气机制。</p>
+      <p class="eyebrow">FANTASY IDLE RPG / PRODUCTION WEATHER / WX-QA-02</p>
+      <h1 data-demo-i18n="weather.title">天气 / 气候 Lab</h1>
+      <p class="subtitle" data-demo-i18n="weather.subtitle">直接验证生产气候内容、确定性天气锋、降水、湿润地表、雷电与 Hazard 可见度。</p>
     </div>
     <div class="top-actions">
       <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
@@ -49,6 +49,7 @@
         <canvas id="stage" aria-label="正式环境渲染画布" data-demo-i18n-aria="weather.stageAria"></canvas>
         <div class="stage-badges" aria-live="polite">
           <span id="phase-badge">DAY · 25%</span>
+          <span id="weather-state-badge">CALM · CLEAR</span>
           <span id="particle-badge">meadow</span>
           <span id="frame-badge">0.00 ms</span>
         </div>
@@ -70,6 +71,44 @@
           <input id="effects-toggle" type="checkbox" checked>
           <span data-demo-i18n="common.effects">环境效果</span>
         </label>
+
+        <div class="weather-controls">
+          <label>
+            <span>模式 / Mode</span>
+            <select id="weather-mode">
+              <option value="timeline">确定性时间线 / Timeline</option>
+              <option value="forced">强制状态 / Forced</option>
+            </select>
+          </label>
+          <label>
+            <span>天气锋 / Front</span>
+            <select id="weather-front">
+              <option value="calm">平稳 / Calm</option>
+              <option value="wet">湿润 / Wet</option>
+              <option value="volatile">剧烈 / Volatile</option>
+              <option value="dry">干燥 / Dry</option>
+              <option value="arcane">魔力 / Arcane</option>
+            </select>
+          </label>
+          <label>
+            <span>强度 / Intensity <output id="intensity-output">0.80</output></span>
+            <input id="weather-intensity" type="range" min="0" max="1" step="0.01" value="0.80">
+          </label>
+          <label>
+            <span>过渡 / Transition <output id="transition-output">100%</output></span>
+            <input id="weather-transition" type="range" min="0" max="1" step="0.01" value="1">
+          </label>
+          <button id="trigger-lightning" type="button">立即触发雷击 / Trigger lightning</button>
+        </div>
+
+        <fieldset class="layer-controls">
+          <legend>天气渲染层 / Render layers</legend>
+          <label><input type="checkbox" data-weather-layer="sky" checked> 云幕</label>
+          <label><input type="checkbox" data-weather-layer="surface" checked> 地表</label>
+          <label><input type="checkbox" data-weather-layer="precipitation" checked> 降水</label>
+          <label><input type="checkbox" data-weather-layer="screen" checked> 雷光</label>
+          <label><input id="reduced-motion" type="checkbox"> 减少动态模拟</label>
+        </fieldset>
 
         <div class="camera-controls" role="group" aria-label="镜头视点" data-demo-i18n-aria="weather.cameraAria">
           <button type="button" data-camera="camp" data-demo-i18n="weather.cameraCamp">营地</button>
@@ -105,7 +144,7 @@
           </div>
           <button id="capture-phases" type="button" data-demo-i18n="weather.recapture">重新采样</button>
         </div>
-        <p class="section-note" data-demo-i18n="weather.phaseHint">对照板临时关闭动态粒子，只比较同一地图与镜头下的原版日夜合成。</p>
+        <p class="section-note" data-demo-i18n="weather.phaseHint">对照板使用同一地图、天气与镜头，检查气候曝光模型对昼夜合成的影响。</p>
         <div class="phase-grid">
           <figure><canvas id="phase-dawn" width="320" height="180"></canvas><figcaption data-demo-i18n="weather.dawn">黎明</figcaption></figure>
           <figure><canvas id="phase-day" width="320" height="180"></canvas><figcaption data-demo-i18n="common.day">昼间</figcaption></figure>
@@ -128,44 +167,57 @@
 
       <div class="source-line">
         <span data-demo-i18n="common.source">生产链路</span>
-        <code>terrain.generate / validate / mount</code><b>→</b><code>renderer.frame</code><b>→</b><code>daynight + particles + effects</code>
+        <code>climateProfile + weather.sample</code><b>→</b><code>renderer.frame</code><b>→</b><code>weather four-layer compositor</code>
       </div>
     </section>
 
     <aside class="research-column">
       <section class="research-header">
-        <p class="section-kicker">CAPABILITY LEDGER / NO WEATHER SYSTEM</p>
-        <h2 data-demo-i18n="weather.ledgerTitle">环境能力与未来缺口</h2>
-        <p data-demo-i18n="weather.ledgerCopy">这里记录原版技术能验证什么，以及未来天气机制仍需另行设计什么。</p>
+        <p class="section-kicker">PRODUCTION WEATHER / QA CONTRACT</p>
+        <h2 data-demo-i18n="weather.ledgerTitle">气候映射与运行诊断</h2>
+        <p data-demo-i18n="weather.ledgerCopy">本页与正式游戏共享天气系统和渲染器，不写存档，不启动战斗、Population 或正式世界生命周期。</p>
       </section>
 
-      <div class="capability-stack">
+      <section class="front-board-panel">
+        <h3>当前区域五天气锋 / Front mapping</h3>
+        <div id="front-board" class="front-board"></div>
+      </section>
+
+      <section class="exposure-panel">
+        <h3>八区暴露审计 / Exposure audit</h3>
+        <div class="audit-table-wrap">
+          <table id="exposure-audit">
+            <thead><tr><th>区域</th><th>暴露</th><th>降水</th><th>星月</th><th>色调</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="capability-stack qa-capability-stack">
         <section class="capability-card ready">
           <div class="capability-label"><span data-demo-i18n="weather.ready">当前已有</span><b>READY</b></div>
           <ul>
-            <li data-demo-i18n="weather.readyDaynight">20 分钟昼夜色调、星空与月亮</li>
-            <li data-demo-i18n="weather.readyAtmosphere">八区固定环境粒子原语</li>
-            <li data-demo-i18n="weather.readyParallax">区域天空、视差、雾带与光柱</li>
-            <li data-demo-i18n="weather.readyWind">正式风动采样与地形反馈</li>
-            <li data-demo-i18n="weather.readyEffects">统一特效开关与像素渲染</li>
+            <li>300 秒确定性全局天气锋与 24 秒过渡</li>
+            <li>八区 ClimateProfile 严格编译绑定</li>
+            <li>雨、雪、灰烬、蒸汽、雾、湿润与雷电四层渲染</li>
+            <li>地下/林冠/高空曝光规则</li>
+            <li>真实 weather:visibility Hazard Provider</li>
           </ul>
         </section>
         <section class="capability-card partial">
-          <div class="capability-label"><span data-demo-i18n="weather.partial">部分可用</span><b>PARTIAL</b></div>
+          <div class="capability-label"><span data-demo-i18n="weather.partial">降级契约</span><b>DEGRADED</b></div>
           <ul>
-            <li data-demo-i18n="weather.partialSnow">雪、尘埃、灰烬、瘴气只能作为固定区域氛围</li>
-            <li data-demo-i18n="weather.partialFog">雾仅存在于视差雾带与原有粒子表达</li>
-            <li data-demo-i18n="weather.partialHazard">Hazard Lab 已有环境可见度 Provider 验证入口</li>
+            <li>关闭特效：保留云色与状态，不运行降水/雷电/湿润动态</li>
+            <li>减少动态：无闪屏、震动与快速粒子</li>
+            <li>音频仅验证 sfx_thunder 事件钩子</li>
           </ul>
         </section>
         <section class="capability-card future">
-          <div class="capability-label"><span data-demo-i18n="weather.future">未来缺口</span><b>UNCONNECTED</b></div>
+          <div class="capability-label"><span data-demo-i18n="weather.future">明确不做</span><b>OUT OF SCOPE</b></div>
           <ul>
-            <li data-demo-i18n="weather.futureRain">降雨与雷电表现</li>
-            <li data-demo-i18n="weather.futureSchedule">天气状态与确定性调度</li>
-            <li data-demo-i18n="weather.futureClimate">区域气候 Profile 与强度参数</li>
-            <li data-demo-i18n="weather.futureAccumulation">积水、积雪或湿润材质</li>
-            <li data-demo-i18n="weather.futureGameplay">正式可见度、导航或玩法联动</li>
+            <li>不改变战斗、移动、奖励、导航和离线收益</li>
+            <li>不持久化天气，不提升 v16 存档</li>
+            <li>本期不生成逐格屋顶遮罩</li>
           </ul>
         </section>
       </div>
@@ -192,66 +244,68 @@
   </main>
 </div>
 
-<script src="../../js/core/utils.js?v=20260731.3"></script>
-<script src="../../js/core/eventbus.js?v=20260731.3"></script>
-<script src="../../js/core/registry.js?v=20260731.3"></script>
-<script src="../../js/i18n/i18n.js?v=20260731.3"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260731.3"></script>
-<script src="../../js/i18n/en.js?v=20260731.3"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260731.3"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260731.3"></script>
-<script src="../../js/core/assets.js?v=20260731.3"></script>
-<script src="../../js/data/formulas.js?v=20260731.3"></script>
-<script src="../../js/sprites/palettes.js?v=20260731.3"></script>
-<script src="../../js/sprites/hero.js?v=20260731.3"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260731.3"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260731.3"></script>
-<script src="../../js/sprites/monsters_expansion.js?v=20260731.3"></script>
-<script src="../../js/sprites/props.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/manifest.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/grassland.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/forest.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/mine.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/graveyard.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/snowpass.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/lavacave.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/skyruins.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/ground-decorations/darkcastle.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260731.3"></script>
-<script src="../../js/sprites/boss_landmarks.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration_v3.manifest.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/manifest.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/grassland.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/forest.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/mine.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/exploration/chests.generated.js?v=20260731.3"></script>
-<script src="../../js/sprites/flora.js?v=20260731.3"></script>
-<script src="../../js/sprites/minimap_icons.js?v=20260731.3"></script>
-<script src="../../js/data/affixes.js?v=20260731.3"></script>
-<script src="../../js/data/items.js?v=20260731.3"></script>
-<script src="../../js/data/classes.js?v=20260731.3"></script>
-<script src="../../js/data/skills.js?v=20260731.3"></script>
-<script src="../../js/data/routes.js?v=20260731.3"></script>
-<script src="../../js/core/content/rules.js?v=20260731.3"></script>
-<script src="../../js/core/content/schemas.js?v=20260731.3"></script>
-<script src="../../js/core/content/compiler.js?v=20260731.3"></script>
-<script src="../../js/core/content/audit.js?v=20260731.3"></script>
-<script src="../../js/core/content/registry.js?v=20260731.3"></script>
-<script src="../../js/core/content/support.js?v=20260731.3"></script>
-<script src="../../js/data/content/content.generated.js?v=20260731.3"></script>
-<script src="../../js/systems/terrain.js?v=20260731.3"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260731.3"></script>
-<script src="../../js/render/terrain.js?v=20260731.3"></script>
-<script src="../../js/render/particles.js?v=20260731.3"></script>
-<script src="../../js/render/daynight.js?v=20260731.3"></script>
-<script src="../../js/render/effects.js?v=20260731.3"></script>
-<script src="../../js/render/renderer.js?v=20260731.3"></script>
-<script src="../demo-i18n.js?v=20260731.3"></script>
-<script src="weather-climate.js?v=20260731.3"></script>
+<script src="../../js/core/utils.js?v=20260731.5"></script>
+<script src="../../js/core/eventbus.js?v=20260731.5"></script>
+<script src="../../js/core/registry.js?v=20260731.5"></script>
+<script src="../../js/i18n/i18n.js?v=20260731.5"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260731.5"></script>
+<script src="../../js/i18n/en.js?v=20260731.5"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260731.5"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260731.5"></script>
+<script src="../../js/core/assets.js?v=20260731.5"></script>
+<script src="../../js/data/formulas.js?v=20260731.5"></script>
+<script src="../../js/sprites/palettes.js?v=20260731.5"></script>
+<script src="../../js/sprites/hero.js?v=20260731.5"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260731.5"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260731.5"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260731.5"></script>
+<script src="../../js/sprites/props.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/manifest.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/grassland.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/forest.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/mine.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/graveyard.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/snowpass.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/lavacave.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/skyruins.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/ground-decorations/darkcastle.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260731.5"></script>
+<script src="../../js/sprites/boss_landmarks.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration_v3.manifest.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260731.5"></script>
+<script src="../../js/sprites/flora.js?v=20260731.5"></script>
+<script src="../../js/sprites/minimap_icons.js?v=20260731.5"></script>
+<script src="../../js/data/affixes.js?v=20260731.5"></script>
+<script src="../../js/data/items.js?v=20260731.5"></script>
+<script src="../../js/data/classes.js?v=20260731.5"></script>
+<script src="../../js/data/skills.js?v=20260731.5"></script>
+<script src="../../js/data/routes.js?v=20260731.5"></script>
+<script src="../../js/core/content/rules.js?v=20260731.5"></script>
+<script src="../../js/core/content/schemas.js?v=20260731.5"></script>
+<script src="../../js/core/content/compiler.js?v=20260731.5"></script>
+<script src="../../js/core/content/audit.js?v=20260731.5"></script>
+<script src="../../js/core/content/registry.js?v=20260731.5"></script>
+<script src="../../js/core/content/support.js?v=20260731.5"></script>
+<script src="../../js/data/content/content.generated.js?v=20260731.5"></script>
+<script src="../../js/systems/weather.js?v=20260731.5"></script>
+<script src="../../js/systems/terrain.js?v=20260731.5"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260731.5"></script>
+<script src="../../js/render/terrain.js?v=20260731.5"></script>
+<script src="../../js/render/particles.js?v=20260731.5"></script>
+<script src="../../js/render/daynight.js?v=20260731.5"></script>
+<script src="../../js/render/effects.js?v=20260731.5"></script>
+<script src="../../js/render/weather.js?v=20260731.5"></script>
+<script src="../../js/render/renderer.js?v=20260731.5"></script>
+<script src="../demo-i18n.js?v=20260731.5"></script>
+<script src="weather-climate.js?v=20260731.5"></script>
 </body>
 </html>

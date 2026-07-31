@@ -52,6 +52,7 @@
     }
 
     Game.particles.setEnabled(Game.state.settings.effects);
+    Game.weather.init();
     Game.audio.setMuted('sfx', !Game.state.settings.sfx);
     Game.audio.setMuted('bgm', !Game.state.settings.music);
 

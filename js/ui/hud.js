@@ -301,6 +301,7 @@
       bus.on('control:changed', function () { Hud.hud.update(true); });
       bus.on('locale:changed', function () { Hud.hud.update(true); });
       bus.on('region:changed', function () { Hud.hud.update(true); });
+      bus.on('weather:changed', function () { Hud.hud.update(true); });
       bus.on('boss:spawned', function () { Hud.hud.update(true); });
       bus.on('boss:failed', function () { Hud.hud.update(true); });
       bus.on('boss:defeated', function () { Hud.hud.update(true); });
@@ -516,6 +517,19 @@
 
       // 增益 chips
       var chips = '';
+      var currentWeather = Game.weather && Game.weather.current
+        ? Game.weather.current() : null;
+      if (currentWeather) {
+        var weatherKind = currentWeather.kind === 'storm' || currentWeather.kind === 'blizzard'
+          ? 'storm' : currentWeather.precipitation.type;
+        if (currentWeather.fogDensity > 0.45 && ['rain', 'snow'].indexOf(weatherKind) < 0) {
+          weatherKind = 'fog';
+        }
+        chips += '<div class="buff-chip weather-chip" aria-label="' +
+          U.esc(t('weather.label') + '：' + t(currentWeather.stateNameKey)) + '">' +
+          '<span class="weather-mark weather-' + U.esc(weatherKind) + '" aria-hidden="true"></span>' +
+          U.esc(t(currentWeather.stateNameKey)) + '</div>';
+      }
       var hero = W.hero;
       if (hero && hero.shield > 0) {
         chips += '<div class="buff-chip shield"><span class="buff-chip-mark"></span>' +

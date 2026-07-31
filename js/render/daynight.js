@@ -39,12 +39,19 @@
   }
 
   var DN = Game.daynight = {
-    nightFactor: function () { return sample().n; },
+    nightFactor: function (options) {
+      var visibility = options && Number.isFinite(options.celestialVisibility)
+        ? U.clamp(options.celestialVisibility, 0, 1) : 1;
+      return sample().n * visibility;
+    },
     phase: function () { return sample().t; },
 
     /** 天空层：星星 + 月亮（在视差层之前、天空渐变之后绘制，屏幕空间） */
-    drawSky: function (ctx, cam, cw, ch) {
+    drawSky: function (ctx, cam, cw, ch, options) {
       var s = sample();
+      var visibility = options && Number.isFinite(options.celestialVisibility)
+        ? U.clamp(options.celestialVisibility, 0, 1) : 1;
+      s.n *= visibility;
       if (s.n <= 0.05) return;
       if (!stars) {
         stars = [];
@@ -82,8 +89,11 @@
     },
 
     /** 全屏色调覆盖层（世界之上、UI 之下） */
-    drawTint: function (ctx, cw, ch) {
+    drawTint: function (ctx, cw, ch, options) {
       var s = sample();
+      var influence = options && Number.isFinite(options.tintInfluence)
+        ? U.clamp(options.tintInfluence, 0, 1) : 1;
+      s.a *= influence;
       if (s.a <= 0.005) return;
       ctx.fillStyle = 'rgba(' + (s.r | 0) + ',' + (s.g | 0) + ',' + (s.b | 0) + ',' + s.a.toFixed(3) + ')';
       ctx.fillRect(0, 0, cw, ch);

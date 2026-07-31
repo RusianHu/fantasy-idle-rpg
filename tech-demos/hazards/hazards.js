@@ -14,7 +14,12 @@
   var feed = [];
   var routeAudit = null;
   var mimicAudit = null;
-  var labEnvironmentVisibility = 1;
+  var labEnvironmentVisibility = null;
+
+  function effectiveEnvironmentVisibility() {
+    if (labEnvironmentVisibility !== null) return labEnvironmentVisibility;
+    return Game.weather ? Game.weather.visibilityMultiplier(Game.state.world.region) : 1;
+  }
   var EVENT_TYPES = [
     'hazard:clue', 'hazard:revealed', 'hazard:warning', 'hazard:activated',
     'hazard:hit', 'hazard:avoided', 'hazard:escapeRequested', 'hazard:riskAccepted',
@@ -932,7 +937,7 @@
       regionId: Game.world.region.id,
       seed: Game.state.world.worldSeed >>> 0,
       strategy: strategy,
-      environmentVisibility: labEnvironmentVisibility,
+      environmentVisibility: effectiveEnvironmentVisibility(),
       scope: scope,
       routes: routes,
       results: results,
@@ -1107,6 +1112,14 @@
       updateRuntime(true);
       runRouteAudit();
     });
+    document.getElementById('audit-visibility-mode').addEventListener('change', function () {
+      var manual = this.value === 'manual';
+      var input = document.getElementById('audit-visibility');
+      input.disabled = !manual;
+      labEnvironmentVisibility = manual ? U.clamp(Number(input.value) || 1, 0, 4) : null;
+      updateRuntime(true);
+      runRouteAudit();
+    });
     document.getElementById('run-mimic-audit').addEventListener('click', runMimicAudit);
     document.getElementById('mimic-samples').addEventListener('change', runMimicAudit);
     document.getElementById('mimic-genuine-start').addEventListener('change', runMimicAudit);
@@ -1167,6 +1180,7 @@
       if (timeMode === 'cycle') {
         Game.state.world.worldTime = (Game.state.world.worldTime + dt) % Game.F.BAL.dayLength;
       }
+      if (Game.weather) Game.weather.update(dt, Game.state.world.worldTime);
       Game.terrain.update(dt);
       Game.particles.update(dt);
       Game.fx.update(dt);
@@ -1195,6 +1209,7 @@
   Game.state.settings.autoCampRest = false;
   Game.state.settings.groundLoot = false;
   Game.state.settings.controlMode = 'manual';
+  Game.weather.init();
   Game.player.setClass('fighter');
   var params = queryParams();
   var seed = parseSeed(params.get('seed'));
@@ -1202,8 +1217,8 @@
   Game.render.init(document.getElementById('stage'));
   bindEvents();
   bindControls();
-  Game.hazards.registerDetectionModifierSource('lab:weather-visibility', function () {
-    return labEnvironmentVisibility;
+  Game.hazards.registerDetectionModifierSource('lab:visibility-override', function () {
+    return labEnvironmentVisibility === null ? 1 : labEnvironmentVisibility;
   });
   var initialId = params.get('region') || location.hash.slice(1);
   var initialIndex = regions.findIndex(function (region) { return region.id === initialId; });
@@ -1246,10 +1261,12 @@
     auditReport: function () { return routeAudit; },
     visibility: function (value) {
       var input = document.getElementById('audit-visibility');
-      if (value === undefined) return labEnvironmentVisibility;
+      if (value === undefined) return effectiveEnvironmentVisibility();
+      document.getElementById('audit-visibility-mode').value = 'manual';
+      input.disabled = false;
       input.value = String(value);
       input.dispatchEvent(new Event('change'));
-      return labEnvironmentVisibility;
+      return effectiveEnvironmentVisibility();
     },
     mimicAudit: runMimicAudit,
     mimicReport: function () { return mimicAudit; },

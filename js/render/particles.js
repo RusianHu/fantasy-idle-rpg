@@ -18,6 +18,7 @@
   var regionType = 'meadow';
   var world = { w: 900, h: 520 };
   var spawnAcc = 0;
+  var ambientScale = 1;
 
   /* ---------- 氛围粒子配置表 ---------- */
   var AMBIENT_DEFS = {
@@ -168,6 +169,11 @@
   var Pt = Game.particles = {
     setEnabled: function (f) { enabled = !!f; if (!f) { ambient.length = 0; bursts.length = 0; } },
     isEnabled: function () { return enabled; },
+    setAmbientScale: function (value) {
+      ambientScale = Number.isFinite(value) ? U.clamp(value, 0, 1) : 1;
+      var keep = Math.floor(AMBIENT_CAP * ambientScale);
+      if (ambient.length > keep) ambient.splice(0, ambient.length - keep);
+    },
 
     initRegion: function (region) {
       regionType = region.particles;
@@ -200,8 +206,8 @@
       var def = AMBIENT_DEFS[regionType];
       var night = Game.daynight ? Game.daynight.nightFactor() : 0;
       if (def) {
-        spawnAcc += def.rate * dt;
-        while (spawnAcc >= 1 && ambient.length < AMBIENT_CAP) {
+        spawnAcc += def.rate * ambientScale * dt;
+        while (spawnAcc >= 1 && ambient.length < AMBIENT_CAP * ambientScale) {
           spawnAcc -= 1;
           var p = { t: 0 };
           def.make(p, night);

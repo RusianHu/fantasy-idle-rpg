@@ -173,6 +173,7 @@
         Game.state.world.region = rid;
       }
       W.region = region;
+      if (Game.weather) Game.weather.enterRegion(rid);
       W.entities = [];
       W.bossEnt = null;
       W.cinematic = null;

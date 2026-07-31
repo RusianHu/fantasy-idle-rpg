@@ -77,6 +77,7 @@
       bus.on('hazard:ambushStarted', function () { A.playSfx('sfx_hazard_ambush'); });
       bus.on('hazard:hit', function () { A.playSfx('sfx_hazard_hit'); });
       bus.on('hazard:avoided', function () { A.playSfx('sfx_hazard_avoided'); });
+      bus.on('weather:lightning', function () { A.playSfx('sfx_thunder'); });
       bus.on('boss:spawned', function () { A.playBgm('bgm_boss'); });
       bus.on('boss:defeated', function () { A.playBgm('bgm_field'); });
       bus.on('boss:failed', function () { A.playBgm('bgm_field'); });

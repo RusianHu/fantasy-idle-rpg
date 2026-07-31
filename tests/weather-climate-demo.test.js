@@ -21,7 +21,9 @@ for (const productionModule of [
   'js/render/renderer.js',
   'js/render/daynight.js',
   'js/render/particles.js',
-  'js/render/effects.js'
+  'js/render/effects.js',
+  'js/systems/weather.js',
+  'js/render/weather.js'
 ]) {
   assert.ok(html.includes(productionModule),
     `Weather/Climate Lab loads production module ${productionModule}`);
@@ -70,8 +72,8 @@ assert.doesNotMatch(script, /Game\.(?:hazards|combat|exploration|expedition|trad
   'Lab does not start gameplay systems');
 assert.doesNotMatch(script, /\.(?:fillRect|strokeRect|beginPath|arc|lineTo)\s*\(/,
   'Lab does not implement demo-only weather drawing primitives');
-assert.doesNotMatch(script, /register(?:Weather|Climate)|Game\.(?:weather|climate)\s*=/i,
-  'Lab does not add production weather or climate APIs');
+assert.match(script, /Game\.weather\.sample|Game\.weather\.inspect|Game\.weather\.setPreview/,
+  'Lab consumes production weather APIs');
 
 const expectedPresets = [
   'meadow', 'leaves', 'dust', 'wisps',
@@ -87,14 +89,16 @@ assert.match(script, /Object\.assign\(\{\}, region,\s*\{/,
 for (const hook of [
   'timeline', 'weatherState', 'intensity', 'visibilityProvider', 'renderLayer'
 ]) {
-  assert.match(script, new RegExp(`${hook}:\\s*['"]unconnected['"]`),
-    `${hook} stays explicitly unconnected`);
+  assert.match(script, new RegExp(`${hook}:\\s*['"](?:production|weather:visibility|production-four-layer)['"]`),
+    `${hook} is connected to production`);
 }
 
 for (const method of [
   'regions', 'particlePresets', 'snapshot', 'report',
   'setRegion', 'setSeed', 'setWorldTime', 'setParticlePreset',
-  'setEffects', 'setCamera', 'capturePhases', 'verifyDeterminism'
+  'setEffects', 'setWeatherMode', 'setWeatherFront', 'setWeatherIntensity',
+  'setTransitionProgress', 'setReducedMotion', 'setRenderLayers',
+  'triggerLightning', 'setCamera', 'capturePhases', 'verifyDeterminism'
 ]) {
   assert.match(script, new RegExp(`${method}:`),
     `WeatherClimateLab exposes ${method}`);
@@ -103,6 +107,8 @@ assert.match(script, /window\.WeatherClimateLab\s*=/);
 
 for (const id of [
   'stage', 'region-tabs', 'seed-input', 'particle-select', 'effects-toggle',
+  'weather-mode', 'weather-front', 'weather-intensity', 'weather-transition',
+  'trigger-lightning', 'reduced-motion', 'front-board', 'exposure-audit',
   'time-slider', 'capture-phases', 'verify-determinism',
   'phase-dawn', 'phase-day', 'phase-dusk', 'phase-night',
   'metrics', 'report', 'map-lab-link', 'hazard-lab-link'
@@ -110,7 +116,7 @@ for (const id of [
   assert.match(html, new RegExp(`id="${id}"`), `Lab exposes #${id}`);
 }
 
-for (const param of ['seed', 'region', 'time', 'particle']) {
+for (const param of ['seed', 'region', 'time', 'particle', 'mode', 'front', 'state', 'intensity']) {
   assert.match(script, new RegExp(`params\\.get\\(['"]${param}['"]\\)`),
     `Lab restores ${param} from the URL`);
 }
@@ -118,7 +124,7 @@ assert.match(html, /weather-climate\.css/);
 assert.match(styles, /min-height:\s*44px/,
   'interactive controls retain a 44px minimum touch target');
 assert.match(hub, /weather-climate\/weather-climate\.html/);
-assert.match(guide, /不是天气系统/);
+assert.match(guide, /生产天气|production weather/i);
 
 const i18nKeys = new Set(
   [...html.matchAll(/data-demo-(?:i18n|page-title|i18n-aria|i18n-title)="([^"]+)"/g)]
@@ -131,4 +137,4 @@ for (const key of i18nKeys) {
   assert.equal(occurrences, 2, `${key} exists once in each demo locale`);
 }
 
-console.log('weather-climate-demo.test.js: production-only rendering Lab contract passed');
+console.log('weather-climate-demo.test.js: production weather QA contract passed');

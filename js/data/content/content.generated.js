@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "401aead7ec4ba1bde9ae9137cc7203a8372b504f4451e0e69ed44c35f7b44698",
+  "sourceSetHash": "8b475ccd54742c6e40a30caef45fc9d2bc594f142eb46c3ac167a40f88380dd8",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -33,7 +33,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "088c55e0f1eb813af2a6ba882e8d922a0047eb8e489a2e1b3e0216691294e0f5"
+      "sha256": "a19b649330aca42127002f2df05035d6ccf782c622deebe0e404e9f6966e97f4"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -43,7 +43,7 @@
     {
       "path": "js/data/packs/regions/factory.support.js",
       "kind": "support",
-      "sha256": "acaa0af0309079c8b8fcba0d94d0423c7a054e02136be47f1aee745721e0a62b"
+      "sha256": "f577a1963c37d46391d0220f40f1c3d5775a0c95e45e2e7e362cbd9081bf3d1f"
     },
     {
       "path": "js/data/packs/regions/forest.pack.js",
@@ -243,7 +243,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "26a35012"
+  "contentFingerprint": "096f5c21"
 });
 })();
 /* source: js/data/packs/regions/catalog.support.js */
@@ -564,6 +564,118 @@
       ]
     }
   ];
+
+  function climateState(regionId, id, kind, precipitation, cloud, fog, wind, ambient, lightning, tint) {
+    return {
+      id: id,
+      kind: kind,
+      nameKey: 'weather.state.' + regionId + '.' + id,
+      precipitation: { type: precipitation, density: precipitation === 'none' ? 0 : 1 },
+      cloudCover: cloud,
+      fogDensity: fog,
+      windMultiplier: wind,
+      ambientScale: ambient,
+      lightning: lightning === true,
+      tint: tint
+    };
+  }
+
+  function climateProfile(regionId, exposure, factors, specs) {
+    var fronts = ['calm', 'wet', 'volatile', 'dry', 'arcane'];
+    var states = {};
+    fronts.forEach(function (front, index) {
+      var spec = specs[index];
+      states[front] = climateState(
+        regionId, spec[0], spec[1], spec[2], spec[3], spec[4],
+        spec[5], spec[6], spec[7], spec[8]
+      );
+    });
+    return {
+      exposure: exposure,
+      factors: factors,
+      states: states,
+      presentation: { nameKey: 'weather.profile.' + regionId }
+    };
+  }
+
+  var CLIMATES = {
+    grassland: climateProfile('grassland', 'open',
+      { precipitation: 1, celestial: 1, tint: 1, wind: 1 },
+      [
+        ['fair', 'clear', 'none', 0.12, 0.02, 0.55, 1, false, '#9ccfe8'],
+        ['showers', 'rain', 'rain', 0.65, 0.12, 0.95, 0.48, false, '#718b9e'],
+        ['thunderstorm', 'storm', 'rain', 0.95, 0.2, 1.25, 0.18, true, '#49566d'],
+        ['highWind', 'wind', 'none', 0.38, 0.05, 1.45, 0.72, false, '#8aa7ac'],
+        ['fairyMist', 'magicFog', 'motes', 0.42, 0.55, 0.45, 0.45, false, '#8ec6bd']
+      ]),
+    forest: climateProfile('forest', 'canopy',
+      { precipitation: 0.65, celestial: 0.25, tint: 0.65, wind: 0.72 },
+      [
+        ['gladeLight', 'clear', 'none', 0.2, 0.08, 0.4, 1, false, '#779b78'],
+        ['canopyRain', 'rain', 'rain', 0.72, 0.2, 0.75, 0.48, false, '#536f68'],
+        ['muffledStorm', 'storm', 'rain', 0.96, 0.3, 1, 0.16, true, '#394f50'],
+        ['leafGusts', 'wind', 'none', 0.45, 0.08, 1.35, 0.72, false, '#687c5a'],
+        ['spiritMist', 'magicFog', 'motes', 0.56, 0.68, 0.38, 0.5, false, '#597f75']
+      ]),
+    mine: climateProfile('mine', 'underground',
+      { precipitation: 0, celestial: 0, tint: 0, wind: 0.18 },
+      [
+        ['stillDust', 'dust', 'dust', 0, 0.12, 0.2, 0.72, false, '#554b45'],
+        ['vaultDrips', 'drip', 'drip', 0, 0.2, 0.18, 0.56, false, '#40545d'],
+        ['deepTremorDust', 'dust', 'dust', 0, 0.5, 0.55, 0.3, false, '#51463f'],
+        ['dustfall', 'dust', 'dust', 0, 0.32, 0.32, 0.5, false, '#63574a'],
+        ['crystalMist', 'crystalFog', 'motes', 0, 0.58, 0.16, 0.5, false, '#3f7782']
+      ]),
+    graveyard: climateProfile('graveyard', 'open',
+      { precipitation: 1, celestial: 0.7, tint: 0.92, wind: 1 },
+      [
+        ['overcast', 'overcast', 'none', 0.7, 0.18, 0.42, 0.8, false, '#626578'],
+        ['coldRain', 'rain', 'rain', 0.84, 0.3, 0.85, 0.42, false, '#454d60'],
+        ['graveStorm', 'storm', 'rain', 1, 0.38, 1.18, 0.15, true, '#39354f'],
+        ['coldWind', 'wind', 'none', 0.58, 0.2, 1.2, 0.62, false, '#545466'],
+        ['soulFog', 'magicFog', 'motes', 0.68, 0.76, 0.36, 0.42, false, '#5c5574']
+      ]),
+    snowpass: climateProfile('snowpass', 'coldOpen',
+      { precipitation: 1, celestial: 0.9, tint: 0.9, wind: 1.15 },
+      [
+        ['frostClear', 'clear', 'none', 0.18, 0.04, 0.5, 0.9, false, '#b8d8e6'],
+        ['snowfall', 'snow', 'snow', 0.68, 0.25, 0.72, 0.52, false, '#a8bdc9'],
+        ['blizzard', 'blizzard', 'snow', 1, 0.66, 1.4, 0.12, true, '#8397a8'],
+        ['powderGusts', 'snow', 'snow', 0.44, 0.32, 1.3, 0.58, false, '#adbfca'],
+        ['auroraSnow', 'magicSnow', 'motes', 0.52, 0.5, 0.6, 0.48, false, '#86b9bd']
+      ]),
+    lavacave: climateProfile('lavacave', 'underground',
+      { precipitation: 0, celestial: 0, tint: 0, wind: 0.25 },
+      [
+        ['embersEase', 'embers', 'none', 0, 0.08, 0.16, 0.82, false, '#6c3526'],
+        ['steamRise', 'steam', 'steam', 0, 0.54, 0.35, 0.45, false, '#78695d'],
+        ['magmaFlare', 'magma', 'motes', 0, 0.28, 0.5, 0.3, false, '#9b3e23'],
+        ['ashfall', 'ash', 'ash', 0, 0.34, 0.26, 0.5, false, '#57443c'],
+        ['sulfurFog', 'sulfurFog', 'motes', 0, 0.66, 0.2, 0.42, false, '#77703e']
+      ]),
+    skyruins: climateProfile('skyruins', 'elevated',
+      { precipitation: 1.18, celestial: 1, tint: 1, wind: 1.35 },
+      [
+        ['clearGale', 'wind', 'none', 0.16, 0.03, 1.2, 0.75, false, '#91badb'],
+        ['rainSquall', 'rain', 'rain', 0.76, 0.18, 1.35, 0.35, false, '#607d99'],
+        ['highStorm', 'storm', 'rain', 1, 0.3, 1.65, 0.1, true, '#44546f'],
+        ['crosswind', 'wind', 'none', 0.35, 0.04, 1.7, 0.62, false, '#7694ae'],
+        ['aetherVeil', 'magicFog', 'motes', 0.62, 0.62, 0.9, 0.42, false, '#719eb7']
+      ]),
+    darkcastle: climateProfile('darkcastle', 'fortressExterior',
+      { precipitation: 0.95, celestial: 0.55, tint: 0.9, wind: 1.05 },
+      [
+        ['lowMiasma', 'magicFog', 'motes', 0.62, 0.52, 0.35, 0.55, false, '#4f385e'],
+        ['blackRain', 'rain', 'rain', 0.9, 0.32, 0.9, 0.3, false, '#342b43'],
+        ['violetStorm', 'storm', 'rain', 1, 0.42, 1.3, 0.1, true, '#342544'],
+        ['ashenWind', 'ash', 'ash', 0.52, 0.28, 1.2, 0.48, false, '#4b414b'],
+        ['soulSquall', 'magicFog', 'motes', 0.82, 0.72, 1.05, 0.24, false, '#56356c']
+      ])
+  };
+
+  R.forEach(function (region) {
+    region.climate = CLIMATES[region.id];
+  });
 
   /*
    * v3 装饰不是逐点独立随机，而由以下作者数据驱动：
@@ -1516,7 +1628,15 @@
       };
       return visual;
     });
+    if (!catalogRegion.climate) {
+      throw new Error('[RegionFactory] missing climate profile: ' + spec.regionId);
+    }
+    var climateProfile = JSON.parse(JSON.stringify(catalogRegion.climate));
+    climateProfile.id = 'climate.' + spec.regionId;
+    climateProfile.regionId = spec.regionId;
     var regionProjection = JSON.parse(JSON.stringify(catalogRegion));
+    delete regionProjection.climate;
+    regionProjection.climateProfileId = climateProfile.id;
     regionProjection.monsters = normals.map(function (monster) { return monster.id; });
     regionProjection.summons = summons.map(function (summon) { return summon.id; });
     regionProjection.hazards = hazards.map(function (hazard) { return hazard.id; });
@@ -1575,9 +1695,11 @@
           offlineEligible: true,
           offlineRepresentative: offline
         }],
+        climateProfile: [climateProfile],
         regionProfile: [{
           id: spec.regionId, tier: catalogRegion.tier,
           populationProfileId: 'population.' + spec.regionId,
+          climateProfileId: climateProfile.id,
           hazardProfileIds: hazardProfiles.map(function (hazard) { return hazard.id; }),
           projection: regionProjection
         }],

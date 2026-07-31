@@ -626,4 +626,48 @@
       noDiscoveries: '离线远征只使用已登记情报，没有发现新地点。'
     }
   });
+  Game.i18n.addPack('zh-CN', {
+    weather: {
+      label: '当前天气',
+      profile: {
+        grassland: '草原气候', forest: '林冠气候', mine: '矿坑微气候',
+        graveyard: '墓园气候', snowpass: '雪山气候', lavacave: '熔岩洞微气候',
+        skyruins: '高空气候', darkcastle: '魔王城外庭气候'
+      },
+      state: {
+        grassland: {
+          fair: '晴朗', showers: '阵雨', thunderstorm: '雷暴',
+          highWind: '强风', fairyMist: '妖精薄雾'
+        },
+        forest: {
+          gladeLight: '林隙晴光', canopyRain: '林冠雨', muffledStorm: '闷雷暴雨',
+          leafGusts: '落叶阵风', spiritMist: '灵雾'
+        },
+        mine: {
+          stillDust: '静尘', vaultDrips: '穹顶渗水', deepTremorDust: '深层震尘',
+          dustfall: '尘降', crystalMist: '晶雾'
+        },
+        graveyard: {
+          overcast: '阴云', coldRain: '冷雨', graveStorm: '墓园雷暴',
+          coldWind: '寒风', soulFog: '魂雾'
+        },
+        snowpass: {
+          frostClear: '霜晴', snowfall: '降雪', blizzard: '暴风雪与雷雪',
+          powderGusts: '粉雪阵风', auroraSnow: '极光雪尘'
+        },
+        lavacave: {
+          embersEase: '余烬平息', steamRise: '蒸汽涌升', magmaFlare: '岩浆耀变',
+          ashfall: '灰烬降落', sulfurFog: '硫磺雾'
+        },
+        skyruins: {
+          clearGale: '晴空劲风', rainSquall: '雨飑', highStorm: '高频雷暴',
+          crosswind: '横风', aetherVeil: '以太云幕'
+        },
+        darkcastle: {
+          lowMiasma: '瘴气低伏', blackRain: '黑雨', violetStorm: '紫雷暴',
+          ashenWind: '灰风', soulSquall: '灵魂飑线'
+        }
+      }
+    }
+  });
 })();

@@ -10,7 +10,7 @@
     'ability', 'trait', 'status', 'aiProfile', 'tacticsProfile',
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
     'actorVariant', 'encounterPack', 'worldSpawnProfile',
-    'worldPopulationProfile', 'regionProfile', 'engagementPolicy',
+    'worldPopulationProfile', 'regionProfile', 'climateProfile', 'engagementPolicy',
     'interactionProfile', 'hazardProfile', 'hazardVisualProfile'
   ];
 
@@ -34,7 +34,8 @@
     encounterPack: ['id', 'members'],
     worldSpawnProfile: ['id', 'identity', 'mountTo', 'placement', 'lifecycle'],
     worldPopulationProfile: ['id', 'regionId', 'channels'],
-    regionProfile: ['id', 'tier', 'populationProfileId'],
+    regionProfile: ['id', 'tier', 'populationProfileId', 'climateProfileId'],
+    climateProfile: ['id', 'regionId', 'exposure', 'factors', 'states', 'presentation'],
     engagementPolicy: ['id', 'manualAttack', 'autoAggro'],
     interactionProfile: ['id', 'actions'],
     hazardProfile: [
@@ -71,8 +72,10 @@
     worldPopulationProfile: { regionId: 'regionProfile' },
     regionProfile: {
       populationProfileId: 'worldPopulationProfile',
-      hazardProfileIds: 'hazardProfile'
+      hazardProfileIds: 'hazardProfile',
+      climateProfileId: 'climateProfile'
     },
+    climateProfile: { regionId: 'regionProfile' },
     hazardProfile: {
       regionId: 'regionProfile', visualProfileId: 'hazardVisualProfile'
     }
@@ -131,6 +134,7 @@
       offlineEligible: true
     },
     regionProfile: { schemaVersion: 1, flags: {} },
+    climateProfile: { schemaVersion: 1, states: {} },
     engagementPolicy: {
       schemaVersion: 1, manualAttack: false, autoAggro: false,
       groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
@@ -168,6 +172,9 @@
     categories: ['player', 'monster', 'npc', 'companion', 'summon', 'object'],
     relations: ['self', 'ally', 'neutral', 'hostile'],
     populationChannels: ['regular', 'rare', 'guardian', 'npc', 'boss'],
-    objectiveTypes: ['eliminate', 'survive', 'protect', 'surrender', 'escape', 'timeout', 'custom']
+    objectiveTypes: ['eliminate', 'survive', 'protect', 'surrender', 'escape', 'timeout', 'custom'],
+    climateFronts: ['calm', 'wet', 'volatile', 'dry', 'arcane'],
+    climateExposures: ['open', 'canopy', 'underground', 'coldOpen', 'elevated', 'fortressExterior'],
+    weatherPrecipitationTypes: ['none', 'rain', 'snow', 'ash', 'drip', 'dust', 'steam', 'motes']
   };
 })();

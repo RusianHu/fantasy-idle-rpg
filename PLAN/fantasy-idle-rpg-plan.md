@@ -14,7 +14,7 @@
   - 正式内容为 5 职业、30 Talent、32 个常驻普通怪、1 个含三阶 Variant 的条件型噬宝匣、8 个 Boss、8 个区域召唤 Actor、16 个 EncounterProfile 与 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v16，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、白名单化 `world.social`、按布局清理的 Hazard 发现/绝对冷却，以及噬宝匣判定序号/真箱保护计数）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、活动噬宝匣、RNG、威胁、施法、Hazard warning/active scheduler、状态与护盾不入档。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要；自动养成使用无副作用角色预览，并把该摘要合入确定性输出/生存/收益评分。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
-  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为无玩家、无迷雾的地图生成/渲染/Population 放置 Lab，复用正式 terrain、renderer、Population 与 Actor 链路，并提供交互小地图、检查/寻路/放置探针、按当前地图关联且完整分类的内容目录、审计、确定性复验和固定 50ms 巡游预览；`tech-demos/exploration-v3` 独立负责导航网格、长途路径与多 Seed 拓扑审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 只集中验证现有地形、昼夜、区域氛围、风动与光柱并登记未连接的未来槽位，不构成天气机制。正式入口及五个工作台只加载同一个确定性 `content.generated.js`，Node 工具从 `*.pack.js` / `*.support.js` 文件系统真源独立校验产物。
+  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置 Lab；`tech-demos/exploration-v3` 负责导航网格、长途路径与多 Seed 拓扑审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器，负责时间线/强制状态、八区暴露、降动态、确定性、雷击与性能验证。正式入口及五个工作台只加载同一个确定性 `content.generated.js`。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）
@@ -142,6 +142,8 @@
   ## 动态氛围与日夜循环（必须）
   - **全局日夜循环**：游戏内时钟驱动（如 20 分钟一昼夜，速度可在配置调整），黎明→白昼→黄昏→夜晚平滑过渡；实现为
   Canvas 世界层之上的全屏色调层（暖橙晨昏、深蓝夜色），夜晚出现星空/月亮远景层。日夜为纯氛围层，不影响挂机数值。
+  - **区域气候与天气锋**：编译内容类型 `climateProfile` 与 `regionProfile.climateProfileId` 严格引用；八区分别声明露天、林冠、地下、寒区、高空或城堡外庭曝光。`Game.weather` 仅由 `worldSeed + floor(worldTime/300) + regionId` 推导五类全局天气锋与区域微气候，段首 24 秒线性过渡，不写存档。雨、雷暴、雾、雪、暴风雪、灰烬、蒸汽、晶雾等复用云幕、地表、世界降水和屏幕雷光四层参数化管线；湿润度在 45 秒内升高、90 秒内衰减。地下禁用星月、外部降水、天空闪电和昼夜色调；森林按 65% 外部降水、25% 星月和 65% 色调降级。
+  - **玩法边界**：天气仅以 `weather:visibility` 向 Hazard 提供 `1/0.8/0.65/0.9/0.75` 倍率并在过渡期插值；不改变战斗、移动、掉落、采集、导航、离线收益或存档。关闭氛围特效后只保留低成本云色与 HUD；减少动态时禁止快速天气粒子、闪屏和震动。
   - **区域环境粒子**：每个区域配置专属的动态粒子/氛围效果并写入区域注册表（如：草原飘絮与流萤、森林落叶与雾气、矿坑
   尘埃、墓地磷火、雪山飘雪、熔岩火星上升、浮空遗迹流云疾走、魔王城暗紫瘴气），粒子用 Canvas 程序化绘制，无需素材图。
   - **篝火休息演出**（配合核心玩法第 9 条）：篝火帧动画 + 火光摇曳的光晕（径向渐变随机抖动半径/透明度）、上升的火星
@@ -231,7 +233,7 @@
   ID」编程。
   - **当前内容编译器与注册表**：正式内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义、Pack-local 中英文与条目，由编译器统一执行 schema/default、引用图、反向 Population 挂载、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。`js/data/packs/**/*.pack.js` 与 `*.support.js` 是文件系统真源；Support 只获得声明的 `authoring.read/write`、`rules.formula/handler` 能力，并通过版本化 `Game.contentAuthoring` 注册值或纯 factory，注册期/安装期改写其他 `Game` 表面均使构建失败。构建器在独立源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring、locales、挂载视图、fingerprint 和 `sourceSetHash`。`js/data/content/*.generated.js` 只是确定性校验/运行产物，禁止手改；正式入口和五个技术演示均只加载一个当前 `BUILD_ID` 的 `content.generated.js`，新增内容不修改 HTML 或手写清单。
   - **Actor 与世界生态合同**：ActorArchetype/Variant、Interaction/Engagement、EncounterPack、WorldSpawnProfile、WorldPopulationProfile 与 RegionProfile 使用稳定 ID 串成完整反向引用链。Population 决定通道和数量，并以不可变 `PopulationMountPlan` 按固定 channel 顺序完成槽位选择、坐标预留、放置失败与 delay/worldTime 重生调度；SpawnProfile 决定身份、放置与生命周期，EncounterPack 只描述可复用成员组。稳定 Spawn 使用 SpawnLease/generation，召唤使用确定性 ephemeral request key。外部攻击先入 EngagementCommand，并在固定 tick 通过 `EngagementDraft → CommitPlan → Game.encounters.startAtomic()` 原子提交 Variant、Relation、社交记忆、Encounter、join、target、ordinal 与 revision；完整 outbox 顺序为 `variant* → relation → started → joined* → committed`，提交后 opening Action 仍走正式 `requestAction()`。目标 DSL、多队伍/coalition、observer、投降/逃跑、奖励授权与版本化确定性 custom handler 统一由 Objective evaluator 决定。
-  - **召唤、噬宝匣与 Hazard 合同**：区域召唤 Actor 不挂 Population，继承召唤者 faction/controller/team，以稳定 sequence 创建并挂载世界表现；`rewardAuthorized:false` 优先于队伍奖励资格，死亡、自毁或 Encounter 结束只清理一次且不产生经验、金币、掉落、讨伐或击杀统计。噬宝匣同样使用不反向挂载区域 Population 的 ephemeral SpawnProfile，但由宝箱事务显式授权奖励；必须先成功 materialize/attach/startEncounter 才移除箱体，胜利时仅结算一次，非胜利 Encounter 结束必须清理且不得泄漏奖励。非 Actor `HazardProfile/HazardVisualProfile` 由独立 `Game.hazards` 管理路线覆盖放置、固定 roll 概率 awareness、shape-aware swept trigger/导航距离、50ms phase、外部 Effect 与 ambush Engagement；环境可见度来源以稳定 ID 注册同步无副作用的 `0..4` 倍率，异常或非法返回按 1 降级且只警告一次，供未来天气、雨雪和昼夜组合接入。VisualProfile 独占 glyph、材质/调色板和阶段表现参数，渲染层只读表现快照并监听 `hazard:*` 事件，不参与命中判定、反向写状态或按区域/profile ID 特判。
+  - **召唤、噬宝匣与 Hazard 合同**：区域召唤 Actor 不挂 Population，继承召唤者 faction/controller/team，以稳定 sequence 创建并挂载世界表现；`rewardAuthorized:false` 优先于队伍奖励资格。噬宝匣使用不反向挂载区域 Population 的 ephemeral SpawnProfile，由宝箱事务显式授权奖励。非 Actor `HazardProfile/HazardVisualProfile` 由 `Game.hazards` 管理路线覆盖、固定 roll、shape-aware swept trigger/导航距离、50ms phase、外部 Effect 与 ambush Engagement；环境可见度 Provider 异常按 1 降级，生产 `weather:visibility` 已接入且不提交伤害或状态。
   - **单位作者入口**：新增单位以独立 `*.pack.js` 内容胶囊注册，通过 `WorldSpawnProfile.mountTo` 反向挂载 Population，不修改区域、引擎、HTML 或手写清单；Pack-local 中英文、内容引用与正式资产必须通过严格编译审计，生成产物禁止手改。
   - **Modifier / Status / Talent 合同**：内容 Modifier 必须显式声明已注册 `stat`、合法 `phase`、`operation` 与有限数值；`add/addPct` 按层线性累加，`multiply` 按层幂次相乘，`set` 不随层放大。`refresh/unique` 只允许一层，`stack` 声明正整数上限，周期效果按实例层数执行。Talent patch 只能指向已注册 Ability/Status 的现有数值路径，非法 stat、phase、operation、成本、层数、周期或 patch 在严格审计时阻止启动。
   - **事件总线（EventBus）**：引擎在关键节点广播事件（`monster:killed`、`player:levelup`、`item:dropped`、
@@ -268,7 +270,7 @@
 
   ## 技术与质量要求
   - `tech-demos/` 演示页必须持续直连并适配当前生产版本，历史兼容协议仅由自动测试保护，不得作为默认演示或保留失效示例。即时性世界逻辑优先在确定性 Lab 中完成技术、时序与渲染验证，再以正式入口做集成冒烟。
-  - Actor / Combat Lab 必须从正式内容清单自动枚举 Actor、召唤物、Action、Talent、Status、Resource、AI、Faction 和 EncounterProfile；支持 1–4 友方、1–8 敌方、暂停/单 tick/倍速、正式 summon Action、稳定自毁、状态/驱散、打断、关系/控制器调整、深链与完整运行时检查。Hazard Lab 必须自动枚举当前区域 Hazard，支持聚焦、线索、强制揭示、触发、推进与实例重置，以九类机关 × 六阶段对照验证材质、范围、方向、铭牌、命中/残留、降动态及中英文窄屏取景；同时显示固定 roll、基础/最终概率、策略、远征视野与外部环境来源，提供天气可见度模拟，并使用真实检定结果审计提前识破绕行、未识破预警和触发后逃生。Lab 还必须使用正式导航网格审计放置锚点、宏观骨架与内容接近链路，报告 planned route coverage、awareness/phase、冷却、策略代价、逃生/风险事件与完整 `hazard:*` 事件链，并复用正式噬宝匣判定函数展示保护计数、合资格概率、三阶变体及胜败事务边界。各 Lab 均不得维护演示专用战斗、Hazard 或噬宝匣实现。
+  - Actor / Combat Lab 必须从正式内容清单自动枚举 Actor、召唤物、Action、Talent、Status、Resource、AI、Faction 和 EncounterProfile。Hazard Lab 必须自动枚举当前区域 Hazard，显示固定 roll、最终概率、策略、远征视野及真实天气 Provider，并保留 `1.0` 手动覆盖。Weather Lab 必须直接使用生产天气模块和渲染器，提供时间线/强制状态、五天气锋、强度、过渡、渲染层、减少动态、雷击、五锋对照、八区暴露与性能诊断；禁止存档、战斗、Population 和正式世界生命周期。
   - 代码结构清晰：严格遵循上一节的模块化/插件化架构，数据配置（怪物表/装备表/区域表/技能表）与逻辑完全分离，便于扩展数值与内容。
   - 战斗逻辑严格由 50ms integer tick 和稳定 scheduler 驱动；`requestAnimationFrame` 仅负责渲染与有限追帧，页面不可见时按时间戳分片补偿，不依赖 `setInterval` 精度，也不把渲染帧率带入战斗结果。
   - **大数字处理**：指数成长曲线后期数值会很大，需在项目早期统一封装数字格式化函数（缩写单位随语言走，见 i18n 一节：

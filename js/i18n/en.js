@@ -632,4 +632,48 @@
       noDiscoveries: 'Offline expeditions use known intelligence only and discover no new places.'
     }
   });
+  Game.i18n.addPack('en', {
+    weather: {
+      label: 'Current weather',
+      profile: {
+        grassland: 'Grassland climate', forest: 'Canopy climate', mine: 'Mine microclimate',
+        graveyard: 'Graveyard climate', snowpass: 'Alpine climate', lavacave: 'Lava-cave microclimate',
+        skyruins: 'High-altitude climate', darkcastle: 'Demon Castle courtyard climate'
+      },
+      state: {
+        grassland: {
+          fair: 'Clear', showers: 'Showers', thunderstorm: 'Thunderstorm',
+          highWind: 'High Winds', fairyMist: 'Fairy Mist'
+        },
+        forest: {
+          gladeLight: 'Glade Light', canopyRain: 'Canopy Rain', muffledStorm: 'Muffled Storm',
+          leafGusts: 'Leaf Gusts', spiritMist: 'Spirit Mist'
+        },
+        mine: {
+          stillDust: 'Still Dust', vaultDrips: 'Vault Drips', deepTremorDust: 'Deep Tremor Dust',
+          dustfall: 'Dustfall', crystalMist: 'Crystal Mist'
+        },
+        graveyard: {
+          overcast: 'Overcast', coldRain: 'Cold Rain', graveStorm: 'Graveyard Storm',
+          coldWind: 'Cold Wind', soulFog: 'Soul Fog'
+        },
+        snowpass: {
+          frostClear: 'Frost Clear', snowfall: 'Snowfall', blizzard: 'Blizzard and Thundersnow',
+          powderGusts: 'Powder Gusts', auroraSnow: 'Aurora Snowdust'
+        },
+        lavacave: {
+          embersEase: 'Embers Easing', steamRise: 'Steam Rising', magmaFlare: 'Magma Flare',
+          ashfall: 'Ashfall', sulfurFog: 'Sulfur Fog'
+        },
+        skyruins: {
+          clearGale: 'Clear Gale', rainSquall: 'Rain Squall', highStorm: 'High-Frequency Storm',
+          crosswind: 'Crosswind', aetherVeil: 'Aether Veil'
+        },
+        darkcastle: {
+          lowMiasma: 'Low Miasma', blackRain: 'Black Rain', violetStorm: 'Violet Storm',
+          ashenWind: 'Ashen Wind', soulSquall: 'Soul Squall'
+        }
+      }
+    }
+  });
 })();

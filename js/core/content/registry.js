@@ -284,6 +284,90 @@
         if (!Number.isInteger(capacity) || capacity < 0) issue(issues, 'population-capacity', { type: type, id: def.id, path: 'channels.' + channel + '.capacity' });
       });
     }
+    if (type === 'climateProfile') {
+      var climateFactors = def.factors || {};
+      var climateStates = def.states || {};
+      if (S.climateExposures.indexOf(def.exposure) < 0) {
+        issue(issues, 'climate-exposure', { type: type, id: def.id, path: 'exposure', ref: def.exposure });
+      }
+      unexpectedFields(climateFactors, [
+        'precipitation', 'celestial', 'tint', 'wind'
+      ], type, def, 'factors', issues);
+      ['precipitation', 'celestial', 'tint', 'wind'].forEach(function (field) {
+        if (!Number.isFinite(climateFactors[field]) || climateFactors[field] < 0 ||
+            climateFactors[field] > (field === 'wind' || field === 'precipitation' ? 2 : 1)) {
+          issue(issues, 'climate-factor', { type: type, id: def.id, path: 'factors.' + field });
+        }
+      });
+      S.climateFronts.forEach(function (front) {
+        var weatherState = climateStates[front];
+        if (!weatherState || typeof weatherState !== 'object') {
+          issue(issues, 'climate-state', { type: type, id: def.id, path: 'states.' + front });
+          return;
+        }
+        unexpectedFields(weatherState, [
+          'id', 'kind', 'nameKey', 'precipitation', 'cloudCover',
+          'fogDensity', 'windMultiplier', 'ambientScale', 'lightning', 'tint'
+        ], type, def, 'states.' + front, issues);
+        if (!S.stableId.test(weatherState.id || '') || !S.stableId.test(weatherState.kind || '')) {
+          issue(issues, 'climate-state-id', { type: type, id: def.id, path: 'states.' + front + '.id' });
+        }
+        var precipitation = weatherState.precipitation || {};
+        unexpectedFields(precipitation, ['type', 'density'], type, def, 'states.' + front + '.precipitation', issues);
+        if (S.weatherPrecipitationTypes.indexOf(precipitation.type) < 0 ||
+            !Number.isFinite(precipitation.density) || precipitation.density < 0 || precipitation.density > 1) {
+          issue(issues, 'climate-precipitation', { type: type, id: def.id, path: 'states.' + front + '.precipitation' });
+        }
+        ['cloudCover', 'fogDensity', 'ambientScale'].forEach(function (field) {
+          if (!Number.isFinite(weatherState[field]) || weatherState[field] < 0 || weatherState[field] > 1) {
+            issue(issues, 'climate-state-factor', { type: type, id: def.id, path: 'states.' + front + '.' + field });
+          }
+        });
+        if (!Number.isFinite(weatherState.windMultiplier) || weatherState.windMultiplier < 0 ||
+            weatherState.windMultiplier > 2 || typeof weatherState.lightning !== 'boolean' ||
+            (weatherState.tint !== undefined && !/^#[0-9a-f]{6}$/i.test(weatherState.tint))) {
+          issue(issues, 'climate-state-presentation', { type: type, id: def.id, path: 'states.' + front });
+        }
+        if (!weatherState.nameKey) {
+          issue(issues, 'required-field', { type: type, id: def.id, path: 'states.' + front + '.nameKey' });
+        } else {
+          ['zh-CN', 'en'].forEach(function (locale) {
+            if (Game.i18n && typeof Game.i18n.has === 'function' && !Game.i18n.has(locale, weatherState.nameKey)) {
+              issue(issues, 'missing-i18n', {
+                type: type, id: def.id, path: 'states.' + front + '.nameKey',
+                ref: weatherState.nameKey, locale: locale,
+                sourcePackId: def.sourcePackId, sourceFile: def.sourceFile
+              });
+            }
+          });
+        }
+        if (def.exposure === 'underground' &&
+            (['rain', 'snow'].indexOf(precipitation.type) >= 0 || weatherState.lightning)) {
+          issue(issues, 'climate-underground-exterior-effect', {
+            type: type, id: def.id, path: 'states.' + front
+          });
+        }
+      });
+      Object.keys(climateStates).forEach(function (front) {
+        if (S.climateFronts.indexOf(front) < 0) {
+          issue(issues, 'climate-front', { type: type, id: def.id, path: 'states.' + front });
+        }
+      });
+      var climateNameKey = def.presentation && def.presentation.nameKey;
+      if (!climateNameKey) {
+        issue(issues, 'required-field', { type: type, id: def.id, path: 'presentation.nameKey' });
+      } else {
+        ['zh-CN', 'en'].forEach(function (locale) {
+          if (Game.i18n && typeof Game.i18n.has === 'function' && !Game.i18n.has(locale, climateNameKey)) {
+            issue(issues, 'missing-i18n', {
+              type: type, id: def.id, path: 'presentation.nameKey',
+              ref: climateNameKey, locale: locale,
+              sourcePackId: def.sourcePackId, sourceFile: def.sourceFile
+            });
+          }
+        });
+      }
+    }
     if (type === 'hazardProfile') {
       var hazardTrigger = def.trigger || {};
       var hazardDetection = def.detection || {};
@@ -760,6 +844,7 @@
     if (type === 'worldPopulationProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'engagementPolicy') validateAdvanced(type, def, definitions, issues);
     if (type === 'interactionProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'climateProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'hazardProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'hazardVisualProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'damageType' && ['physical', 'magic', 'true'].indexOf(def.category) < 0) {

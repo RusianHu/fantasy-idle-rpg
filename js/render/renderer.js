@@ -823,6 +823,7 @@
       if (!ctx || !Game.world.region) return;
       var W = Game.world, region = W.region;
       R.updateCamera(dt);
+      if (Game.weatherRender) Game.weatherRender.update(dt);
 
       if (parallaxRegion !== region.id) buildParallax(region);
 
@@ -841,7 +842,13 @@
       ctx.fillRect(0, 0, cw, ch);
 
       // 2) 星空 / 月亮
-      Game.daynight.drawSky(ctx, cam, cw, ch);
+      var weatherState = Game.weather && Game.weather.current ? Game.weather.current() : null;
+      var climateLight = weatherState ? {
+        celestialVisibility: weatherState.celestialVisibility,
+        tintInfluence: weatherState.tintInfluence
+      } : null;
+      Game.daynight.drawSky(ctx, cam, cw, ch, climateLight);
+      if (Game.weatherRender) Game.weatherRender.drawSky(ctx, cw, ch);
 
       // 3) 视差远景（锚定世界地平线）
       var horizonY = (Game.world.BOUND_TOP - 6 - cam.y) * z + ch / 2 + sh.y;
@@ -873,6 +880,7 @@
       }
       Game.terrain.drawDecals(ctx);
       Game.terrain.drawTufts(ctx, viewL, viewT, viewR, viewB);
+      if (Game.weatherRender) Game.weatherRender.drawSurface(ctx, viewL, viewT, viewR, viewB);
       if (Game.explorationRender) Game.explorationRender.drawWorldOverlay(ctx, viewL, viewT, viewR, viewB, t);
       if (Game.hazardRender) Game.hazardRender.drawGround(ctx, viewL, viewT, viewR, viewB);
 
@@ -989,7 +997,7 @@
 
       // 6) 篝火光晕（半径/透明度随机抖动）
       var fxOn = !Game.particles || Game.particles.isEnabled();
-      var nightF = Game.daynight.nightFactor();
+      var nightF = Game.daynight.nightFactor(climateLight);
       var cf = Game.terrain.campfirePos;
       if (cf) {
         var flick = 0.86 + 0.14 * Math.sin(t * 9.7) * Math.sin(t * 5.3 + 1.7);
@@ -1026,6 +1034,7 @@
 
       // 7) 触发粒子 + 氛围粒子 + 形状特效
       Game.particles.draw(ctx);
+      if (Game.weatherRender) Game.weatherRender.drawWorld(ctx, viewL, viewT, viewR, viewB);
       Game.fx.drawShapes(ctx);
       if (Game.exploration) Game.exploration.drawFog(ctx, viewL, viewT, viewR, viewB);
       if (Game.hazardRender) Game.hazardRender.drawOverlay(ctx, viewL, viewT, viewR, viewB);
@@ -1034,6 +1043,7 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       if (fxOn && region.rays) {
         var dayK = 1 - Math.min(1, nightF / 0.4);
+        if (weatherState) dayK *= 1 - weatherState.cloudCover * weatherState.intensity * 0.82;
         if (dayK > 0.05) {
           ctx.save();
           ctx.globalAlpha = region.rays.alpha * dayK * (0.85 + 0.15 * Math.sin(t * 0.7));
@@ -1051,7 +1061,8 @@
           ctx.restore();
         }
       }
-      Game.daynight.drawTint(ctx, cw, ch);
+      Game.daynight.drawTint(ctx, cw, ch, climateLight);
+      if (Game.weatherRender) Game.weatherRender.drawScreen(ctx, cw, ch);
       if (Game.ending && Game.ending.isPending && Game.ending.isPending()) {
         var dawn = ctx.createLinearGradient(0, ch * 0.38, 0, ch);
         dawn.addColorStop(0, 'rgba(255,205,120,0)');

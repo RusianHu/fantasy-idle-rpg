@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260731.3') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260731.5') format('woff2');
   font-display: swap;
 }
 
@@ -588,6 +588,68 @@ html[lang="en"] .auto-boss-label { font-size: 7px; letter-spacing: .3px; }
   color: #a0e0a8;
   text-shadow: 1px 1px 0 #000;
   width: max-content;
+}
+.weather-chip {
+  color: #dbe8ee;
+  border-color: #526b78;
+  background: linear-gradient(180deg, #1b2938e8, #101827e8);
+}
+.weather-mark {
+  position: relative;
+  flex: 0 0 15px;
+  width: 15px;
+  height: 13px;
+  margin-right: 4px;
+}
+.weather-mark::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 4px;
+  width: 10px;
+  height: 5px;
+  background: #a9bdc7;
+  box-shadow: 3px 2px 0 #a9bdc7, 3px -2px 0 #c6d6dc, 6px 0 0 #c6d6dc;
+}
+.weather-rain::after,
+.weather-drip::after,
+.weather-storm::after,
+.weather-snow::after,
+.weather-ash::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 10px;
+  width: 2px;
+  height: 3px;
+  background: #70badd;
+  box-shadow: 5px 1px 0 #70badd, 9px 0 0 #70badd;
+}
+.weather-storm::after {
+  width: 3px;
+  height: 2px;
+  background: #f4dc73;
+  box-shadow: 2px 2px 0 #f4dc73, 1px 4px 0 #f4dc73;
+}
+.weather-snow::after {
+  width: 2px;
+  height: 2px;
+  background: #fff;
+  box-shadow: 5px 1px 0 #fff, 9px 0 0 #fff;
+}
+.weather-ash::after {
+  width: 2px;
+  height: 2px;
+  background: #b69e92;
+  box-shadow: 5px 1px 0 #8c7972, 9px 0 0 #b69e92;
+}
+.weather-fog::before {
+  left: 1px;
+  top: 3px;
+  width: 13px;
+  height: 2px;
+  background: #9fafb4;
+  box-shadow: 3px 4px 0 #7f9299, -1px 8px 0 #aebfc3;
 }
 .buff-chip-mark {
   flex: 0 0 6px;
