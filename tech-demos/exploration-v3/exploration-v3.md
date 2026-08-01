@@ -1,6 +1,6 @@
-# 开放探索 v3 生成器审计
+# 开放探索 v4 与自动守卫审计
 
-入口：`exploration-v3.html?seed=20260727&region=grassland&lang=zh-CN`。本页调用正式 `Game.terrain.generate/validate`、`Game.nav` 与扫掠碰撞，不创建世界循环或写入存档。
+入口：`exploration-v3.html?seed=20260727&region=grassland&lang=zh-CN`。目录名为兼容旧深链而保留；页面调用正式 `Game.terrain`、`terrain_v4`、`Game.nav`、`Game.encounterPools` 与守卫预览，不创建世界循环或写入存档。
 
 - 导航格显示硬阻挡与可行走区；距离场显示阻挡净宽。
 - 宏观层显示中心、主干、环路与替代路径；内容层以共享手绘像素图标显示营地、地标、资源、奇物、生态、威胁、守门精英、Boss 巢穴和冒险者预览。
@@ -11,5 +11,6 @@
 - 区块层显示 512px 的 5×3 世界分块。
 - JSON 报告包含本次布局版本、尝试/修复/回退、完整结构指标与稳定内容 ID。
 - 「批量审计 32 种子」对当前区域连续执行生成、结构验证与营地—巢穴完整长途寻路，并分别汇报布局和路径失败数；「批量评估 32 种子」另执行每种子的 4 个正常中断和 2 组修复前/修复后失败缓存对照，仅将带目标触发、fallback 观测和特定终态的旧行为计为有效复现，单次共 256 条自动模式路线。
+- v4 守卫面板选择资源/巢穴/Boss 门卫、显形/伏击、三种自动策略和当前生命比例，直接显示生产门槛与 `return-camp / engage / resume-target` 轨迹；胜利、撤退、读档和换远征按钮验证目标恢复、状态保留与清轮边界。
 
-完整验收以 `tests/v1_13.test.js` 的八区 1,600 布局、5,000 拓扑模糊种子和黄金摘要，`tests/navigation-long-route.test.js` 的八区双向长途矩阵，以及 `tests/auto-navigation-audit.test.js` 的八区中断/失败缓存矩阵为准。
+完整验收以 `tests/terrain-v4.test.js` 的八区 1,600 张 v4 布局、5,000 个快速种子和独立黄金摘要，`tests/guard-sites-v4.test.js` 的守卫事务矩阵，以及既有 v3、长途导航和自动中断回归为准。

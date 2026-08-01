@@ -3,8 +3,98 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "76971fe7b7f50de7291958d1d8544a82b85b53503aa6d26540ef8e5351229a4a",
+  "sourceSetHash": "d07a51978ee2c59f14d5a64c431018e51affc4c022ee3fb529729e634b3efa68",
   "sources": [
+    {
+      "path": "js/data/packs/guardians/badger_brambleback.pack.js",
+      "kind": "pack",
+      "sha256": "c07ee318d097f73cfd86739c8a4c330de596181b9144970859ba826057536016"
+    },
+    {
+      "path": "js/data/packs/guardians/crab_oreplate.pack.js",
+      "kind": "pack",
+      "sha256": "28d61cca79c3f084890b5b17244e6c9fdb125e47cf159e4e406d783bbee41a9d"
+    },
+    {
+      "path": "js/data/packs/guardians/factory.support.js",
+      "kind": "support",
+      "sha256": "3f48d8adcf69452ade8e806798b05b18befafc79e41911ef9c703a9f51c94a5e"
+    },
+    {
+      "path": "js/data/packs/guardians/knight_cryptbound.pack.js",
+      "kind": "pack",
+      "sha256": "2913ceed0d52cb4cd68a56be3a1351597328fe2c4482627a4e2de36f7ceeac74"
+    },
+    {
+      "path": "js/data/packs/guardians/leopard_snowveil.pack.js",
+      "kind": "pack",
+      "sha256": "08949e0d05f64a61b21a119035547edd92b49feb407405199e80efa0c00471b9"
+    },
+    {
+      "path": "js/data/packs/guardians/lizard_reedstalker.pack.js",
+      "kind": "pack",
+      "sha256": "9fb01401a63695f4596a2adabfdcfd9f96c36372a3ea4052dea33e430c0d287a"
+    },
+    {
+      "path": "js/data/packs/guardians/mantis_vineblade.pack.js",
+      "kind": "pack",
+      "sha256": "c7fa0ec45c2a8e06d95db5f0c63984bcb1cd23e117568d68eef14656a2e0bdd0"
+    },
+    {
+      "path": "js/data/packs/guardians/minotaur_ironhorn.pack.js",
+      "kind": "pack",
+      "sha256": "c8d87d37b6fcdb7fe5768094595133134cc9121901d4cc3dc7259d7d4bfc1fbc"
+    },
+    {
+      "path": "js/data/packs/guardians/owlbear_mossclaw.pack.js",
+      "kind": "pack",
+      "sha256": "89ede9ebd074006a14095adc6a672b81ebc8f8c89a2901b1ef66705503ff8bfa"
+    },
+    {
+      "path": "js/data/packs/guardians/scorpion_cindertail.pack.js",
+      "kind": "pack",
+      "sha256": "d5007b3bf2ef8b643a7878fb53c3a5fabaa5295d5387eac7fe5e9eb9b0bd443b"
+    },
+    {
+      "path": "js/data/packs/guardians/serpent_cloudcoil.pack.js",
+      "kind": "pack",
+      "sha256": "bd1a268bc8c46ccb2fb979b5a3d0eab65f2fea4490b47da84359d0c384c2beda"
+    },
+    {
+      "path": "js/data/packs/guardians/spider_ossuary.pack.js",
+      "kind": "pack",
+      "sha256": "1014bcf4fa94611fe100011fc4a425dfd0257d0b5d29479ad29a0916512f5990"
+    },
+    {
+      "path": "js/data/packs/guardians/stalker_shadeclaw.pack.js",
+      "kind": "pack",
+      "sha256": "9d4c715afdb9b9d6fe7f53069fddc411ab4434d7104c21d8484bc19bfad13aa7"
+    },
+    {
+      "path": "js/data/packs/guardians/tortoise_basalt.pack.js",
+      "kind": "pack",
+      "sha256": "5cff91f737aba675a80e1d653f161c3fd7afeb071b56babe4a4294ef5820ae5a"
+    },
+    {
+      "path": "js/data/packs/guardians/troll_rimehide.pack.js",
+      "kind": "pack",
+      "sha256": "0398c5c5980553eb5b4e39d16bc815dc857961f56a2fd04506c63f059790a95c"
+    },
+    {
+      "path": "js/data/packs/guardians/warden_galeforged.pack.js",
+      "kind": "pack",
+      "sha256": "3c5ad1c0b172d33b6a1cd6ed752e8429618434bf163fa0ef38ef0e9fa977a491"
+    },
+    {
+      "path": "js/data/packs/guardians/worm_dustmaw.pack.js",
+      "kind": "pack",
+      "sha256": "1caff1a93c7b18d02c192776f88e7c7e0b748cbc273b3612c70759e42520f729"
+    },
+    {
+      "path": "js/data/packs/guardians/z_region_ecology.pack.js",
+      "kind": "pack",
+      "sha256": "ce404ee6c495fc45abf2fcaf80df7e41e3f4d1414cf41659c96393ad702960ac"
+    },
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
       "kind": "pack",
@@ -123,6 +213,21 @@
       ]
     },
     {
+      "id": "authoring.guard-monster-factory",
+      "version": "1.0.0",
+      "sourceFile": "js/data/packs/guardians/factory.support.js",
+      "requires": [
+        {
+          "id": "authoring.combat-formulas",
+          "range": "^1.0.0"
+        }
+      ],
+      "capabilities": [
+        "authoring.read",
+        "authoring.write"
+      ]
+    },
+    {
       "id": "authoring.region-catalog",
       "version": "1.0.0",
       "sourceFile": "js/data/packs/regions/catalog.support.js",
@@ -155,6 +260,11 @@
     {
       "kind": "factory",
       "id": "effect.damage",
+      "version": 1
+    },
+    {
+      "kind": "factory",
+      "id": "guard.monster.pack",
       "version": 1
     },
     {
@@ -204,6 +314,70 @@
       "version": "2.0.0"
     },
     {
+      "id": "monster.guard.badger_brambleback",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.crab_oreplate",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.knight_cryptbound",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.leopard_snowveil",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.lizard_reedstalker",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.mantis_vineblade",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.minotaur_ironhorn",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.owlbear_mossclaw",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.scorpion_cindertail",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.serpent_cloudcoil",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.spider_ossuary",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.stalker_shadeclaw",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.tortoise_basalt",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.troll_rimehide",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.warden_galeforged",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.worm_dustmaw",
+      "version": "1.0.0"
+    },
+    {
       "id": "region.darkcastle",
       "version": "2.1.0"
     },
@@ -240,6 +414,10 @@
       "version": "2.0.0"
     },
     {
+      "id": "world.encounter-pools-v4",
+      "version": "1.0.0"
+    },
+    {
       "id": "world.hoard-mimic",
       "version": "1.0.0"
     },
@@ -252,9 +430,229 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "a0664f1f"
+  "contentFingerprint": "2ee36b7a"
 });
 })();
+/* source: js/data/packs/guardians/factory.support.js */
+/* Deterministic authoring factory for one independently registered guard-pool monster. */
+(function () {
+  'use strict';
+  var Game = window.Game;
+  Game.contentSupport.register({
+    id: 'authoring.guard-monster-factory', version: '1.0.0',
+    requires: [{ id: 'authoring.combat-formulas', range: '^1.0.0' }],
+    capabilities: ['authoring.read', 'authoring.write'],
+    sourceFile: 'js/data/packs/guardians/factory.support.js',
+    install: function (capabilities) {
+      var balance = capabilities.authoring.value('balance.combat');
+      function damage(type, coefficient) {
+        return {
+          type: 'damage', damageTypeId: type,
+          formulaId: 'core.damage.power-coefficient-v1',
+          params: { powerStat: ['slashing', 'piercing', 'blunt'].indexOf(type) >= 0
+            ? 'physicalPower' : 'magicPower', coefficient: coefficient }
+        };
+      }
+
+      function stat(id, spec) {
+        var guard = spec.role === 'guardian';
+        var hp = balance.monster.hpBase * (guard ? 1.65 : 1.08);
+        var power = balance.monster.powerBase * (guard ? 1.18 : 1.24);
+        var defense = balance.monster.defenseBase * (guard ? 1.42 : 0.94);
+        return {
+          id: 'stats.' + id, stats: {
+            maxHp: { base: hp, tierScale: balance.monster.hpTierScale },
+            armor: { base: defense, tierScale: balance.monster.defenseTierScale },
+            ward: { base: defense * 0.82, tierScale: balance.monster.defenseTierScale },
+            physicalPower: { base: power, tierScale: balance.monster.powerTierScale },
+            magicPower: { base: power, tierScale: balance.monster.powerTierScale },
+            accuracy: 0.92, gcdSpeed: guard ? 0.9 : 1.02, castSpeed: 1,
+            autoAttackSpeed: guard ? 0.9 : 1.04, cooldownRate: 1,
+            moveSpeed: guard ? 34 : 43, range: spec.range || 27,
+            critChance: guard ? 0.03 : 0.08, critMultiplier: 1.5,
+            dodgeChance: guard ? 0.01 : 0.08,
+            healingPower: { base: power, tierScale: balance.monster.powerTierScale },
+            shieldPower: { base: hp, tierScale: balance.monster.hpTierScale },
+            lifesteal: 0, statusPotency: guard ? 1.15 : 1.25,
+            tenacity: guard ? 0.34 : 0.14, interruptPower: 1,
+            threatMultiplier: 1, resourceRegen: 1,
+            expMultiplier: 1, goldMultiplier: 1, dropMultiplier: 1
+          }
+        };
+      }
+
+      function statusDefinition(id, spec, statusId) {
+        var guardModifiers = {
+          badger_brambleback: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.3 }],
+          owlbear_mossclaw: [{ stat: 'physicalPower', phase: 'status', operation: 'multiply', value: 1.16 }],
+          crab_oreplate: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.34 }, { stat: 'ward', phase: 'status', operation: 'multiply', value: 1.22 }],
+          knight_cryptbound: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.25 }, { stat: 'tenacity', phase: 'status', operation: 'add', value: 0.16 }],
+          troll_rimehide: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.12 }],
+          tortoise_basalt: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.28 }, { stat: 'ward', phase: 'status', operation: 'multiply', value: 1.28 }],
+          warden_galeforged: [{ stat: 'ward', phase: 'status', operation: 'multiply', value: 1.42 }],
+          minotaur_ironhorn: [{ stat: 'physicalPower', phase: 'status', operation: 'multiply', value: 1.18 }]
+        };
+        var hunterModifiers = {
+          mantis_vineblade: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.3 }],
+          worm_dustmaw: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.62 }, { stat: 'accuracy', phase: 'status', operation: 'multiply', value: 0.82 }],
+          spider_ossuary: [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.28 }],
+          leopard_snowveil: [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 0.78 }],
+          serpent_cloudcoil: [{ stat: 'gcdSpeed', phase: 'status', operation: 'multiply', value: 0.72 }],
+          stalker_shadeclaw: [{ stat: 'ward', phase: 'status', operation: 'multiply', value: 0.78 }, { stat: 'healingPower', phase: 'status', operation: 'multiply', value: 0.75 }]
+        };
+        var definition = {
+          id: statusId, stacking: spec.role === 'guardian' ? 'refresh' : 'stack',
+          maxStacks: spec.role === 'guardian' ? 1 : 3,
+          durationTicks: spec.role === 'guardian' ? 100 : 100,
+          modifiers: spec.role === 'guardian'
+            ? (guardModifiers[id] || [{ stat: 'armor', phase: 'status', operation: 'multiply', value: 1.24 }])
+            : (hunterModifiers[id] || [{ stat: 'moveSpeed', phase: 'status', operation: 'multiply', value: 0.82 }]),
+          presentation: { nameKey: 'combat.status.' + id + '.name', icon: spec.role === 'guardian' ? 'icon_skill_guard' : 'icon_skill_strike' }
+        };
+        if (id === 'troll_rimehide') {
+          definition.periodicIntervalTicks = 24;
+          definition.periodic = [{ type: 'heal', coefficient: 0.28, target: { relation: 'self', shape: 'single' } }];
+        }
+        if (id === 'lizard_reedstalker' || id === 'scorpion_cindertail') {
+          definition.periodicIntervalTicks = 20;
+          definition.periodic = [Object.assign(damage(id === 'scorpion_cindertail' ? 'fire' : 'slashing', id === 'scorpion_cindertail' ? 0.14 : 0.1), { canCrit: false })];
+        }
+        if (id === 'stalker_shadeclaw') {
+          definition.periodicIntervalTicks = 24;
+          definition.periodic = [Object.assign(damage('necrotic', 0.11), { canCrit: false })];
+        }
+        return definition;
+      }
+
+      function specialDefinition(id, spec, statusId) {
+        var self = { relation: 'self', shape: 'single' };
+        var hostile = { relation: 'hostile', shape: 'single', range: spec.range || 34 };
+        var ability = {
+          id: id + '.special', kind: 'action', actionType: 'gcd',
+          timing: { castTicks: spec.role === 'guardian' ? 22 : 10, animationLockTicks: 12,
+            cooldownTicks: spec.role === 'guardian' ? 190 : 145, queueable: true, interruptible: true },
+          target: spec.role === 'guardian' ? self : hostile,
+          effects: spec.role === 'guardian'
+            ? [{ type: 'shield', coefficient: 0.22, durationTicks: 120, target: self }, { type: 'applyStatus', statusId: statusId, target: self }]
+            : [damage(spec.damageType, 1.28), { type: 'applyStatus', statusId: statusId }],
+          aiHints: { priority: spec.role === 'guardian' ? 92 : 78, role: spec.role === 'guardian' ? 'defensive' : 'damage' },
+          presentation: { nameKey: 'combat.ability.' + id + '_special.name', icon: spec.role === 'guardian' ? 'icon_skill_guard' : 'icon_skill_strike' }
+        };
+        if (id === 'owlbear_mossclaw') {
+          ability.target = { relation: 'hostile', shape: 'circle', range: 42, radius: 38, maxTargets: 4 };
+          ability.effects = [damage('slashing', 0.68), { type: 'knockback', distance: 10 }, { type: 'applyStatus', statusId: statusId, target: self }];
+          ability.aiHints.role = 'control';
+        } else if (id === 'crab_oreplate' || id === 'tortoise_basalt' || id === 'warden_galeforged') {
+          ability.effects[0].coefficient = id === 'warden_galeforged' ? 0.3 : 0.28;
+        } else if (id === 'troll_rimehide') {
+          ability.effects = [{ type: 'heal', maxHpCoefficient: 0.1, target: self }, { type: 'applyStatus', statusId: statusId, target: self }];
+          ability.aiHints.role = 'heal';
+        } else if (id === 'minotaur_ironhorn') {
+          ability.target = hostile;
+          ability.effects = [{ type: 'movement', distance: 18 }, damage('blunt', 1.36), { type: 'knockback', distance: 18 }, { type: 'applyStatus', statusId: statusId, target: self }];
+          ability.aiHints.role = 'control';
+        } else if (id === 'worm_dustmaw') {
+          ability.target = { relation: 'hostile', shape: 'circle', range: 40, radius: 36, maxTargets: 4 };
+          ability.effects = [damage('blunt', 0.92), { type: 'knockback', distance: 12 }, { type: 'applyStatus', statusId: statusId }];
+          ability.aiHints.role = 'control';
+        } else if (id === 'leopard_snowveil') {
+          ability.effects.unshift({ type: 'movement', distance: 18 });
+        } else if (id === 'serpent_cloudcoil') {
+          ability.target = { relation: 'hostile', shape: 'circle', range: 68, radius: 34, maxTargets: 3 };
+          ability.effects = [{ type: 'repeat', times: 2, effects: [damage('lightning', 0.64)] }, { type: 'applyStatus', statusId: statusId }];
+        }
+        return ability;
+      }
+
+      function monsterPack(spec) {
+        var id = spec.id, guard = spec.role === 'guardian';
+        var statusId = id + (guard ? '.fortified' : '.marked');
+        var specialId = id + '.special';
+        var packId = spec.regionId + '.special.' + id;
+        return {
+          id: 'monster.guard.' + id, version: '1.0.0', schemaVersion: 1,
+          sourceFile: spec.sourceFile,
+          requires: [{ id: 'core.combat', range: '^2.0.0' }, { id: 'world.actors', range: '^2.0.0' }],
+          locales: {
+            'zh-CN': (function () {
+              var out = {};
+              out['monster.' + id + '.name'] = spec.zhName;
+              out['monster.' + id + '.desc'] = spec.zhDesc;
+              out['combat.lore.' + id] = spec.zhLore;
+              out['combat.ability.' + id + '_basic.name'] = spec.zhBasic;
+              out['combat.ability.' + id + '_special.name'] = spec.zhSpecial;
+              out['combat.trait.' + id + '.name'] = spec.zhTrait;
+              out['combat.status.' + id + '.name'] = guard ? '领地戒备' : '猎手标记';
+              return out;
+            })(),
+            en: (function () {
+              var out = {};
+              out['monster.' + id + '.name'] = spec.enName;
+              out['monster.' + id + '.desc'] = spec.enDesc;
+              out['combat.lore.' + id] = spec.enLore;
+              out['combat.ability.' + id + '_basic.name'] = spec.enBasic;
+              out['combat.ability.' + id + '_special.name'] = spec.enSpecial;
+              out['combat.trait.' + id + '.name'] = spec.enTrait;
+              out['combat.status.' + id + '.name'] = guard ? 'Territorial Guard' : 'Hunter Mark';
+              return out;
+            })()
+          },
+          definitions: {
+            statProfile: [stat(id, spec)],
+            status: [statusDefinition(id, spec, statusId)],
+            ability: [{
+              id: id + '.basic', kind: 'action', actionType: 'gcd',
+              timing: { castTicks: 0, animationLockTicks: 10, cooldownTicks: 0, queueable: true },
+              target: { relation: 'hostile', shape: 'single', range: spec.range || 27 },
+              effects: [damage(spec.damageType, guard ? 0.84 : 0.92)], aiHints: { priority: 12 },
+              presentation: { nameKey: 'combat.ability.' + id + '_basic.name', icon: 'icon_skill_strike' }
+            }, specialDefinition(id, spec, statusId)],
+            trait: [{
+              id: id + '.trait', kind: 'passive', tags: [guard ? 'guardian' : 'ambusher'],
+              modifiers: [{ stat: guard ? 'tenacity' : 'dodgeChance', phase: 'otherFlat', operation: 'add', value: guard ? 0.12 : 0.04 }],
+              triggers: [], presentation: { nameKey: 'combat.trait.' + id + '.name', icon: guard ? 'icon_skill_guard' : 'icon_skill_strike' }
+            }],
+            rewardProfile: [{
+              id: 'reward.' + id,
+              exp: { base: balance.monster.rewardExpBase * (guard ? 1.15 : 1.1), tierScale: balance.monster.rewardExpTierScale },
+              gold: { base: balance.monster.rewardGoldBase * (guard ? 1.15 : 1.1), tierScale: balance.monster.rewardGoldTierScale },
+              dropBudget: guard ? 1.15 : 1.1
+            }],
+            actorArchetype: [{
+              id: id, category: 'monster', rank: 'normal',
+              identity: { nameKey: 'monster.' + id + '.name', descKey: 'monster.' + id + '.desc', loreKey: 'combat.lore.' + id },
+              presentation: { spriteId: id, portraitId: id, scale: guard ? 1.12 : 1, renderProfileId: 'render.actor.standard' },
+              body: { size: guard ? 'large' : 'medium', collisionRadius: guard ? 10 : 8, movementTypes: spec.movementTypes || ['ground'] },
+              tags: ['normal', 'encounter-pool', guard ? 'territory-guardian' : 'ambush-hunter'],
+              defaultFactionId: spec.factionId, statProfileId: 'stats.' + id,
+              resourceProfileIds: [], abilityGrantIds: [id + '.basic', specialId], traitIds: [id + '.trait'],
+              resistanceProfileId: 'resist.standard', aiProfileId: 'ai.monster.standard',
+              rewardProfileId: 'reward.' + id, interactionProfileId: 'interaction.hostile',
+              engagementPolicyId: 'engagement.hostile', legacy: { tier: spec.tier, mods: {}, boss: false, scale: guard ? 1.12 : 1 }
+            }],
+            encounterPack: [{
+              id: packId, members: [{ slotId: 'special', archetypeId: id }],
+              formation: { spacing: 0 }, leashRadius: guard ? 156 : 142,
+              rewardBudget: 1, groupAlert: true, ambushEligible: !guard
+            }],
+            worldSpawnProfile: [{
+              id: 'spawn.' + packId, encounterPackId: packId, mountTo: [],
+              identity: { scope: 'regionStable', socialGroupId: 'social.' + spec.factionId },
+              placement: { selector: 'layoutEntity', source: 'encounterSite', required: false,
+                onFailure: 'skipOptional', occupancyRadius: guard ? 14 : 11 },
+              lifecycle: { activation: 'poolRequested', unload: 'despawn', onDefeat: 'closeLease',
+                onEscape: 'closeLease', respawn: { mode: 'none', resetVariant: true } },
+              offlineEligible: false
+            }]
+          }
+        };
+      }
+
+      capabilities.authoring.provideFactory({ id: 'guard.monster.pack', version: 1, fn: monsterPack });
+    }
+  });
+})();
+
 /* source: js/data/packs/regions/catalog.support.js */
 /* ============================================================
  * regions/catalog.support.js — 八大区域确定性作者数据
@@ -1829,6 +2227,168 @@
 })();
 
 window.Game.contentSupport.installAll();
+/* source: js/data/packs/guardians/badger_brambleback.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'badger_brambleback',regionId:'grassland',factionId:'wild',tier:1,role:'guardian',damageType:'blunt',zhName:'荆背穴獾',zhDesc:'背甲缠满硬刺的领地穴獾。',zhLore:'它会用背脊接住第一击，再从灌木根部反扑。',zhBasic:'穴爪重击',zhSpecial:'荆背戒备',zhTrait:'硬刺反守',enName:'Brambleback Badger',enDesc:'A territorial badger armored in hooked brambles.',enLore:'It receives the first blow on its back, then counters from the roots.',enBasic:'Burrow Claw',enSpecial:'Bramble Guard',enTrait:'Spined Defense',sourceFile:'js/data/packs/guardians/badger_brambleback.pack.js'}));})();
+
+/* source: js/data/packs/guardians/crab_oreplate.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'crab_oreplate',regionId:'mine',factionId:'mine_denizens',tier:3,role:'guardian',damageType:'blunt',zhName:'矿甲岩蟹',zhDesc:'将矿脉结晶凝成厚壳的岩蟹。',zhLore:'矿镐的回声会让它把入口封得更紧。',zhBasic:'岩钳砸击',zhSpecial:'矿壳护盾',zhTrait:'矿脉甲壳',enName:'Oreplate Crab',enDesc:'A stone crab whose shell has fused with ore seams.',enLore:'The echo of a pickaxe makes it seal the passage tighter.',enBasic:'Stone Pincer',enSpecial:'Ore Shell',enTrait:'Vein Carapace',sourceFile:'js/data/packs/guardians/crab_oreplate.pack.js'}));})();
+
+/* source: js/data/packs/guardians/knight_cryptbound.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'knight_cryptbound',regionId:'graveyard',factionId:'undead',tier:4,role:'guardian',damageType:'slashing',zhName:'缚墓骑士',zhDesc:'被誓约束缚于墓门前的旧骑士。',zhLore:'墓志已经风化，守门的誓言却仍清晰。',zhBasic:'锈刃斩',zhSpecial:'墓穴护卫',zhTrait:'不朽誓约',enName:'Cryptbound Knight',enDesc:'An old knight oathbound to a crypt gate.',enLore:'The epitaph has weathered away, but its oath remains clear.',enBasic:'Rustblade',enSpecial:'Crypt Guard',enTrait:'Undying Oath',sourceFile:'js/data/packs/guardians/knight_cryptbound.pack.js'}));})();
+
+/* source: js/data/packs/guardians/leopard_snowveil.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'leopard_snowveil',regionId:'snowpass',factionId:'frost_clans',tier:5,role:'hunter',damageType:'slashing',zhName:'雪幕影豹',zhDesc:'在风雪中只留下浅淡轮廓的猎豹。',zhLore:'你看见雪幕破开时，利爪已经完成了扑袭。',zhBasic:'冰爪',zhSpecial:'暴露扑袭',zhTrait:'雪幕猎踪',enName:'Snowveil Leopard',enDesc:'A hunting cat visible only as a pale outline in blizzards.',enLore:'When the snow veil parts, its pounce is already complete.',enBasic:'Ice Claw',enSpecial:'Exposing Pounce',enTrait:'Snowveil Hunt',sourceFile:'js/data/packs/guardians/leopard_snowveil.pack.js'}));})();
+
+/* source: js/data/packs/guardians/lizard_reedstalker.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'lizard_reedstalker',regionId:'grassland',factionId:'wild',tier:1,role:'hunter',damageType:'slashing',zhName:'苇影猎蜥',zhDesc:'潜伏在苇草阴影中的迅捷猎蜥。',zhLore:'草叶停摆时，它已经绕到了猎物背后。',zhBasic:'苇刃撕咬',zhSpecial:'影袭放血',zhTrait:'伏草猎手',enName:'Reedstalker Lizard',enDesc:'A swift lizard hidden in reed shadows.',enLore:'When the reeds stop moving, it is already behind its prey.',enBasic:'Reedfang',enSpecial:'Shadow Rend',enTrait:'Reed Ambusher',sourceFile:'js/data/packs/guardians/lizard_reedstalker.pack.js'}));})();
+
+/* source: js/data/packs/guardians/mantis_vineblade.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'mantis_vineblade',regionId:'forest',factionId:'forest_guardians',tier:2,role:'hunter',damageType:'slashing',zhName:'藤刃螳',zhDesc:'前肢如藤刃般锋利的林间伏击者。',zhLore:'它先用蔓须封路，再落下安静而精准的一斩。',zhBasic:'藤刃切割',zhSpecial:'束缚斩击',zhTrait:'叶幕潜行',enName:'Vineblade Mantis',enDesc:'A forest ambusher with vine-edged forelimbs.',enLore:'It closes the path with tendrils before delivering one quiet cut.',enBasic:'Vine Cut',enSpecial:'Binding Slash',enTrait:'Leafveil',sourceFile:'js/data/packs/guardians/mantis_vineblade.pack.js'}));})();
+
+/* source: js/data/packs/guardians/minotaur_ironhorn.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'minotaur_ironhorn',regionId:'darkcastle',factionId:'demon_army',tier:8,role:'guardian',damageType:'blunt',zhName:'黑铁角魔',zhDesc:'用黑铁包覆双角的城堡破阵者。',zhLore:'它守门的方式，是把每个来客撞回门外。',zhBasic:'铁角撞击',zhSpecial:'破门冲锋',zhTrait:'黑铁壁垒',enName:'Ironhorn Minotaur',enDesc:'A castle breaker whose horns are clad in black iron.',enLore:'It guards a door by hurling every visitor back through it.',enBasic:'Iron Horn',enSpecial:'Gatebreaker Charge',enTrait:'Black-Iron Bulwark',sourceFile:'js/data/packs/guardians/minotaur_ironhorn.pack.js'}));})();
+
+/* source: js/data/packs/guardians/owlbear_mossclaw.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'owlbear_mossclaw',regionId:'forest',factionId:'forest_guardians',tier:2,role:'guardian',damageType:'slashing',zhName:'苔爪枭熊',zhDesc:'苔藓覆盖巨爪的林地领主。',zhLore:'一声低吼足以让林间小径重新归于寂静。',zhBasic:'苔爪横扫',zhSpecial:'领地怒吼',zhTrait:'古林厚皮',enName:'Mossclaw Owlbear',enDesc:'A woodland lord with moss-covered claws.',enLore:'One low roar returns every forest trail to silence.',enBasic:'Moss Claw',enSpecial:'Territorial Roar',enTrait:'Oldwood Hide',sourceFile:'js/data/packs/guardians/owlbear_mossclaw.pack.js'}));})();
+
+/* source: js/data/packs/guardians/scorpion_cindertail.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'scorpion_cindertail',regionId:'lavacave',factionId:'infernal',tier:6,role:'hunter',damageType:'fire',zhName:'烬尾巨蝎',zhDesc:'尾针燃着余烬火光的洞穴猎手。',zhLore:'熄灭的火星会沿着地面倒流，最后聚在它的尾针上。',zhBasic:'炭钳',zhSpecial:'燃烧毒刺',zhTrait:'余烬潜伏',enName:'Cindertail Scorpion',enDesc:'A cavern hunter with embers burning along its stinger.',enLore:'Dead sparks crawl backward across the floor and gather on its tail.',enBasic:'Coal Pincer',enSpecial:'Burning Sting',enTrait:'Ember Ambush',sourceFile:'js/data/packs/guardians/scorpion_cindertail.pack.js'}));})();
+
+/* source: js/data/packs/guardians/serpent_cloudcoil.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'serpent_cloudcoil',regionId:'skyruins',factionId:'ruin_guardians',tier:7,role:'hunter',damageType:'lightning',movementTypes:['flying'],zhName:'云环飞蛇',zhDesc:'盘绕云气飞行的带电长蛇。',zhLore:'云层里的一道亮线，往往不是闪电。',zhBasic:'云牙',zhSpecial:'电弧伏击',zhTrait:'云环猎行',enName:'Cloudcoil Serpent',enDesc:'An electrified serpent flying within a ring of cloud.',enLore:'A bright line in the clouds is not always lightning.',enBasic:'Cloud Fang',enSpecial:'Arc Ambush',enTrait:'Cloudcoil Hunt',sourceFile:'js/data/packs/guardians/serpent_cloudcoil.pack.js'}));})();
+
+/* source: js/data/packs/guardians/spider_ossuary.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'spider_ossuary',regionId:'graveyard',factionId:'undead',tier:4,role:'hunter',damageType:'poison',zhName:'骨库墓蛛',zhDesc:'以碎骨和墓丝编网的苍白巨蛛。',zhLore:'每一根骨丝都连着墓道里最轻微的脚步。',zhBasic:'墓毒螯咬',zhSpecial:'骨网拘束',zhTrait:'骨库织者',enName:'Ossuary Spider',enDesc:'A pale spider weaving webs from bone splinters and grave silk.',enLore:'Every bone thread carries the faintest footstep through the crypt.',enBasic:'Grave Venom',enSpecial:'Ossuary Web',enTrait:'Boneweaver',sourceFile:'js/data/packs/guardians/spider_ossuary.pack.js'}));})();
+
+/* source: js/data/packs/guardians/stalker_shadeclaw.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'stalker_shadeclaw',regionId:'darkcastle',factionId:'demon_army',tier:8,role:'hunter',damageType:'necrotic',zhName:'影爪潜魔',zhDesc:'藏在城堡阴影缝隙中的诅咒猎手。',zhLore:'它不会追逐影子，因为它正从影子里追逐你。',zhBasic:'暗影利爪',zhSpecial:'诅咒猎杀',zhTrait:'潜影追踪',enName:'Shadeclaw Stalker',enDesc:'A cursed hunter hidden in the castle’s seams of shadow.',enLore:'It does not chase shadows; it chases you from inside them.',enBasic:'Shadow Claw',enSpecial:'Cursed Hunt',enTrait:'Shade Pursuit',sourceFile:'js/data/packs/guardians/stalker_shadeclaw.pack.js'}));})();
+
+/* source: js/data/packs/guardians/tortoise_basalt.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'tortoise_basalt',regionId:'lavacave',factionId:'infernal',tier:6,role:'guardian',damageType:'fire',zhName:'玄武岩熔龟',zhDesc:'厚重熔壳会随呼吸明灭的古老熔龟。',zhLore:'它伏在熔岩边时，看起来只像一块尚未冷却的岩石。',zhBasic:'熔岩头槌',zhSpecial:'熔壳护盾',zhTrait:'玄武岩甲',enName:'Basalt Tortoise',enDesc:'An ancient tortoise whose molten shell pulses with each breath.',enLore:'At the lava edge it resembles nothing more than cooling stone.',enBasic:'Magma Headbutt',enSpecial:'Molten Shell',enTrait:'Basalt Armor',sourceFile:'js/data/packs/guardians/tortoise_basalt.pack.js'}));})();
+
+/* source: js/data/packs/guardians/troll_rimehide.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'troll_rimehide',regionId:'snowpass',factionId:'frost_clans',tier:5,role:'guardian',damageType:'frost',zhName:'霜皮巨魔',zhDesc:'伤口会在严寒中缓慢闭合的山岭巨魔。',zhLore:'冰层并非盔甲，而是它仍在愈合的旧伤。',zhBasic:'霜拳',zhSpecial:'冻皮再生',zhTrait:'有限再生',enName:'Rimehide Troll',enDesc:'A mountain troll whose wounds slowly close in deep cold.',enLore:'The ice is not armor, but old wounds still healing.',enBasic:'Rime Fist',enSpecial:'Frozen Renewal',enTrait:'Limited Regeneration',sourceFile:'js/data/packs/guardians/troll_rimehide.pack.js'}));})();
+
+/* source: js/data/packs/guardians/warden_galeforged.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'warden_galeforged',regionId:'skyruins',factionId:'ruin_guardians',tier:7,role:'guardian',damageType:'lightning',zhName:'风铸守卫',zhDesc:'由遗迹金属与凝固气流铸成的守卫。',zhLore:'破损的甲片之间仍有古老的风在循环。',zhBasic:'风铸拳',zhSpecial:'风障防护',zhTrait:'遗迹壁垒',enName:'Galeforged Warden',enDesc:'A warden forged from ruin metal and solidified wind.',enLore:'Ancient air still circulates between its broken plates.',enBasic:'Galeforged Fist',enSpecial:'Gale Barrier',enTrait:'Ruin Bulwark',sourceFile:'js/data/packs/guardians/warden_galeforged.pack.js'}));})();
+
+/* source: js/data/packs/guardians/worm_dustmaw.pack.js */
+(function(){'use strict';var G=window.Game;G.content.registerPack(G.contentAuthoring.factory('guard.monster.pack')({id:'worm_dustmaw',regionId:'mine',factionId:'mine_denizens',tier:3,role:'hunter',damageType:'blunt',zhName:'尘颚穴虫',zhDesc:'在松散矿尘下掘行的巨口穴虫。',zhLore:'落尘是唯一的警告，下一刻地面便会张口。',zhBasic:'尘颚噬咬',zhSpecial:'掘地震击',zhTrait:'震感狩猎',enName:'Dustmaw Burrower',enDesc:'A great-mawed worm tunneling beneath mine dust.',enLore:'Falling dust is the only warning before the floor opens.',enBasic:'Dustmaw Bite',enSpecial:'Burrow Quake',enTrait:'Tremor Hunter',sourceFile:'js/data/packs/guardians/worm_dustmaw.pack.js'}));})();
+
+/* source: js/data/packs/guardians/z_region_ecology.pack.js */
+/* Regional encounter pools and guard-site contracts. Actor packs remain independently registered. */
+(function () {
+  'use strict';
+  var Game = window.Game;
+  var regions = [
+    { id: 'grassland', guard: 'badger_brambleback', hunter: 'lizard_reedstalker', ambush: 'hazard.grassland.roadside_ambush' },
+    { id: 'forest', guard: 'owlbear_mossclaw', hunter: 'mantis_vineblade', ambush: 'hazard.forest.thicket_ambush' },
+    { id: 'mine', guard: 'crab_oreplate', hunter: 'worm_dustmaw', ambush: 'hazard.mine.tunnel_ambush' },
+    { id: 'graveyard', guard: 'knight_cryptbound', hunter: 'spider_ossuary', ambush: 'hazard.graveyard.grave_ambush' },
+    { id: 'snowpass', guard: 'troll_rimehide', hunter: 'leopard_snowveil', ambush: 'hazard.snowpass.whiteout_ambush' },
+    { id: 'lavacave', guard: 'tortoise_basalt', hunter: 'scorpion_cindertail', ambush: 'hazard.lavacave.cinder_ambush' },
+    { id: 'skyruins', guard: 'warden_galeforged', hunter: 'serpent_cloudcoil', ambush: 'hazard.skyruins.rift_ambush' },
+    { id: 'darkcastle', guard: 'minotaur_ironhorn', hunter: 'stalker_shadeclaw', ambush: 'hazard.darkcastle.gate_ambush' }
+  ];
+  var recipeIds = ['solo-a', 'solo-b', 'solo-c', 'solo-d', 'duo', 'duo-summoner', 'duo-mixed', 'trio'];
+  var recipeWeights = [18, 17, 13, 10, 16, 12, 9, 5];
+  var ambushIds = ['solo-a', 'solo-b', 'solo-c', 'duo', 'duo-mixed'];
+  var pools = [], guardProfiles = [], populationPatches = [], regionPatches = [], hazardPatches = [];
+
+  function entry(spawnId, weight, maxPerMount) {
+    var out = { worldSpawnProfileId: spawnId, weight: weight };
+    if (maxPerMount) out.maxPerMount = maxPerMount;
+    return out;
+  }
+  function pool(regionId, name, category, roles, entries) {
+    return { id: 'pool.' + regionId + '.' + name, regionId: regionId,
+      category: category, roles: roles, entries: entries };
+  }
+  function guardProfile(regionId, kind, targetKinds, coverage, visiblePool, ambushPool) {
+    return {
+      id: 'guard-site.' + regionId + '.' + kind, regionId: regionId,
+      targetKinds: targetKinds, coverage: coverage,
+      modeWeights: { visible: 1, ambush: kind === 'bossGate' ? 0 : 1 },
+      visiblePoolId: visiblePool, ambushPoolId: ambushPool || visiblePool,
+      triggerRadius: kind === 'bossGate' ? 58 : 42,
+      detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 },
+      resetPolicy: 'expedition', offlinePolicy: 'block'
+    };
+  }
+
+  regions.forEach(function (region) {
+    var rid = region.id;
+    var normalEntries = recipeIds.map(function (id, index) {
+      return entry('spawn.' + rid + '.' + id, recipeWeights[index], 4);
+    });
+    var ambushEntries = ambushIds.map(function (id, index) {
+      return entry('spawn.' + rid + '.' + id, [18, 17, 13, 16, 9][index], 2);
+    });
+    var specialGuardSpawn = 'spawn.' + rid + '.special.' + region.guard;
+    var specialHunterSpawn = 'spawn.' + rid + '.special.' + region.hunter;
+    var ids = {
+      roaming: 'pool.' + rid + '.roaming', rareRoaming: 'pool.' + rid + '.rareRoaming',
+      worldAmbush: 'pool.' + rid + '.worldAmbush',
+      resourceGuardVisible: 'pool.' + rid + '.resourceGuardVisible',
+      resourceGuardAmbush: 'pool.' + rid + '.resourceGuardAmbush',
+      nestGuardVisible: 'pool.' + rid + '.nestGuardVisible',
+      nestGuardAmbush: 'pool.' + rid + '.nestGuardAmbush',
+      bossGate: 'pool.' + rid + '.bossGate', boss: 'pool.' + rid + '.boss'
+    };
+    pools.push(
+      pool(rid, 'roaming', 'regular', ['wander', 'patrol'], normalEntries),
+      pool(rid, 'rareRoaming', 'rare', ['wander'], [entry(specialGuardSpawn, 1, 1), entry(specialHunterSpawn, 1, 1)]),
+      pool(rid, 'worldAmbush', 'regular', ['ambush'], ambushEntries),
+      pool(rid, 'resourceGuardVisible', 'elite', ['resourceGuard', 'patrol'], [entry(specialGuardSpawn, 1, 1)]),
+      pool(rid, 'resourceGuardAmbush', 'elite', ['resourceGuard', 'ambush'], [entry(specialHunterSpawn, 1, 1)]),
+      pool(rid, 'nestGuardVisible', 'nest', ['treasureGuard', 'patrol'], [entry(specialGuardSpawn, 1, 1)]),
+      pool(rid, 'nestGuardAmbush', 'nest', ['treasureGuard', 'ambush'], [entry(specialHunterSpawn, 1, 1)]),
+      pool(rid, 'bossGate', 'elite', ['bossGate', 'patrol'], [entry('spawn.' + rid + '.guardian', 1, 1)]),
+      pool(rid, 'boss', 'boss', ['patrol'], [entry('spawn.' + rid + '.boss', 1, 1)])
+    );
+    var resourceProfileId = 'guard-site.' + rid + '.resource';
+    var nestProfileId = 'guard-site.' + rid + '.nest';
+    var gateProfileId = 'guard-site.' + rid + '.bossGate';
+    guardProfiles.push(
+      guardProfile(rid, 'resource', ['resource'], 0.3, ids.resourceGuardVisible, ids.resourceGuardAmbush),
+      guardProfile(rid, 'nest', ['nestTreasure'], 1, ids.nestGuardVisible, ids.nestGuardAmbush),
+      guardProfile(rid, 'bossGate', ['bossGate'], 1, ids.bossGate, ids.bossGate)
+    );
+    populationPatches.push({
+      id: 'population.' + rid, patch: true,
+      channels: {
+        regular: { poolProfileId: ids.roaming },
+        rare: { capacity: 1, selection: 'weighted', poolProfileId: ids.rareRoaming },
+        guardian: { poolProfileId: ids.bossGate },
+        boss: { poolProfileId: ids.boss }
+      }
+    });
+    regionPatches.push({
+      id: rid, patch: true, encounterPoolIds: ids,
+      guardSiteProfileIds: [resourceProfileId, nestProfileId, gateProfileId]
+    });
+    hazardPatches.push({ id: region.ambush, patch: true,
+      outcome: { encounterPoolId: ids.worldAmbush } });
+  });
+
+  Game.content.registerPack({
+    id: 'world.encounter-pools-v4', version: '1.0.0', schemaVersion: 1,
+    sourceFile: 'js/data/packs/guardians/z_region_ecology.pack.js',
+    requires: regions.map(function (region) { return { id: 'region.' + region.id, range: '^2.0.0' }; })
+      .concat(regions.reduce(function (out, region) {
+        return out.concat([
+          { id: 'monster.guard.' + region.guard, range: '^1.0.0' },
+          { id: 'monster.guard.' + region.hunter, range: '^1.0.0' }
+        ]);
+      }, [])),
+    definitions: {
+      encounterPoolProfile: pools, guardSiteProfile: guardProfiles,
+      worldPopulationProfile: populationPatches, regionProfile: regionPatches,
+      hazardProfile: hazardPatches
+    }
+  });
+})();
+
 /* source: js/data/packs/jobs/cleric.pack.js */
 (function () {
   'use strict';

@@ -4,18 +4,18 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#151614">
-<meta name="build-id" content="20260801.2">
+<meta name="build-id" content="20260801.4">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23151614'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%23151614'/%3E%3C/svg%3E">
-<title data-demo-page-title="explore.pageTitle">开放探索 v3 生成器审计 · 幻境远征</title>
-<link rel="stylesheet" href="exploration-v3.css?v=20260801.2">
+<title>开放探索 v4 / 自动守卫审计 · 幻境远征</title>
+<link rel="stylesheet" href="exploration-v3.css?v=20260801.4">
 </head>
 <body>
 <main>
   <header class="page-header">
     <div>
-      <p class="eyebrow">FANTASY IDLE RPG / GENERATOR AUDIT / V3</p>
-      <h1 data-demo-i18n="explore.title">开放探索 v3 生成器审计</h1>
-      <p data-demo-i18n="explore.subtitle">宏观图、硬阻挡、分段长途寻路、内容角色与结构验证</p>
+      <p class="eyebrow">FANTASY IDLE RPG / GENERATOR AUDIT / V4</p>
+      <h1>开放探索 v4 / 自动守卫审计</h1>
+      <p>宏观图、半开放巢穴、守卫池、分段长途寻路与中断恢复验证</p>
     </div>
     <div class="page-actions">
       <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
@@ -51,6 +51,11 @@
         <span><canvas width="18" height="18" data-map-icon="threat" aria-hidden="true"></canvas><b data-demo-i18n="explore.threat">威胁</b></span>
         <span><canvas width="18" height="18" data-map-icon="guardian" aria-hidden="true"></canvas><b data-demo-i18n="explore.guardian">守门精英</b></span>
         <span><canvas width="18" height="18" data-map-icon="lair" aria-hidden="true"></canvas><b data-demo-i18n="explore.lair">Boss 巢穴</b></span>
+        <span><canvas width="18" height="18" data-map-icon="nest" aria-hidden="true"></canvas><b data-demo-i18n="explore.nest">半开放巢穴</b></span>
+        <span><canvas width="18" height="18" data-map-icon="chestLocked" aria-hidden="true"></canvas><b data-demo-i18n="explore.chestLocked">锁定宝箱</b></span>
+        <span><canvas width="18" height="18" data-map-icon="chestAvailable" aria-hidden="true"></canvas><b data-demo-i18n="explore.chestAvailable">可领取宝箱</b></span>
+        <span><canvas width="18" height="18" data-map-icon="ambushRevealed" aria-hidden="true"></canvas><b data-demo-i18n="explore.ambushRevealed">已识破伏击</b></span>
+        <span><canvas width="18" height="18" data-map-icon="bossGate" aria-hidden="true"></canvas><b data-demo-i18n="explore.bossGate">Boss 门卫</b></span>
         <span><canvas width="18" height="18" data-map-icon="merchant" aria-hidden="true"></canvas><b data-demo-i18n="explore.merchant">移动行商</b></span>
         <span><canvas width="18" height="18" data-map-icon="hero" aria-hidden="true"></canvas><b data-demo-i18n="explore.hero">冒险者</b></span>
       </div>
@@ -105,50 +110,68 @@
       <pre id="auto-report" data-testid="auto-report"></pre>
     </div>
   </section>
+  <section class="auto-audit guard-audit" aria-labelledby="guard-audit-title">
+    <div class="audit-heading"><div><p class="eyebrow">PRODUCTION GUARD PLAN / AUTO POLICY</p>
+      <h2 id="guard-audit-title">v4 守卫与战后恢复场景</h2></div><output id="guard-audit-status">ready</output></div>
+    <div class="audit-controls">
+      <label>策略<select id="guard-strategy"><option value="safe">安全</option><option value="balanced" selected>均衡</option><option value="loot">掠夺</option></select></label>
+      <label>当前生命<input id="guard-health" type="number" min="0.1" max="1" step="0.05" value="0.8"></label>
+      <label>目标<select id="guard-kind"><option value="resource">资源守卫</option><option value="nestTreasure">巢穴守卫</option><option value="bossGate">Boss 门卫</option></select></label>
+      <button type="button" data-guard-audit="victory">胜利并恢复目标</button>
+      <button type="button" data-guard-audit="retreat">撤退 / 团灭</button>
+      <button type="button" data-guard-audit="reload">读档</button>
+      <button type="button" data-guard-audit="expedition">换远征</button>
+    </div>
+    <pre id="guard-audit-report"></pre>
+  </section>
   <pre id="report"></pre>
 </main>
-<script src="../../js/core/utils.js?v=20260801.2"></script>
-<script src="../../js/core/eventbus.js?v=20260801.2"></script>
-<script src="../../js/core/registry.js?v=20260801.2"></script>
-<script src="../../js/i18n/i18n.js?v=20260801.2"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260801.2"></script>
-<script src="../../js/i18n/en.js?v=20260801.2"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260801.2"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260801.2"></script>
-<script src="../../js/core/assets.js?v=20260801.2"></script>
-<script src="../../js/sprites/palettes.js?v=20260801.2"></script>
-<script src="../../js/sprites/hero.js?v=20260801.2"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260801.2"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260801.2"></script>
-<script src="../../js/sprites/monsters_expansion.js?v=20260801.2"></script>
-<script src="../../js/sprites/props.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/manifest.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/grassland.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/forest.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/mine.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/graveyard.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/snowpass.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/lavacave.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/skyruins.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/ground-decorations/darkcastle.generated.js?v=20260801.2"></script>
-<script src="../../js/sprites/exploration_v3.js?v=20260801.2"></script>
-<script src="../../js/sprites/boss_landmarks.generated.js?v=20260801.2"></script>
-<script src="../../js/core/content/rules.js?v=20260801.2"></script>
-<script src="../../js/core/content/schemas.js?v=20260801.2"></script>
-<script src="../../js/core/content/compiler.js?v=20260801.2"></script>
-<script src="../../js/core/content/audit.js?v=20260801.2"></script>
-<script src="../../js/core/content/registry.js?v=20260801.2"></script>
-<script src="../../js/core/content/support.js?v=20260801.2"></script>
-<script src="../../js/data/content/content.generated.js?v=20260801.2"></script>
-<script src="../../js/data/formulas.js?v=20260801.2"></script>
-<script src="../../js/systems/terrain.js?v=20260801.2"></script>
-<script src="../../js/systems/terrain_v3.js?v=20260801.2"></script>
-<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260801.2"></script>
-<script src="../../js/systems/nav.js?v=20260801.2"></script>
-<script src="../../js/systems/expedition_ai.js?v=20260801.2"></script>
-<script src="../../js/sprites/minimap_icons.js?v=20260801.2"></script>
-<script src="../demo-i18n.js?v=20260801.2"></script>
-<script src="auto-route-audit.js?v=20260801.2"></script>
-<script src="exploration-v3.js?v=20260801.2"></script>
+<script src="../../js/core/utils.js?v=20260801.4"></script>
+<script src="../../js/core/eventbus.js?v=20260801.4"></script>
+<script src="../../js/core/registry.js?v=20260801.4"></script>
+<script src="../../js/i18n/i18n.js?v=20260801.4"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260801.4"></script>
+<script src="../../js/i18n/en.js?v=20260801.4"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260801.4"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260801.4"></script>
+<script src="../../js/core/assets.js?v=20260801.4"></script>
+<script src="../../js/sprites/palettes.js?v=20260801.4"></script>
+<script src="../../js/sprites/hero.js?v=20260801.4"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260801.4"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260801.4"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260801.4"></script>
+<script src="../../js/sprites/monsters_guards.js?v=20260801.4"></script>
+<script src="../../js/sprites/props.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/manifest.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/grassland.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/forest.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/mine.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/graveyard.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/snowpass.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/lavacave.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/skyruins.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/ground-decorations/darkcastle.generated.js?v=20260801.4"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260801.4"></script>
+<script src="../../js/sprites/boss_landmarks.generated.js?v=20260801.4"></script>
+<script src="../../js/core/content/rules.js?v=20260801.4"></script>
+<script src="../../js/core/content/schemas.js?v=20260801.4"></script>
+<script src="../../js/core/content/compiler.js?v=20260801.4"></script>
+<script src="../../js/core/content/audit.js?v=20260801.4"></script>
+<script src="../../js/core/content/registry.js?v=20260801.4"></script>
+<script src="../../js/core/content/support.js?v=20260801.4"></script>
+<script src="../../js/data/content/content.generated.js?v=20260801.4"></script>
+<script src="../../js/data/formulas.js?v=20260801.4"></script>
+<script src="../../js/systems/terrain.js?v=20260801.4"></script>
+<script src="../../js/systems/terrain_v3.js?v=20260801.4"></script>
+<script src="../../js/systems/terrain_v4.js?v=20260801.4"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260801.4"></script>
+<script src="../../js/systems/nav.js?v=20260801.4"></script>
+<script src="../../js/systems/encounter_pools.js?v=20260801.4"></script>
+<script src="../../js/systems/expedition_ai.js?v=20260801.4"></script>
+<script src="../../js/systems/guard_sites.js?v=20260801.4"></script>
+<script src="../../js/sprites/minimap_icons.js?v=20260801.4"></script>
+<script src="../demo-i18n.js?v=20260801.4"></script>
+<script src="auto-route-audit.js?v=20260801.4"></script>
+<script src="exploration-v3.js?v=20260801.4"></script>
 </body>
 </html>

@@ -18,15 +18,18 @@
   var latestBaseReport = null;
   var latestAutoResult = null;
   var latestAutoRun = null;
+  var guardExpeditionIndex = 1;
 
   Game.content.finalize({ strict: true });
   D.init();
   Game.i18n.setLocale(D.locale());
   Game.state = {
     settings: { expeditionStrategy: 'balanced' },
-    world: { worldTime: 0, region: 'grassland' },
+    world: { worldTime: 0, region: 'grassland', worldSeed: 0, layoutVersion: 4,
+      guardSites: { version: 1, layoutVersion: 4, regions: {} } },
     inv: { potions: {} }
   };
+  Game.expedition = { current: function () { return { index: guardExpeditionIndex }; } };
 
   function regionName(region) {
     return Game.i18n.t('region.' + region.id + '.name');
@@ -174,6 +177,9 @@
       marks(layout.ecology, 'ecology', sx, sy);
       marks(layout.threats, 'threat', sx, sy);
       marks([layout.guardian], 'guardian', sx, sy);
+      marks(layout.nests || [], 'nest', sx, sy);
+      marks(layout.treasureSites || [], 'chestLocked', sx, sy);
+      marks(layout.guardSites || [], 'guardian', sx, sy);
       marks([{ x: layout.camp.x + 54, y: layout.camp.y + 36 }], 'hero', sx, sy);
     }
 
@@ -424,7 +430,7 @@
         try {
           for (var i = 0; i < 32; i++) {
             var seed = (baseSeed + Math.imul(i + 1, 0x9e3779b1)) >>> 0;
-            var layout = Game.terrain.generate(region, seed, 3);
+            var layout = Game.terrain.generate(region, seed, 4);
             var base = Game.autoRouteAudit.baseline(layout);
             var seedOk = base.reached;
             normalScenarios.forEach(function (scenario) {
@@ -539,8 +545,9 @@
     seedInput.value = Game.util.hex32(seed);
     var region = Game.reg.get('region', regionSelect.value);
     Game.state.world.region = region.id;
+    Game.state.world.worldSeed = seed;
     var started = performance.now();
-    latest = Game.terrain.generate(region, seed, 3);
+    latest = Game.terrain.generate(region, seed, 4);
     var report = Game.terrain.validate(latest, region);
     var elapsed = performance.now() - started;
     latestRoute = simulateLongRoute(latest);
@@ -581,7 +588,10 @@
         resources: Array.from(new Set(latest.nodes.map(function (item) { return item.defId; }))),
         curios: latest.curios.map(function (item) { return item.defId; }),
         ecology: latest.ecology.map(function (item) { return item.defId; }),
-        guardian: latest.guardian.defId
+        guardian: latest.guardian.defId,
+        nests: latest.nests.map(function (item) { return item.id; }),
+        treasures: latest.treasureSites.map(function (item) { return item.id; }),
+        guardSites: latest.guardSites.map(function (item) { return item.id; })
       },
       population: population && {
         id: population.id,
@@ -615,6 +625,53 @@
     }
     draw();
     runAutoAudit();
+    runGuardAudit('victory');
+    return report;
+  }
+
+  function runGuardAudit(scenario) {
+    if (!latest) return null;
+    if (scenario === 'expedition') guardExpeditionIndex++;
+    var strategy = document.getElementById('guard-strategy').value;
+    var health = Game.util.clamp(Number(document.getElementById('guard-health').value) || 0.8, 0.1, 1);
+    var targetKind = document.getElementById('guard-kind').value;
+    Game.state.settings.expeditionStrategy = strategy;
+    var plan = Game.guardSites.preview(regionSelect.value, latest);
+    var site = plan.filter(function (candidate) { return candidate.targetKind === targetKind; })[0];
+    if (!site) return null;
+    var profile = Game.content.get('guardSiteProfile', site.profileId);
+    var poolId = site.mode === 'ambush' ? profile.ambushPoolId : profile.visiblePoolId;
+    var resolution = Game.encounterPools.resolve(poolId, {
+      worldSeed: latest.worldSeed, regionId: regionSelect.value, layoutVersion: 4,
+      expeditionIndex: guardExpeditionIndex, siteId: site.id
+    });
+    var threshold = Game.guardSites.autoThreshold(targetKind);
+    var initial = site.mode === 'ambush' ? 'concealed' : 'revealed';
+    var trace;
+    if (scenario === 'reload') {
+      trace = [initial, 'save-stable-state-only', Game.guardSites.contract.reloadTransientPolicy, initial];
+    } else if (scenario === 'expedition') {
+      trace = ['expedition-reset', initial, 'target-rearmed'];
+    } else if (health < threshold) {
+      trace = [initial, 'health-blocked', 'return-camp', 'recover', 'retry'];
+    } else if (scenario === 'retreat') {
+      trace = [initial, 'revealed', 'engaged'].concat(Game.guardSites.contract.retreat);
+    } else {
+      trace = [initial, 'revealed', 'engaged'].concat(Game.guardSites.contract.victory, ['target-revalidated', 'interaction-resumed']);
+    }
+    var report = {
+      productionModules: ['terrain_v4', 'guard_sites.preview', 'encounter_pools.resolve'],
+      scenario: scenario || 'victory', strategy: strategy, health: health, threshold: threshold,
+      eligible: health >= threshold, expeditionIndex: guardExpeditionIndex,
+      site: site, poolId: poolId, resolution: resolution,
+      hiddenInformation: initial === 'concealed' ? 'not exposed to auto target metadata' : 'visible',
+      trace: trace, contract: Game.guardSites.contract
+    };
+    document.getElementById('guard-audit-report').textContent = JSON.stringify(report, null, 2);
+    var scenarioStatus = scenario === 'expedition' ? 'PASS RESET' :
+      (scenario === 'reload' ? 'PASS RELOAD' : (report.eligible ? 'PASS' : 'CAMP RECOVERY'));
+    document.getElementById('guard-audit-status').textContent =
+      scenarioStatus + ' · E' + guardExpeditionIndex + ' · ' + site.id;
     return report;
   }
 
@@ -634,7 +691,7 @@
           for (var i = 0; i < 32; i++) {
             var seed = (base + Math.imul(i + 1, 0x9e3779b1)) >>> 0;
             var started = performance.now();
-            var layout = Game.terrain.generate(region, seed, 3);
+            var layout = Game.terrain.generate(region, seed, 4);
             var report = Game.terrain.validate(layout, region);
             var elapsed = performance.now() - started;
             totalMs += elapsed;
@@ -681,6 +738,13 @@
   auditButton.addEventListener('click', auditSeeds);
   runAutoButton.addEventListener('click', runAutoAudit);
   auditAutoButton.addEventListener('click', auditAutoSeeds);
+  document.querySelector('.guard-audit').addEventListener('click', function (event) {
+    var button = event.target.closest('[data-guard-audit]');
+    if (button) runGuardAudit(button.getAttribute('data-guard-audit'));
+  });
+  ['guard-strategy', 'guard-health', 'guard-kind'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', function () { runGuardAudit('victory'); });
+  });
   regionSelect.addEventListener('change', generate);
   seedInput.addEventListener('keydown', function (event) { if (event.key === 'Enter') generate(); });
   ['show-distance', 'show-graph', 'show-route', 'show-auto-route', 'show-content', 'show-chunks'].forEach(function (id) {

@@ -86,7 +86,7 @@
     instance.awareness = 'revealed';
     instance.revealUntilTick = worldTick + Math.max(0, instance.profile.lifecycle.revealTicks || 0);
     var saved = savedRegion(instance.regionId);
-    if (saved.discoveredHazardIds.indexOf(instance.id) < 0) {
+    if (!instance.dynamic && saved.discoveredHazardIds.indexOf(instance.id) < 0) {
       saved.discoveredHazardIds.push(instance.id);
       saved.discoveredHazardIds.sort();
     }
@@ -105,6 +105,7 @@
       };
     }
     emit(instance, 'hazard:revealed', payload);
+    if (typeof instance.onReveal === 'function') instance.onReveal(instance, payload);
     refreshNavigation();
     return true;
   }
@@ -436,7 +437,7 @@
   }
 
   function makeInstance(profile, ordinal, anchor) {
-    var id = stableInstanceId(profile, ordinal);
+    var id = anchor.instanceId || stableInstanceId(profile, ordinal);
     var saved = savedRegion(regionId);
     var cooldownUntil = Number(saved.hazardCooldowns[id]) || 0;
     var discovered = saved.discoveredHazardIds.indexOf(id) >= 0;
@@ -477,7 +478,10 @@
       actorIds: [],
       lockEncounterId: null,
       disabled: false,
-      hitUntilTick: 0
+      hitUntilTick: 0,
+      dynamic: !!anchor.dynamic,
+      onReveal: anchor.onReveal || null,
+      onTrigger: anchor.onTrigger || null
     };
     instances.push(instance);
     byId[id] = instance;
@@ -684,6 +688,18 @@
     if (instance.disabled || instance.phase !== 'dormant' || !instance.armedAfterExit ||
         activeHazardCount() >= 2 || instance.cooldownUntilWorldTime > worldTime()) return false;
     reveal(instance, 'trigger');
+    if (typeof instance.onTrigger === 'function') {
+      var handled = instance.onTrigger(instance, actors) !== false;
+      emit(instance, 'hazard:dynamicTriggered', {
+        handled: handled, targetActorIds: actors.map(function (actor) { return actor.id; })
+      });
+      if (handled) {
+        instance.disabled = true;
+        instance.phase = 'dormant';
+        refreshNavigation();
+        return true;
+      }
+    }
     instance.triggerOrdinal++;
     instance.warningEndTick = worldTick + instance.profile.lifecycle.warningTicks +
       Math.max(0, instance.revealUntilTick - worldTick);
@@ -1028,6 +1044,36 @@
       return detectionContext(instanceId, actorId);
     },
 
+    registerDynamic: function (profileId, spec) {
+      spec = spec || {};
+      var profile = Game.content.get('hazardProfile', profileId);
+      if (!profile || !regionId || profile.regionId !== regionId ||
+          !spec.id || byId[spec.id] || !Number.isFinite(spec.x) || !Number.isFinite(spec.y)) {
+        return null;
+      }
+      var instance = makeInstance(profile, instances.length, {
+        id: spec.anchorId || spec.id,
+        instanceId: spec.id, dynamic: true,
+        x: spec.x, y: spec.y, orientation: Number(spec.orientation) || 0,
+        onReveal: spec.onReveal, onTrigger: spec.onTrigger
+      });
+      instance.awareness = spec.revealed ? 'revealed' : 'concealed';
+      instance.detectionRoll = Number.isFinite(spec.detectionRoll) ?
+        U.clamp(spec.detectionRoll, 0, 0.999999) : instance.detectionRoll;
+      emit(instance, 'hazard:dynamicRegistered', {});
+      return instance;
+    },
+
+    unregisterDynamic: function (id) {
+      var instance = byId[id];
+      if (!instance || !instance.dynamic || instance.lockEncounterId) return false;
+      delete byId[id];
+      var index = instances.indexOf(instance);
+      if (index >= 0) instances.splice(index, 1);
+      refreshNavigation();
+      return true;
+    },
+
     forceReveal: function (id, reason) {
       var instance = byId[id];
       return instance ? reveal(instance, reason || 'forced') : false;
@@ -1104,7 +1150,8 @@
           triggerOrdinal: instance.triggerOrdinal,
           threatId: instance.threatId,
           actorIds: instance.actorIds.slice(),
-          disabled: instance.disabled
+          disabled: instance.disabled,
+          dynamic: instance.dynamic
         };
       });
     },

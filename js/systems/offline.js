@@ -58,11 +58,29 @@
       if (Game.state.world.layoutVersion >= 3 && Game.exploration && region.exploration) {
         var ers = Game.exploration.regionState(region.id);
         var known = Object.keys(ers.discovered.resources || {});
-        var knownDefs = region.exploration.resources.filter(function (def) {
-          return known.indexOf(def.id) >= 0;
+        var routeNodes = Game.world && Game.world.layout && Game.world.layout.nodes || [];
+        var knownNodeCounts = {}, eligibleNodeCounts = {}, eligibleRouteNodes = [];
+        routeNodes.forEach(function (node) {
+          if (known.indexOf(node.defId) < 0) return;
+          knownNodeCounts[node.defId] = (knownNodeCounts[node.defId] || 0) + 1;
+          var blockedByGuard = Game.world.layout.version >= 4 && Game.guardSites &&
+            Game.guardSites.blocksOffline(node);
+          if (blockedByGuard) return;
+          eligibleNodeCounts[node.defId] = (eligibleNodeCounts[node.defId] || 0) + 1;
+          eligibleRouteNodes.push(node);
         });
-        var routeLength = knownDefs.length ? 420 + knownDefs.length * 240 : 0;
-        var routeSeconds = routeLength / 56 + knownDefs.length * F.BAL.gatherDuration;
+        var knownDefs = region.exploration.resources.filter(function (def) {
+          if (known.indexOf(def.id) < 0) return false;
+          if (!routeNodes.length || !Game.world || !Game.world.layout ||
+              Game.world.layout.version < 4 || !Game.guardSites) return true;
+          return (eligibleNodeCounts[def.id] || 0) > 0;
+        });
+        var routeWeight = knownDefs.reduce(function (sum, def) {
+          var total = knownNodeCounts[def.id] || 1;
+          return sum + (eligibleNodeCounts[def.id] === undefined ? total : eligibleNodeCounts[def.id]) / total;
+        }, 0);
+        var routeLength = routeWeight ? 420 + routeWeight * 240 : 0;
+        var routeSeconds = routeLength / 56 + routeWeight * F.BAL.gatherDuration;
         var loopSeconds = Math.max(90, routeSeconds);
         var loops = knownDefs.length ? Math.floor(elapsedSec / loopSeconds) : 0;
         var travelCap = Math.floor(elapsedSec / Math.max(8, routeSeconds / Math.max(1, knownDefs.length)));
@@ -71,7 +89,9 @@
         for (var ki = 0; ki < knownDefs.length; ki++) {
           var kd = knownDefs[ki];
           var cooldown = kd.rarity === 'rare' ? 1200 : 600;
-          var actions = Math.min(loops, Math.floor(elapsedSec / cooldown) + 1);
+          var availability = (eligibleNodeCounts[kd.id] === undefined ? 1 :
+            eligibleNodeCounts[kd.id] / Math.max(1, knownNodeCounts[kd.id] || 1));
+          var actions = Math.floor(Math.min(loops, Math.floor(elapsedSec / cooldown) + 1) * availability);
           gatherActions += actions;
           materials[kd.material] = actions * Math.max(1, Math.floor((F.gatherYield(tier).min + F.gatherYield(tier).max) / 2));
         }
@@ -88,10 +108,9 @@
             Game.terrain && Game.terrain.dangerAt) {
           var knownIds = {};
           for (var di = 0; di < knownDefs.length; di++) knownIds[knownDefs[di].id] = true;
-          var routeNodes = Game.world.layout.nodes || [];
-          for (var ni = 0; ni < routeNodes.length; ni++) {
-            if (!knownIds[routeNodes[ni].defId]) continue;
-            dangerTotal += Game.terrain.dangerAt(routeNodes[ni].x, routeNodes[ni].y);
+          for (var ni = 0; ni < eligibleRouteNodes.length; ni++) {
+            if (!knownIds[eligibleRouteNodes[ni].defId]) continue;
+            dangerTotal += Game.terrain.dangerAt(eligibleRouteNodes[ni].x, eligibleRouteNodes[ni].y);
             dangerSamples++;
           }
           if (dangerSamples) routeDanger = U.clamp(dangerTotal / dangerSamples, 0, 1);

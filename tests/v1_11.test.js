@@ -605,7 +605,7 @@ assert.equal(Game.routes.validate(migratedCurrent.world.routePlan).length, 0);
 assert.deepEqual(Object.keys(migratedCurrent.inv.materials), []);
 assert.deepEqual(Object.keys(migratedCurrent.world.nodeCooldowns), []);
 assert.deepEqual(Object.keys(migratedCurrent.world.exploration), []);
-assert.equal(migratedCurrent.world.layoutVersion, 3);
+assert.equal(migratedCurrent.world.layoutVersion, 4);
 assert.equal(migratedCurrent.world.finalRegionLocked, false);
 assert.equal(migratedCurrent.settings.groundLoot, true);
 assert.equal(migratedCurrent.settings.autoCampRest, false);

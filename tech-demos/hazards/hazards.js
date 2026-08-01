@@ -23,7 +23,8 @@
   var EVENT_TYPES = [
     'hazard:clue', 'hazard:revealed', 'hazard:warning', 'hazard:activated',
     'hazard:hit', 'hazard:avoided', 'hazard:escapeRequested', 'hazard:riskAccepted',
-    'hazard:ambushStarted', 'hazard:cooldown', 'hazard:reset'
+    'hazard:ambushStarted', 'hazard:cooldown', 'hazard:reset',
+    'guardSite:revealed', 'guardSite:engaged', 'guardSite:cleared'
   ];
 
   function queryParams() {
@@ -268,6 +269,10 @@
   }
 
   function eventText(type, instance) {
+    if (type.indexOf('guardSite:') === 0) {
+      var phase = type.split(':')[1];
+      return D.locale() === 'en' ? 'Guard site ' + phase : '守卫站点：' + phase;
+    }
     var profile = instance && (instance.profile || instance);
     var presentation = profile && profile.presentation || {};
     var key = type === 'hazard:warning' ? presentation.warningKey :
@@ -284,9 +289,9 @@
     var instance = Game.hazards.get(event.instanceId);
     var text = eventText(type, instance);
     feed.unshift({
-      tick: event.tick,
+      tick: event.tick === undefined ? Math.round(Game.state.world.worldTime * 20) : event.tick,
       type: type,
-      profileId: event.profileId
+      profileId: event.profileId || event.siteId
     });
     feed = feed.slice(0, 7);
     callout(text);
@@ -1037,7 +1042,7 @@
     feed = [];
     Game.state.settings.controlMode = 'manual';
     Game.state.world.region = region.id;
-    Game.state.world.layoutVersion = 3;
+    Game.state.world.layoutVersion = 4;
     Game.state.world.mode = 'battle';
     Game.state.world.deathsRow = 0;
     Game.state.player.level = 1 + Math.max(0, region.tier - 1) * 9;
@@ -1068,6 +1073,59 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-time]'), function (button) {
       button.classList.toggle('active', button.getAttribute('data-time') === mode);
     });
+  }
+
+  function guardScenario(mode) {
+    if (!Game.guardSites || !Game.world.layout || Game.world.layout.version < 4) return null;
+    if (Game.world.hero && Game.world.hero.encounterId) {
+      Game.world.endEncounter('lab-guard-scenario-reset');
+    }
+    var targets = (Game.world.layout.nodes || []).concat(Game.world.layout.treasureSites || []);
+    var sites = targets.map(function (target) { return Game.guardSites.forTarget(target); })
+      .filter(function (site, index, list) { return site && list.indexOf(site) === index && site.state !== 'cleared'; });
+    var wantsConcealed = mode !== 'visible';
+    var site = sites.filter(function (candidate) {
+      return wantsConcealed ? candidate.state === 'concealed' : candidate.state === 'revealed';
+    })[0] || sites[0];
+    if (!site) return null;
+    paused = true;
+    prepareManual();
+    if (mode === 'reduced') {
+      document.getElementById('effects-toggle').checked = false;
+      Game.state.settings.effects = false; Game.particles.setEnabled(false);
+    }
+    if (mode === 'visible') {
+      if (site.state === 'concealed') Game.guardSites.reveal(site, 'lab-visible');
+      setHeroPosition(site.x + 76, site.y);
+    } else if (mode === 'detect' || mode === 'reduced') {
+      setHeroPosition(site.x + 70, site.y);
+      Game.guardSites.reveal(site, 'lab-detection');
+    } else {
+      var target = targets.filter(function (candidate) { return candidate.id === site.targetId; })[0];
+      setHeroPosition(site.x, site.y);
+      if (mode === 'preempt') {
+        Game.world.hero.interactOrder = {
+          type: target && target.kind === 'nestTreasure' ? 'chest' : 'gather',
+          target: target,
+          targetRef: target,
+          phase: 'approach'
+        };
+        Game.world.hero.moveOrder = { type: 'interact', target: target, targetRef: target };
+      }
+      Game.guardSites.trigger(site, { targetId: site.targetId, reason: mode === 'preempt' ? 'interaction' : 'ambush' });
+    }
+    site = Game.guardSites.forTarget(site.targetId) || site;
+    var result = { id: site.id, state: site.state, mode: site.mode,
+      targetKind: site.targetKind, targetId: site.targetId,
+      effects: Game.state.settings.effects !== false,
+      interactionCanceled: mode !== 'preempt' ||
+        (!Game.world.hero.interactOrder && !Game.world.hero.moveOrder) };
+    document.getElementById('guard-scenario-status').textContent =
+      result.state + ' · ' + result.targetKind + ' · motion ' + (result.effects ? 'on' : 'off') +
+      (mode === 'preempt' ? ' · preempt ' + (result.interactionCanceled ? 'ok' : 'failed') : '');
+    callout('Guard Site · ' + result.state + ' · ' + result.targetKind);
+    syncPauseUi(); updateRuntime(true);
+    return result;
   }
 
   function syncPauseUi() {
@@ -1102,6 +1160,10 @@
     document.getElementById('advance-hazard').addEventListener('click', advanceHazard);
     document.getElementById('resolve-hazard').addEventListener('click', resolveHazard);
     document.getElementById('reset-hazard').addEventListener('click', resetHazard);
+    document.querySelector('.guard-scenarios').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-guard-scenario]');
+      if (button) guardScenario(button.getAttribute('data-guard-scenario'));
+    });
     document.getElementById('run-route-audit').addEventListener('click', runRouteAudit);
     document.getElementById('audit-scope').addEventListener('change', runRouteAudit);
     document.getElementById('audit-strategy').addEventListener('change', runRouteAudit);
@@ -1162,7 +1224,7 @@
       input.setCustomValidity('');
       Game.state.world.worldSeed = seed;
       Game.state.world.exploration = {};
-      Game.state.world.hazards = { layoutVersion: 3, regions: {} };
+      Game.state.world.hazards = { layoutVersion: 4, regions: {} };
       activateRegion(currentIndex);
     });
   }
@@ -1202,7 +1264,7 @@
   Game.ui.modals.init();
   Game.state = Game.State.newGame();
   Game.i18n.setLocale(D.locale());
-  Game.state.world.layoutVersion = 3;
+  Game.state.world.layoutVersion = 4;
   Game.state.world.regionOrder = Game.reg.ids('region');
   Game.state.settings.autoAdvance = false;
   Game.state.settings.autoEquip = false;
@@ -1270,6 +1332,7 @@
     },
     mimicAudit: runMimicAudit,
     mimicReport: function () { return mimicAudit; },
+    guardScenario: guardScenario,
     region: function (id) {
       var index = regions.findIndex(function (region) { return region.id === id; });
       if (index < 0) return false;

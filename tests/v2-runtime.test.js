@@ -33,7 +33,7 @@ function load(file) { vm.runInContext(read(file), sandbox, { filename: file }); 
   'js/i18n/zh-CN.js', 'js/i18n/en.js',
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
-  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js',
+  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js', 'js/sprites/monsters_guards.js',
   'js/sprites/props.js',
   'js/sprites/ground-decorations/grassland.generated.js',
   'js/sprites/ground-decorations/forest.generated.js',
@@ -108,7 +108,7 @@ const audit = Game.content.finalize({ strict: true });
 assert.equal(audit.ok, true);
 assert.equal(audit.counts.class, 5);
 assert.equal(audit.counts.talent, 30);
-assert.equal(audit.counts.actorArchetype, 58);
+assert.equal(audit.counts.actorArchetype, 74);
 assert.equal(audit.counts.encounterProfile, 24);
 
 [

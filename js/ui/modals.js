@@ -112,6 +112,19 @@
         }
         M.toast(msg, 'gold', 3200);
       });
+      bus.on('guardSite:revealed', function (p) {
+        if (p && p.reason !== 'region-init' && p.mode === 'ambush') M.toast(t('ui.guardRevealed'));
+      });
+      bus.on('guardSite:engaged', function (p) {
+        M.toast(t(p && p.mode === 'ambush' ? 'ui.guardAmbush' : 'ui.guardEngaged'), 'warn');
+      });
+      bus.on('guardSite:cleared', function () { M.toast(t('ui.guardCleared')); });
+      bus.on('nest:discovered', function () { M.toast(t('ui.nestDiscovered')); });
+      bus.on('nestChest:opened', function (p) {
+        M.toast(t('ui.nestChestOpened', {
+          gold: fmt(p && p.gold || 0), count: p && p.materialCount || 0
+        }), 'gold');
+      });
       bus.on('merchant:discovered', function (p) {
         var profile = Game.content.get('merchantProfile', p.merchantProfileId);
         M.toast(t('merchant.ui.discovered', {

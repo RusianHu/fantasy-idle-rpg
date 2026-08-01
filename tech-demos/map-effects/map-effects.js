@@ -221,7 +221,17 @@
     (layout.hazardAnchors || []).forEach(function (item, index) {
       out.push(contentPoint(Object.assign({ id: 'hazard-anchor-' + index }, item), 'hazard'));
     });
+    (layout.nests || []).forEach(function (item) { out.push(contentPoint(item, 'nest')); });
+    (layout.treasureSites || []).forEach(function (item) { out.push(contentPoint(item, 'nest-treasure')); });
+    (layout.guardSites || []).forEach(function (item) { out.push(contentPoint(item, 'guard-site')); });
+    (layout.rareThreats || []).forEach(function (item) { out.push(contentPoint(item, 'rare-threat')); });
+    if (layout.bossGatePoint) out.push(contentPoint(layout.bossGatePoint, 'boss-gate'));
     return out;
+  }
+
+  function stableTerrainSnapshot(value) {
+    return value && value.version >= 4 && Game.terrain.snapshotV4
+      ? Game.terrain.snapshotV4(value) : Game.terrain.snapshotV3(value);
   }
 
   function nearestObject(x, y, maxDistance) {
@@ -519,6 +529,39 @@
         drawCircle(item, item.radius || 18, '#d98955', 'rgba(217,137,85,.06)');
       });
     }
+    if (layers.nests) {
+      (layout.nests || []).forEach(function (nest) {
+        var screen = worldToScreen(nest), zoom = Game.render.cam.zoom;
+        overlayCtx.save();
+        overlayCtx.strokeStyle = '#b982e7'; overlayCtx.lineWidth = 2;
+        overlayCtx.setLineDash([5, 3]); overlayCtx.beginPath();
+        overlayCtx.ellipse(screen.x, screen.y, nest.rx * zoom, nest.ry * zoom, 0, 0, Math.PI * 2);
+        overlayCtx.stroke(); overlayCtx.restore();
+        [nest.mainEntrance, nest.sideOpening].forEach(function (opening, index) {
+          drawWorldLine([nest, { x: nest.x + Math.cos(opening.angle) * nest.rx,
+            y: nest.y + Math.sin(opening.angle) * nest.ry }], index ? '#69cdd2' : '#f1d765', 3);
+        });
+      });
+    }
+    if (layers.treasureSites) (layout.treasureSites || []).forEach(function (site) {
+      drawCircle(site, 8, '#f1d765', 'rgba(241,215,101,.24)');
+    });
+    if (layers.guardSites || layers.poolResolution) (layout.guardSites || []).forEach(function (site) {
+      if (layers.guardSites) drawCircle(site, 10, site.mode === 'ambush' ? '#df6a86' : '#e99d5d', 'rgba(233,157,93,.16)');
+      if (layers.poolResolution && Game.encounterPools) {
+        var profile = Game.content.get('guardSiteProfile', site.profileId);
+        var poolId = profile && (site.mode === 'ambush' ? profile.ambushPoolId : profile.visiblePoolId);
+        var resolved = poolId && Game.encounterPools.resolve(poolId, { worldSeed: layout.worldSeed,
+          regionId: region.id, layoutVersion: layout.version, expeditionIndex: 1, siteId: site.id });
+        if (resolved) {
+          var label = worldToScreen(site);
+          overlayCtx.fillStyle = 'rgba(8,10,20,.82)'; overlayCtx.fillRect(label.x + 7, label.y - 20, 178, 15);
+          overlayCtx.fillStyle = '#e9dc9a'; overlayCtx.font = '9px Consolas';
+          overlayCtx.fillText(resolved.poolId.replace('pool.' + region.id + '.', '') + ' → ' +
+            resolved.worldSpawnProfileId.replace('spawn.' + region.id + '.', ''), label.x + 10, label.y - 9);
+        }
+      }
+    });
     if (layers.reservations && populationPlan) {
       populationPlan.reservations.forEach(function (item) {
         drawCircle(item, item.occupancyRadius || 10, '#c9a95b', 'rgba(201,169,91,.06)');
@@ -1913,8 +1956,8 @@
   function verifyDeterminism() {
     if (!layout) return null;
     var started = now();
-    var regenerated = Game.terrain.generate(region, layout.worldSeed, 3);
-    var terrainSnapshot = Game.terrain.snapshotV3(regenerated);
+    var regenerated = Game.terrain.generate(region, layout.worldSeed, layout.version);
+    var terrainSnapshot = stableTerrainSnapshot(regenerated);
     var decorationSnapshot = productionDecorationSnapshot(regenerated);
     var previewContext = Object.assign({}, populationContext, { preview: true });
     var previewPlan = Game.population.prepareRegion(region.id, regenerated, previewContext);
@@ -1996,6 +2039,34 @@
     return actors.map(function (actor) { return { id: actor.id, x: actor.x, y: actor.y }; });
   }
 
+  function runBatchTopology() {
+    var failures = [], full = 0, quick = 0, signatures = {};
+    regions.forEach(function (candidateRegion, regionIndex) {
+      for (var ordinal = 1; ordinal <= 10; ordinal++) {
+        var seed = Math.imul(ordinal + regionIndex * 31, 2654435761) >>> 0;
+        var candidate = Game.terrain.generate(candidateRegion, seed, 4);
+        var report = Game.terrain.validate(candidate);
+        if (!report.valid) failures.push({ regionId: candidateRegion.id, seed: seed, failures: report.failures });
+        full++;
+      }
+    });
+    for (var index = 0; index < 5000; index++) {
+      var fuzzRegion = regions[index % regions.length];
+      var fuzzSeed = Math.imul(index + 17, 2246822519) >>> 0;
+      var topology = Game.terrain.fastTopology(fuzzRegion, fuzzSeed);
+      if (topology.loopRank < 2 || topology.edges < topology.centers + 1) {
+        failures.push({ regionId: fuzzRegion.id, seed: fuzzSeed, topology: topology });
+      }
+      signatures[fuzzRegion.id + ':' + topology.signature] = true; quick++;
+    }
+    var result = { ok: failures.length === 0, fullLayouts: full, quickTopologies: quick,
+      uniqueTopologies: Object.keys(signatures).length, failures: failures.slice(0, 30) };
+    result.reportHash = hash(result);
+    log('generation', 'v4 batch topology ' + (result.ok ? 'passed' : 'failed'), result, result.ok ? 'info' : 'error');
+    setStatus((result.ok ? lt('pass') : lt('fail')) + ' · 80 full / 5000 quick · ' + result.reportHash);
+    return copy(result);
+  }
+
   function setMotion(enabled) {
     enabled = !!enabled;
     if (!enabled && motion) resetPositions();
@@ -2035,7 +2106,7 @@
       seed: layout.worldSeed >>> 0,
       seedHex: U.hex32(layout.worldSeed),
       layoutVersion: layout.version,
-      terrain: Game.terrain.snapshotV3(layout),
+      terrain: stableTerrainSnapshot(layout),
       validation: copy(validation),
       populationPlan: planSignature(populationPlan),
       merchantAudit: merchantAuditSignature(merchantAudit),
@@ -2252,12 +2323,13 @@
     Game.actors.reset();
     Game.state.world.region = region.id;
     Game.state.world.worldSeed = requestedSeed;
-    Game.state.world.layoutVersion = 3;
+    var layoutVersion = Number(document.getElementById('layout-version').value) === 3 ? 3 : 4;
+    Game.state.world.layoutVersion = layoutVersion;
     Game.state.world.worldTime = Game.F.BAL.dayLength * 0.25;
     Game.state.settings.effects = false;
     var timings = {};
     var began = now();
-    layout = Game.terrain.generate(region, requestedSeed, 3);
+    layout = Game.terrain.generate(region, requestedSeed, layoutVersion);
     decorField = null;
     decorFieldKey = null;
     timings.generate = now() - began;
@@ -2318,7 +2390,7 @@
     candidateInspection = null;
     generationRecord = {
       timings: timings,
-      terrainHash: hash(Game.terrain.snapshotV3(layout)),
+      terrainHash: hash(stableTerrainSnapshot(layout)),
       decorationHash: hash(productionDecorationSnapshot(layout)),
       populationHash: hash(planSignature(populationPlan)),
       actorCoordinateHash: hash(expectedActorCoordinates(populationPlan, merchantAudit)),
@@ -2536,6 +2608,9 @@
     document.getElementById('seed-prev').addEventListener('click', function () { regenerate({ seed: ((seedValue() || 0) - 1) >>> 0 }); });
     document.getElementById('seed-next').addEventListener('click', function () { regenerate({ seed: ((seedValue() || 0) + 1) >>> 0 }); });
     document.getElementById('seed-random').addEventListener('click', randomize);
+    document.getElementById('layout-version').addEventListener('change', function () {
+      regenerate({ seed: seedValue() });
+    });
     document.addEventListener('click', function (event) {
       var recent = event.target.closest('[data-recent-seed]');
       if (recent) regenerate({ seed: parseSeed(recent.getAttribute('data-recent-seed')) });
@@ -2544,6 +2619,7 @@
       var url = new URL(location.href);
       url.searchParams.set('region', region.id);
       url.searchParams.set('seed', U.hex32(layout.worldSeed));
+      url.searchParams.set('layout', String(layout.version));
       copyText(url.href).then(function () { setStatus(lt('copied')); });
     });
     Array.prototype.forEach.call(document.querySelectorAll('[data-focus]'), function (button) {
@@ -2579,6 +2655,7 @@
     document.getElementById('issue-prev').addEventListener('click', function () { focusIssue(-1); });
     document.getElementById('issue-next').addEventListener('click', function () { focusIssue(1); });
     document.getElementById('verify-determinism').addEventListener('click', verifyDeterminism);
+    document.getElementById('batch-topology').addEventListener('click', runBatchTopology);
     document.getElementById('reset-positions').addEventListener('click', resetPositions);
     document.getElementById('focus-merchant').addEventListener('click', function () {
       if (!merchantAudit || !merchantAudit.chosen) return;
@@ -2699,6 +2776,7 @@
     var found = regions.findIndex(function (item) { return item.id === rid; });
     currentIndex = found >= 0 ? found : 0;
     var seed = parseSeed(params.get('seed'));
+    document.getElementById('layout-version').value = params.get('layout') === '3' ? '3' : '4';
     bindEvents();
     regenerate({ seed: seed === null ? 0x89ABCDEF : seed });
     window.MapGenerationLab = {
@@ -2718,6 +2796,7 @@
         return point ? rerunMerchantAudit(point) : copy(merchantAuditSignature(merchantAudit));
       },
       verifyDeterminism: verifyDeterminism,
+      batchTopology: runBatchTopology,
       decorationReport: function () {
         return copy({
           ecology: layout && layout.decorationEcology,

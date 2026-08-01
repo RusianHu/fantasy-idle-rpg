@@ -263,7 +263,8 @@
     if (!Game.environment) return null;
     return nearest(Game.world.layout.nodes || [], hero, function (node) {
       return U.dist(hero.x, hero.y, node.x, node.y) <= 120 &&
-        Game.environment.autoNodeReady(node);
+        Game.environment.autoNodeReady(node) &&
+        (!Game.guardSites || Game.guardSites.autoEligible(node));
     });
   }
 
@@ -285,6 +286,20 @@
       danger: Game.terrain.dangerAt(order.x, order.y),
       reason: current.reason || 'travel'
     };
+  }
+
+  function guardResumeTarget(hero) {
+    if (!Game.guardSites || !Game.guardSites.peekResumeTargetId) return null;
+    var id = Game.guardSites.peekResumeTargetId();
+    if (!id) return null;
+    var target = (Game.world.layout.nodes || []).filter(function (node) { return node.id === id; })[0];
+    var type = 'gather';
+    if (!target && Game.worldTreasures) { target = Game.worldTreasures.get(id); type = 'chest'; }
+    var valid = target && Game.guardSites.canInteract(target) &&
+      (type !== 'gather' || !Game.environment || Game.environment.autoNodeReady(target)) &&
+      (type !== 'chest' || !target.claimed);
+    if (!valid) { Game.guardSites.consumeResumeTargetId(); return null; }
+    return { target: target, type: type, distance: U.dist(hero.x, hero.y, target.x, target.y) };
   }
 
   function movementExpectation(hero, intentId) {
@@ -311,7 +326,8 @@
   function matureNode(hero, fullCircuit) {
     var rs = Game.exploration.regionState(Game.state.world.region);
     return nearest(Game.world.layout.nodes || [], hero, function (n) {
-      if (!visible(n) || !rs.discovered.resources[n.defId] || !Game.environment.autoNodeReady(n)) return false;
+      if (!visible(n) || !rs.discovered.resources[n.defId] || !Game.environment.autoNodeReady(n) ||
+          (Game.guardSites && !Game.guardSites.autoEligible(n))) return false;
       if (fullCircuit) return true;
       var direct = U.dist(hero.x, hero.y, n.x, n.y);
       var frontier = Game.exploration.nextObjective(Game.state.world.region, hero.x, hero.y);
@@ -322,18 +338,47 @@
 
   function guardianTarget(hero) {
     var layout = Game.world.layout, state = Game.exploration.regionState(Game.state.world.region);
-    if (state.discovered.guardian || !visible(layout.guardian)) return null;
+    var gateSite = null;
+    if (layout.version >= 4 && Game.guardSites) {
+      gateSite = Game.guardSites.snapshot().filter(function (site) {
+        return site.targetKind === 'bossGate' && !site.cleared;
+      })[0];
+      if (!gateSite) return null;
+      if (!Game.guardSites.autoEligible(gateSite)) return { target: gateSite,
+        distance: U.dist(hero.x, hero.y, gateSite.x, gateSite.y), blockedHealth: true };
+    } else if (state.discovered.guardian) return null;
+    if (!visible(layout.guardian)) return null;
     var entity = null;
     for (var i = 0; i < Game.world.entities.length; i++) {
-      if (Game.world.entities[i].guardian && !Game.world.entities[i].dead) entity = Game.world.entities[i];
+      if (Game.world.entities[i].guardian && !Game.world.entities[i].dead &&
+          (!gateSite || Game.world.entities[i].guardSiteId === gateSite.id)) entity = Game.world.entities[i];
     }
     return entity ? { target: entity, distance: U.dist(hero.x, hero.y, entity.x, entity.y) } : null;
+  }
+
+  function nestTreasureTarget(hero) {
+    if (!Game.worldTreasures) return null;
+    return nearest(Game.worldTreasures.list(), hero, function (treasure) {
+      return visible(treasure) && (!Game.guardSites || Game.guardSites.autoEligible(treasure));
+    });
+  }
+
+  function hasHealthBlockedGuardTarget() {
+    if (!Game.guardSites) return false;
+    var snapshots = Game.guardSites.snapshot();
+    for (var i = 0; i < snapshots.length; i++) {
+      var site = snapshots[i];
+      if (site.cleared || !site.revealed || !Game.exploration.isRevealed(site.x, site.y)) continue;
+      if (!Game.guardSites.autoEligible(site)) return true;
+    }
+    return false;
   }
 
   function bossObjective(hero) {
     var ready = Game.exploration.readiness(Game.state.world.region);
     var retryAt = Game.exploration.regionState(Game.state.world.region).bossRetryAt || 0;
-    if (!ready.lair || ready.total < 70 || (Game.state.world.worldTime || 0) < retryAt) return null;
+    if (!ready.lair || ready.total < 70 || (Game.state.world.worldTime || 0) < retryAt ||
+        (Game.world.layout.version >= 4 && Game.guardSites && !Game.guardSites.isBossGateCleared())) return null;
     var lair = Game.world.layout.bossLair;
     return { target: lair, distance: U.dist(hero.x, hero.y, lair.x, lair.y), ready: ready };
   }
@@ -355,6 +400,18 @@
       return emitIntent({ id: 'player-order', target: hero.interactOrder.target, distance: 0, danger: 0, reason: null });
     }
     if (hero.interactOrder) return emitIntent(interactionIntent(hero.interactOrder));
+
+    var guardResume = guardResumeTarget(hero);
+    if (guardResume) {
+      if (Game.world.startInteraction({ type: guardResume.type, target: guardResume.target }, false)) {
+        Game.guardSites.consumeResumeTargetId();
+        return emitIntent({ id: guardResume.type, target: guardResume.target,
+          distance: guardResume.distance, danger: Game.terrain.dangerAt(guardResume.target.x, guardResume.target.y),
+          reason: 'guard-resume' });
+      }
+      if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
+        distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
+    }
 
     var loot = expiringLoot(hero);
     if (loot) {
@@ -412,17 +469,53 @@
     }
 
     var prog = Game.State.regionProg(Game.state.world.region);
+    var nestTreasure = strategy() === 'loot' ? nestTreasureTarget(hero) : null;
+    if (nestTreasure) {
+      if (Game.world.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) {
+        return emitIntent({ id: 'chest', target: nestTreasure.target,
+          distance: nestTreasure.distance, danger: Game.terrain.dangerAt(nestTreasure.target.x, nestTreasure.target.y),
+          reason: 'nest-priority' });
+      }
+      if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
+        distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
+    }
     var node = matureNode(hero, !!prog.firstKill);
     if (node) {
       if (Game.world.startInteraction({ type: 'gather', target: node.target }, false)) {
         return emitIntent({ id: 'gather', target: node.target, distance: node.distance, danger: Game.terrain.dangerAt(node.target.x, node.target.y), reason: null });
       }
+      if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
+        distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
+    }
+
+    nestTreasure = nestTreasureTarget(hero);
+    if (nestTreasure) {
+      if (Game.world.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) {
+        return emitIntent({ id: 'chest', target: nestTreasure.target,
+          distance: nestTreasure.distance, danger: Game.terrain.dangerAt(nestTreasure.target.x, nestTreasure.target.y),
+          reason: 'nest' });
+      }
+      if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
+        distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
     }
 
     var guardian = guardianTarget(hero);
     if (guardian) {
+      if (guardian.blockedHealth) {
+        setMove(hero, layout.camp, 'ai-camp-guard-health');
+        return emitIntent({ id: 'camp', target: layout.camp,
+          distance: U.dist(hero.x, hero.y, layout.camp.x, layout.camp.y), danger: 0,
+          reason: 'guard-health' });
+      }
       hero.target = guardian.target;
       return emitIntent({ id: 'guardian', target: guardian.target, distance: guardian.distance, danger: 0.9, reason: null });
+    }
+
+    if (hasHealthBlockedGuardTarget()) {
+      setMove(hero, layout.camp, 'ai-camp-guard-health');
+      return emitIntent({ id: 'camp', target: layout.camp,
+        distance: U.dist(hero.x, hero.y, layout.camp.x, layout.camp.y), danger: 0,
+        reason: 'guard-health' });
     }
 
     if (boss) {

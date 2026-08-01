@@ -17,7 +17,7 @@
 
   function blankDiscovery() {
     return {
-      landmarks: {}, resources: {}, curios: {}, ecology: {}, threats: {},
+      landmarks: {}, resources: {}, curios: {}, ecology: {}, threats: {}, nests: {},
       guardian: false, curioChoices: {}
     };
   }
@@ -37,7 +37,8 @@
       bossRetryAt: 0,
       completionRewarded: false,
       migrationGift: false,
-      landmarkEffects: {}
+      landmarkEffects: {},
+      discoveryRewardLedger: {}
     };
   }
 
@@ -61,6 +62,7 @@
     out.resourceCounts = out.resourceCounts || {};
     out.threatCooldowns = out.threatCooldowns || {};
     out.landmarkEffects = out.landmarkEffects || {};
+    out.discoveryRewardLedger = out.discoveryRewardLedger || {};
     out.expeditionIndex = Math.max(0, Number(out.expeditionIndex) || 0);
     out.bossRetryAt = Math.max(0, Number(out.bossRetryAt) || 0);
     return out;
@@ -185,6 +187,7 @@
     if (kind === 'curios') return layout.curios || [];
     if (kind === 'ecology') return layout.ecology || [];
     if (kind === 'threats') return layout.threats || [];
+    if (kind === 'nests') return layout.nests || [];
     return [];
   }
 
@@ -192,11 +195,12 @@
     var layout = Game.world && Game.world.layout;
     if (!layout || layout.version < 3) return;
     var rs = regionState(rid);
-    ['landmarks', 'resources', 'curios', 'ecology', 'threats'].forEach(function (kind) {
+    ['landmarks', 'resources', 'curios', 'ecology', 'threats', 'nests'].forEach(function (kind) {
       var list = contentMap(layout, kind);
       for (var i = 0; i < list.length; i++) {
         var ent = list[i];
-        var radius = kind === 'threats' ? Math.max(90, ent.radius * 0.7) : (kind === 'ecology' ? 56 : 70);
+        var radius = kind === 'threats' ? Math.max(90, ent.radius * 0.7) :
+          (kind === 'nests' ? Math.max(ent.rx || 96, ent.ry || 76) + 48 : (kind === 'ecology' ? 56 : 70));
         if (U.dist(x, y, ent.x, ent.y) > radius) continue;
         if (kind === 'ecology' && Game.expedition && !Game.expedition.isEcologyActive(ent.defId)) continue;
         Collection.record(kind, ent.defId, {
@@ -251,7 +255,11 @@
     var landmarkPoints = Math.round(25 * Math.min(landmarkCount, 4) / 4);
     var resourcePoints = Math.round(18 * Math.min(resourceCount, 5) / 5);
     var curioPoints = Math.round(12 * Math.min(curioCount, 3) / 3);
-    var guardianPoints = rs.discovered.guardian ? 15 : 0;
+    var currentV4 = Game.world && Game.world.layout && Game.world.layout.version >= 4 &&
+      Game.world.region && Game.world.region.id === rid;
+    var guardianPoints = currentV4 && Game.guardSites
+      ? (Game.guardSites.isBossGateCleared() ? 15 : 0)
+      : (rs.discovered.guardian ? 15 : 0);
     var lairDef = cfg.landmarks[3] && cfg.landmarks[3].id;
     var lair = !!(lairDef && rs.discovered.landmarks[lairDef]);
     return {
@@ -339,15 +347,19 @@
         bucket[id] = true;
       }
       // 探索里程碑占 55%；首次收集/交互合计约 24%；战斗承担余下约 20%。
-      var shares = { landmarks: 0.015, resources: 0.014, curios: 0.02, ecology: 0.015, guardian: 0.02, threats: 0 };
-      var exp = rewardExp(rid, shares[kind] || 0);
+      var shares = { landmarks: 0.015, resources: 0.014, curios: 0.02, ecology: 0.015, guardian: 0.02, threats: 0, nests: 0 };
+      var ledgerKey = kind + ':' + id;
+      var firstReward = !rs.discoveryRewardLedger[ledgerKey];
+      if (firstReward) rs.discoveryRewardLedger[ledgerKey] = true;
+      var exp = firstReward ? rewardExp(rid, shares[kind] || 0) : 0;
       var eventName = {
         landmarks: 'landmark:discovered',
         resources: 'resource:registered',
         curios: 'curio:found',
         ecology: 'ecology:recorded',
         threats: 'threat:discovered',
-        guardian: 'guardian:defeated'
+        guardian: 'guardian:defeated',
+        nests: 'nest:discovered'
       }[kind];
       if (eventName) bus.emit(eventName, { rid: rid, id: id, exp: exp, entity: opts.entity || null });
       if (kind === 'landmarks') applyLandmarkEffect(rid, id, opts.entity || null);
@@ -372,6 +384,8 @@
         curios: { found: Object.keys(rs.discovered.curios).length, total: cfg.curios.length },
         ecology: { found: Object.keys(rs.discovered.ecology).length, total: cfg.ecology.length },
         threats: { found: Object.keys(rs.discovered.threats).length, total: 3 },
+        nests: { found: Object.keys(rs.discovered.nests).length,
+          total: Game.world && Game.world.layout && Game.world.layout.nests ? Game.world.layout.nests.length : 0 },
         guardian: !!rs.discovered.guardian
       };
     }
@@ -554,7 +568,20 @@
         return point.bossLair ? 'lair' : 'landmark';
       });
       mark(layout.curios, rsd.curios, 'curio');
-      if (rsd.guardian) icon('guardian', layout.guardian);
+      mark(layout.nests || [], rsd.nests || {}, 'nest');
+      if (layout.version >= 4 && Game.worldTreasures) {
+        Game.worldTreasures.all().forEach(function (treasure) {
+          if (treasure.claimed || !rsd.nests[treasure.nestId] || !E.isRevealed(treasure.x, treasure.y, rid)) return;
+          icon(treasure.locked ? 'chestLocked' : 'chestAvailable', treasure);
+        });
+      }
+      if (layout.version >= 4 && Game.guardSites) {
+        Game.guardSites.snapshot().forEach(function (site) {
+          if (!site.revealed || site.cleared || !E.isRevealed(site.x, site.y, rid)) return;
+          icon(site.targetKind === 'bossGate' ? 'bossGate' :
+            (site.mode === 'ambush' ? 'ambushRevealed' : 'guardian'), site);
+        });
+      } else if (rsd.guardian) icon('guardian', layout.guardian);
       var merchantEvent = Game.merchants && Game.merchants.activeEvent &&
         Game.merchants.activeEvent();
       if (merchantEvent && merchantEvent.state === 'available') {

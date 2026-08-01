@@ -11,8 +11,12 @@ const output = execFileSync(process.execPath, ['tools/audit-content.js', '--fixt
 const audit = JSON.parse(output);
 assert.equal(audit.ok, true);
 assert.ok(audit.packs.some((pack) => pack.id === 'fixture.authoring'));
-assert.equal(audit.counts.actorArchetype, 62);
-assert.ok(audit.counts.worldSpawnProfile >= 29);
+// Production owns 74 actors after the 16 independent v4 guard/hunter packs;
+// the authoring fixture deliberately contributes four more archetypes.
+assert.equal(audit.counts.actorArchetype, 78);
+assert.equal(audit.counts.encounterPoolProfile, 72);
+assert.equal(audit.counts.guardSiteProfile, 24);
+assert.ok(audit.counts.worldSpawnProfile >= 112);
 const scaffold = fs.readFileSync(path.join(ROOT, 'tools/scaffold-actor.ps1'), 'utf8');
 assert.match(scaffold, /OutputDirectory must stay inside js\/data\/packs/);
 assert.match(scaffold, /build-content-bundle\.js/);

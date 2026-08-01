@@ -10,6 +10,7 @@
     'ability', 'trait', 'status', 'aiProfile', 'tacticsProfile',
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
     'actorVariant', 'encounterPack', 'worldSpawnProfile',
+    'encounterPoolProfile', 'guardSiteProfile',
     'worldPopulationProfile', 'regionProfile', 'climateProfile', 'engagementPolicy',
     'interactionProfile', 'merchantProfile', 'merchantStockPool',
     'dialogueProfile', 'hazardProfile', 'hazardVisualProfile'
@@ -34,6 +35,12 @@
     actorVariant: ['id', 'archetypeId', 'overrides'],
     encounterPack: ['id', 'members'],
     worldSpawnProfile: ['id', 'identity', 'mountTo', 'placement', 'lifecycle'],
+    encounterPoolProfile: ['id', 'regionId', 'category', 'roles', 'entries'],
+    guardSiteProfile: [
+      'id', 'regionId', 'targetKinds', 'coverage', 'modeWeights',
+      'visiblePoolId', 'ambushPoolId', 'triggerRadius', 'detection',
+      'resetPolicy', 'offlinePolicy'
+    ],
     worldPopulationProfile: ['id', 'regionId', 'channels'],
     regionProfile: ['id', 'tier', 'populationProfileId', 'climateProfileId'],
     climateProfile: ['id', 'regionId', 'exposure', 'factors', 'states', 'presentation'],
@@ -80,7 +87,13 @@
     regionProfile: {
       populationProfileId: 'worldPopulationProfile',
       hazardProfileIds: 'hazardProfile',
+      guardSiteProfileIds: 'guardSiteProfile',
       climateProfileId: 'climateProfile'
+    },
+    encounterPoolProfile: { regionId: 'regionProfile' },
+    guardSiteProfile: {
+      regionId: 'regionProfile', visiblePoolId: 'encounterPoolProfile',
+      ambushPoolId: 'encounterPoolProfile'
     },
     climateProfile: { regionId: 'regionProfile' },
     merchantProfile: {
@@ -140,6 +153,15 @@
       },
       offlineEligible: false
     },
+    encounterPoolProfile: {
+      schemaVersion: 1, roles: [], entries: []
+    },
+    guardSiteProfile: {
+      schemaVersion: 1, targetKinds: [], coverage: 0.3,
+      modeWeights: { visible: 1, ambush: 1 }, triggerRadius: 42,
+      detection: { clueRadius: 112, revealRadius: 74, revealChance: 0.25 },
+      resetPolicy: 'expedition', offlinePolicy: 'block'
+    },
     worldPopulationProfile: {
       schemaVersion: 1, flags: {}, channels: {}, baseSpawnRefs: {},
       offlineEligible: true
@@ -191,6 +213,12 @@
     categories: ['player', 'monster', 'npc', 'companion', 'summon', 'object'],
     relations: ['self', 'ally', 'neutral', 'hostile'],
     populationChannels: ['regular', 'rare', 'guardian', 'npc', 'boss'],
+    encounterPoolCategories: ['regular', 'rare', 'elite', 'nest', 'boss'],
+    encounterPoolRoles: [
+      'wander', 'patrol', 'ambush', 'resourceGuard',
+      'treasureGuard', 'bossGate'
+    ],
+    guardTargetKinds: ['resource', 'nestTreasure', 'bossGate'],
     objectiveTypes: ['eliminate', 'survive', 'protect', 'surrender', 'escape', 'timeout', 'custom'],
     climateFronts: ['calm', 'wet', 'volatile', 'dry', 'arcane'],
     climateExposures: ['open', 'canopy', 'underground', 'coldOpen', 'elevated', 'fortressExterior'],

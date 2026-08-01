@@ -161,6 +161,16 @@ async function run() {
       'front=volatile&intensity=0.85&lang=en'
     );
 
+    let labReady = false;
+    for (let attempt = 0; attempt < 40 && !labReady; attempt++) {
+      labReady = await cdp.evaluate(
+        `typeof window.WeatherClimateLab === 'object'`
+      );
+      if (!labReady) await delay(50);
+    }
+    assert.equal(labReady, true,
+      'WeatherClimateLab initializes without page errors: ' + cdp.errors.join(' | '));
+
     const mobile = await cdp.evaluate(`(() => {
       document.querySelector('[data-speed="0"]')?.click();
       const saveBefore = [

@@ -13,7 +13,8 @@ vm.runInNewContext(source, context, { filename: 'minimap_icons.js' });
 const icons = context.window.Game.mapIcons;
 const expected = [
   'camp', 'landmark', 'resource', 'curio', 'ecology',
-  'threat', 'guardian', 'lair', 'merchant', 'hero'
+  'threat', 'guardian', 'lair', 'nest', 'chestLocked',
+  'chestAvailable', 'ambushRevealed', 'bossGate', 'merchant', 'hero'
 ];
 assert.deepEqual(Array.from(icons.types), expected);
 
@@ -47,4 +48,4 @@ assert.match(drawMapSource, /icon\('merchant', merchantEvent\)/,
 assert.doesNotMatch(drawMapSource, /\.arc\s*\(/,
   'production minimap location markers must not regress to circles');
 
-console.log('Minimap icon set OK: 10 hand-pixelled location silhouettes including the merchant wagon.');
+console.log('Minimap icon set OK: 15 hand-pixelled location silhouettes including v4 guards and nests.');

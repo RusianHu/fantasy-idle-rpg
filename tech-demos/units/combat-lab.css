@@ -7,6 +7,7 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); font: 14px/1.45 ui-monospace, Consolas, monospace; }
 button, select, input { min-height: 44px; border: 1px solid var(--line); background: #10152a; color: var(--ink); font: inherit; }
+select { min-width: 44px; }
 button { padding: 7px 11px; cursor: pointer; }
 button:hover, button.active { border-color: var(--gold); color: var(--gold); }
 a { color: var(--gold); }
@@ -83,12 +84,24 @@ header label, .setup label, .tools label, .inspector label, .catalog label, .run
 .portrait-qa-card code { color: var(--dim); font-size: 9px; }
 .inspector pre { height: 515px; }
 .tabs { display: flex; gap: 4px; margin: 8px 0; }
-.tabs button { min-height: 34px; padding: 4px 7px; flex: 1; font-size: 11px; }
+.tabs button { min-height: 44px; padding: 4px 7px; flex: 1; font-size: 11px; }
 .tools { grid-template-columns: repeat(10, minmax(100px, 1fr)); margin-top: 12px; }
 .tools h2 { grid-column: 1 / -1; }
 .diagnostics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
 pre { margin: 0; min-height: 180px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #cdd5f6; font: 11px/1.5 ui-monospace, monospace; }
 .catalog { margin-top: 12px; }
+.guard-contact { margin-top: 12px; }
+.guard-contact-head { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.guard-contact-head h2, .guard-contact-head p { margin: 0; }
+.guard-contact-head p { margin-top: 4px; color: var(--dim); font-size: 10px; }
+.guard-contact-head output { color: var(--green); font: 10px/1.4 ui-monospace, monospace; }
+.guard-contact-sheet { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+.guard-contact-card { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; align-items: center; min-width: 0; padding: 7px; background: #0e1327; border: 1px solid var(--line); }
+.guard-contact-card canvas { width: 80px; height: 44px; image-rendering: pixelated; background: #080b17; border: 1px solid #293357; }
+.guard-contact-card div { display: grid; gap: 2px; min-width: 0; }
+.guard-contact-card strong, .guard-contact-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guard-contact-card strong { color: var(--gold); font-size: 10px; }
+.guard-contact-card code, .guard-contact-card small { color: var(--dim); font-size: 8px; }
 #catalog-counts { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
 #catalog-counts span { padding: 3px 6px; border: 1px solid var(--line); color: var(--dim); }
 .hpbar, .castbar { fill: #252c49; }
@@ -102,6 +115,7 @@ pre { margin: 0; min-height: 180px; max-height: 360px; overflow: auto; white-spa
   .runtime-grid { grid-template-columns: 1fr; }
   .inspector pre { height: 300px; }
   .diagnostics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .guard-contact-sheet { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 540px) {
   .lab-shell { padding: 8px; }
@@ -112,5 +126,6 @@ pre { margin: 0; min-height: 180px; max-height: 360px; overflow: auto; white-spa
   .mmo-qa-head { align-items: flex-start; flex-direction: column; }
   .mmo-qa-head output { margin-left: 0; }
   .mmo-timeline { grid-template-columns: 1fr; }
+  .guard-contact-sheet { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

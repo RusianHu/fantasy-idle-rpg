@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.2") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.4") format("woff2");
   font-display: swap;
 }
 
@@ -212,6 +212,13 @@ h1 { margin-bottom: 7px; font-size: 31px; font-weight: 600; line-height: 1.08; }
   background: var(--surface);
   font: 12px Consolas, monospace;
   text-transform: uppercase;
+}
+.seed-control select {
+  min-height: 44px;
+  min-width: 76px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
 }
 .seed-control button, .focus-actions button, .tool-actions button,
 .probe-actions button, .runtime-actions button, .log-actions button {

@@ -208,7 +208,7 @@ assert.equal(
   Game.weather.visibilityMultiplier('grassland')
 );
 
-assert.equal(Game.SAVE_VERSION, 17);
+assert.equal(Game.SAVE_VERSION, 18);
 assert.doesNotMatch(
   fs.readFileSync(path.join(ROOT, 'js/core/save.js'), 'utf8'),
   /\bweather\s*:/

@@ -1,10 +1,10 @@
 # 地图生成、渲染与放置 Lab
 
-入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面固定使用 `layoutVersion:3`，按 `terrain.generate / validate / mount → Population.prepareRegion → Actor materialize → audit → renderer` 运行正式链路，但不调用 `Game.world.init()`。
+入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面默认使用 `layoutVersion:4`，可切回 v3 基线，按 `terrain.generate / terrain_v4.compose / validate / mount → EncounterPool.resolve → Population.prepareRegion → Actor materialize → audit → renderer` 运行正式链路，但不调用 `Game.world.init()`。
 
 ## 验证范围
 
-- 八区 2400×1440 地形、液体、导航、区块、装饰、营地、地标、资源、奇物、生态、威胁、Hazard 锚点及 Population Actor。
+- 八区 2400×1440 地形、液体、导航、区块、装饰、营地、地标、资源、奇物、生态、威胁、Hazard 锚点及 Population Actor；v4 另显示巢穴墙体/双门洞、固定宝箱、守卫锚点、稀有威胁、Boss 门卫点和正式池解析结果。
 - 无玩家、无迷雾、无存档读写；不创建战斗、运行时 Hazard、探索 AI、宝箱或交易状态。
 - 全图小地图支持点击和拖动镜头、视口框同步、地点/Actor/错误标记与对象聚焦。
 - 检查、正式导航测距、SpawnProfile 放置探针、放置审计、确定性复验及固定 50ms 的 Seeded 巡游预览。
@@ -23,6 +23,6 @@
 
 ## QA 接口
 
-`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`merchantAudit`、`verifyDeterminism`、`decorationReport` 和 `resetPositions`。`merchantAudit(point)` 可读取当前报告或以世界坐标重设 QA 点；确定性复验同时比较宏观地形、完整装饰生态、Population 计划、行商放置与 Actor 坐标。
+`window.MapGenerationLab` 暴露 `regenerate`、`randomize`、`catalog`、`snapshot`、`logs`、`focus`、`setCamera`、`setLayer`、`setMotion`、`probe`、`inspect`、`measure`、`merchantAudit`、`verifyDeterminism`、`decorationReport` 和 `resetPositions`。确定性复验比较 v3 基础、v4 巢穴、Population、池解析、行商放置与 Actor 坐标；页面按钮另执行当前区域 80 张完整 v4 与 5,000 个快速种子的拓扑报告。
 
 长途导航、拓扑可视化和多 Seed 批量审计仍由 `tech-demos/exploration-v3` 独立负责。

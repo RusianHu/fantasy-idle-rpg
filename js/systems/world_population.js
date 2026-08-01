@@ -94,6 +94,18 @@
     var hazard = Game.content.all('hazardProfile').filter(function (profile) {
       return profile.regionId === rid && profile.category === 'ambushTrigger';
     })[0];
+    var poolId = hazard && hazard.outcome && hazard.outcome.encounterPoolId;
+    if (poolId && Game.encounterPools) {
+      var resolved = Game.encounterPools.resolve(poolId, {
+        worldSeed: context.worldSeed, regionId: rid,
+        layoutVersion: context.layoutVersion,
+        expeditionIndex: context.expeditionIndex || 0,
+        siteId: threat.id
+      });
+      var pooledProfile = resolved && Game.content.get('worldSpawnProfile',
+        resolved.worldSpawnProfileId);
+      if (pooledProfile) return pooledProfile;
+    }
     var allowed = hazard && hazard.outcome && hazard.outcome.encounterPackIds || [];
     function compatible(profile) {
       var pack = profile && Game.content.get('encounterPack', profile.encounterPackId);
@@ -338,6 +350,8 @@
       else if (source === 'threat') list = layout.threats || [];
       else if (source === 'landmark') list = layout.landmarks || [];
       else if (source === 'ecology') list = layout.ecology || [];
+      else if (source === 'encounterSite') list = channel === 'rare'
+        ? (layout.rareThreats || []) : (layout.guardSites || []);
       else list = [];
       if (source === 'threat' && !list.length) list = layout.spawnCandidates || [];
       list.filter(function (entry) {
@@ -413,6 +427,24 @@
     }).map(function (reservation) {
       return reservation.slotId || reservation.id || null;
     });
+    var merchantV4Overlap = [];
+    if (layout && layout.version >= 4 && profile.identity &&
+        profile.identity.socialGroupId === 'social.merchant-guild') {
+      (layout.nests || []).forEach(function (nest) {
+        var nx = (candidate.x - nest.x) / Math.max(1, nest.rx * 1.2 + radius);
+        var ny = (candidate.y - nest.y) / Math.max(1, nest.ry * 1.2 + radius);
+        if (nx * nx + ny * ny <= 1) merchantV4Overlap.push(nest.id);
+      });
+      [].concat(layout.landmarks || [], layout.nodes || [], layout.curios || [],
+        layout.ecology || [], layout.hazardAnchors || [], layout.treasureSites || [],
+        layout.guardSites || [], layout.bossGatePoint || []).forEach(function (site) {
+        if (!site || !Number.isFinite(site.x) || !Number.isFinite(site.y)) return;
+        var reserve = site.kind === 'guardSite' ? 72 : (site.kind === 'nestTreasure' ? 64 : 52);
+        if (Game.util.dist(candidate.x, candidate.y, site.x, site.y) < radius + reserve) {
+          merchantV4Overlap.push(site.id || site.defId || site.kind || 'interaction');
+        }
+      });
+    }
     var checks = [
       {
         id: 'walkable',
@@ -448,6 +480,14 @@
         enforced: true,
         pass: overlap.length === 0,
         actual: overlap,
+        expected: []
+      },
+      {
+        id: 'v4ReservedSite',
+        enforced: layout && layout.version >= 4 && profile.identity &&
+          profile.identity.socialGroupId === 'social.merchant-guild',
+        pass: merchantV4Overlap.length === 0,
+        actual: merchantV4Overlap,
         expected: []
       }
     ];
