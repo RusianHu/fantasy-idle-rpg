@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.4") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.9") format("woff2");
   font-display: swap;
 }
 :root {
@@ -36,7 +36,7 @@ button:disabled { color: #777d74; border-color: #454b45; cursor: wait; }
 .canvas-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 196px; background: #090c0c; border: 1px solid #596159; overflow: hidden; }
 canvas { display: block; width: 100%; height: auto; align-self: center; image-rendering: pixelated; }
 aside { padding: 12px; display: grid; align-content: start; gap: 9px; background: #141a18; border-left: 1px solid #465048; }
-aside label { min-height: 32px; display: flex; align-items: center; gap: 7px; color: #b6bbb3; font-size: 10px; }
+aside label { min-height: 44px; display: flex; align-items: center; gap: 7px; color: #b6bbb3; font-size: 10px; }
 aside input { min-height: 0; accent-color: #c4a950; }
 .legend { display: grid; grid-template-columns: 1fr; gap: 6px; padding-top: 8px; border-top: 1px solid #3f4740; font-size: 9px; }
 .legend span { min-width: 0; min-height: 24px; display: grid; grid-template-columns: 20px minmax(0, 1fr); align-items: center; gap: 6px; color: #c6cbc3; }

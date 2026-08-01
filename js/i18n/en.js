@@ -625,11 +625,13 @@
       strategy: { safe: 'Safe', balanced: 'Balanced', loot: 'Plunder' },
       strategyAria: 'Auto-expedition strategy: {strategy}. Activate to cycle.',
       aiIntent: 'AI intent',
+      distanceMeters: '{n} m',
       intent: {
         idle: 'Surveying', survival: 'Returning safely', combat: 'In combat',
         'player-order': 'Following order', loot: 'Recovering loot', frontier: 'Exploring frontier',
         discovery: 'Investigating', gather: 'Gathering', guardian: 'Hunting guardian',
         boss: 'Heading to lair', circuit: 'Gathering circuit', camp: 'Returning to camp',
+        'chest-approach': 'Heading to treasure', chest: 'Opening chest',
         interaction: 'Focused interaction'
       },
       searchClues: 'Search Clues', viewReadiness: 'View Readiness', goLair: 'Go to Lair', challengeBoss: 'Challenge Boss',

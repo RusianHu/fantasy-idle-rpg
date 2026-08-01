@@ -19,6 +19,8 @@
   var latestAutoResult = null;
   var latestAutoRun = null;
   var guardExpeditionIndex = 1;
+  var guardRuntimeSequence = 0;
+  var guardAuditHealth = 0.8;
 
   Game.content.finalize({ strict: true });
   D.init();
@@ -30,6 +32,7 @@
     inv: { potions: {} }
   };
   Game.expedition = { current: function () { return { index: guardExpeditionIndex }; } };
+  Game.player = { hpPct: function () { return guardAuditHealth; } };
 
   function regionName(region) {
     return Game.i18n.t('region.' + region.id + '.name');
@@ -629,16 +632,87 @@
     return report;
   }
 
+  function guardRuntimeReset() {
+    var rid = regionSelect.value, region = Game.reg.get('region', rid);
+    if (!latest || !region) return null;
+    if (Game.encounters) Game.encounters.reset();
+    if (Game.guardSites) Game.guardSites.reset();
+    if (Game.population) Game.population.reset(rid);
+    if (Game.actors) Game.actors.reset();
+    if (Game.parties) Game.parties.reset();
+    if (Game.relations && Game.relations.reset) Game.relations.reset();
+    Game.state.world.region = rid;
+    Game.state.world.worldSeed = latest.worldSeed;
+    Game.state.world.layoutVersion = 4;
+    Game.state.world.worldTime = 100;
+    Game.state.world.guardSites = { version: 1, layoutVersion: 4, regions: {} };
+    Game.world.region = region;
+    Game.world.layout = latest;
+    Game.world.entities = [];
+    Game.world.props = [];
+    Game.world.groundLoot = [];
+    Game.world.encounterSequence = 1;
+    Game.world.encounterOrdinals = {};
+    var hero = Game.actors.spawn({
+      id: 'guard-audit:hero:' + (++guardRuntimeSequence), archetypeId: 'adventurer',
+      classId: 'fighter', level: 10, tier: Game.State.regionTier(rid),
+      factionId: 'adventurers', controllerId: 'ai:player-auto',
+      transform: { x: latest.camp.x, y: latest.camp.y + 24, direction: 'd' },
+      spawnSource: { kind: 'lab', sourceId: 'exploration-v4-guard-audit', sequence: guardRuntimeSequence }
+    });
+    hero.x = latest.camp.x; hero.y = latest.camp.y + 24;
+    Game.world.hero = hero;
+    Game.world.entities.push(hero);
+    Game.guardSites.initRegion(rid, latest);
+    return hero;
+  }
+
+  function siteForGuardKind(targetKind) {
+    var snapshots = (latest.nodes || []).concat(latest.treasureSites || [], latest.bossGatePoint || []);
+    for (var i = 0; i < snapshots.length; i++) {
+      var site = Game.guardSites.forTarget(snapshots[i]);
+      if (site && site.targetKind === targetKind && site.state !== 'cleared') return site;
+    }
+    return null;
+  }
+
+  function moveHeroTo(site) {
+    var hero = Game.world.hero;
+    hero.x = site.x; hero.y = site.y;
+    hero.components.transform.x = site.x; hero.components.transform.y = site.y;
+    return hero;
+  }
+
+  function killGuardActors(site) {
+    var ids = site.actorIds.slice();
+    ids.forEach(function (id) {
+      var actor = Game.actors.get(id);
+      if (!actor) return;
+      actor.dead = true; actor.hp = 0;
+      if (actor.components.vitals) actor.components.vitals.hp = 0;
+    });
+    // Exercise the real Population lease callback before the EventBus victory
+    // signal, matching production world.onEntityKilled ordering. Guard sites
+    // must suppress the profile's generic guardian respawn timer.
+    if (ids.length && Game.population && Game.population.onActorDefeated) {
+      Game.population.onActorDefeated(Game.actors.get(ids[0]));
+    }
+    Game.bus.emit('actor:defeated', { targetActorIds: ids });
+    return ids;
+  }
+
   function runGuardAudit(scenario) {
     if (!latest) return null;
-    if (scenario === 'expedition') guardExpeditionIndex++;
     var strategy = document.getElementById('guard-strategy').value;
     var health = Game.util.clamp(Number(document.getElementById('guard-health').value) || 0.8, 0.1, 1);
     var targetKind = document.getElementById('guard-kind').value;
     Game.state.settings.expeditionStrategy = strategy;
-    var plan = Game.guardSites.preview(regionSelect.value, latest);
-    var site = plan.filter(function (candidate) { return candidate.targetKind === targetKind; })[0];
-    if (!site) return null;
+    guardAuditHealth = health;
+    var hero = guardRuntimeReset();
+    var site = siteForGuardKind(targetKind);
+    if (!hero || !site) return null;
+    var beforeSnapshot = Game.guardSites.snapshot();
+    var initial = site.state;
     var profile = Game.content.get('guardSiteProfile', site.profileId);
     var poolId = site.mode === 'ambush' ? profile.ambushPoolId : profile.visiblePoolId;
     var resolution = Game.encounterPools.resolve(poolId, {
@@ -646,33 +720,91 @@
       expeditionIndex: guardExpeditionIndex, siteId: site.id
     });
     var threshold = Game.guardSites.autoThreshold(targetKind);
-    var initial = site.mode === 'ambush' ? 'concealed' : 'revealed';
-    var trace;
-    if (scenario === 'reload') {
-      trace = [initial, 'save-stable-state-only', Game.guardSites.contract.reloadTransientPolicy, initial];
-    } else if (scenario === 'expedition') {
-      trace = ['expedition-reset', initial, 'target-rearmed'];
-    } else if (health < threshold) {
-      trace = [initial, 'health-blocked', 'return-camp', 'recover', 'retry'];
-    } else if (scenario === 'retreat') {
-      trace = [initial, 'revealed', 'engaged'].concat(Game.guardSites.contract.retreat);
-    } else {
-      trace = [initial, 'revealed', 'engaged'].concat(Game.guardSites.contract.victory, ['target-revalidated', 'interaction-resumed']);
-    }
-    var report = {
-      productionModules: ['terrain_v4', 'guard_sites.preview', 'encounter_pools.resolve'],
+    var autoEligible = Game.guardSites.autoEligible(site);
+    var result = {
+      productionModules: ['terrain_v4', 'actors', 'population.materialize', 'encounters',
+        'world.startEncounter', 'guard_sites'],
       scenario: scenario || 'victory', strategy: strategy, health: health, threshold: threshold,
-      eligible: health >= threshold, expeditionIndex: guardExpeditionIndex,
-      site: site, poolId: poolId, resolution: resolution,
-      hiddenInformation: initial === 'concealed' ? 'not exposed to auto target metadata' : 'visible',
-      trace: trace, contract: Game.guardSites.contract
+      autoEligible: autoEligible, expeditionIndex: guardExpeditionIndex, siteId: site.id,
+      initialState: initial, poolId: poolId, resolution: resolution,
+      concealedExposed: initial === 'concealed' &&
+        beforeSnapshot.some(function (candidate) { return candidate.id === site.id; }),
+      contract: Game.guardSites.contract
     };
-    document.getElementById('guard-audit-report').textContent = JSON.stringify(report, null, 2);
-    var scenarioStatus = scenario === 'expedition' ? 'PASS RESET' :
-      (scenario === 'reload' ? 'PASS RELOAD' : (report.eligible ? 'PASS' : 'CAMP RECOVERY'));
+    if (!autoEligible) {
+      result.outcome = 'health-blocked';
+      result.state = Game.guardSites.forTarget(site.targetId).state;
+    } else if (scenario === 'expedition') {
+      guardExpeditionIndex++;
+      Game.guardSites.resetExpedition(regionSelect.value);
+      var rearmed = siteForGuardKind(targetKind);
+      result.outcome = 'expedition-reset';
+      result.expeditionIndex = guardExpeditionIndex;
+      result.state = rearmed && rearmed.state;
+      result.canInteract = rearmed && Game.guardSites.canInteract(rearmed.targetId);
+    } else {
+      moveHeroTo(site);
+      result.triggered = Game.guardSites.trigger(site, { targetId: site.targetId, reason: 'lab-' + scenario });
+      var engaged = Game.guardSites.forTarget(site.targetId);
+      result.afterTrigger = engaged && { state: engaged.state, encounterId: engaged.encounterId,
+        actorIds: engaged.actorIds.slice(), spawnId: engaged.spawnId };
+      if (scenario === 'retreat' || scenario === 'defeat') {
+        Game.encounters.end(engaged.encounterId,
+          scenario === 'defeat' ? 'party-defeated' : 'escape');
+        Game.state.world.worldTime += 3;
+        Game.guardSites.update();
+        var restored = Game.guardSites.forTarget(site.targetId);
+        result.outcome = scenario === 'defeat' ? 'party-defeated-and-rearmed' : 'retreated-and-rearmed';
+        result.state = restored && restored.state;
+        result.actorCount = restored && restored.actorIds.length;
+        result.canInteract = restored && Game.guardSites.canInteract(restored.targetId);
+      } else if (scenario === 'reload') {
+        var persisted = JSON.parse(JSON.stringify(Game.state.world.guardSites));
+        Game.encounters.end(engaged.encounterId, 'lab-reload');
+        Game.guardSites.reset();
+        Game.population.reset(regionSelect.value);
+        Game.world.entities = [hero];
+        Game.state.world.guardSites = persisted;
+        Game.guardSites.initRegion(regionSelect.value, latest);
+        var restoredAfterLoad = Game.guardSites.forTarget(site.targetId);
+        result.outcome = 'save-and-reload';
+        result.persisted = persisted;
+        result.state = restoredAfterLoad && restoredAfterLoad.state;
+        result.actorCount = restoredAfterLoad && restoredAfterLoad.actorIds.length;
+      } else {
+        var actorIds = killGuardActors(engaged);
+        var encounterEnded = Game.encounters.end(engaged.encounterId, 'victory', {
+          done: true, status: 'success', reason: 'victory'
+        });
+        Game.state.world.worldTime += 121;
+        var postVictoryPopulation = Game.population && Game.population.update
+          ? Game.population.update(121, Game.state.world.worldTime) : { spawned: [] };
+        Game.guardSites.update();
+        var cleared = Game.guardSites.forTarget(site.targetId);
+        result.outcome = 'victory';
+        result.defeatedActorIds = actorIds;
+        result.encounterEnded = encounterEnded;
+        result.postVictoryWorldTime = Game.state.world.worldTime;
+        result.postVictorySpawned = (postVictoryPopulation.spawned || []).map(function (spawn) {
+          return spawn.lease && spawn.lease.spawnId;
+        });
+        result.state = cleared && cleared.state;
+        result.canInteract = cleared && Game.guardSites.canInteract(cleared.targetId);
+        result.resumeTargetId = Game.guardSites.consumeResumeTargetId();
+      }
+    }
+    result.passed = result.outcome === 'health-blocked' ||
+      (result.outcome === 'victory' && result.state === 'cleared' && result.canInteract &&
+        result.postVictorySpawned && result.postVictorySpawned.length === 0) ||
+      ((result.outcome === 'party-defeated-and-rearmed' || result.outcome === 'retreated-and-rearmed') &&
+        result.state === 'revealed' && result.actorCount > 0 && !result.canInteract) ||
+      (result.outcome === 'save-and-reload' && result.state === 'revealed' && result.actorCount > 0) ||
+      (result.outcome === 'expedition-reset' && result.state !== 'cleared' && !result.canInteract);
+    document.getElementById('guard-audit-report').textContent = JSON.stringify(result, null, 2);
     document.getElementById('guard-audit-status').textContent =
-      scenarioStatus + ' · E' + guardExpeditionIndex + ' · ' + site.id;
-    return report;
+      (result.outcome === 'health-blocked' ? 'CAMP RECOVERY' : (result.passed ? 'PASS' : 'FAIL')) +
+      ' · E' + result.expeditionIndex + ' · ' + site.id;
+    return result;
   }
 
   function auditSeeds() {

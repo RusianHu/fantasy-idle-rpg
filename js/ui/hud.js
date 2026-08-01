@@ -397,8 +397,10 @@
           strategy: t('explore.strategy.' + strategy)
         }));
         els.expeditionIntentLabel.textContent = t('explore.aiIntent');
+        var intentDistance = intent.distance > 1
+          ? t('explore.distanceMeters', { n: Math.round(intent.distance) }) : '';
         els.expeditionIntentTarget.textContent = t('explore.intent.' + (intent.id || 'idle')) +
-          (intent.distance > 1 ? ' · ' + Math.round(intent.distance) + 'm' : '');
+          (intentDistance ? ' · ' + intentDistance : '');
         els.expeditionReadinessLabel.textContent = t('explore.readiness');
         els.expeditionReadinessValue.textContent = readiness.total + '/100';
         els.expeditionReadinessValue.classList.toggle('ready', readiness.total >= 70 && readiness.lair);

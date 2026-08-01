@@ -237,16 +237,17 @@
     return nearest(urgent, hero);
   }
 
-  function interactionIntent(order) {
+  function interactionIntent(order, reason) {
     var target = order && order.target;
-    var id = order && order.type === 'chest' ? 'chest' :
+    var id = order && order.type === 'chest'
+      ? (order.phase === 'act' ? 'chest' : 'chest-approach') :
       (order && order.type === 'gather' ? 'gather' : 'loot');
     return {
       id: id,
       target: target || null,
       distance: target ? U.dist(Game.world.hero.x, Game.world.hero.y, target.x, target.y) : 0,
       danger: target ? Game.terrain.dangerAt(target.x, target.y) : 0,
-      reason: order && order.explicit ? 'player' : 'ambient'
+      reason: reason || (order && order.explicit ? 'player' : 'ambient')
     };
   }
 
@@ -405,9 +406,7 @@
     if (guardResume) {
       if (Game.world.startInteraction({ type: guardResume.type, target: guardResume.target }, false)) {
         Game.guardSites.consumeResumeTargetId();
-        return emitIntent({ id: guardResume.type, target: guardResume.target,
-          distance: guardResume.distance, danger: Game.terrain.dangerAt(guardResume.target.x, guardResume.target.y),
-          reason: 'guard-resume' });
+        return emitIntent(interactionIntent(hero.interactOrder, 'guard-resume'));
       }
       if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
         distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
@@ -472,9 +471,7 @@
     var nestTreasure = strategy() === 'loot' ? nestTreasureTarget(hero) : null;
     if (nestTreasure) {
       if (Game.world.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) {
-        return emitIntent({ id: 'chest', target: nestTreasure.target,
-          distance: nestTreasure.distance, danger: Game.terrain.dangerAt(nestTreasure.target.x, nestTreasure.target.y),
-          reason: 'nest-priority' });
+        return emitIntent(interactionIntent(hero.interactOrder, 'nest-priority'));
       }
       if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
         distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
@@ -491,9 +488,7 @@
     nestTreasure = nestTreasureTarget(hero);
     if (nestTreasure) {
       if (Game.world.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) {
-        return emitIntent({ id: 'chest', target: nestTreasure.target,
-          distance: nestTreasure.distance, danger: Game.terrain.dangerAt(nestTreasure.target.x, nestTreasure.target.y),
-          reason: 'nest' });
+        return emitIntent(interactionIntent(hero.interactOrder, 'nest'));
       }
       if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
         distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });

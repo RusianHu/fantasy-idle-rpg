@@ -78,6 +78,53 @@ assert.equal(Game.nav.diagnostics.invalidated, 1);
 const productionWorld = Game.world;
 const originalPlayer = Game.player;
 
+for (const locale of ['zh-CN', 'en']) {
+  for (const id of [
+    'idle', 'survival', 'combat', 'player-order', 'loot', 'frontier',
+    'discovery', 'gather', 'guardian', 'boss', 'circuit', 'camp',
+    'interaction', 'chest-approach', 'chest'
+  ]) {
+    assert.equal(Game.i18n.has(locale, `explore.intent.${id}`), true,
+      `${locale} must translate production expedition intent ${id}`);
+  }
+}
+assert.equal(Game.i18n.raw('zh-CN', 'explore.intent.chest-approach'), '前往宝藏');
+assert.equal(Game.i18n.raw('en', 'explore.intent.chest-approach'), 'Heading to treasure');
+assert.equal(Game.i18n.raw('zh-CN', 'explore.intent.chest'), '开启宝箱');
+assert.equal(Game.i18n.raw('en', 'explore.intent.chest'), 'Opening chest');
+assert.equal(Game.i18n.raw('zh-CN', 'explore.distanceMeters'), '{n} 米');
+assert.equal(Game.i18n.raw('en', 'explore.distanceMeters'), '{n} m');
+
+const distantChest = { id: 'treasure:intent-phase', x: 1074, y: 100 };
+const chestIntentHero = {
+  x: 100, y: 100, hp: 100, maxHp: 100,
+  state: 'walk', target: null, moveOrder: null,
+  interactOrder: { type: 'chest', target: distantChest, phase: null },
+  navRoute: null, manualTarget: false
+};
+Game.world = {
+  hero: chestIntentHero,
+  layout: { version: 4, nodes: [], camp: { x: 0, y: 0 } },
+  entities: [], groundLoot: [], bossEnt: null,
+  controlMode: () => 'auto',
+  contactThreat: () => null,
+  cancelInteraction: () => false
+};
+Game.player = { hpPct: () => 1 };
+Game.state.world.mode = 'battle';
+Game.expeditionAI.reset();
+Game.expeditionAI.update(chestIntentHero, 0);
+assert.equal(Game.expeditionAI.intent().id, 'chest-approach',
+  'a distant chest order reports travel, not an action already in progress');
+assert.equal(Game.expeditionAI.intent().distance, 974);
+chestIntentHero.interactOrder.phase = 'act';
+Game.expeditionAI.update(chestIntentHero, 0);
+assert.equal(Game.expeditionAI.intent().id, 'chest',
+  'the opening intent begins only after the interaction reaches its action phase');
+Game.world = productionWorld;
+Game.player = originalPlayer;
+Game.expeditionAI.reset();
+
 function runWatchdogSimulation({ fps, terrainCost, moving }) {
   const target = { id: `node:watchdog:${fps}:${terrainCost}`, x: 120, y: 100 };
   const hero = {
@@ -218,6 +265,7 @@ Game.player = originalPlayer;
 const ambientSnapshot = {
   hero: productionWorld.hero,
   layout: productionWorld.layout,
+  region: productionWorld.region,
   entities: productionWorld.entities,
   groundLoot: productionWorld.groundLoot,
   bossEnt: productionWorld.bossEnt
@@ -238,6 +286,7 @@ chests.length = 0;
 chests.push(blockedChest, availableChest);
 productionWorld.hero = ambientHero;
 productionWorld.layout = { version: 2, nodes: [], camp: { x: 0, y: 0 } };
+productionWorld.region = { world: { w: 1400, h: 800 } };
 productionWorld.entities = [];
 productionWorld.groundLoot = [];
 productionWorld.bossEnt = null;
@@ -275,12 +324,39 @@ assert.equal(productionWorld.startInteraction({
 }, true), true, 'an explicit player interaction may retry a blocked target');
 productionWorld.cancelInteraction('test');
 
+const farChest = {
+  id: 'chest:far-phase', x: 1100, y: 100, age: 0, ttl: 30,
+  rare: false, phase: 0
+};
+chests.length = 0;
+chests.push(farChest);
+ambientHero.x = 100;
+ambientHero.y = 100;
+ambientHero.state = 'idle';
+assert.equal(productionWorld.startInteraction({
+  type: 'chest', target: farChest
+}, false), true);
+productionWorld.updateInteraction(ambientHero, 0.25);
+assert.equal(ambientHero.interactOrder.phase, undefined,
+  'a far chest order remains in approach phase');
+assert.equal(ambientHero.state, 'walk');
+assert.equal(chests.includes(farChest), true,
+  'a distant chest cannot be claimed before entering interaction reach');
+ambientHero.x = farChest.x - 20;
+ambientHero.y = farChest.y;
+productionWorld.updateInteraction(ambientHero, 0);
+assert.equal(ambientHero.interactOrder.phase, 'act',
+  'chest action phase begins only inside the 26px interaction reach');
+assert.equal(ambientHero.state, 'opening');
+productionWorld.cancelInteraction('test');
+
 Game.state.world.worldTime += 31;
 assert.equal(Game.expeditionAI.isTargetBlocked(persistentTarget.id), false,
   'temporary target block must expire');
 chests.length = 0;
 productionWorld.hero = ambientSnapshot.hero;
 productionWorld.layout = ambientSnapshot.layout;
+productionWorld.region = ambientSnapshot.region;
 productionWorld.entities = ambientSnapshot.entities;
 productionWorld.groundLoot = ambientSnapshot.groundLoot;
 productionWorld.bossEnt = ambientSnapshot.bossEnt;

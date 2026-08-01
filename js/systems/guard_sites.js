@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   var Game = window.Game, U = Game.util, C = Game.contentCompiler;
-  var regionId = null, layout = null, sites = [], byId = {}, byTarget = {};
+  var regionId = null, layout = null, sites = [], byId = {}, byTarget = {}, actorSiteIds = {};
   var pendingResumeTargetId = null;
   var HEALTH = {
     safe: { resource: 0.8, nestTreasure: 0.9, bossGate: 0.9 },
@@ -145,6 +145,8 @@
     site.spawnId = result.lease.spawnId;
     site.actorIds = result.actors.map(function (actor) {
       actor.guardSiteId = site.id;
+      actor.populationRespawnManaged = false;
+      actorSiteIds[actor.id] = site.id;
       actor.guardian = site.targetKind === 'bossGate';
       actor.territory = { id: site.id, x: site.x, y: site.y,
         radius: site.targetKind === 'bossGate' ? 168 : 118 };
@@ -212,6 +214,7 @@
     if (!site || site.state === 'cleared') return false;
     unregisterHazard(site);
     site.state = 'cleared'; site.encounterId = null; site.rearmAt = 0;
+    site.actorIds = []; site.spawnId = null;
     pendingResumeTargetId = site.resumeTargetId || null;
     remember(saved(regionId).clearedIds, site.id);
     if (site.targetKind === 'bossGate' && Game.collection) {
@@ -224,7 +227,7 @@
     return true;
   }
   function initialize(rid, nextLayout) {
-    regionId = rid; layout = nextLayout; sites = []; byId = {}; byTarget = {};
+    regionId = rid; layout = nextLayout; sites = []; byId = {}; byTarget = {}; actorSiteIds = {};
     pendingResumeTargetId = null;
     if (!layout || layout.version < 4) return [];
     var state = saved(rid);
@@ -325,13 +328,14 @@
       if (rid === regionId && Game.world && Game.world.layout) return initialize(rid, Game.world.layout);
       return true;
     },
-    reset: function () { regionId = null; layout = null; sites = []; byId = {}; byTarget = {}; pendingResumeTargetId = null; }
+    reset: function () { regionId = null; layout = null; sites = []; byId = {}; byTarget = {}; actorSiteIds = {}; pendingResumeTargetId = null; }
   };
 
   Game.bus.on('actor:defeated', function (event) {
     var ids = event && event.targetActorIds || [];
     ids.forEach(function (id) {
-      var actor = Game.actors && Game.actors.get(id), site = actor && byId[actor.guardSiteId];
+      var actor = Game.actors && Game.actors.get(id);
+      var site = byId[actor && actor.guardSiteId || actorSiteIds[id]];
       if (!site || site.state === 'cleared') return;
       var alive = site.actorIds.some(function (actorId) {
         var member = Game.actors.get(actorId);
@@ -342,8 +346,13 @@
   });
   Game.bus.on('encounter:ended', function (event) {
     var encounterId = event && event.encounterId;
+    var payload = event && event.payload || {};
     sites.forEach(function (site) {
       if (site.encounterId !== encounterId || site.state === 'cleared') return;
+      if (payload.reason === 'victory' || payload.status === 'success') {
+        clearSite(site, 'victory');
+        return;
+      }
       site.encounterId = null; site.state = 'revealed';
       if (site.spawnId) Game.population.close(site.spawnId, 'guard-reset', { despawn: true });
       site.actorIds = []; site.spawnId = null; site.rearmAt = Game.state.world.worldTime + 2;

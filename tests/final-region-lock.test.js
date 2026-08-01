@@ -101,6 +101,8 @@ function makeWorldHarness(options = {}) {
   const events = [];
   let deathOptions = null;
   let lockCalls = 0;
+  let bossGateCleared = options.bossGateCleared !== false;
+  const explorationState = { bossRetryAt: 0 };
   const progress = {
     kills: options.kills || 0,
     cleared: !!options.cleared,
@@ -115,7 +117,7 @@ function makeWorldHarness(options = {}) {
     bus: eventBus(events),
     reg: { get() { return null; } },
     state: {
-      settings: { controlMode: 'auto' },
+      settings: { controlMode: 'auto', autoBoss: true },
       player: { hp: 0 },
       world: {
         region: 'darkcastle',
@@ -126,7 +128,7 @@ function makeWorldHarness(options = {}) {
       },
       meta: { stats: { deaths: 0 } }
     },
-    State: { regionProg: () => progress },
+    State: { regionProg: () => progress, regionTier: () => 8 },
     prog: {
       isFinalRegion: (rid) => rid === 'darkcastle',
       lockFinalRegion(rid) {
@@ -145,6 +147,20 @@ function makeWorldHarness(options = {}) {
       }
     },
     nav: { clear() {} },
+    player: { hpPct: () => 1 },
+    exploration: {
+      readiness: () => ({ lair: true, total: 100 }),
+      regionState: () => explorationState
+    },
+    guardSites: { isBossGateCleared: () => bossGateCleared },
+    population: {
+      mountChannel() {
+        const boss = { id: 'boss-retry', mid: 'demon_lord', spawnId: 'boss-retry-spawn' };
+        return [{ primary: boss, actors: [boss] }];
+      },
+      close() {}
+    },
+    actors: { despawn() {} },
     inv: { commitDrop() {} },
     fx: null,
     environment: null,
@@ -178,7 +194,11 @@ function makeWorldHarness(options = {}) {
     killTarget: 10,
     world: { w: 900, h: 520 }
   };
-  Game.world.layout = { camp: { x: 100, y: 240 } };
+  Game.world.layout = {
+    version: options.layoutVersion || 3,
+    camp: { x: 100, y: 240 },
+    bossPoint: { x: 300, y: 220 }
+  };
   Game.world.hero = hero;
   Game.world.entities = [hero];
   Game.world.groundLoot = [];
@@ -187,7 +207,9 @@ function makeWorldHarness(options = {}) {
     progress,
     events,
     deathOptions: () => deathOptions,
-    lockCalls: () => lockCalls
+    lockCalls: () => lockCalls,
+    explorationState,
+    setBossGateCleared(value) { bossGateCleared = value; }
   };
 }
 
@@ -235,7 +257,24 @@ function makeWorldHarness(options = {}) {
   ));
 }
 
+{
+  const retry = makeWorldHarness({ kills: 10, layoutVersion: 4, bossGateCleared: false });
+  retry.Game.world.bossEnt = { id: 'failed-boss', mid: 'demon_lord' };
+  retry.Game.world.onBossFailed('defeat');
+  assert.equal(retry.explorationState.bossRetryAt, 160,
+    'boss failure schedules an exact 60-second retry delay');
+  retry.Game.state.world.worldTime = 159.999;
+  assert.equal(retry.Game.world.trySpawnBoss({ manual: true }), false,
+    'the failed Boss cannot respawn before the retry deadline');
+  retry.Game.state.world.worldTime = 160;
+  assert.equal(retry.Game.world.trySpawnBoss({ manual: true }), false,
+    'an uncleared v4 Boss gate still blocks retry after the timer expires');
+  retry.setBossGateCleared(true);
+  assert.equal(retry.Game.world.trySpawnBoss({ manual: true }), true,
+    'the Boss may retry exactly at the deadline once its v4 gate guard is cleared');
+}
+
 console.log(
-  'Final-region lock tests passed: defeat fallback, persistent relock, boss retry unlock, ' +
+  'Final-region lock tests passed: defeat fallback, persistent relock, 60-second gated Boss retry, ' +
   'first-kill preservation and voluntary-retreat exclusion.'
 );

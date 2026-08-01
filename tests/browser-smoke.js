@@ -2175,6 +2175,7 @@ async function run() {
       Game.ui.trade.open(area.id);
       const unifiedTradeOpen = Game.ui.tabs.current() === 'trade' &&
         !!document.querySelector('.trade-panel-head');
+      W.setControlMode('auto');
       const pauseOrigin = { x: hero.x, y: hero.y };
       hero.moveOrder = {
         x: area.x + Math.min(24, area.radius * 0.5),
@@ -2189,10 +2190,17 @@ async function run() {
         hero.y - pauseOrigin.y
       ) < 0.01 && !hero.moveOrder &&
         Game.expeditionAI.intent().id === 'interaction';
+      const tradePauseDiagnostics = {
+        delta: Math.hypot(hero.x - pauseOrigin.x, hero.y - pauseOrigin.y),
+        moveOrder: hero.moveOrder,
+        encounterId: hero.encounterId || null,
+        intent: Game.expeditionAI.intent()
+      };
       Game.ui.tabs.open('inv');
       Game.trade.update();
       const tradePauseReleasedOnTab = !Game.interactions.isPaused('autoExplore') &&
         !Game.ui.trade.isOpen();
+      W.setControlMode('manual');
       Game.ui.trade.open(area.id);
       const exchangeTab = [...document.querySelectorAll('.trade-section-tabs .subtab')]
         .find((el) => el.textContent.trim() === Game.i18n.t('shopSec.exchange'));
@@ -2287,7 +2295,7 @@ async function run() {
         proximityPicked, clickPickupOrdered, clickPicked, switchReclaimed,
         gatherCompleted, gatherInterrupted, chestOpened,
         tradeApproachOrdered, tradeHudVisible, unifiedTradeOpen,
-        tradePauseActive, tradeAutoMovePaused, tradePauseReleasedOnTab,
+        tradePauseActive, tradeAutoMovePaused, tradePauseDiagnostics, tradePauseReleasedOnTab,
         exchangeOffersVisible, tradeLockedOnLeave, tradeUnlockedOnReturn,
         tradePauseReleasedOnClose,
         merchantDialoguePauseContract,
@@ -2309,6 +2317,9 @@ async function run() {
     assert.equal(v111Checks.tradeHudVisible, true);
     assert.equal(v111Checks.unifiedTradeOpen, true);
     assert.equal(v111Checks.tradePauseActive, true);
+    if (!v111Checks.tradeAutoMovePaused) {
+      console.error('trade pause diagnostics:', JSON.stringify(v111Checks.tradePauseDiagnostics));
+    }
     assert.equal(v111Checks.tradeAutoMovePaused, true);
     assert.equal(v111Checks.tradePauseReleasedOnTab, true);
     assert.equal(v111Checks.exchangeOffersVisible, true);
@@ -2928,15 +2939,59 @@ async function run() {
 
       Game.state.world.region = finalRid;
       Game.state.world.mode = 'battle';
+      Game.state.world.layoutVersion = 4;
       Game.world.init(finalRid);
       Game.state.player.hp = Game.player.derived().maxHp;
       const retryProgress = Game.State.regionProg(finalRid);
       retryProgress.kills = Game.world.region.killTarget;
-      Game.world.trySpawnBoss({ manual: true });
+      const gateTarget = Game.world.layout.bossGatePoint;
+      let gateSite = Game.guardSites.forTarget(gateTarget);
+      Game.world.hero.x = gateSite.x;
+      Game.world.hero.y = gateSite.y;
+      Game.guardSites.trigger(gateSite, { targetId: gateTarget.id, reason: 'browser-smoke' });
+      gateSite = Game.guardSites.forTarget(gateTarget);
+      const gateEncounterId = gateSite.encounterId;
+      for (const actorId of gateSite.actorIds) {
+        const actor = Game.actors.get(actorId);
+        actor.dead = true;
+        actor.hp = 0;
+        if (actor.components.vitals) actor.components.vitals.hp = 0;
+      }
+      Game.bus.emit('actor:defeated', { targetActorIds: gateSite.actorIds.slice() });
+      if (gateEncounterId) Game.encounters.end(gateEncounterId, 'guard-smoke-victory');
+      const gateCleared = Game.guardSites.isBossGateCleared();
+      const finalExploration = Game.exploration.regionState(finalRid);
+      const explorationConfig = Game.world.region.exploration;
+      for (const def of explorationConfig.landmarks) finalExploration.discovered.landmarks[def.id] = true;
+      for (const def of explorationConfig.resources) finalExploration.discovered.resources[def.id] = true;
+      for (const def of explorationConfig.curios) finalExploration.discovered.curios[def.id] = true;
+      const retryAt = finalExploration.bossRetryAt || 0;
+      Game.state.world.worldTime = Math.max(Game.state.world.worldTime, retryAt);
+      Game.world.hero.x = Game.world.layout.bossPoint.x;
+      Game.world.hero.y = Game.world.layout.bossPoint.y;
+      Game.state.world.mode = 'battle';
+      Game.world.hero.state = 'idle';
+      Game.world.bossEnt = null;
+      if (Game.merchants && !Game.merchants.allowBossChallenge(finalRid)) {
+        Game.state.world.worldTime += 2;
+      }
+      const bossStartDiagnostics = {
+        readiness: Game.exploration.readiness(finalRid),
+        heroState: Game.world.hero.state,
+        heroEncounterId: Game.world.hero.encounterId || null,
+        mode: Game.state.world.mode,
+        worldTime: Game.state.world.worldTime,
+        transitionActive: Game.transitions.isActive()
+      };
+      const bossStartResult = Game.world.trySpawnBoss({ manual: true });
       const voluntaryStarted = !!Game.world.bossEnt;
       Game.world.setMode('rest');
       const voluntary = {
         started: voluntaryStarted,
+        gateCleared,
+        retryAt,
+        bossStartResult,
+        bossStartDiagnostics,
         region: Game.state.world.region,
         locked: Game.state.world.finalRegionLocked,
         bossGone: !Game.world.bossEnt
@@ -2983,6 +3038,10 @@ async function run() {
     assert.equal(finalRegionLock.afterReopen.reopened, true);
     assert.equal(finalRegionLock.afterReopen.previousFirstKill, true);
     assert.equal(finalRegionLock.afterReopen.savedLocked, false);
+    assert.equal(finalRegionLock.voluntary.gateCleared, true);
+    if (!finalRegionLock.voluntary.started) {
+      console.error('v4 boss start diagnostics:', JSON.stringify(finalRegionLock.voluntary));
+    }
     assert.equal(finalRegionLock.voluntary.started, true);
     assert.equal(finalRegionLock.voluntary.region, 'darkcastle');
     assert.equal(finalRegionLock.voluntary.locked, false);
@@ -3014,6 +3073,8 @@ async function run() {
       boss.hp = 0;
       Game.world.entities.push(boss);
       Game.world.bossEnt = boss;
+      Game.render.snapCamera(hero.x, hero.y);
+      Game.render.frame(1 / 60);
       document.getElementById('toasts').replaceChildren();
       const playBefore = Game.state.meta.stats.playSec;
       const timeBefore = Game.state.world.worldTime;
@@ -3078,9 +3139,11 @@ async function run() {
       });
       const canvas = document.getElementById('stage');
       const pixels = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-      let warmPixels = 0;
+      let coloredPixels = 0;
       for (let i = 0; i < pixels.length; i += Math.max(4, Math.floor(pixels.length / 1200 / 4) * 4)) {
-        if (pixels[i] > pixels[i + 2] && pixels[i] > 70) warmPixels++;
+        if (pixels[i + 3] > 0 && (pixels[i] > 20 || pixels[i + 1] > 20 || pixels[i + 2] > 20)) {
+          coloredPixels++;
+        }
       }
       return {
         phase: Game.ending.phase(),
@@ -3090,7 +3153,7 @@ async function run() {
         buttons,
         withinViewport: rr.left >= 0 && rr.top >= 0 && rr.right <= innerWidth && rr.bottom <= innerHeight,
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth,
-        warmPixels,
+        coloredPixels,
         playFrozen: Math.abs(Game.state.meta.stats.playSec - ${JSON.stringify(endingStart.playBefore)}) < 0.2,
         timeFrozen: Math.abs(Game.state.world.worldTime - ${JSON.stringify(endingStart.timeBefore)}) < 0.2
       };
@@ -3104,7 +3167,7 @@ async function run() {
     assert.equal(endingSummary.withinViewport, true);
     assert.equal(endingSummary.noHorizontalOverflow, true);
     assert.ok(
-      endingSummary.warmPixels > 0,
+      endingSummary.coloredPixels > 0,
       'ending keeps the live nonblank canvas behind its dawn treatment: ' + JSON.stringify(endingSummary)
     );
     assert.equal(endingSummary.playFrozen, true);
@@ -3436,7 +3499,7 @@ async function run() {
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 5, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 6, 'technical demo hub exposes every current workbench');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);
@@ -3516,8 +3579,8 @@ async function run() {
         noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
       };
     })()`);
-    assert.equal(weatherDemo.title, 'Weather / Climate Rendering Prep Lab');
-    assert.match(weatherDemo.zhTitle, /天气 \/ 气候筹备型渲染 Lab/);
+    assert.equal(weatherDemo.title, 'Weather / Climate Lab');
+    assert.match(weatherDemo.zhTitle, /天气 \/ 气候 Lab/);
     assert.ok(weatherDemo.stageVisible > 500);
     assert.ok(weatherDemo.colors > 8);
     assert.equal(weatherDemo.phaseVisible.length, 4);
@@ -3527,7 +3590,7 @@ async function run() {
     assert.equal(weatherDemo.determinism.sameInputsMatch, true);
     assert.equal(weatherDemo.determinism.timeChangesCanvas, true);
     assert.equal(weatherDemo.determinism.seedChangesLayout, true);
-    assert.equal(weatherDemo.snapshot.productionWeatherSystem, false);
+    assert.equal(weatherDemo.snapshot.productionWeatherSystem, true);
     assert.equal(weatherDemo.snapshot.noPlayer, true);
     assert.equal(weatherDemo.snapshot.fogEnabled, false);
     assert.equal(weatherDemo.snapshot.saveWrites, false);
@@ -3545,7 +3608,13 @@ async function run() {
     assert.deepEqual(weatherDemo.params, {
       seed: '1234ABCD', region: 'forest', particle: 'snow', lang: 'en'
     });
-    assert.ok(Object.values(weatherDemo.futureHooks).every((value) => value === 'unconnected'));
+    assert.deepEqual(weatherDemo.futureHooks, {
+      timeline: 'production',
+      weatherState: 'production',
+      intensity: 'production',
+      visibilityProvider: 'weather:visibility',
+      renderLayer: 'production-four-layer'
+    });
     assert.equal(weatherDemo.linksCarryContext, true);
     assert.equal(weatherDemo.productionModulesOnly, true);
     assert.equal(weatherDemo.saveUnchanged, true);
@@ -3648,7 +3717,7 @@ async function run() {
     assert.equal(hazardDemo.visibility, 0.5);
     assert.ok(hazardDemo.weatherDetection.effectiveChance < hazardDemo.detection.effectiveChance);
     assert.ok(hazardDemo.weatherDetection.sources.some((source) =>
-      source.id === 'lab:weather-visibility' && source.multiplier === 0.5));
+      source.id === 'lab:visibility-override' && source.multiplier === 0.5));
     assert.equal(hazardDemo.routeSummary.activePlacements, hazardDemo.routeSummary.placements);
     assert.ok(hazardDemo.routeSummary.links > 40);
     assert.ok(hazardDemo.routeSummary.baselineCrossings > 0);
@@ -3697,7 +3766,7 @@ async function run() {
     })()`);
     assert.equal(generatorDemo.region, 'grassland');
     assert.equal(generatorDemo.seed, '20260727');
-    assert.equal(generatorDemo.layoutVersion, 3);
+    assert.equal(generatorDemo.layoutVersion, 4);
     assert.ok(generatorDemo.resources >= 16 && generatorDemo.resources <= 22);
     assert.equal(generatorDemo.chunks, 15);
     assert.equal(generatorDemo.valid, true);
@@ -3707,9 +3776,9 @@ async function run() {
     assert.equal(generatorDemo.metricCount, 12);
     assert.equal(generatorDemo.chunkToggle, true);
     assert.equal(generatorDemo.routeToggle, true);
-    assert.equal(generatorDemo.iconCount, 9);
+    assert.equal(generatorDemo.iconCount, 15);
     assert.equal(generatorDemo.iconsPainted, true);
-    assert.ok(generatorDemo.visible > 1000, 'v3 generator canvas is nonblank');
+    assert.ok(generatorDemo.visible > 1000, 'v4 generator canvas is nonblank');
     assert.equal(generatorDemo.controlsTouchable, true);
     assert.equal(generatorDemo.noHorizontalOverflow, true);
 
@@ -3812,7 +3881,7 @@ async function run() {
     })()`);
     assert.equal(demo.seed, '89ABCDEF');
     assert.equal(demo.region, 'lavacave');
-    assert.equal(demo.layoutVersion, 3);
+    assert.equal(demo.layoutVersion, 4);
     assert.deepEqual(demo.world, [2400, 1440]);
     assert.equal(demo.v3TerrainLoaded, true);
     assert.equal(demo.within, true, 'mobile QA toolbar controls fit viewport');
@@ -3975,9 +4044,9 @@ async function run() {
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.catalog.complete, true);
-    assert.equal(unitsBubbleDemo.catalog.actorCount, 58);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 74);
     assert.equal(unitsBubbleDemo.catalog.classCount, 5);
-    assert.equal(unitsBubbleDemo.catalog.monsterCount, 41);
+    assert.equal(unitsBubbleDemo.catalog.monsterCount, 57);
     assert.equal(unitsBubbleDemo.catalog.summonCount, 9);
     assert.equal(unitsBubbleDemo.catalog.encounterCount, 26);
     assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);

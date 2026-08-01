@@ -11,6 +11,7 @@ select { min-width: 44px; }
 button { padding: 7px 11px; cursor: pointer; }
 button:hover, button.active { border-color: var(--gold); color: var(--gold); }
 a { color: var(--gold); }
+header nav a { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; padding: 8px 4px; }
 .lab-shell { width: min(1500px, 100%); margin: auto; padding: 16px; }
 header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 12px; }
 header p { margin: 0; color: var(--gold); font-size: 11px; letter-spacing: .12em; }
@@ -22,6 +23,7 @@ header label, .setup label, .tools label, .inspector label, .catalog label, .run
 }
 .setup select, .setup input, .tools select, .inspector select, .catalog select,
 .runtime-toolbar select { width: 100%; min-width: 0; }
+#speed { width: 52px; min-width: 52px; }
 .panel { background: linear-gradient(180deg, #171d37, var(--panel)); border: 1px solid var(--line); padding: 12px; box-shadow: 0 4px 0 #050711; }
 .setup, .tools { display: grid; grid-template-columns: repeat(9, minmax(100px, 1fr)); gap: 8px; align-items: end; margin-bottom: 12px; }
 .runtime-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, .8fr); gap: 12px; }

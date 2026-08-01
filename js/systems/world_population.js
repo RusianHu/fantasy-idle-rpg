@@ -807,7 +807,8 @@
         slotRuntime[lease.slotId].spawnId = null;
       }
       var profile = Game.content.get('worldSpawnProfile', lease.profileId);
-      if (profile && (options.scheduleRespawn || reason === 'defeated' || reason === 'escaped')) {
+      if (profile && options.scheduleRespawn !== false &&
+          (options.scheduleRespawn || reason === 'defeated' || reason === 'escaped')) {
         scheduleRespawn(lease, profile, reason, options);
       }
       return true;
@@ -821,7 +822,8 @@
         return !member || member.dead || member.hp <= 0;
       });
       if (defeated) P.close(actor.spawnId, 'defeated', {
-        delay: lease.context && lease.context.threat && lease.context.threat.respawn
+        delay: lease.context && lease.context.threat && lease.context.threat.respawn,
+        scheduleRespawn: actor.populationRespawnManaged !== false
       });
       return defeated ? lease : null;
     },
@@ -829,7 +831,10 @@
     onActorEscaped: function (actor) {
       if (!actor || !actor.spawnId || !leases[actor.spawnId]) return null;
       var lease = leases[actor.spawnId];
-      P.close(actor.spawnId, 'escaped', { despawn: true });
+      P.close(actor.spawnId, 'escaped', {
+        despawn: true,
+        scheduleRespawn: actor.populationRespawnManaged !== false
+      });
       return lease;
     },
 

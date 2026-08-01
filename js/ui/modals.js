@@ -50,6 +50,7 @@
 
       /* ---- 事件驱动的 Toast ---- */
       var t = function (k, v) { return Game.i18n.t(k, v); };
+      var fmt = function (value) { return Game.i18n.fmtNum(value); };
       var lastLevelToast = 0;
 
       bus.on('player:levelup', function (p) {

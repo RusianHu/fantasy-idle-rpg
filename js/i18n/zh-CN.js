@@ -619,11 +619,13 @@
       strategy: { safe: '安全', balanced: '均衡', loot: '掠夺' },
       strategyAria: '当前自动远征策略：{strategy}，点击切换',
       aiIntent: 'AI 意图',
+      distanceMeters: '{n} 米',
       intent: {
         idle: '观察环境', survival: '生存回营', combat: '接敌战斗',
         'player-order': '执行指令', loot: '回收掉落', frontier: '探索未知',
         discovery: '调查记录', gather: '采集资源', guardian: '讨伐精英',
         boss: '前往巢穴', circuit: '采集巡回', camp: '返回营地',
+        'chest-approach': '前往宝藏', chest: '开启宝箱',
         interaction: '专注互动'
       },
       searchClues: '搜寻线索', viewReadiness: '查看准备', goLair: '前往巢穴', challengeBoss: '挑战 Boss',
