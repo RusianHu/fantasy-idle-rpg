@@ -12,5 +12,6 @@
 - JSON 报告包含本次布局版本、尝试/修复/回退、完整结构指标与稳定内容 ID。
 - 「批量审计 32 种子」对当前区域连续执行生成、结构验证与营地—巢穴完整长途寻路，并分别汇报布局和路径失败数；「批量评估 32 种子」另执行每种子的 4 个正常中断和 2 组修复前/修复后失败缓存对照，仅将带目标触发、fallback 观测和特定终态的旧行为计为有效复现，单次共 256 条自动模式路线。
 - v4 守卫面板选择资源/巢穴/Boss 门卫、显形/伏击、三种自动策略和当前生命比例，直接调用生产 `autoEligible()` 并显示池解析、Actor/SpawnLease/Encounter 与 `resume-target`；Boss 胜利会结束真实 Encounter、调用真实 Population 击败回调并推进 121 秒，只有 `cleared + postVictorySpawned:[]` 才显示 PASS。主动撤退、团灭、读档和换远征分别验证守卫重整、瞬态丢弃与清轮边界。
+- 永久宝藏决策审计直接复用生产 `Game.expeditionAI`、`worldTreasures` 与迷雾 `isRevealed`，在确定性 v4 布局上对隐藏、近场（120px）和远场（1197px）三种永久宝藏场景断言：未揭雾宝藏不改道、近场已揭雾宝藏触发 `chest-approach` 绕行、远场已揭雾宝藏保留前沿航段；事件与决策以中英文标签呈现。
 
 完整验收以 `tests/terrain-v4.test.js` 的八区 1,600 张 v4 布局、5,000 个快速种子和独立黄金摘要，`tests/guard-sites-v4.test.js` 的守卫事务矩阵，以及既有 v3、长途导航和自动中断回归为准。

@@ -761,6 +761,13 @@
         if (!gatherTarget || !Game.exploration.isRevealed(gatherTarget.x, gatherTarget.y)) return false;
         if (!explicit && (!Game.environment || !Game.environment.autoNodeReady(gatherTarget))) return false;
       }
+      // 永久宝藏（巢穴固定箱）必须已揭雾；未发现的宝藏永远不能成为交互或导航
+      // 目标。校验失败时直接返回，不建立 interactOrder、不清除 moveOrder 与导航，
+      // 避免覆盖正在执行的前沿/发现航段。手动点击同样要求已揭雾。
+      if (order.type === 'chest' && order.target && order.target.fixedNestChest &&
+          Game.exploration && !Game.exploration.isRevealed(order.target.x, order.target.y)) {
+        return false;
+      }
       hero.interactOrder = order;
       hero.moveOrder = null;
       hero.manualTarget = false;
@@ -907,13 +914,19 @@
           if (W.startInteraction({ type: 'chest', target: chest.target }, false)) return true;
         }
       }
-      var nestTreasure = Game.worldTreasures && Game.worldTreasures.nearest(
-        hero.x, hero.y, allowed
-      );
-      if (nestTreasure && (W.controlMode() === 'auto' || nestTreasure.distance <= 26)) {
-        var site = Game.guardSites && Game.guardSites.forTarget(nestTreasure.target);
-        if (!site || Game.guardSites.autoEligible(site)) {
-          if (W.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) return true;
+      // 永久宝藏（巢穴固定箱）由 expeditionAI 统一决策：自动模式下不再在此
+      // 扫描全图 worldTreasures，避免覆盖刚建立的前沿/发现航段（曾经会把约
+      // 1197px 外的未揭雾宝藏选为目标并清除原路线）。手动模式保留 26px 邻近
+      // 辅助交互，目标仍须通过 startInteraction 的揭雾与守卫校验。
+      if (W.controlMode() !== 'auto') {
+        var nestTreasure = Game.worldTreasures && Game.worldTreasures.nearest(
+          hero.x, hero.y, allowed
+        );
+        if (nestTreasure && nestTreasure.distance <= 26) {
+          var site = Game.guardSites && Game.guardSites.forTarget(nestTreasure.target);
+          if (!site || Game.guardSites.autoEligible(site)) {
+            if (W.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) return true;
+          }
         }
       }
       if (W.controlMode() === 'auto' && Game.environment) {

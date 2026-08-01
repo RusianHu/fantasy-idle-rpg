@@ -866,10 +866,53 @@
     });
   }
 
+  function runTreasureAuditUI() {
+    if (!latest) return;
+    var status = document.getElementById('treasure-audit-status');
+    var report = document.getElementById('treasure-audit-report');
+    var casesEl = document.getElementById('treasure-cases');
+    status.textContent = D.t('explore.treasureRunning');
+    status.setAttribute('data-state', 'running');
+    requestAnimationFrame(function () {
+      setTimeout(function () {
+        var summary;
+        try {
+          summary = Game.autoRouteAudit.runTreasureAudit(latest);
+        } finally {
+          if (latest) {
+            Game.terrain.layout = latest;
+            Game.nav.useLayout(latest);
+          }
+        }
+        var byCase = {};
+        summary.results.forEach(function (r) { byCase[r.caseId] = r; });
+        Array.prototype.forEach.call(casesEl.querySelectorAll('li[data-case]'), function (li) {
+          var caseId = li.getAttribute('data-case');
+          var out = li.querySelector('output');
+          var r = byCase[caseId];
+          if (!r) { if (out) out.textContent = '-'; return; }
+          var label = r.decision === 'frontier'
+            ? D.t('explore.treasureDecisionFrontier')
+            : (r.decision === 'chest-approach'
+              ? D.t('explore.treasureDecisionChestApproach')
+              : D.t('explore.treasureDecisionOther', { decision: r.decision }));
+          if (out) out.textContent = (r.passed ? 'PASS · ' : 'FAIL · ') + label;
+          li.setAttribute('data-state', r.passed ? 'pass' : 'fail');
+        });
+        status.textContent = D.t('explore.treasureDone',
+          { passed: summary.passed, total: summary.total });
+        status.setAttribute('data-state',
+          summary.passed === summary.total ? 'pass' : 'fail');
+        report.textContent = JSON.stringify(summary, null, 2);
+      }, 20);
+    });
+  }
+
   document.getElementById('generate').addEventListener('click', generate);
   auditButton.addEventListener('click', auditSeeds);
   runAutoButton.addEventListener('click', runAutoAudit);
   auditAutoButton.addEventListener('click', auditAutoSeeds);
+  document.getElementById('run-treasure-audit').addEventListener('click', runTreasureAuditUI);
   document.querySelector('.guard-audit').addEventListener('click', function (event) {
     var button = event.target.closest('[data-guard-audit]');
     if (button) runGuardAudit(button.getAttribute('data-guard-audit'));

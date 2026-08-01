@@ -17,10 +17,12 @@ loadProductionContent(load, global);
 load('js/data/formulas.js');
 load('js/systems/terrain.js');
 load('js/systems/terrain_v3.js');
+load('js/systems/terrain_v4.js');
 load('js/vendor/easystar-0.4.4.min.js');
 load('js/systems/nav.js');
 load('js/systems/environment.js');
 load('js/systems/world.js');
+load('js/systems/world_treasures.js');
 load('js/systems/expedition_ai.js');
 load('tech-demos/exploration-v3/auto-route-audit.js');
 
@@ -362,6 +364,407 @@ productionWorld.groundLoot = ambientSnapshot.groundLoot;
 productionWorld.bossEnt = ambientSnapshot.bossEnt;
 Game.expeditionAI.reset();
 
+// === 永久宝藏决策：揭雾边界、120px 近场绕行与航段稳定 ===
+// 复现截图中的缺陷：自动模式已选定未知前沿后，世界循环又从全图选中未揭雾
+// 的永久宝藏并清除原探索路线。下方固化为自动化回归。
+(function () {
+  const savedExploration = Game.exploration;
+  const savedTerrain = Game.terrain;
+  const savedEnvironment = Game.environment;
+  const savedGuardSites = Game.guardSites;
+  const savedPlayer = Game.player;
+  const savedState = Game.state;
+  const savedStateNs = Game.State;
+  const savedNav = Game.nav;
+  const savedWorldProps = {
+    hero: productionWorld.hero,
+    layout: productionWorld.layout,
+    entities: productionWorld.entities,
+    groundLoot: productionWorld.groundLoot,
+    bossEnt: productionWorld.bossEnt,
+    region: productionWorld.region,
+    isHostileActor: productionWorld.isHostileActor,
+    contactThreat: productionWorld.contactThreat
+  };
+
+  function mountTreasureWorld(opts) {
+    const rid = 'grassland';
+    Game.state = {
+      settings: {
+        expeditionStrategy: opts.strategy || 'balanced',
+        controlMode: opts.controlMode || 'auto'
+      },
+      world: { worldTime: 0, region: rid, mode: 'battle' },
+      inv: { potions: {} }
+    };
+    Game.State = { regionTier: () => 1, regionProg: () => ({ firstKill: false }) };
+    Game.player = { hpPct: () => 1, addGold() {} };
+    const camp = { x: 100, y: 100 };
+    const layout = {
+      version: 4, camp,
+      nodes: opts.nodes || [],
+      landmarks: [], curios: [], ecology: [],
+      treasureSites: opts.treasures || [],
+      guardSites: [],
+      bossLair: { x: 2300, y: 1300 },
+      bossPoint: { x: 2300, y: 1300 },
+      guardian: null
+    };
+    Game.terrain = {
+      layout,
+      dangerAt: () => 0,
+      projectPoint: (x, y) => ({ x, y }),
+      isWalkable: () => true
+    };
+    Game.exploration = {
+      isRevealed: opts.isRevealed || (() => true),
+      nextObjective: () => opts.frontier || null,
+      regionState: () => ({
+        discovered: {
+          landmarks: {}, resources: {}, curios: {}, ecology: {},
+          threats: {}, nests: {}, guardian: false
+        },
+        bossRetryAt: 0
+      }),
+      readiness: () => ({ lair: false, total: 0, coverage: 0 }),
+      isComplete: () => false,
+      coverage: () => 0
+    };
+    Game.environment = {
+      autoNodeReady: () => true,
+      nodeReady: () => true,
+      nearestNode: opts.nearestNode || (() => null),
+      nearestChest: opts.nearestChest || (() => null),
+      chests: () => opts.environmentChests || [],
+      autoChestReady: () => true
+    };
+    Game.nav = {
+      clear() {}, recover() { return false; },
+      diagnostics: { peakMs: 0, invalidated: 0 }
+    };
+    const guardStub = {
+      forTarget: () => null,
+      canInteract: () => true,
+      claimedTreasure: opts.claimedTreasure || (() => false),
+      autoEligible: () => true,
+      peekResumeTargetId: () => null,
+      consumeResumeTargetId: () => null,
+      snapshot: () => [],
+      isBossGateCleared: () => true,
+      autoThreshold: () => 0,
+      triggerRadius: () => 42
+    };
+    Object.assign(guardStub, opts.guardOverrides || {});
+    Game.guardSites = guardStub;
+    Game.worldTreasures.reset();
+    Game.worldTreasures.initRegion(rid, layout);
+    const hero = Object.assign({
+      x: 100, y: 100, hp: 100, maxHp: 100,
+      state: 'idle', target: null, moveOrder: null, interactOrder: null,
+      navRoute: null, manualTarget: false
+    }, opts.hero);
+    productionWorld.hero = hero;
+    productionWorld.layout = layout;
+    productionWorld.entities = opts.entities || [];
+    productionWorld.groundLoot = opts.groundLoot || [];
+    productionWorld.bossEnt = null;
+    productionWorld.region = { world: { w: 2400, h: 1440 } };
+    productionWorld.isHostileActor = opts.isHostileActor || (() => false);
+    productionWorld.contactThreat = () => null;
+    Game.expeditionAI.reset();
+    return { hero, layout, rid };
+  }
+
+  function restoreControlledWorld() {
+    Game.exploration = savedExploration;
+    Game.terrain = savedTerrain;
+    Game.environment = savedEnvironment;
+    Game.guardSites = savedGuardSites;
+    Game.player = savedPlayer;
+    Game.state = savedState;
+    Game.State = savedStateNs;
+    Game.nav = savedNav;
+    productionWorld.hero = savedWorldProps.hero;
+    productionWorld.layout = savedWorldProps.layout;
+    productionWorld.entities = savedWorldProps.entities;
+    productionWorld.groundLoot = savedWorldProps.groundLoot;
+    productionWorld.bossEnt = savedWorldProps.bossEnt;
+    productionWorld.region = savedWorldProps.region;
+    productionWorld.isHostileActor = savedWorldProps.isHostileActor;
+    productionWorld.contactThreat = savedWorldProps.contactThreat;
+    Game.worldTreasures.reset();
+    Game.expeditionAI.reset();
+  }
+
+  try {
+    // 场景 A：约 1197px 未揭雾宝藏不能成为交互或导航目标。
+    const farHidden = { id: 'treasure:far-hidden', x: 1297, y: 100, depth: 'mid' };
+    const frontierTarget = { id: 'frontier:5:7', x: 400, y: 100 };
+    const scenarioA = mountTreasureWorld({
+      treasures: [farHidden],
+      isRevealed: (x) => x < 500, // 前沿已揭雾，远宝藏仍在黑雾
+      frontier: frontierTarget,
+      hero: {
+        x: 100, y: 100,
+        moveOrder: {
+          x: 400, y: 100, id: 'ai-frontier:5:7', ai: true,
+          targetRef: frontierTarget
+        }
+      }
+    });
+    // chooseAmbientInteraction 在自动模式下不再扫描 worldTreasures，
+    // 因此前沿航段保持不变，且不产生 chest 交互。
+    assert.equal(productionWorld.chooseAmbientInteraction(scenarioA.hero), false,
+      'auto mode must not scan worldTreasures and clear the frontier leg');
+    assert.equal(scenarioA.hero.interactOrder, null,
+      'no chest interaction may be started for an unrevealed treasure');
+    assert.equal(scenarioA.hero.moveOrder.id, 'ai-frontier:5:7',
+      'the ai-frontier move order must survive the ambient selector');
+    // startInteraction 对未揭雾永久宝藏必须直接拒绝（含手动点击），
+    // 且不修改 moveOrder/interactOrder/导航。
+    assert.equal(productionWorld.startInteraction(
+      { type: 'chest', target: Game.worldTreasures.get(farHidden.id) }, false
+    ), false, 'automatic interaction must reject an unrevealed permanent treasure');
+    assert.equal(productionWorld.startInteraction(
+      { type: 'chest', target: Game.worldTreasures.get(farHidden.id) }, true
+    ), false, 'manual interaction must also reject an unrevealed permanent treasure');
+    assert.equal(scenarioA.hero.moveOrder.id, 'ai-frontier:5:7',
+      'a rejected treasure must not clear the preserved move order');
+    assert.equal(scenarioA.hero.interactOrder, null,
+      'a rejected treasure must not establish an interaction order');
+    // 远征 AI 在保留航段下也不会改道到未揭雾宝藏。
+    Game.expeditionAI.update(scenarioA.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'frontier',
+      'the frontier intent must remain while the hidden treasure is out of reach');
+    assert.equal(Game.expeditionAI.intent().target.id, 'frontier:5:7');
+    assert.equal(scenarioA.hero.moveOrder.id, 'ai-frontier:5:7');
+
+    // 场景 B：已揭雾且恰好 120px 的宝藏触发近场绕行；超过阈值保持当前航段。
+    const nearTreasure = { id: 'treasure:near-120', x: 220, y: 100, depth: 'mid' };
+    const scenarioB = mountTreasureWorld({
+      treasures: [nearTreasure],
+      isRevealed: () => true,
+      frontier: { id: 'frontier:9:9', x: 900, y: 100 },
+      hero: {
+        x: 100, y: 100,
+        moveOrder: {
+          x: 900, y: 100, id: 'ai-frontier:9:9', ai: true,
+          targetRef: { id: 'frontier:9:9', x: 900, y: 100 }
+        }
+      }
+    });
+    Game.expeditionAI.update(scenarioB.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'chest-approach',
+      'a revealed treasure at exactly 120px must trigger an opportunistic detour');
+    assert.equal(Game.expeditionAI.intent().reason, 'along-route-treasure');
+    assert.equal(scenarioB.hero.interactOrder.target.id, 'treasure:near-120');
+    assert.equal(scenarioB.hero.moveOrder, null,
+      'the detour must clear the move order so the hero approaches the chest');
+
+    const justBeyond = { id: 'treasure:beyond-120', x: 221, y: 100, depth: 'mid' };
+    const scenarioB2 = mountTreasureWorld({
+      treasures: [justBeyond],
+      isRevealed: () => true,
+      frontier: { id: 'frontier:9:9', x: 900, y: 100 },
+      hero: {
+        x: 100, y: 100,
+        moveOrder: {
+          x: 900, y: 100, id: 'ai-frontier:9:9', ai: true,
+          targetRef: { id: 'frontier:9:9', x: 900, y: 100 }
+        }
+      }
+    });
+    Game.expeditionAI.update(scenarioB2.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'frontier',
+      'a treasure beyond 120px must not preempt the preserved frontier leg');
+    assert.equal(scenarioB2.hero.moveOrder.id, 'ai-frontier:9:9',
+      'the frontier leg must remain intact beyond the detour threshold');
+    assert.equal(scenarioB2.hero.interactOrder, null);
+
+    // 场景 C：近场宝藏优先于成熟资源；战斗与紧急掉落仍具有更高优先级。
+    const detourTreasure = { id: 'treasure:detour', x: 220, y: 100, depth: 'mid' };
+    const matureNode = { id: 'node:mature', x: 210, y: 100, material: 'wood' };
+    // C1：无战斗/掉落时，近场宝藏优先于成熟采集节点。
+    const scenarioC1 = mountTreasureWorld({
+      treasures: [detourTreasure],
+      nodes: [matureNode],
+      isRevealed: () => true,
+      frontier: null,
+      hero: { x: 100, y: 100 }
+    });
+    Game.expeditionAI.update(scenarioC1.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'chest-approach',
+      'a near-field treasure must take priority over a mature resource');
+    assert.equal(scenarioC1.hero.interactOrder.target.id, 'treasure:detour');
+    // 对照：移除宝藏后，成熟节点才会被选取。
+    const scenarioC1b = mountTreasureWorld({
+      treasures: [],
+      nodes: [matureNode],
+      isRevealed: () => true,
+      frontier: null,
+      hero: { x: 100, y: 100 }
+    });
+    Game.expeditionAI.update(scenarioC1b.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'gather',
+      'without a treasure the mature node is gathered along the route');
+    assert.equal(scenarioC1b.hero.interactOrder.target.id, 'node:mature');
+
+    // C2：沿途接敌优先于近场宝藏。
+    const hostileEnt = { id: 'enemy:rge', x: 140, y: 100, hp: 100, dead: false };
+    const scenarioC2 = mountTreasureWorld({
+      treasures: [detourTreasure],
+      isRevealed: () => true,
+      frontier: null,
+      entities: [hostileEnt],
+      isHostileActor: (hero, ent) => ent.id === 'enemy:rge',
+      hero: { x: 100, y: 100 }
+    });
+    Game.expeditionAI.update(scenarioC2.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'combat',
+      'a route encounter must preempt a near-field treasure');
+    assert.equal(scenarioC2.hero.target, hostileEnt);
+    assert.equal(scenarioC2.hero.interactOrder, null);
+
+    // C3：紧急掉落优先于近场宝藏。
+    const urgentLoot = { id: 'loot:urgent', x: 130, y: 100, ttl: 10, age: 0 };
+    const scenarioC3 = mountTreasureWorld({
+      treasures: [detourTreasure],
+      isRevealed: () => true,
+      frontier: null,
+      groundLoot: [urgentLoot],
+      hero: { x: 100, y: 100 }
+    });
+    Game.expeditionAI.update(scenarioC3.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'loot',
+      'an expiring drop must preempt a near-field treasure');
+    assert.equal(scenarioC3.hero.interactOrder.target.id, 'loot:urgent');
+
+    // 场景 D：当前航段结束后，远处已知宝藏仍可按既有策略被选择。
+    const distantKnown = { id: 'treasure:distant-known', x: 1297, y: 100, depth: 'deep' };
+    const scenarioD = mountTreasureWorld({
+      treasures: [distantKnown],
+      isRevealed: () => true,
+      frontier: null,
+      hero: { x: 100, y: 100, moveOrder: null }
+    });
+    Game.expeditionAI.update(scenarioD.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'chest-approach',
+      'a revealed distant treasure remains selectable once no leg is preserved');
+    assert.equal(Game.expeditionAI.intent().reason, 'nest');
+    assert.equal(scenarioD.hero.interactOrder.target.id, 'treasure:distant-known');
+
+    // 场景 E：临时宝箱、手动点击与目标屏蔽不回归。
+    // E1：临时宝箱（非永久宝藏）不受新增揭雾校验影响。
+    const scenarioE1 = mountTreasureWorld({
+      treasures: [],
+      isRevealed: () => false,
+      hero: { x: 100, y: 100 }
+    });
+    const timedChest = { id: 'chest:timed', x: 120, y: 100, age: 0, ttl: 30 };
+    assert.equal(productionWorld.startInteraction(
+      { type: 'chest', target: timedChest }, false
+    ), true, 'a timed chest is not subject to the permanent-treasure reveal check');
+    assert.equal(scenarioE1.hero.interactOrder.target.id, 'chest:timed');
+    productionWorld.cancelInteraction('test');
+    // E2：自动模式下 chooseAmbientInteraction 仍会拾取临时宝箱。
+    const scenarioE2 = mountTreasureWorld({
+      treasures: [],
+      isRevealed: () => true,
+      nearestChest: () => ({ target: timedChest, distance: 20 }),
+      hero: { x: 100, y: 100 }
+    });
+    assert.equal(productionWorld.chooseAmbientInteraction(scenarioE2.hero), true,
+      'auto mode must still pick up a ready timed chest');
+    assert.equal(scenarioE2.hero.interactOrder.target.id, 'chest:timed');
+    productionWorld.cancelInteraction('test');
+    // E3：手动点击已揭雾永久宝藏成功，未揭雾则被拒绝（与场景 A 一致）。
+    const revealedManual = { id: 'treasure:manual', x: 150, y: 100, depth: 'mid' };
+    const scenarioE3 = mountTreasureWorld({
+      treasures: [revealedManual],
+      isRevealed: () => true,
+      hero: { x: 100, y: 100 }
+    });
+    assert.equal(productionWorld.startInteraction(
+      { type: 'chest', target: Game.worldTreasures.get(revealedManual.id) }, true
+    ), true, 'a manual click on a revealed permanent treasure must succeed');
+    productionWorld.cancelInteraction('test');
+    // E4：被临时屏蔽的永久宝藏不会被近场绕行选中。
+    const blockedTreasure = { id: 'treasure:blocked', x: 220, y: 100, depth: 'mid' };
+    const scenarioE4 = mountTreasureWorld({
+      treasures: [blockedTreasure],
+      isRevealed: () => true,
+      frontier: { id: 'frontier:1:1', x: 600, y: 100 },
+      hero: { x: 100, y: 100 }
+    });
+    // 挂载后再绑定交互目标，确保引用的是已初始化的永久宝藏实例。
+    scenarioE4.hero.interactOrder = {
+      type: 'chest',
+      target: Game.worldTreasures.get(blockedTreasure.id),
+      phase: null
+    };
+    // 让英雄在宝藏接近阶段静止 6 秒以上，触发 watchdog 取消并屏蔽目标。
+    for (let tick = 0; tick < 16; tick++) {
+      Game.state.world.worldTime += 0.5;
+      Game.expeditionAI.update(scenarioE4.hero, 0.5);
+    }
+    assert.equal(Game.expeditionAI.isTargetBlocked(blockedTreasure.id), true,
+      'a stuck treasure approach must temporarily block the target');
+    assert.notEqual(Game.expeditionAI.intent().id, 'chest-approach',
+      'a blocked treasure must not be reselected as a chest detour');
+    assert.equal(scenarioE4.hero.interactOrder, null,
+      'the stuck interaction must have been cancelled');
+
+    // 场景 F：守卫胜利后恢复开箱；目标失效时不产生循环重试。
+    // F1：守卫清除后 peekResumeTargetId 指向宝藏，远征 AI 恢复开箱接近。
+    const resumeTreasure = { id: 'treasure:resume', x: 220, y: 100, depth: 'mid' };
+    let resumeId = resumeTreasure.id;
+    const scenarioF1 = mountTreasureWorld({
+      treasures: [resumeTreasure],
+      isRevealed: () => true,
+      frontier: null,
+      guardOverrides: {
+        peekResumeTargetId: () => resumeId,
+        consumeResumeTargetId: () => { const old = resumeId; resumeId = null; return old; }
+      },
+      hero: { x: 100, y: 100 }
+    });
+    Game.expeditionAI.update(scenarioF1.hero, 0);
+    assert.equal(Game.expeditionAI.intent().id, 'chest-approach',
+      'after a guard victory the AI must resume opening the treasure');
+    assert.equal(Game.expeditionAI.intent().reason, 'guard-resume');
+    assert.equal(scenarioF1.hero.interactOrder.target.id, 'treasure:resume');
+    assert.equal(resumeId, null, 'the resume target must be consumed once resumed');
+
+    // F2：恢复目标已失效（被领取）时，消费目标并回落，不循环重试。
+    const claimedTreasure = { id: 'treasure:claimed', x: 220, y: 100, depth: 'mid' };
+    let resumeIdF2 = claimedTreasure.id;
+    const scenarioF2 = mountTreasureWorld({
+      treasures: [claimedTreasure],
+      isRevealed: () => true,
+      frontier: null,
+      claimedTreasure: (id) => id === claimedTreasure.id,
+      guardOverrides: {
+        peekResumeTargetId: () => resumeIdF2,
+        consumeResumeTargetId: () => { const old = resumeIdF2; resumeIdF2 = null; return old; }
+      },
+      hero: { x: 100, y: 100 }
+    });
+    assert.equal(Game.worldTreasures.get(claimedTreasure.id).claimed, true,
+      'the resume target must be reported as claimed');
+    Game.expeditionAI.update(scenarioF2.hero, 0);
+    assert.equal(resumeIdF2, null,
+      'an invalid resume target must be consumed to prevent retry loops');
+    assert.notEqual(Game.expeditionAI.intent().id, 'chest-approach',
+      'an invalid resume target must not start a chest interaction');
+    assert.equal(scenarioF2.hero.interactOrder, null);
+
+    restoreControlledWorld();
+  } catch (err) {
+    restoreControlledWorld();
+    throw err;
+  }
+})();
+
 assert.equal(Game.autoRouteAudit.isExpectedLegacyGap({
   passed: false,
   reason: 'audit-timeout',
@@ -422,7 +825,35 @@ for (const region of Game.reg.all('region')) {
 assert.equal(normalRuns, 32);
 assert.equal(reproduced, 16);
 assert.equal(recovered, 16);
+
+// 永久宝藏决策审计：隐藏 / 近场 / 远场三种场景在确定性 v4 区域上必须与修复后语义一致。
+const treasureCaseIds = Object.keys(Game.autoRouteAudit.treasureCases);
+let treasureAudits = 0;
+for (const region of Game.reg.all('region')) {
+  Game.state.world.region = region.id;
+  const layout = Game.terrain.generate(region, 8, 4);
+  const summary = Game.autoRouteAudit.runTreasureAudit(layout);
+  assert.equal(summary.total, treasureCaseIds.length,
+    `${region.id} treasure audit must cover all cases`);
+  assert.equal(summary.passed, treasureCaseIds.length,
+    `${region.id} treasure audit must pass all cases (got ${summary.results.map((r) => r.caseId + '=' + r.decision).join(', ')})`);
+  treasureAudits += summary.passed;
+}
+assert.equal(treasureAudits, treasureCaseIds.length * 8,
+  'all regions must pass every permanent-treasure decision case');
+// 逐场景固化截图缺陷：未揭雾宝藏不得改道、近场宝藏触发绕行、远场宝藏保留航段。
+const probeRegion = Game.reg.get('region', 'grassland');
+const probeLayout = Game.terrain.generate(probeRegion, 0xA17B00, 4);
+assert.equal(Game.autoRouteAudit.treasureDecisionAudit(probeLayout, 'treasure-hidden').decision, 'frontier',
+  'an unrevealed permanent treasure must not divert the frontier leg');
+assert.equal(Game.autoRouteAudit.treasureDecisionAudit(probeLayout, 'treasure-near').decision, 'chest-approach',
+  'a revealed permanent treasure at 120px must trigger an opportunistic detour');
+assert.equal(Game.autoRouteAudit.treasureDecisionAudit(probeLayout, 'treasure-near').reason, 'along-route-treasure');
+assert.equal(Game.autoRouteAudit.treasureDecisionAudit(probeLayout, 'treasure-far').decision, 'frontier',
+  'a revealed but distant permanent treasure must not preempt the preserved leg');
+
 console.log(
   `Auto-navigation audit passed: ${normalRuns} normal interruptions, ` +
-  `${reproduced} legacy gaps reproduced, ${recovered} production recoveries.`
+  `${reproduced} legacy gaps reproduced, ${recovered} production recoveries, ` +
+  `${treasureAudits} permanent-treasure decision cases.`
 );

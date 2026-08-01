@@ -1,6 +1,6 @@
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.10") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260802.1") format("woff2");
   font-display: swap;
 }
 :root {
@@ -65,6 +65,12 @@ aside input { min-height: 0; accent-color: #c4a950; }
 .event-table tr[data-policy="current"] td:nth-child(2) { color: #86c99c; }
 .event-table td:nth-child(1), .event-table td:nth-child(5) { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .audit-results pre { max-height: 300px; margin: 0; border: 0; border-left: 1px solid #3e463e; }
+.treasure-cases { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; }
+.treasure-cases li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 9px; background: #151a16; border: 1px solid #3e463e; color: #c6cbc3; font-size: 10px; }
+.treasure-cases li output { color: #899189; font-size: 10px; font-variant-numeric: tabular-nums; }
+.treasure-cases li[data-state="pass"] output { color: #86c99c; }
+.treasure-cases li[data-state="fail"] output { color: #e78576; }
+.treasure-audit pre { max-height: 220px; }
 pre { min-height: 92px; max-height: 240px; margin: 8px 0 0; padding: 10px; overflow: auto; color: #b7c0ba; background: #101511; border: 1px solid #343c35; font: 10px/1.55 Consolas, monospace; }
 @media (max-width: 900px) {
   .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }

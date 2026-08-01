@@ -269,6 +269,18 @@
     });
   }
 
+  // 永久宝藏（巢穴固定箱）的机会性近场绕行：仅当已揭雾、未领取、未被临时
+  // 屏蔽且守卫状态允许自动挑战时，才在 120px 内短程绕行，与沿途成熟资源一致。
+  // 远程宝藏不在此处抢占航段，仍由下方安全/均衡/掠夺策略在航段结束后排序。
+  function nearbyMatureTreasure(hero) {
+    if (!Game.worldTreasures) return null;
+    return nearest(Game.worldTreasures.list(), hero, function (treasure) {
+      return visible(treasure) &&
+        U.dist(hero.x, hero.y, treasure.x, treasure.y) <= 120 &&
+        (!Game.guardSites || Game.guardSites.autoEligible(treasure));
+    });
+  }
+
   function preservedTravel(hero) {
     var order = hero.moveOrder;
     if (!order || !order.ai) return null;
@@ -431,6 +443,15 @@
       });
     }
 
+    var closeTreasure = nearbyMatureTreasure(hero);
+    if (closeTreasure) {
+      if (Game.world.startInteraction({ type: 'chest', target: closeTreasure.target }, false)) {
+        return emitIntent(interactionIntent(hero.interactOrder, 'along-route-treasure'));
+      }
+      if (hero.target && !hero.target.dead) return emitIntent({ id: 'combat', target: hero.target,
+        distance: U.dist(hero.x, hero.y, hero.target.x, hero.target.y), danger: 1, reason: 'guard-trigger' });
+    }
+
     var closeNode = nearbyMatureNode(hero);
     if (closeNode && Game.world.startInteraction({ type: 'gather', target: closeNode.target }, false)) {
       return emitIntent({
@@ -440,8 +461,9 @@
       });
     }
 
-    // 已开始的航段保持到抵达；沿途紧急掉落、接敌和新资源仍可在
-    // 上方抢占，避免已进入视野的前沿每 0.35 秒跳到别处。
+    // 已开始的航段保持到抵达；沿途紧急掉落、接敌和近场宝藏/新资源仍可在
+    // 上方抢占，避免已进入视野的前沿每 0.35 秒跳到别处。远程永久宝藏只能
+    // 在没有待保留航段时（即下方 preservedTravel 返回空之后）参与策略排序。
     var travel = !force && preservedTravel(hero);
     if (travel) {
       return emitIntent(travel);

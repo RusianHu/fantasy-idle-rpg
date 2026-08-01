@@ -3836,6 +3836,30 @@ async function run() {
     assert.equal(generatorDemo.controlsTouchable, true);
     assert.equal(generatorDemo.noHorizontalOverflow, true);
 
+    const treasureAudit = await cdp.evaluate(`(() => {
+      const button = document.getElementById('run-treasure-audit');
+      if (!button || !window.Game || !Game.autoRouteAudit || !Game.autoRouteAudit.runTreasureAudit) {
+        return { ready: false };
+      }
+      const layout = Game.terrain.generate(Game.reg.get('region', 'grassland'), 0xA17B00, 4);
+      const summary = Game.autoRouteAudit.runTreasureAudit(layout);
+      return {
+        ready: true,
+        total: summary.total,
+        passed: summary.passed,
+        cases: summary.results.map((r) => ({ caseId: r.caseId, decision: r.decision, passed: r.passed }))
+      };
+    })()`);
+    assert.equal(treasureAudit.ready, true, 'exploration demo must expose the treasure decision audit');
+    assert.equal(treasureAudit.total, 3, 'treasure audit must cover hidden, near and far cases');
+    assert.equal(treasureAudit.passed, 3, 'all permanent-treasure decision cases must pass in the browser');
+    const hiddenCase = treasureAudit.cases.find((c) => c.caseId === 'treasure-hidden');
+    const nearCase = treasureAudit.cases.find((c) => c.caseId === 'treasure-near');
+    const farCase = treasureAudit.cases.find((c) => c.caseId === 'treasure-far');
+    assert.equal(hiddenCase.decision, 'frontier', 'an unrevealed treasure must not divert the route');
+    assert.equal(nearCase.decision, 'chest-approach', 'a revealed 120px treasure must trigger a detour');
+    assert.equal(farCase.decision, 'frontier', 'a revealed distant treasure must keep the frontier leg');
+
     await cdp.navigate(BASE + 'tech-demos/map-effects/map-effects.html?seed=89ABCDEF&region=lavacave');
     const demo = await cdp.evaluate(`(() => {
       const ids = [

@@ -538,14 +538,182 @@
     };
   }
 
+  // 永久宝藏决策审计：在不重复 nav 模拟的前提下，直接验证生产 expeditionAI
+  // 对隐藏 / 近场 / 远场永久宝藏的抉择。三种场景对应缺陷复现与修复后语义：
+  //   - treasure-hidden：未揭雾宝藏（约 120px）不得改道，保留前沿航段。
+  //   - treasure-near ：已揭雾且恰好 120px 的宝藏触发机会性绕行。
+  //   - treasure-far  ：已揭雾但远距（1197px）宝藏不抢占航段，仅在航段结束后参与排序。
+  var TREASURE_CASES = {
+    'treasure-hidden': { id: 'treasure-hidden', reveal: false, offset: 120, expect: 'frontier' },
+    'treasure-near': { id: 'treasure-near', reveal: true, offset: 120, expect: 'chest-approach' },
+    'treasure-far': { id: 'treasure-far', reveal: true, offset: 1197, expect: 'frontier' }
+  };
+
+  function treasureAuditSnapshot() {
+    var Game = window.Game;
+    var W = Game.world;
+    return {
+      exploration: Game.exploration, terrain: Game.terrain, environment: Game.environment,
+      guardSites: Game.guardSites, player: Game.player, state: Game.state,
+      State: Game.State, nav: Game.nav, interactions: Game.interactions,
+      worldProps: W ? {
+        hero: W.hero, layout: W.layout, entities: W.entities, groundLoot: W.groundLoot,
+        bossEnt: W.bossEnt, region: W.region, isHostileActor: W.isHostileActor,
+        contactThreat: W.contactThreat
+      } : null
+    };
+  }
+
+  function treasureAuditRestore(saved) {
+    var Game = window.Game;
+    var W = Game.world;
+    Game.exploration = saved.exploration;
+    Game.terrain = saved.terrain;
+    Game.environment = saved.environment;
+    Game.guardSites = saved.guardSites;
+    if (Game.worldTreasures && Game.worldTreasures.reset) Game.worldTreasures.reset();
+    Game.player = saved.player;
+    Game.state = saved.state;
+    Game.State = saved.State;
+    Game.nav = saved.nav;
+    Game.interactions = saved.interactions;
+    if (W && saved.worldProps) {
+      W.hero = saved.worldProps.hero;
+      W.layout = saved.worldProps.layout;
+      W.entities = saved.worldProps.entities;
+      W.groundLoot = saved.worldProps.groundLoot;
+      W.bossEnt = saved.worldProps.bossEnt;
+      W.region = saved.worldProps.region;
+      W.isHostileActor = saved.worldProps.isHostileActor;
+      W.contactThreat = saved.worldProps.contactThreat;
+    }
+    if (Game.expeditionAI && Game.expeditionAI.reset) Game.expeditionAI.reset();
+  }
+
+  function treasureDecisionAudit(layout, caseId) {
+    var Game = window.Game;
+    var caseDef = TREASURE_CASES[caseId];
+    if (!caseDef) throw new Error('Unknown treasure audit case: ' + caseId);
+    if (!Game.worldTreasures || !Game.expeditionAI) {
+      return { caseId: caseId, passed: false, reason: 'missing-modules' };
+    }
+    var saved = treasureAuditSnapshot();
+    try {
+      var W = Game.world;
+      var rid = (Game.state && Game.state.world && Game.state.world.region) || 'grassland';
+      var camp = (layout && layout.camp) || { x: 120, y: 120 };
+      var heroX = camp.x, heroY = camp.y;
+      var frontier = { id: 'frontier:audit', x: heroX + 400, y: heroY };
+      var treasure = {
+        id: 'audit:treasure:' + caseId, x: heroX + caseDef.offset, y: heroY, depth: 'mid'
+      };
+      var auditLayout = Object.assign({}, layout, {
+        treasureSites: [treasure], guardSites: [],
+        nodes: [], landmarks: [], curios: [], ecology: []
+      });
+      Game.state = {
+        settings: { expeditionStrategy: 'balanced', controlMode: 'auto' },
+        world: { worldTime: 0, region: rid, mode: 'battle' },
+        inv: { potions: {} }
+      };
+      Game.State = {
+        regionTier: function () { return 1; },
+        regionProg: function () { return { firstKill: false }; }
+      };
+      Game.player = { hpPct: function () { return 1; }, addGold: function () {} };
+      Game.terrain = {
+        layout: auditLayout, dangerAt: function () { return 0; },
+        projectPoint: function (x, y) { return { x: x, y: y }; },
+        isWalkable: function () { return true; }
+      };
+      Game.exploration = {
+        isRevealed: function (x) {
+          return caseDef.reveal ? true : x < heroX + caseDef.offset - 1;
+        },
+        nextObjective: function () { return frontier; },
+        regionState: function () {
+          return {
+            discovered: { landmarks: {}, resources: {}, curios: {}, ecology: {},
+              threats: {}, nests: {}, guardian: false },
+            bossRetryAt: 0
+          };
+        },
+        readiness: function () { return { lair: false, total: 0, coverage: 0 }; },
+        isComplete: function () { return false; },
+        coverage: function () { return 0; }
+      };
+      Game.environment = {
+        autoNodeReady: function () { return true; }, nodeReady: function () { return true; },
+        nearestNode: function () { return null; }, nearestChest: function () { return null; },
+        chests: function () { return []; }, autoChestReady: function () { return true; }
+      };
+      Game.nav = {
+        clear: function () {}, recover: function () { return false; },
+        diagnostics: { peakMs: 0, invalidated: 0 }
+      };
+      Game.guardSites = {
+        forTarget: function () { return null; }, canInteract: function () { return true; },
+        claimedTreasure: function () { return false; }, autoEligible: function () { return true; },
+        peekResumeTargetId: function () { return null; }, consumeResumeTargetId: function () { return null; },
+        snapshot: function () { return []; }, isBossGateCleared: function () { return true; },
+        autoThreshold: function () { return 0; }, triggerRadius: function () { return 42; }
+      };
+      Game.worldTreasures.reset();
+      Game.worldTreasures.initRegion(rid, auditLayout);
+      var hero = {
+        x: heroX, y: heroY, hp: 100, maxHp: 100, state: 'idle', target: null,
+        moveOrder: { x: frontier.x, y: frontier.y, id: 'ai-frontier:audit', ai: true,
+          targetRef: frontier },
+        interactOrder: null, navRoute: null, manualTarget: false
+      };
+      W.hero = hero; W.layout = auditLayout; W.entities = []; W.groundLoot = [];
+      W.bossEnt = null; W.region = { world: { w: 2400, h: 1440 } };
+      W.isHostileActor = function () { return false; };
+      W.contactThreat = function () { return null; };
+      Game.expeditionAI.reset();
+      Game.expeditionAI.update(hero, 0);
+      var intent = Game.expeditionAI.intent();
+      var decision = intent.id;
+      var passed = decision === caseDef.expect;
+      return {
+        caseId: caseId, passed: passed, decision: decision, expected: caseDef.expect,
+        reveal: caseDef.reveal, offset: caseDef.offset,
+        reason: intent.reason || null,
+        treasure: { id: treasure.id, x: treasure.x, y: treasure.y },
+        hero: { x: heroX, y: heroY },
+        logs: [{
+          event: passed ? 'treasure:decision-ok' : 'treasure:decision-mismatch',
+          decision: decision, expected: caseDef.expect, reveal: caseDef.reveal,
+          offset: caseDef.offset
+        }]
+      };
+    } finally {
+      treasureAuditRestore(saved);
+    }
+  }
+
+  function runTreasureAudit(layout) {
+    var results = Object.keys(TREASURE_CASES).map(function (caseId) {
+      return treasureDecisionAudit(layout, caseId);
+    });
+    return {
+      total: results.length,
+      passed: results.filter(function (r) { return r.passed; }).length,
+      results: results
+    };
+  }
+
   Game.autoRouteAudit = {
     DT: DT,
     SPEED: SPEED,
     scenarios: SCENARIOS,
+    treasureCases: TREASURE_CASES,
     baseline: baseline,
     run: run,
     compare: compare,
     isExpectedLegacyGap: isExpectedLegacyGap,
-    summarize: summarize
+    summarize: summarize,
+    treasureDecisionAudit: treasureDecisionAudit,
+    runTreasureAudit: runTreasureAudit
   };
 })();
