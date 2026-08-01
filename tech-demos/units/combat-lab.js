@@ -60,12 +60,25 @@
   var presentationCursor = 0;
   var movementTrace = [];
   var movementSignatures = {};
+  var lastTerrainAudit = null;
+  var lastMmoAudit = null;
+  var mmoState = null;
+  var labTerrainLayout = null;
   var lastSummonSnapshot = null;
   var lastSelfDestructResult = null;
   var allyTeamId = 'party';
   var enemyTeamId = 'enemy';
   var canvas = $('stage');
   var ctx = canvas.getContext('2d');
+
+  ['aggro:detected', 'encounter:assistJoined', 'encounter:evadeStarted',
+    'encounter:evadeCompleted'].forEach(function (eventName) {
+    Game.bus.on(eventName, function (payload) {
+      if (!mmoState) return;
+      mmoState.timeline.push({ type: eventName, payload: payload || null });
+      renderMmoTimeline();
+    });
+  });
 
   var copy = {
     'zh-CN': {
@@ -84,6 +97,11 @@
       portraits: '双方肖像槽 QA', allyPortrait: '友方肖像', enemyPortrait: '敌方肖像',
       portraitReady: '生产渲染器 · 双方非空', portraitPartial: '等待双方战斗 Actor',
       ecosystem: 'Population / Engagement / Objective / Variant',
+      terrainAudit: '运行地形回归', terrainReady: '地形回归待运行',
+      terrainPassed: '地形寻路 / 位移回归通过', terrainFailed: '地形寻路 / 位移回归失败',
+      mmoAudit: '一键 MMO 接敌回归', mmoTitle: 'MMO 感知 / 增援 / Evade',
+      mmoReady: 'MMO 接敌回归待运行', mmoPassed: 'MMO 接敌 / 回巢回归通过',
+      mmoFailed: 'MMO 接敌 / 回巢回归失败',
       provoke: '中立群体挑衅', surrenderAction: '目标投降', forgive: '赎罪 / 清除记忆'
     },
     en: {
@@ -102,6 +120,11 @@
       portraits: 'Combat portrait slots QA', allyPortrait: 'Ally portrait', enemyPortrait: 'Enemy portrait',
       portraitReady: 'Production renderer · both populated', portraitPartial: 'Waiting for both combat Actors',
       ecosystem: 'Population / Engagement / Objective / Variant',
+      terrainAudit: 'Run terrain regression', terrainReady: 'Terrain regression ready',
+      terrainPassed: 'Terrain routing / displacement passed', terrainFailed: 'Terrain routing / displacement failed',
+      mmoAudit: 'Run MMO aggro regression', mmoTitle: 'MMO aggro / assist / Evade',
+      mmoReady: 'MMO aggro regression ready', mmoPassed: 'MMO aggro / Evade regression passed',
+      mmoFailed: 'MMO aggro / Evade regression failed',
       provoke: 'Provoke neutral group', surrenderAction: 'Target surrenders', forgive: 'Atone / clear memory'
     }
   };
@@ -120,6 +143,8 @@
     summon: ['召唤与继承', 'Summon / inheritance'],
     boss: ['Boss 50% phase', 'Boss 50% phase'],
     engagement: ['中立群体 / 外部命令', 'Neutral group / external command'],
+    terrain: ['不可通行区寻路 / 位移', 'Impassable routing / displacement'],
+    mmoAggro: ['MMO 接敌 / 增援 / Evade', 'MMO aggro / assist / Evade'],
     threeTeam: ['三阵营与中立观察者', 'Three teams and neutral observer'],
     surrender: ['投降目标', 'Surrender objective']
   };
@@ -138,6 +163,17 @@
       node.textContent = tr(node.getAttribute('data-lab'));
     });
     $('pause').textContent = paused ? tr('resume') : tr('pause');
+    if ($('terrain-audit-status')) {
+      $('terrain-audit-status').textContent = !lastTerrainAudit
+        ? tr('terrainReady')
+        : (lastTerrainAudit.passed ? tr('terrainPassed') : tr('terrainFailed'));
+    }
+    if ($('mmo-audit-status')) {
+      $('mmo-audit-status').textContent = !lastMmoAudit
+        ? tr('mmoReady')
+        : (lastMmoAudit.passed ? tr('mmoPassed') : tr('mmoFailed'));
+    }
+    renderMmoTimeline();
     refreshLocalizedDefinitionSelects();
     fillScenarios($('scenario').value);
     updateCatalog();
@@ -286,6 +322,50 @@
       spawnSource: { kind: 'lab', sourceId: 'neutral', sequence: 300 }
     });
   }
+
+  function buildLabTerrainArena() {
+    var cell = 16, w = canvas.width / cell, h = canvas.height / cell;
+    var grid = [], costs = [], distance = [];
+    for (var y = 0; y < h; y++) {
+      var row = [], costRow = [], distanceRow = [];
+      for (var x = 0; x < w; x++) {
+        var border = x === 0 || y === 0 || x === w - 1 || y === h - 1;
+        var divider = (x === 29 || x === 30) && y <= 22;
+        var open = !border && !divider;
+        row.push(open ? 1 : 0);
+        costRow.push(1);
+        distanceRow.push(open ? 1 : 0);
+      }
+      grid.push(row);
+      costs.push(costRow);
+      distance.push(distanceRow);
+    }
+    return {
+      version: 3,
+      regionId: 'lab-terrain',
+      world: { w: canvas.width, h: canvas.height },
+      nav: { cell: cell, w: w, h: h, grid: grid, costs: costs, distance: distance }
+    };
+  }
+
+  function configureLabTerrain(enabled) {
+    if (!enabled) {
+      labTerrainLayout = null;
+      Game.terrain.layout = null;
+      if (Game.nav) {
+        Game.nav.layout = null;
+        Game.nav.finder = null;
+      }
+      return null;
+    }
+    labTerrainLayout = buildLabTerrainArena();
+    Game.terrain.layout = labTerrainLayout;
+    if (!Game.nav || !Game.nav.useLayout(labTerrainLayout)) {
+      throw new Error('Combat Lab terrain scenario requires production navigation');
+    }
+    return labTerrainLayout;
+  }
+
   function scenarioPreset(id) {
     var preset = {
       gcd: { classId: 'fighter', allies: 1, enemies: 2 },
@@ -301,6 +381,8 @@
       summon: { classId: 'mage', allies: 2, enemies: 4 },
       boss: { classId: 'fighter', allies: 4, enemies: 1, boss: true },
       engagement: { classId: 'fighter', allies: 1, enemies: 1, engagement: true },
+      terrain: { classId: 'fighter', allies: 1, enemies: 1 },
+      mmoAggro: { classId: 'fighter', allies: 1, enemies: 6, encounterId: 'encounter.forest' },
       threeTeam: { classId: 'fighter', allies: 2, enemies: 4, encounterId: 'lab.encounter.three-team' },
       surrender: { classId: 'cleric', allies: 2, enemies: 2, encounterId: 'lab.encounter.surrender' }
     }[id];
@@ -349,9 +431,139 @@
     var result = Game.engagement.processCommands(1)[0];
     encounter = result && result.ok ? Game.encounters.get(result.encounterId) : null;
   }
+
+  function materializeMmoPack(profileId, key, x, y) {
+    var result = Game.population.materialize(profileId, {
+      regionId: 'forest',
+      populationId: 'population.forest',
+      layoutSlotKey: key,
+      spawnRequestKey: 'mmo-lab:' + key,
+      planSlotId: 'regular:mmo-lab:' + key,
+      x: x, y: y, tier: 2
+    });
+    if (!result || !result.ok) throw new Error('MMO Lab Population failed: ' + key);
+    return {
+      id: result.lease.groupId,
+      profileId: profileId,
+      primary: result.primary,
+      actors: result.actors,
+      x: x, y: y,
+      leashRadius: result.primary.packLeashRadius
+    };
+  }
+
+  function setupMmoAggroScenario(tier) {
+    Game.population.reset('forest');
+    Game.worldAggro.reset();
+    encounter = null;
+    paused = true;
+    var hero = Game.actors.spawn({
+      instanceId: 'lab:ally:0', archetypeId: 'adventurer',
+      classId: $('class').value, level: Number($('level').value) || 20, tier: tier,
+      factionId: 'adventurers', controllerId: 'player:manual',
+      statValues: stats($('class').value, tier),
+      transform: { x: 300, y: 240, direction: 'r' },
+      spawnSource: { kind: 'lab', sourceId: 'mmo-aggro', sequence: 1 }
+    });
+    hero.actorRecordId = 'lab-primary';
+    hero.sprite = 'hero_' + $('class').value;
+    hero.state = 'gather';
+    hero.interactOrder = {
+      type: 'gather', phase: 'act', elapsed: 1.25,
+      target: { id: 'mmo-herb', x: 306, y: 244 }
+    };
+    hero.moveOrder = { id: 'gather-route', x: 306, y: 244 };
+    Game.parties.addMember('lab-party', hero.id);
+
+    // pack A 含正式召唤者；pack B 可增援；pack C 位于硬墙后方且同时
+    // 验证最多一个世界 pack 的上限。
+    var packs = [
+      materializeMmoPack('spawn.forest.duo-summoner', 'initial', 350, 240),
+      materializeMmoPack('spawn.forest.duo', 'assist', 390, 286),
+      materializeMmoPack('spawn.forest.duo-mixed', 'blocked', 548, 240)
+    ];
+    Game.world.region = { id: 'forest', world: labTerrainLayout.world };
+    Game.world.layout = labTerrainLayout;
+    Game.world.hero = hero;
+    Game.world.entities = [hero];
+    packs.forEach(function (pack) {
+      Array.prototype.push.apply(Game.world.entities, pack.actors);
+    });
+    Game.world.encounterSequence = 1;
+    Game.world.encounterOrdinals = {};
+    Game.world.compatSpawnSequence = 1;
+    Game.world.groundLoot = [];
+    Game.world.cinematic = null;
+    Game.world.bossEnt = null;
+    Game.player = Game.player || {};
+    Game.player.hasClass = function () { return true; };
+    Game.environment = Game.environment || {};
+    mmoState = {
+      hero: hero,
+      packs: packs,
+      gatheringInterrupted: false,
+      timeline: [{ type: 'gather:started', payload: { elapsed: 1.25 } }]
+    };
+    Game.environment.interruptGather = function () {
+      if (mmoState) mmoState.gatheringInterrupted = true;
+    };
+    refreshRuntimeSelects();
+    renderMmoTimeline();
+    draw();
+    updateUi(true);
+    return mmoState;
+  }
+
+  function mmoTimelineLabel(type) {
+    var labels = {
+      'gather:started': ['采集中', 'Gathering'],
+      'aggro:detected': ['发现玩家并即时接敌', 'Player detected; Encounter started'],
+      'encounter:assistJoined': ['邻近 pack 增援', 'Nearby pack assisted'],
+      'encounter:evadeStarted': ['脱离 leash，开始回巢', 'Leash left; Evade started'],
+      'encounter:evadeCompleted': ['合法出生点满状态恢复', 'Home reached; full reset']
+    };
+    var entry = labels[type];
+    return entry ? entry[locale() === 'en' ? 1 : 0] : type;
+  }
+
+  function mmoCheckLabel(id) {
+    var labels = {
+      modes: ['手动 / 自动均可被敌方感知', 'Enemy perception works in manual / auto'],
+      los: ['硬墙阻断 LOS', 'Hard wall blocks LOS'],
+      interrupt: ['采集与世界路线即时中断', 'Gathering and world route interrupted'],
+      initialPack: ['初始 pack 整组入战并写入威胁', 'Initial pack joined with base threat'],
+      assist: ['仅最近常规 pack 增援一次', 'Only nearest regular pack assisted once'],
+      summon: ['召唤继承 / maxActive / 零奖励', 'Summon inheritance / maxActive / zero reward'],
+      leash: ['多 leash zone 越界结束 Encounter', 'Leaving all leash zones ended Encounter'],
+      evade: ['存活怪合法回巢并满状态恢复', 'Survivors returned legally at full state'],
+      defeated: ['已击败成员未复活', 'Defeated member did not revive']
+    };
+    var entry = labels[id];
+    return entry ? entry[locale() === 'en' ? 1 : 0] : id;
+  }
+
+  function renderMmoTimeline() {
+    var root = $('mmo-timeline');
+    if (!root) return;
+    var rows = [];
+    if (lastMmoAudit && lastMmoAudit.checks) {
+      lastMmoAudit.checks.forEach(function (check) {
+        rows.push('<li class="' + (check.pass ? 'pass' : 'fail') + '">' +
+          (check.pass ? 'PASS · ' : 'FAIL · ') + mmoCheckLabel(check.id) + '</li>');
+      });
+    } else if (mmoState && mmoState.timeline.length) {
+      mmoState.timeline.slice(-12).forEach(function (entry) {
+        rows.push('<li>' + mmoTimelineLabel(entry.type) + '</li>');
+      });
+    } else {
+      rows.push('<li>' + tr('mmoReady') + '</li>');
+    }
+    root.innerHTML = rows.join('');
+  }
   function reset() {
     updateUrl();
     scenarioPreset($('scenario').value);
+    if (Game.worldAggro) Game.worldAggro.reset();
     Game.engagement.reset();
     Game.encounters.reset();
     Game.relations.reset();
@@ -364,33 +576,50 @@
     presentationCursor = 0;
     movementTrace = [];
     movementSignatures = {};
+    lastTerrainAudit = null;
+    lastMmoAudit = null;
+    mmoState = null;
+    if ($('terrain-audit-status')) $('terrain-audit-status').textContent = tr('terrainReady');
     lastSummonSnapshot = null;
     lastSelfDestructResult = null;
     charmOverride = null;
     var profile = Game.content.get('encounterProfile', $('encounter').value) ||
       Game.content.get('encounterProfile', 'encounter.grassland');
+    var terrainScenario = $('scenario').value === 'terrain' ||
+      $('scenario').value === 'mmoAggro';
+    configureLabTerrain(terrainScenario);
     configureTeamIds(profile);
     var tier = Number($('tier').value) || tierFor(profile);
     $('tier').value = tier;
     Game.state = {
       world: {
-        region: profile.regionId,
-        worldSeed: Number($('seed').value) >>> 0,
-        worldTime: 300,
+          region: profile.regionId,
+          worldSeed: Number($('seed').value) >>> 0,
+          worldTime: 300,
+          mode: 'battle',
         social: {
           spawnVariants: {},
           memories: { spawnId: {}, socialGroupId: {}, factionId: {} }
         }
       },
-      player: { level: Number($('level').value) || 20 }
+      player: { level: Number($('level').value) || 20 },
+      settings: {
+        controlMode: 'manual', combatStrategy: $('strategy').value,
+        combatTactics: {}, expeditionStrategy: 'balanced'
+      },
+      meta: { stats: {} }
     };
     Game.parties.create({ id: 'lab-party', maxMembers: 4 });
-    if ($('scenario').value === 'engagement') {
+    if ($('scenario').value === 'mmoAggro') {
+      setupMmoAggroScenario(tier);
+      return;
+    } else if ($('scenario').value === 'engagement') {
       resetEngagementScenario(tier);
     } else {
       encounter = Game.encounters.start(profile.id, {
         id: 'lab:encounter', seed: Number($('seed').value) >>> 0,
-        fullLog: true, silent: true, lab: true
+        fullLog: true, silent: true, lab: true,
+        terrainCollision: terrainScenario
       });
     }
     if ($('scenario').value === 'engagement') {
@@ -459,6 +688,16 @@
           if (controllers[actor.id]) actor.controllerId = controllers[actor.id];
         });
       }
+    }
+    if (id === 'terrain' && allies[0] && enemies[0]) {
+      allies[0].x = 260;
+      allies[0].y = 160;
+      allies[0].controllerId = 'ai:player-auto';
+      enemies[0].x = 700;
+      enemies[0].y = 160;
+      enemies[0].controllerId = 'ai:monster';
+      allies[0].components.movement.path = null;
+      enemies[0].components.movement.path = null;
     }
     if ((id === 'interrupt' || id === 'overlap') && enemies.length) {
       enemies.slice(0, id === 'overlap' ? 3 : 1).forEach(function (enemy) {
@@ -729,6 +968,36 @@
     for (var gy = 0; gy <= canvas.height; gy += 32) {
       ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(canvas.width, gy); ctx.stroke();
     }
+    if (labTerrainLayout && ((encounter && encounter.context.terrainCollision) ||
+        $('scenario').value === 'mmoAggro')) {
+      var nav = labTerrainLayout.nav;
+      for (var ty = 0; ty < nav.h; ty++) {
+        for (var tx = 0; tx < nav.w; tx++) {
+          if (nav.grid[ty][tx]) continue;
+          ctx.fillStyle = (tx === 29 || tx === 30) && ty <= 22
+            ? '#3b4058' : '#202538';
+          ctx.fillRect(tx * nav.cell, ty * nav.cell, nav.cell, nav.cell);
+          ctx.strokeStyle = 'rgba(151,164,202,.18)';
+          ctx.strokeRect(tx * nav.cell + .5, ty * nav.cell + .5, nav.cell - 1, nav.cell - 1);
+        }
+      }
+      Game.actors.query().forEach(function (actor) {
+        var path = actor.components.movement && actor.components.movement.path;
+        if (!path || path.failed || !path.points.length) return;
+        ctx.save();
+        ctx.strokeStyle = actor.teamId === allyTeamId
+          ? 'rgba(104,174,231,.55)' : 'rgba(239,117,105,.55)';
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath();
+        ctx.moveTo(actor.x, actor.y);
+        for (var pi = path.index; pi < path.points.length; pi++) {
+          ctx.lineTo(path.points[pi].x, path.points[pi].y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      });
+    }
+    drawMmoOverlay();
     if (encounter) encounter.telegraphs.forEach(function (telegraph) {
       ctx.fillStyle = 'rgba(239,117,105,.18)'; ctx.strokeStyle = '#ef7569'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(telegraph.x, telegraph.y, telegraph.radius || 28, 0, Math.PI * 2);
@@ -804,6 +1073,37 @@
     drawActionBubbles();
   }
 
+  function drawMmoOverlay() {
+    if ($('scenario').value !== 'mmoAggro' || !mmoState) return;
+    var hero = mmoState.hero;
+    mmoState.packs.forEach(function (pack, index) {
+      var representative = pack.actors.filter(function (actor) { return !actor.dead; })[0] ||
+        pack.primary;
+      var p = representative && Game.worldAggro.policy(representative) || {};
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = 'rgba(237,240,255,.32)';
+      ctx.beginPath(); ctx.arc(pack.x, pack.y, pack.leashRadius, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = 'rgba(239,117,105,.65)';
+      ctx.beginPath(); ctx.arc(pack.x, pack.y, Number(p.aggroRadius) || 64, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = 'rgba(231,196,91,.42)';
+      ctx.beginPath(); ctx.arc(pack.x, pack.y, Number(p.assistRadius) || 96, 0, Math.PI * 2); ctx.stroke();
+      if (representative && hero) {
+        var visible = Game.terrain.hasLineOfSight(representative, hero, 4);
+        ctx.setLineDash([]);
+        ctx.strokeStyle = visible ? 'rgba(110,210,138,.8)' : 'rgba(239,117,105,.88)';
+        ctx.beginPath(); ctx.moveTo(hero.x, hero.y); ctx.lineTo(representative.x, representative.y); ctx.stroke();
+      }
+      ctx.fillStyle = '#edf0ff';
+      ctx.font = '10px ui-monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('PACK ' + String.fromCharCode(65 + index), pack.x, pack.y - 12);
+      ctx.restore();
+    });
+  }
+
   function bodyRadius(actor) {
     return Math.max(0, Number(actor && actor.components.body &&
       actor.components.body.collisionRadius) || 0);
@@ -846,6 +1146,8 @@
       return a.id.localeCompare(b.id);
     }).map(function (actor) {
       var intent = actor.components.movement.intent;
+      var path = actor.components.movement.path;
+      var terrainEnabled = !!(encounter && encounter.context.terrainCollision && labTerrainLayout);
       var action = actor.components.actionState;
       return {
         actorId: actor.id,
@@ -855,6 +1157,20 @@
         intent: intent && {
           reason: intent.reason, targetActorId: intent.targetId,
           stopRange: intent.stopRange
+        },
+        path: path && {
+          targetActorId: path.targetId,
+          plannedTick: path.plannedTick,
+          expiresTick: path.expiresTick,
+          waypoint: path.index + 1,
+          waypointCount: path.points.length,
+          failed: path.failed
+        },
+        terrain: {
+          enabled: terrainEnabled,
+          legal: !terrainEnabled || Game.terrain.isWalkable(
+            actor.x, actor.y, bodyRadius(actor)
+          )
         },
         action: action && {
           state: action.state, abilityId: action.abilityId,
@@ -899,7 +1215,9 @@
         item.intent && item.intent.targetActorId,
         item.action && item.action.state,
         item.action && item.action.abilityId,
-        item.contact && item.contact.overlapping
+        item.contact && item.contact.overlapping,
+        item.path && item.path.waypoint,
+        item.terrain && item.terrain.legal
       ]);
       var periodicPrimary = encounter && encounter.tick % 10 === 0 &&
         item.actorId === 'lab:ally:0';
@@ -947,7 +1265,9 @@
       movement: {
         current: movementSnapshot(),
         overlaps: physicalOverlaps(),
-        trace: movementTrace.slice()
+        trace: movementTrace.slice(),
+        terrainMetrics: encounter && encounter.metrics.movement || null,
+        terrainAudit: lastTerrainAudit
       },
       panel: $('presentation-events').textContent
     };
@@ -975,6 +1295,278 @@
     updateUi(true);
     return presentationDiagnostics();
   }
+
+  function runTerrainAudit() {
+    if ($('scenario').value !== 'terrain' || !encounter || encounter.lifecycle !== 'active') {
+      $('scenario').value = 'terrain';
+      reset();
+    }
+    paused = true;
+    $('pause').textContent = tr('resume');
+    var ally = Game.actors.query({ teamId: allyTeamId })[0];
+    var enemy = Game.actors.query({ teamId: enemyTeamId })[0];
+    if (!ally || !enemy || !encounter || !labTerrainLayout) {
+      lastTerrainAudit = { passed: false, reason: 'setup' };
+      $('terrain-audit-status').textContent = tr('terrainFailed');
+      return lastTerrainAudit;
+    }
+    function legal(actor) {
+      return Game.terrain.isWalkable(actor.x, actor.y, bodyRadius(actor));
+    }
+    function clearRuntimeMovement(actor) {
+      actor.components.movement.intent = null;
+      actor.components.movement.path = null;
+      actor.components.movement.moving = false;
+    }
+
+    // First reproduce the old failure: a retreat and a knockback point directly
+    // into the wall. Both must be shortened by the production swept collision.
+    ally.x = 456; ally.y = 200;
+    enemy.x = 420; enemy.y = 200;
+    var retreatStart = ally.x;
+    Game.combat.applyEffect({
+      encounterId: encounter.id, sourceActorId: ally.id,
+      targetActorId: ally.id, abilityId: 'lab.terrain-retreat'
+    }, {
+      type: 'movement', distance: 40,
+      target: { relation: 'self', shape: 'single', range: 9999 }
+    });
+    var retreat = {
+      requested: 40,
+      moved: +(ally.x - retreatStart).toFixed(2),
+      legal: legal(ally),
+      clamped: ally.x < 464
+    };
+
+    ally.x = 420; ally.y = 200;
+    enemy.x = 456; enemy.y = 200;
+    var knockbackStart = enemy.x;
+    Game.combat.applyEffect({
+      encounterId: encounter.id, sourceActorId: ally.id,
+      targetActorId: enemy.id, abilityId: 'lab.terrain-knockback'
+    }, {
+      type: 'knockback', distance: 40,
+      target: { relation: 'hostile', shape: 'single', range: 9999 }
+    });
+    var knockback = {
+      requested: 40,
+      moved: +(enemy.x - knockbackStart).toFixed(2),
+      legal: legal(enemy),
+      clamped: enemy.x < 464
+    };
+
+    ally.x = 472; ally.y = 200;
+    clearRuntimeMovement(ally);
+    var embeddedBefore = !legal(ally);
+    stepCombat();
+    var embeddedRecovery = {
+      reproduced: embeddedBefore,
+      legal: legal(ally),
+      x: +ally.x.toFixed(2),
+      y: +ally.y.toFixed(2)
+    };
+
+    ally.x = 260; ally.y = 160;
+    enemy.x = 700; enemy.y = 160;
+    ally.controllerId = 'ai:player-auto';
+    enemy.controllerId = 'ai:monster';
+    clearRuntimeMovement(ally);
+    clearRuntimeMovement(enemy);
+    movementTrace = [];
+    movementSignatures = {};
+    traceMovement(true);
+
+    var usedOpening = false;
+    var illegalSamples = 0;
+    var actionStarted = false;
+    var ticks = 0;
+    for (; ticks < 1400 && encounter.lifecycle === 'active'; ticks++) {
+      stepCombat();
+      [ally, enemy].forEach(function (actor) {
+        if (!legal(actor)) illegalSamples++;
+        if (actor.y >= 23 * 16 && actor.x >= 27 * 16 && actor.x <= 32 * 16) {
+          usedOpening = true;
+        }
+      });
+      actionStarted = actionStarted || Object.keys(encounter.metrics.actions).some(function (actorId) {
+        return encounter.metrics.actions[actorId] > 0;
+      });
+      if (usedOpening && actionStarted) break;
+    }
+    var metrics = encounter.metrics.movement || {};
+    lastTerrainAudit = {
+      passed: retreat.clamped && retreat.legal && knockback.clamped && knockback.legal &&
+        embeddedRecovery.reproduced && embeddedRecovery.legal &&
+        illegalSamples === 0 && usedOpening && actionStarted &&
+        metrics.pathReplans > 0 && metrics.pathFailures === 0,
+      ticks: ticks + 1,
+      retreat: retreat,
+      knockback: knockback,
+      embeddedRecovery: embeddedRecovery,
+      route: {
+        usedOpening: usedOpening,
+        actionStarted: actionStarted,
+        illegalSamples: illegalSamples
+      },
+      metrics: Object.assign({}, metrics),
+      overlaps: physicalOverlaps()
+    };
+    $('terrain-audit-status').textContent = lastTerrainAudit.passed
+      ? tr('terrainPassed') : tr('terrainFailed');
+    updatePresentation(.05);
+    draw();
+    updateUi(true);
+    return lastTerrainAudit;
+  }
+
+  function runMmoAggroAudit() {
+    if ($('scenario').value !== 'mmoAggro' || !mmoState) {
+      $('scenario').value = 'mmoAggro';
+      reset();
+    }
+    paused = true;
+    $('pause').textContent = tr('resume');
+    var hero = mmoState.hero;
+    var initialPack = mmoState.packs[0];
+    var assistPack = mmoState.packs[1];
+    var blockedPack = mmoState.packs[2];
+    var checks = [];
+    function check(id, pass, details) {
+      checks.push({ id: id, pass: !!pass, details: details || null });
+      return !!pass;
+    }
+
+    Game.state.settings.controlMode = 'manual';
+    var manualCandidate = Game.worldAggro.findDetection(hero);
+    Game.state.settings.controlMode = 'auto';
+    var autoCandidate = Game.worldAggro.findDetection(hero);
+    Game.state.settings.controlMode = 'manual';
+    check('modes', !!manualCandidate && !!autoCandidate &&
+      manualCandidate.actor.id === autoCandidate.actor.id, {
+        manual: manualCandidate && manualCandidate.actor.id,
+        auto: autoCandidate && autoCandidate.actor.id
+      });
+    check('los', !Game.terrain.hasLineOfSight(blockedPack.primary, hero, 4), {
+      actorId: blockedPack.primary.id
+    });
+
+    Game.worldAggro.scan();
+    encounter = hero.encounterId && Game.encounters.get(hero.encounterId);
+    var initialIds = initialPack.actors.map(function (actor) { return actor.id; }).sort();
+    check('interrupt', mmoState.gatheringInterrupted && !hero.interactOrder && !hero.moveOrder);
+    check('initialPack', !!encounter && initialIds.every(function (actorId) {
+      return encounter.participants.indexOf(actorId) >= 0 &&
+        encounter.threatTables[actorId] && encounter.threatTables[actorId][hero.id] >= 1;
+    }), { actorIds: initialIds });
+
+    Game.worldAggro.scan();
+    Game.worldAggro.scan();
+    var assistIds = assistPack.actors.map(function (actor) { return actor.id; }).sort();
+    check('assist', !!encounter && encounter.context.assistPackIds.length === 1 &&
+      assistIds.every(function (actorId) { return encounter.participants.indexOf(actorId) >= 0; }) &&
+      blockedPack.actors.every(function (actor) { return !actor.encounterId; }), {
+        assistPackIds: encounter && encounter.context.assistPackIds.slice(),
+        leashZones: encounter && encounter.context.leashZones.length
+      });
+
+    var summoner = encounter && encounter.participants.map(Game.actors.get).filter(function (actor) {
+      return actor && actor.blueprint.archetypeId === 'shaman_mosscap';
+    })[0];
+    var summonAbility = Game.content.get('ability', 'shaman_mosscap.plant_spore_pod');
+    var summonEffect = summonAbility && summonAbility.effects.filter(function (effect) {
+      return effect.type === 'summon';
+    })[0];
+    if (summoner && summonEffect) {
+      Game.combat.applyEffect({
+        encounterId: encounter.id,
+        sourceActorId: summoner.id,
+        targetActorId: hero.id,
+        abilityId: summonAbility.id
+      }, summonEffect);
+      Game.combat.applyEffect({
+        encounterId: encounter.id,
+        sourceActorId: summoner.id,
+        targetActorId: hero.id,
+        abilityId: summonAbility.id
+      }, summonEffect);
+    }
+    var summons = Game.actors.query({ category: 'summon' }).filter(function (actor) {
+      return !actor.dead;
+    });
+    var summon = summons[0];
+    check('summon', summons.length === 1 && summon && summoner &&
+      summon.teamId === summoner.teamId && summon.factionId === summoner.factionId &&
+      summon.controllerId === summoner.controllerId && summon.rewardAuthorized === false &&
+      Number(summon.exp) === 0 && Number(summon.gold) === 0 &&
+      encounter.context.assistPackIds.length === 1, summon && compactActor(summon));
+
+    var defeated = initialPack.actors.filter(function (actor) {
+      return actor !== summoner;
+    })[0];
+    if (defeated) {
+      defeated.hp = 0;
+      defeated.dead = true;
+      defeated.lifecycle = 'defeated';
+      defeated.components.actionState.state = 'defeated';
+    }
+    var survivors = encounter.participants.map(Game.actors.get).filter(function (actor) {
+      return actor && actor.teamId === enemyTeamId && actor !== defeated &&
+        actor.category !== 'summon' && !actor.dead;
+    });
+    survivors.forEach(function (actor) {
+      actor.hp = actor.maxHp * .35;
+      actor.x = Math.min(448, actor.x + 36);
+    });
+    hero.x = 900;
+    hero.y = 400;
+    Game.combat.tickFixed(encounter.id);
+    var leashEnded = encounter.lifecycle === 'ended' && encounter.result &&
+      encounter.result.reason === 'leash';
+    check('leash', leashEnded && encounter.context.leashZones.length === 2 &&
+      Game.actors.query({ category: 'summon' }).length === 0, {
+        result: encounter.result,
+        leashZones: encounter.context.leashZones
+      });
+
+    for (var tick = 0; tick < 180 && survivors.some(function (actor) {
+      return Game.worldAggro.isEvading(actor);
+    }); tick++) {
+      if (Game.nav) Game.nav.update(32);
+      survivors.forEach(function (actor) { Game.worldAggro.updateEvader(actor, .1); });
+    }
+    var returned = survivors.every(function (actor) {
+      return !Game.worldAggro.isEvading(actor) && actor.hp === actor.maxHp &&
+        Game.util.dist(actor.x, actor.y, actor.spawnX, actor.spawnY) <= 6 &&
+        Game.terrain.isWalkable(actor.x, actor.y,
+          actor.components.body && actor.components.body.collisionRadius || 6);
+    });
+    check('evade', returned, Game.worldAggro.snapshot());
+    check('defeated', !defeated || (defeated.dead && defeated.hp === 0 &&
+      !Game.worldAggro.isEvading(defeated)));
+
+    lastMmoAudit = {
+      passed: checks.every(function (entry) { return entry.pass; }),
+      checks: checks,
+      events: mmoState.timeline.slice(),
+      snapshot: Game.worldAggro.snapshot(),
+      encounter: encounter && {
+        id: encounter.id,
+        lifecycle: encounter.lifecycle,
+        result: encounter.result,
+        initialPackId: encounter.context.initialPackId,
+        assistPackIds: encounter.context.assistPackIds.slice(),
+        leashZones: encounter.context.leashZones.slice()
+      }
+    };
+    $('mmo-audit-status').textContent = lastMmoAudit.passed
+      ? tr('mmoPassed') : tr('mmoFailed');
+    renderMmoTimeline();
+    updatePresentation(.05);
+    draw();
+    updateUi(true);
+    return lastMmoAudit;
+  }
+
   function compactActor(actor) {
     if (!actor) return null;
     return {
@@ -1104,6 +1696,9 @@
       'telegraphs ' + encounter.telegraphs.length,
       'events ' + encounter.eventLog.length,
       'visuals ' + Game.combatPresentation.snapshot().recordCount,
+      'nav ' + (encounter.metrics.movement
+        ? encounter.metrics.movement.pathReplans + '/' + encounter.metrics.movement.pathFailures
+        : '—'),
       'result ' + (encounter.result && encounter.result.winnerTeamId || '—')
     ].map(function (value) { return '<span>' + value + '</span>'; }).join('');
     $('participants').textContent = JSON.stringify(Game.actors.query().map(compactActor), null, 2);
@@ -1115,7 +1710,12 @@
     $('events').textContent = JSON.stringify(encounter.eventLog.slice(-35), null, 2);
     $('presentation-events').textContent = JSON.stringify(
       Game.combatPresentation.snapshot().records.slice(-35), null, 2);
-    $('movement-trace').textContent = JSON.stringify(movementTrace.slice(-35), null, 2);
+    $('movement-trace').textContent = JSON.stringify({
+      terrainEnabled: !!encounter.context.terrainCollision,
+      metrics: encounter.metrics.movement || null,
+      terrainAudit: lastTerrainAudit,
+      trace: movementTrace.slice(-35)
+    }, null, 2);
     $('ecosystem').textContent = JSON.stringify({
       population: Game.content.populationView('population.' + (encounter.profile.regionId || 'grassland')),
       leases: Game.population.leases(),
@@ -1128,6 +1728,13 @@
       variantCleanup: encounter.scheduler.filter(function (item) {
         return item.kind === 'variantTransition';
       }),
+      combatNavigation: {
+        terrainEnabled: !!encounter.context.terrainCollision,
+        metrics: encounter.metrics.movement || null,
+        audit: lastTerrainAudit
+      },
+      worldAggro: Game.worldAggro && Game.worldAggro.snapshot(),
+      mmoAudit: lastMmoAudit,
       social: Game.state && Game.state.world && Game.state.world.social,
       summonDiagnostics: {
         selectedArchetypeId: $('summon-archetype').value,
@@ -1189,6 +1796,8 @@
         stepCombat(); updatePresentation(.05); draw(); updateUi(true);
       }],
       ['impact', function () { runToImpact(500); }],
+      ['terrain-audit', runTerrainAudit],
+      ['mmo-audit', runMmoAggroAudit],
       ['force-action', function () {
         Game.combat.requestAction({
           actorId: $('tool-source').value, targetId: $('tool-target').value,
@@ -1268,6 +1877,8 @@
       snapshot: function () { return Game.actionBubbles.active(); },
       rebuild: reset,
       stepUntilImpact: runToImpact,
+      terrainAudit: runTerrainAudit,
+      mmoAggroAudit: runMmoAggroAudit,
       presentation: presentationDiagnostics,
       portraits: updatePortraitQa,
       summon: doSummon,

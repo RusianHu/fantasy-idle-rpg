@@ -399,6 +399,15 @@
       graphics.fillRect(x + 3, y + 6, 2, 2);
       graphics.fillStyle = '#f7e7c7';
       graphics.fillRect(x + 3, y, 1, 3);
+    } else if (icon === 'evade') {
+      graphics.fillStyle = accent;
+      graphics.fillRect(x + 1, y + 1, 5, 1);
+      graphics.fillRect(x, y + 2, 2, 3);
+      graphics.fillRect(x + 1, y + 5, 2, 2);
+      graphics.fillStyle = ink;
+      graphics.fillRect(x + 3, y + 3, 5, 1);
+      graphics.fillRect(x + 6, y + 4, 2, 3);
+      graphics.fillRect(x + 5, y + 6, 1, 1);
     } else if (icon === 'chest') {
       graphics.fillRect(x, y + 2, 8, 6);
       graphics.fillStyle = accent;

@@ -235,6 +235,11 @@
     accent: '#bd554c', paper: '#efd7bc', ink: '#3b201d',
     placement: 'side', priority: 95, duration: 1.35, cooldown: 1.2
   });
+  registerType('evade', {
+    icon: 'evade',
+    accent: '#7e8790', paper: '#d8d5c8', ink: '#30353a',
+    placement: 'side', priority: 92, duration: 1.8, cooldown: 1.4
+  });
   registerType('chest', {
     icon: 'chest',
     accent: '#b3813e', paper: '#f0dfb2', ink: '#342617',

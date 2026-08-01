@@ -79,7 +79,8 @@
     },
 
     actorTapDistance: function (actor, wx, wy) {
-      if (!actor || actor.dead || actor.hazardConcealed || actor.lifecycle !== 'active') {
+      if (!actor || actor.dead || actor.hazardConcealed || actor.evading ||
+          actor.lifecycle !== 'active') {
         return Infinity;
       }
       var spriteH = Math.max(0, Number(actor.spriteH) || 0);
@@ -97,7 +98,7 @@
 
     isHostileActor: function (source, target) {
       return !!(source && target && target.components && target.components.vitals &&
-        !target.hazardConcealed &&
+        !target.hazardConcealed && !target.evading &&
         target.hp > 0 && !target.dead &&
         Game.relations.resolve(source.id, target.id, source.encounterId || null) === 'hostile');
     },
@@ -134,10 +135,36 @@
       return active.length;
     },
 
-    startEncounter: function (target) {
+    interruptForEncounter: function (reason) {
+      var hero = W.hero;
+      if (!hero) return false;
+      W.cancelInteraction(reason || 'combat');
+      hero.moveOrder = null;
+      hero.manualTarget = false;
+      if (Game.nav) Game.nav.clear(hero);
+      if (Game.ui && Game.ui.trade) Game.ui.trade.close(reason || 'combat');
+      if (Game.ui && Game.ui.modals && Game.ui.modals.closeInteractionModals) {
+        Game.ui.modals.closeInteractionModals(reason || 'combat');
+      }
+      if (Game.interactions && Game.interactions.resetPauses) {
+        Game.interactions.resetPauses(reason || 'combat');
+      }
+      return true;
+    },
+
+    startEncounter: function (target, options) {
+      options = options || {};
       var hero = W.hero;
       if (!W.isHostileActor(hero, target)) return null;
-      if (hero.encounterId) return Game.encounters.get(hero.encounterId);
+      if (hero.encounterId) {
+        var current = Game.encounters.get(hero.encounterId);
+        if (current && current.lifecycle === 'active' &&
+            current.participants.indexOf(target.id) >= 0) {
+          Game.combatAI.setPriorityTarget(hero.id, target.id);
+          hero.target = target;
+        }
+        return current;
+      }
       // Never create an encounter that the first fixed tick must immediately
       // destroy. The target remains locked while the hero enters the pack leash.
       if (!W.isWithinEncounterLeash(hero, target)) return null;
@@ -145,6 +172,28 @@
       var profileId = 'encounter.' + W.region.id + (boss ? '.boss' : '');
       var stableSpawn = target.spawnId || target.packAnchorId || target.id;
       var ordinal = (W.encounterOrdinals[stableSpawn] || 0) + 1;
+      var pack = target.packId && Game.content &&
+        Game.content.get && Game.content.get('encounterPack', target.packId);
+      var groupAlert = boss || !pack || pack.groupAlert !== false;
+      var ids = boss || !groupAlert ? [target.id] : (target.packMemberIds || [target.id]);
+      var members = ids.map(Game.actors.get).filter(function (actor) {
+        return actor && actor.lifecycle === 'active' && !actor.dead && actor.hp > 0 &&
+          !actor.evading && !actor.evadeState && !actor.hazardConcealed && !actor.hidden;
+      }).sort(function (a, b) { return a.id.localeCompare(b.id); });
+      var initialPackId = target.packAnchorId || target.spawnId || target.packId || target.id;
+      var leashZone = target.packLeashRadius &&
+        Number.isFinite(target.packAnchorX) && Number.isFinite(target.packAnchorY) ? {
+          packId: initialPackId,
+          x: target.packAnchorX,
+          y: target.packAnchorY,
+          radius: target.packLeashRadius,
+          actorIds: members.map(function (actor) { return actor.id; })
+        } : null;
+      var engagementPolicyId = target.blueprint && target.blueprint.resolvedProfiles &&
+        target.blueprint.resolvedProfiles.engagementPolicyId;
+      var engagementPolicy = engagementPolicyId && Game.content && Game.content.get &&
+        Game.content.get('engagementPolicy', engagementPolicyId) || {};
+      W.interruptForEncounter(options.reason || 'combat');
       var encounter = Game.encounters.start(profileId, {
         id: 'world:' + W.region.id + ':' + W.encounterSequence++,
         seed: U.strSeed([Game.state.world.worldSeed, W.region.id, stableSpawn, ordinal, profileId].join('|')),
@@ -155,16 +204,35 @@
           x: target.packAnchorX, y: target.packAnchorY
         } : null,
         leashRadius: target.packLeashRadius || 0,
-        world: true
+        leashZones: leashZone ? [leashZone] : [],
+        initialPackId: initialPackId,
+        initialPackActorIds: members.map(function (actor) { return actor.id; }),
+        assistPackIds: [],
+        assistPackActorIds: {},
+        engagement: {
+          reason: options.reason || 'player-command',
+          initiatorActorId: options.initiatorActorId || hero.id,
+          socialGroupId: target.socialGroupId || null,
+          policyId: engagementPolicyId || null,
+          maxAssistPacks: boss ? 0 : Math.max(0, Number(engagementPolicy.maxAssistPacks) || 0)
+        },
+        aggroDiagnostics: {
+          detectedAtWorldTime: Number(Game.state.world.worldTime) || 0,
+          initialDistance: U.dist(hero.x, hero.y, target.x, target.y),
+          requiresLineOfSight: engagementPolicy.requiresLineOfSight !== false
+        },
+        world: true,
+        boss: !!boss
       });
       W.encounterOrdinals[stableSpawn] = ordinal;
       Game.encounters.join(encounter.id, hero.id, 'party');
-      var ids = boss ? [target.id] : (target.packMemberIds || [target.id]);
-      ids.map(Game.actors.get).filter(function (actor) {
-        return actor && !actor.dead && actor.hp > 0;
-      }).sort(function (a, b) { return a.id.localeCompare(b.id); }).forEach(function (actor) {
+      members.forEach(function (actor) {
         Game.encounters.join(encounter.id, actor.id, 'enemy');
+        actor.engaged = true;
       });
+      if (Game.worldAggro && Game.worldAggro.seedThreat) {
+        Game.worldAggro.seedThreat(encounter, members, hero);
+      }
       Game.combatAI.strategy(hero.id, Game.state.settings.combatStrategy || 'balanced');
       hero.tactics = Object.assign({}, Game.state.settings.combatTactics || {});
       hero.components.targeting.priorityTargetId = target.id;
@@ -180,6 +248,7 @@
     init: function (rid) {
       W.bindControls();
       W.endEncounter('region-change');
+      if (Game.worldAggro) Game.worldAggro.reset();
       if (Game.hazards) Game.hazards.reset();
       if (W.hero && Game.units) Game.units.commit(W.hero);
       if (Game.population) Game.population.reset(rid);
@@ -923,6 +992,31 @@
       if (hero.state === 'dead' || hero.state === 'recover' || hero.state === 'entrance') return;
       var sw = Game.state.world;
 
+      // Encounter 激活后世界坐标由固定战斗 tick 独占。点击只允许在当前
+      // Encounter 的存活敌方参与者之间切换优先目标，不能借此拉入新 pack。
+      if (hero.encounterId) {
+        var encounter = Game.encounters.get(hero.encounterId);
+        var combatBest = null, combatBestD = Infinity;
+        if (encounter && encounter.lifecycle === 'active') {
+          encounter.participants.map(Game.actors.get).forEach(function (actor) {
+            if (!actor || actor === hero || !W.isHostileActor(hero, actor)) return;
+            var distance = W.actorTapDistance(actor, wx, wy);
+            if (Number.isFinite(distance) && distance < combatBestD) {
+              combatBest = actor;
+              combatBestD = distance;
+            }
+          });
+        }
+        if (combatBest) {
+          hero.target = combatBest;
+          hero.manualTarget = true;
+          Game.combatAI.setPriorityTarget(hero.id, combatBest.id);
+          if (Game.fx) Game.fx.ring(combatBest.x,
+            combatBest.y - combatBest.spriteH * 0.4, 12, '#f0c860');
+        }
+        return;
+      }
+
       // 交易实体（≥30px 世界命中）；行商篷车复用存活 Actor 的正式交谈入口。
       if (Game.trade) {
         var areas = Game.trade.areas();
@@ -1136,16 +1230,30 @@
           W.onEntityKilled(actor, event.sourceActorId && Game.actors.get(event.sourceActorId));
         }
       });
-      bus.on('encounter:ended', function () {
+      bus.on('encounter:ended', function (event) {
         if (!W.hero || !W.hero.components.vitals) return;
         if (Game.units) Game.units.commit(W.hero);
         else Game.state.player.hp = W.hero.hp;
         W.hero.target = null;
+        W.hero.manualTarget = false;
+        W.hero.moveOrder = null;
+        if (Game.nav) Game.nav.clear(W.hero);
+        var reason = event && event.payload && event.payload.reason || 'ended';
+        var safeToPlan = Game.state.world.mode === 'battle' &&
+          W.hero.state !== 'dead' && W.hero.state !== 'recover' &&
+          ['travel', 'region-change', 'reset', 'removed', 'boss-failed'].indexOf(reason) < 0;
+        if (safeToPlan && W.controlMode() === 'auto' &&
+            Game.expeditionAI && Game.expeditionAI.replan) {
+          Game.expeditionAI.replan('combat-ended:' + reason);
+        } else if (safeToPlan && W.controlMode() === 'manual') {
+          W.hero.state = 'idle';
+        }
       });
     },
 
     canManualMove: function (hero) {
       return !!hero && Game.player.hasClass() &&
+        !hero.encounterId &&
         !(Game.transitions && Game.transitions.isActive()) &&
         !(Game.ending && Game.ending.isActive()) &&
         Game.state.world.mode === 'battle' &&
@@ -1173,7 +1281,13 @@
       w.mode = mode;
       var hero = W.hero;
       if (mode === 'rest') {
-        W.endEncounter('retreat');
+        var activeEncounter = hero.encounterId && Game.encounters.get(hero.encounterId);
+        if (!bossRetreat && activeEncounter && Game.worldAggro &&
+            Game.worldAggro.beginEvade(activeEncounter, 'retreat')) {
+          // 普通回营与越界共用 Evade；存活怪物自行返回出生点。
+        } else {
+          W.endEncounter('retreat');
+        }
         W.flushGroundLoot('rest');
         W.cancelInteraction('rest');
         // 先切换到安全模式，再撤掉 Boss，确保点击后的同一帧不再受击。
@@ -1323,6 +1437,9 @@
       if (Game.items) Game.items.update(dt);
       if (Game.environment) Game.environment.update(dt);
       W.updateGroundLoot(dt);
+      // 世界敌方感知必须先于自动回营和玩家自动/手动行为，确保同一逻辑
+      // tick 中断互动与探索路线并立即把坐标所有权交给 Encounter。
+      if (Game.worldAggro) Game.worldAggro.update(dt);
       W.updateAutoCamp(hero);
 
       // 自动讨伐开启时，进度满且状态安全才让 Boss 登场；关闭时等待手动按钮。
@@ -1488,6 +1605,26 @@
 
       Game.combat.potionTick(hero, dt);
 
+      // 战斗内不接受世界移动输入；追击、避让、击退与碰撞全部由 50ms
+      // 固定 tick 更新，避免渲染帧移动和战斗帧互相覆盖坐标。
+      if (hero.encounterId) {
+        var activeEncounter = Game.encounters.get(hero.encounterId);
+        var priorityId = hero.components.targeting.priorityTargetId;
+        var priority = priorityId && Game.actors.get(priorityId);
+        if (!priority || !activeEncounter ||
+            activeEncounter.participants.indexOf(priority.id) < 0 ||
+            !W.isHostileActor(hero, priority)) {
+          priority = activeEncounter && Game.combatAI.chooseTarget(activeEncounter, hero,
+            { relation: 'hostile' });
+        }
+        hero.target = priority || null;
+        var fixedMove = hero.components.movement.intent;
+        hero.state = fixedMove ? 'walk' : 'fight';
+        hero.moving = !!fixedMove;
+        if (priority) hero.dir = U.dirOf(priority.x - hero.x, priority.y - hero.y);
+        return;
+      }
+
       // 手动方向输入优先于点地路径和锁定目标
       if (W.controlMode() === 'manual') {
         var mv = W.manualMoveVector();
@@ -1612,6 +1749,7 @@
 
     /* ---------------- 怪物 AI ---------------- */
     updateMonster: function (e, dt) {
+      if (Game.worldAggro && Game.worldAggro.updateEvader(e, dt)) return;
       if (e.hazardConcealed) {
         e.flash = Math.max(0, e.flash - dt);
         e.lungeT = Math.max(0, e.lungeT - dt);

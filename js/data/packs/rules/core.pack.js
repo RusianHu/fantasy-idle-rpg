@@ -135,15 +135,21 @@
       engagementPolicy: [
         {
           id: 'engagement.hostile', manualAttack: true, autoAggro: true,
-          groupPropagation: 'socialGroup', rewardEligible: true, memorySeconds: 180
+          groupPropagation: 'socialGroup', rewardEligible: true, memorySeconds: 180,
+          aggroRadius: 64, contactRadius: 34, assistRadius: 96,
+          maxAssistPacks: 1, requiresLineOfSight: true
         },
         {
           id: 'engagement.protected', manualAttack: false, autoAggro: false,
-          groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
+          groupPropagation: 'none', rewardEligible: false, memorySeconds: 0,
+          aggroRadius: 0, contactRadius: 0, assistRadius: 0,
+          maxAssistPacks: 0, requiresLineOfSight: true
         },
         {
           id: 'engagement.neutral-provokable', manualAttack: true, autoAggro: false,
-          groupPropagation: 'socialGroup', rewardEligible: false, memorySeconds: 180
+          groupPropagation: 'socialGroup', rewardEligible: false, memorySeconds: 180,
+          aggroRadius: 0, contactRadius: 0, assistRadius: 0,
+          maxAssistPacks: 0, requiresLineOfSight: true
         }
       ],
       tacticsProfile: [

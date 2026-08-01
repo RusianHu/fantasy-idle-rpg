@@ -214,7 +214,10 @@
     actor.spawnX = context.x; actor.spawnY = context.y;
     actor.packId = pack && pack.id || null;
     actor.packAnchorId = lease.groupId;
-    actor.packAnchorX = context.x; actor.packAnchorY = context.y;
+    // pack 共享同一个 lease 锚点；成员自身 spawnX/Y 仍保留阵型偏移。
+    // 否则由不同成员发现玩家时会生成不同 leash zone。
+    actor.packAnchorX = Number.isFinite(lease.context.x) ? lease.context.x : context.x;
+    actor.packAnchorY = Number.isFinite(lease.context.y) ? lease.context.y : context.y;
     actor.packLeashRadius = pack && pack.leashRadius || 0;
     actor.packPrimary = context.memberIndex === 0;
     actor.rewardScale = (pack && pack.rewardBudget || 1) / Math.max(1, pack && pack.members.length || 1);

@@ -38,7 +38,7 @@ Game.encounters = {
     encounterStarts++;
     const encounter = {
       id: context.id, profileId, context, lifecycle: 'active',
-      participants: [], teams: {}
+      participants: [], teams: {}, threatTables: {}
     };
     encounters.set(encounter.id, encounter);
     return encounter;
@@ -49,6 +49,7 @@ Game.encounters = {
     encounter.participants.push(actorId);
     encounter.teams[teamId] = encounter.teams[teamId] || { id: teamId, members: [] };
     encounter.teams[teamId].members.push(actorId);
+    encounter.threatTables[actorId] = {};
     actor.encounterId = id;
     actor.teamId = teamId;
     return true;
@@ -66,10 +67,28 @@ Game.encounters = {
     return { reason };
   }
 };
-Game.combatAI = { strategy() {} };
+Game.combatAI = {
+  strategy() {},
+  setPriorityTarget(actorId, targetId) {
+    actors.get(actorId).components.targeting.priorityTargetId = targetId;
+    return true;
+  }
+};
 Game.nav = { finder: null, clear(ent) { if (ent) ent.navRoute = null; } };
 Game.terrain = { costAt: () => 1 };
 Game.particles = null;
+Game.content = {
+  get(type) {
+    if (type === 'encounterPack') return { groupAlert: true };
+    if (type === 'engagementPolicy') return {
+      maxAssistPacks: 1, requiresLineOfSight: true
+    };
+    return null;
+  }
+};
+Game.player = { hasClass: () => true };
+Game.transitions = { isActive: () => false };
+Game.ending = { isActive: () => false };
 
 vm.runInContext(read('js/systems/world.js'), sandbox, { filename: 'js/systems/world.js' });
 const W = Game.world;
@@ -95,12 +114,21 @@ const monster = {
   dead: false, packId: 'grassland.solo-a', packAnchorId: 'threat-a',
   packAnchorX: 0, packAnchorY: 180, packLeashRadius: 144,
   packMemberIds: ['monster-a'], territory: { radius: 165 },
-  rewardScale: 1, components: { vitals: { hp: 100, maxHp: 100 } }
+  rewardScale: 1, lifecycle: 'active', spriteH: 18, socialGroupId: 'wild',
+  blueprint: { resolvedProfiles: { engagementPolicyId: 'engagement.hostile' } },
+  components: { vitals: { hp: 100, maxHp: 100 } }
 };
+const monsterMate = {
+  ...monster, id: 'monster-b', x: 135, spawnX: 135,
+  memberSlotId: 'member-b', components: { vitals: { hp: 100, maxHp: 100 } }
+};
+monster.packMemberIds = ['monster-a', 'monster-b'];
+monsterMate.packMemberIds = monster.packMemberIds;
 actors.set(hero.id, hero);
 actors.set(monster.id, monster);
+actors.set(monsterMate.id, monsterMate);
 W.hero = hero;
-W.entities = [hero, monster];
+W.entities = [hero, monster, monsterMate];
 
 // Reproduces the reported geometry: the bubble can appear at 72px, but the
 // hero is already outside the pack leash and must not create a one-tick fight.
@@ -112,10 +140,62 @@ assert.equal(hero.encounterId, null);
 
 hero.x = 130;
 assert.equal(W.isWithinEncounterLeash(hero, monster), true);
-const encounter = W.startEncounter(monster);
+let gatherInterrupted = false;
+let tradeClosed = false;
+let modalClosed = false;
+let pausesReset = false;
+hero.interactOrder = { type: 'gather', phase: 'act', target: { id: 'node' } };
+hero.moveOrder = { id: 'old-route', x: 150, y: 180 };
+Game.environment = { interruptGather() { gatherInterrupted = true; } };
+Game.ui = {
+  trade: { close() { tradeClosed = true; } },
+  modals: { closeInteractionModals() { modalClosed = true; } }
+};
+Game.interactions = { resetPauses() { pausesReset = true; } };
+Game.worldAggro = {
+  seedThreat(active, enemies, source) {
+    enemies.forEach((enemy) => { active.threatTables[enemy.id][source.id] = 1; });
+  },
+  updateEvader: () => false
+};
+const encounter = W.startEncounter(monster, {
+  reason: 'aggro', initiatorActorId: monster.id
+});
 assert.ok(encounter && encounter.lifecycle === 'active');
 assert.equal(encounterStarts, 1);
 assert.equal(hero.encounterId, encounter.id);
+assert.equal(gatherInterrupted, true);
+assert.equal(tradeClosed, true);
+assert.equal(modalClosed, true);
+assert.equal(pausesReset, true);
+assert.equal(hero.interactOrder, null);
+assert.equal(hero.moveOrder, null);
+assert.equal(encounter.context.engagement.reason, 'aggro');
+assert.equal(encounter.context.engagement.initiatorActorId, monster.id);
+assert.deepEqual(Array.from(encounter.context.initialPackActorIds).sort(),
+  ['monster-a', 'monster-b']);
+assert.equal(encounter.context.leashZones.length, 1);
+assert.equal(encounter.threatTables[monster.id][hero.id], 1);
+assert.equal(encounter.threatTables[monsterMate.id][hero.id], 1);
+
+const outsider = {
+  ...monster, id: 'monster-outside', x: 165, spawnX: 165,
+  packAnchorId: 'outside-pack', packMemberIds: ['monster-outside'],
+  components: { vitals: { hp: 100, maxHp: 100 } }
+};
+actors.set(outsider.id, outsider);
+W.entities.push(outsider);
+hero.target = monster;
+W.handleTap(outsider.x, outsider.y);
+assert.equal(hero.target.id, monster.id,
+  'combat tap cannot pull an actor outside the current Encounter');
+assert.equal(encounter.participants.includes(outsider.id), false);
+W.handleTap(monsterMate.x, monsterMate.y);
+assert.equal(hero.target.id, monsterMate.id,
+  'combat tap changes priority among current Encounter participants');
+assert.equal(hero.components.targeting.priorityTargetId, monsterMate.id);
+assert.equal(W.canManualMove(hero), false,
+  'manual world movement is disabled while Encounter owns coordinates');
 
 W.endEncounter('test-reset');
 monster.spawnX = 28;

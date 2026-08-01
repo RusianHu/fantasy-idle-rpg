@@ -150,6 +150,7 @@ async function run() {
         };
       });
       const combatPresentation = chainResults.find((item) => item.scenario === 'overlap').diagnostics;
+      const terrainAudit = api.terrainAudit();
       const sceneButtons = Array.from(document.querySelectorAll('[data-bubble-scene]'));
       const walkButtons = Array.from(document.querySelectorAll('[data-bubble-walk]'));
       const walks = ['l', 'r', 'vertical'].map((id) => ({
@@ -160,9 +161,13 @@ async function run() {
         id, layouts: api.setScene(id),
         active: document.querySelector('[data-bubble-scene="' + id + '"]').classList.contains('active')
       }));
-      const buttons = sceneButtons.concat(walkButtons);
+      const mmoAudit = api.mmoAggroAudit();
+      const evadeBubble = Game.actionBubbles.type('evade');
+      const mmoButton = document.getElementById('mmo-audit');
+      const buttons = sceneButtons.concat(walkButtons, [mmoButton]);
       return {
-        catalog: api.catalog(), walks, scenes, combatPresentation,
+        catalog: api.catalog(), walks, scenes, combatPresentation, terrainAudit, mmoAudit,
+        evadeBubble,
         chainMatrix: chainResults.map(({ diagnostics: omitted, ...item }) => item),
         locale: document.documentElement.lang,
         sceneLabels: sceneButtons.map((button) => button.textContent.trim()),
@@ -198,6 +203,22 @@ async function run() {
     assert.equal(diagnostics.combatPresentation.movement.current.some((item) =>
       item.contact && item.contact.overlapping), false,
     'movement → contact → attack chain keeps hostile feet collision-safe');
+    assert.equal(diagnostics.terrainAudit.passed, true,
+      'terrain scenario routes around blockers and clamps forced displacement');
+    assert.equal(diagnostics.terrainAudit.route.illegalSamples, 0);
+    assert.equal(diagnostics.terrainAudit.route.usedOpening, true);
+    assert.equal(diagnostics.terrainAudit.retreat.clamped, true);
+    assert.equal(diagnostics.terrainAudit.knockback.clamped, true);
+    assert.equal(diagnostics.terrainAudit.embeddedRecovery.legal, true);
+    assert.equal(diagnostics.mmoAudit.passed, true,
+      'MMO scenario passes perception, assist, summon and Evade lifecycle checks');
+    assert.equal(diagnostics.mmoAudit.checks.length, 9);
+    assert.equal(diagnostics.mmoAudit.checks.every((check) => check.pass), true);
+    assert.equal(diagnostics.mmoAudit.encounter.assistPackIds.length, 1);
+    assert.equal(diagnostics.mmoAudit.encounter.leashZones.length, 2);
+    assert.equal(diagnostics.evadeBubble.icon, 'evade');
+    assert.ok(diagnostics.evadeBubble.priority >= 5,
+      'Evade return/reset feedback is a high-priority action bubble');
     assert.deepEqual(diagnostics.chainMatrix.map((item) => item.scenario),
       ['gcd', 'resource', 'overlap', 'healing', 'combo']);
     for (const chain of diagnostics.chainMatrix) {

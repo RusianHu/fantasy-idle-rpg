@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "3f89e5fc4db86a8304666bfc7bbb89c70283dc54a3d8e7b493c03f394ad0dbd7",
+  "sourceSetHash": "76971fe7b7f50de7291958d1d8544a82b85b53503aa6d26540ef8e5351229a4a",
   "sources": [
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
@@ -88,7 +88,7 @@
     {
       "path": "js/data/packs/rules/core.pack.js",
       "kind": "pack",
-      "sha256": "01897e8723da19a359828ca32f42ee7f81c3674e75d1d7ea7b9819494987bc6d"
+      "sha256": "6fbb553b913384cb80f09475efcbeb002cc52a36f9417126bec68aba84b50cf5"
     },
     {
       "path": "js/data/packs/world/actors.pack.js",
@@ -252,6 +252,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "444aede6"
+  "contentFingerprint": "a0664f1f"
 });
 })();

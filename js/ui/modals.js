@@ -180,6 +180,14 @@
       return activePauseModals.length;
     },
 
+    closeInteractionModals: function (reason) {
+      var closing = activePauseModals.slice();
+      closing.forEach(function (handle) {
+        if (handle && !handle.closed) handle.close(reason || 'combat');
+      });
+      return closing.length;
+    },
+
     confirm: function (msg, onOk, onCancel) {
       var t = Game.i18n.t;
       var c = U.el('div', '');

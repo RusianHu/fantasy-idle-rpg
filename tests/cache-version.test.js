@@ -17,6 +17,7 @@ const demoFiles = [
 ].map(([html, css]) => ({ html, css, source: read(html), style: read(css) }));
 const unitsDemo = read('tech-demos/units/units.html');
 const unitsDemoScript = read('tech-demos/units/units.js');
+const combatLabScript = read('tech-demos/units/combat-lab.js');
 const style = read('css/style.css');
 const utils = read('js/core/utils.js');
 const main = read('js/main.js');
@@ -55,8 +56,20 @@ assert.match(read('tech-demos/demo-i18n.js'), /window\.DemoI18n/,
   'technical demos must share the bilingual QA locale helper');
 assert.match(unitsDemo, /systems\/terrain_v3\.js\?v=/,
   'units QA must load the production v3 terrain override');
+assert.match(unitsDemo, /vendor\/easystar-0\.4\.4\.min\.js\?v=/,
+  'units QA terrain regression must load the production pathfinder');
+assert.match(unitsDemo, /systems\/nav\.js\?v=/,
+  'units QA terrain regression must load production navigation');
 assert.match(unitsDemo, /systems\/action_bubbles\.js\?v=/,
   'units QA must load the production action bubble manager');
+assert.match(unitsDemo, /systems\/world_aggro\.js\?v=/,
+  'units QA must load the production world aggro controller');
+assert.match(unitsDemo, /id="mmo-audit"/,
+  'units QA must expose one-click MMO aggro regression');
+assert.match(combatLabScript, /Game\.worldAggro\.scan\(\)/,
+  'combat Lab must exercise production aggro perception');
+assert.match(combatLabScript, /Game\.worldAggro\.updateEvader/,
+  'combat Lab must exercise production Evade return');
 assert.match(unitsDemoScript, /Game\.actionBubbles\.show/,
   'units QA must exercise the production action bubble API');
 assert.match(main, /fusion-pixel\.woff2\?v=' \+ encodeURIComponent\(Game\.BUILD_ID\)/,

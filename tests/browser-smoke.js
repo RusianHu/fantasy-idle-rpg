@@ -3949,10 +3949,12 @@ async function run() {
           active: document.querySelector('[data-bubble-scene="' + id + '"]').classList.contains('active')
         };
       });
-      const buttons = sceneButtons.concat(walkButtons);
+      const mmoButton = document.getElementById('mmo-audit');
+      const buttons = sceneButtons.concat(walkButtons, [mmoButton]);
       return {
         catalog: api.catalog(),
         snapshot: api.snapshot(),
+        mmoAudit: api.mmoAggroAudit(),
         walks,
         scenes,
         locale: document.documentElement.lang,
@@ -3964,6 +3966,7 @@ async function run() {
           return rect.left >= 0 && rect.right <= innerWidth;
         }),
         sourceLoaded: !!document.querySelector('script[src*="systems/action_bubbles.js"]'),
+        aggroSourceLoaded: !!document.querySelector('script[src*="systems/world_aggro.js"]'),
         portraitSourceLoaded: !!document.querySelector('script[src*="ui/combat_portraits.js"]'),
         portraits: api.portraits(),
         status: document.getElementById('bubble-status').textContent,
@@ -3972,11 +3975,11 @@ async function run() {
     })()`);
     console.log('units bubble diagnostics:', JSON.stringify(unitsBubbleDemo));
     assert.equal(unitsBubbleDemo.catalog.complete, true);
-    assert.equal(unitsBubbleDemo.catalog.actorCount, 54);
+    assert.equal(unitsBubbleDemo.catalog.actorCount, 58);
     assert.equal(unitsBubbleDemo.catalog.classCount, 5);
     assert.equal(unitsBubbleDemo.catalog.monsterCount, 41);
     assert.equal(unitsBubbleDemo.catalog.summonCount, 9);
-    assert.equal(unitsBubbleDemo.catalog.encounterCount, 18);
+    assert.equal(unitsBubbleDemo.catalog.encounterCount, 26);
     assert.match(unitsBubbleDemo.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.equal(unitsBubbleDemo.snapshot.length, 2,
       'units QA must expose both anchors: ' + JSON.stringify(unitsBubbleDemo));
@@ -4008,6 +4011,11 @@ async function run() {
     assert.equal(unitsBubbleDemo.allControlsTouchable, true);
     assert.equal(unitsBubbleDemo.allControlsWithinViewport, true);
     assert.equal(unitsBubbleDemo.sourceLoaded, true);
+    assert.equal(unitsBubbleDemo.aggroSourceLoaded, true);
+    assert.equal(unitsBubbleDemo.mmoAudit.passed, true);
+    assert.equal(unitsBubbleDemo.mmoAudit.checks.length, 9);
+    assert.equal(unitsBubbleDemo.mmoAudit.encounter.assistPackIds.length, 1);
+    assert.equal(unitsBubbleDemo.mmoAudit.encounter.leashZones.length, 2);
     assert.equal(unitsBubbleDemo.portraitSourceLoaded, true);
     assert.equal(unitsBubbleDemo.portraits.ally.mode, 'dedicated-portrait');
     assert.equal(unitsBubbleDemo.portraits.enemy.mode, 'sprite-portrait');

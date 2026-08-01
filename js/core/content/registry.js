@@ -485,7 +485,23 @@
       });
     }
     if (type === 'engagementPolicy') {
-      if (typeof def.manualAttack !== 'boolean' || typeof def.autoAggro !== 'boolean') issue(issues, 'engagement-policy-flags', { type: type, id: def.id });
+      if (typeof def.manualAttack !== 'boolean' || typeof def.autoAggro !== 'boolean' ||
+          typeof def.requiresLineOfSight !== 'boolean') {
+        issue(issues, 'engagement-policy-flags', { type: type, id: def.id });
+      }
+      ['aggroRadius', 'contactRadius', 'assistRadius'].forEach(function (field) {
+        if (!Number.isFinite(def[field]) || def[field] < 0 || def[field] > 512) {
+          issue(issues, 'engagement-policy-radius', {
+            type: type, id: def.id, path: field, value: def[field]
+          });
+        }
+      });
+      if (!Number.isInteger(def.maxAssistPacks) ||
+          def.maxAssistPacks < 0 || def.maxAssistPacks > 3) {
+        issue(issues, 'engagement-policy-assist-limit', {
+          type: type, id: def.id, path: 'maxAssistPacks', value: def.maxAssistPacks
+        });
+      }
     }
     if (type === 'interactionProfile') {
       var actionIds = {};

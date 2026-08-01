@@ -24,6 +24,12 @@
       combatTactics: 'Combat thresholds', tacticHeal: 'Heal threshold',
       tacticDefense: 'Defense threshold', tacticDodge: 'Telegraph dodge threshold'
     },
+    worldAggro: {
+      detected: 'An enemy detected the player and started an Encounter.',
+      assistJoined: 'A nearby hostile pack joined the active Encounter.',
+      evadeStarted: 'The player left every leash zone; surviving enemies are returning home.',
+      evadeCompleted: 'The enemy reached a legal spawn point and reset its combat state.'
+    },
     monster: monster,
     actor: {
       adventurer: { name: 'Lone Adventurer', desc: 'A frontline adventurer registered with the guild.', lore: 'Follows the guild-authored expedition route to cleanse Lucia of miasma.' },

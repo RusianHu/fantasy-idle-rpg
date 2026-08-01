@@ -27,6 +27,12 @@
       combatTactics: '战斗阈值', tacticHeal: '治疗触发线',
       tacticDefense: '防御触发线', tacticDodge: '预警躲避线'
     },
+    worldAggro: {
+      detected: '敌方发现玩家，遭遇立即建立。',
+      assistJoined: '邻近敌方群组加入当前遭遇。',
+      evadeStarted: '玩家离开全部警戒领地，存活敌人正在回巢。',
+      evadeCompleted: '敌人已返回合法出生点并完成状态重置。'
+    },
     monster: monster,
     actor: {
       adventurer: { name: '独行冒险者', desc: '公会登记的前线冒险者。', lore: '沿着公会编定的远征路线净化露西亚大陆的瘴气。' },

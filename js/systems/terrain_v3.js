@@ -1876,6 +1876,50 @@
     return nav.distance[gy][gx] * nav.cell >= (radius || 0);
   };
 
+  /**
+   * 导航格 supercover 视线。遍历线段接触到的全部格子，任何硬阻挡都会
+   * 截断感知；clearance 同时要求线路与阻挡保留指定半径。旧布局没有
+   * 导航格时安全降级为可见，保持 v1/v2 行为兼容。
+   */
+  T.hasLineOfSight = function (from, to, clearance) {
+    var nav = T.layout && T.layout.nav;
+    if (!from || !to || !Number.isFinite(from.x) || !Number.isFinite(from.y) ||
+        !Number.isFinite(to.x) || !Number.isFinite(to.y)) return false;
+    if (!nav || T.layout.version < 3 || !nav.grid) return true;
+    clearance = Math.max(0, Number(clearance) || 0);
+    var x0 = Math.floor(from.x / nav.cell), y0 = Math.floor(from.y / nav.cell);
+    var x1 = Math.floor(to.x / nav.cell), y1 = Math.floor(to.y / nav.cell);
+    var dx = x1 - x0, dy = y1 - y0;
+    var nx = Math.abs(dx), ny = Math.abs(dy);
+    var sx = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+    var sy = dy > 0 ? 1 : (dy < 0 ? -1 : 0);
+    var x = x0, y = y0, ix = 0, iy = 0;
+
+    function visibleCell(gx, gy) {
+      if (gx < 0 || gy < 0 || gx >= nav.w || gy >= nav.h || !nav.grid[gy][gx]) {
+        return false;
+      }
+      return !clearance || !nav.distance ||
+        nav.distance[gy][gx] * nav.cell >= clearance;
+    }
+
+    if (!visibleCell(x, y)) return false;
+    while (ix < nx || iy < ny) {
+      var decision = (1 + 2 * ix) * ny - (1 + 2 * iy) * nx;
+      if (decision === 0) {
+        // 穿过格角时两侧相邻格同属 supercover，任一阻挡都遮蔽。
+        if (!visibleCell(x + sx, y) || !visibleCell(x, y + sy)) return false;
+        x += sx; y += sy; ix++; iy++;
+      } else if (decision < 0) {
+        x += sx; ix++;
+      } else {
+        y += sy; iy++;
+      }
+      if (!visibleCell(x, y)) return false;
+    }
+    return true;
+  };
+
   T.dangerAt = function (x, y) {
     var nav = T.layout && T.layout.nav;
     if (!nav || !nav.danger) return 0;

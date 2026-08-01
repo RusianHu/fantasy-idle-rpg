@@ -581,8 +581,9 @@
           moveDy = facing[1];
         }
         var moveLength = Math.sqrt(moveDx * moveDx + moveDy * moveDy) || 1;
-        source.x += moveDx / moveLength * maxMove;
-        source.y += moveDy / moveLength * maxMove;
+        displaceActor(encounter, source,
+          moveDx / moveLength * maxMove,
+          moveDy / moveLength * maxMove);
       } else {
         targets.forEach(function (target) {
           var forcedDx = effect.type === 'pull' ? source.x - target.x : target.x - source.x;
@@ -598,8 +599,9 @@
             forcedDistance = Math.min(forcedDistance, Math.max(0, distance(source, target) -
               collisionRadius(source) - collisionRadius(target) - 2));
           }
-          target.x += forcedDx / forcedLength * forcedDistance;
-          target.y += forcedDy / forcedLength * forcedDistance;
+          displaceActor(encounter, target,
+            forcedDx / forcedLength * forcedDistance,
+            forcedDy / forcedLength * forcedDistance);
         });
       }
     } else if (effect.type === 'summon') {
@@ -863,9 +865,123 @@
       actor.components.body.collisionRadius) || 0);
   }
 
+  var COMBAT_REPATH_TICKS = 12;
+  var COMBAT_TARGET_MOVE_THRESHOLD = 32;
+
+  function terrainCollisionEnabled(encounter) {
+    return !!(encounter &&
+      (encounter.context.world || encounter.context.terrainCollision) &&
+      Game.terrain && Game.terrain.layout && Game.terrain.layout.version >= 3 &&
+      Game.terrain.isWalkable && Game.terrain.sweepMove);
+  }
+
+  function movementMetrics(encounter) {
+    var metrics = encounter.metrics.movement;
+    if (!metrics) {
+      metrics = encounter.metrics.movement = {
+        pathReplans: 0,
+        pathFailures: 0,
+        blockedSteps: 0,
+        terrainRecoveries: 0,
+        displacementClamps: 0
+      };
+    }
+    return metrics;
+  }
+
+  function clearMovementPath(actor) {
+    if (actor && actor.components && actor.components.movement) {
+      actor.components.movement.path = null;
+    }
+  }
+
+  function repairTerrainPosition(encounter, actor) {
+    if (!terrainCollisionEnabled(encounter) ||
+        Game.terrain.isWalkable(actor.x, actor.y, collisionRadius(actor))) return false;
+    var nav = Game.terrain.layout.nav;
+    var clearance = Math.max(1, Math.ceil(collisionRadius(actor) / nav.cell));
+    var projected = Game.terrain.projectPoint &&
+      Game.terrain.projectPoint(actor.x, actor.y, clearance);
+    if (!projected) return false;
+    actor.x = projected.x;
+    actor.y = projected.y;
+    clearMovementPath(actor);
+    movementMetrics(encounter).terrainRecoveries++;
+    return true;
+  }
+
+  function moveActorBy(encounter, actor, dx, dy, kind) {
+    var requested = Math.sqrt(dx * dx + dy * dy);
+    if (!requested) return 0;
+    if (!terrainCollisionEnabled(encounter)) {
+      actor.x += dx;
+      actor.y += dy;
+      return requested;
+    }
+    repairTerrainPosition(encounter, actor);
+    var swept = Game.terrain.sweepMove(
+      actor.x, actor.y, dx, dy, collisionRadius(actor)
+    );
+    actor.x = swept.x;
+    actor.y = swept.y;
+    var moved = Number.isFinite(swept.moved)
+      ? swept.moved : Math.sqrt(dx * dx + dy * dy);
+    if (moved + 0.01 < requested) {
+      var metrics = movementMetrics(encounter);
+      if (kind === 'displacement') metrics.displacementClamps++;
+      else metrics.blockedSteps++;
+    }
+    return moved;
+  }
+
+  function displaceActor(encounter, actor, dx, dy) {
+    clearMovementPath(actor);
+    return moveActorBy(encounter, actor, dx, dy, 'displacement');
+  }
+
+  function combatWaypoint(encounter, actor, intent) {
+    if (!terrainCollisionEnabled(encounter) || !Game.nav ||
+        !Game.nav.finder || typeof Game.nav.solveImmediate !== 'function') {
+      return { x: intent.x, y: intent.y, final: true };
+    }
+    var movement = actor.components.movement;
+    var path = movement.path;
+    var targetChanged = path && path.targetId !== (intent.targetId || null);
+    var targetMoved = path && Game.util.dist(
+      path.targetX, path.targetY, intent.x, intent.y
+    ) > COMBAT_TARGET_MOVE_THRESHOLD;
+    if (!path || targetChanged || targetMoved || encounter.tick >= path.expiresTick) {
+      var points = Game.nav.solveImmediate(actor.x, actor.y, intent.x, intent.y);
+      path = movement.path = {
+        targetId: intent.targetId || null,
+        targetX: intent.x,
+        targetY: intent.y,
+        plannedTick: encounter.tick,
+        expiresTick: encounter.tick + COMBAT_REPATH_TICKS,
+        index: 0,
+        points: points || [],
+        failed: !points
+      };
+      var metrics = movementMetrics(encounter);
+      metrics.pathReplans++;
+      if (!points) metrics.pathFailures++;
+    }
+    if (path.failed || !path.points.length) return null;
+    while (path.index < path.points.length - 1 && Game.util.dist(
+      actor.x, actor.y, path.points[path.index].x, path.points[path.index].y
+    ) < 5) path.index++;
+    var point = path.points[path.index];
+    return {
+      x: point.x,
+      y: point.y,
+      final: path.index === path.points.length - 1
+    };
+  }
+
   function movementTick(encounter, actor) {
     var intent = actor.components.movement && actor.components.movement.intent;
     if (!intent || !Number.isFinite(intent.x) || !Number.isFinite(intent.y)) return;
+    repairTerrainPosition(encounter, actor);
     var target = intent.targetId ? Game.actors.get(intent.targetId) : null;
     if (target && alive(target) &&
         Game.relations.resolve(actor.id, target.id, encounter.id) === 'hostile') {
@@ -901,8 +1017,10 @@
         awayLength = 1;
       }
       var correction = minimumSeparation - distanceLeft;
-      actor.x += awayX / awayLength * correction;
-      actor.y += awayY / awayLength * correction;
+      moveActorBy(encounter, actor,
+        awayX / awayLength * correction,
+        awayY / awayLength * correction,
+        'separation');
       dx = target.x - actor.x;
       dy = target.y - actor.y;
       distanceLeft = Math.sqrt(dx * dx + dy * dy);
@@ -911,17 +1029,36 @@
     if (distanceLeft <= stopDistance) {
       actor.components.movement.intent = null;
       actor.components.movement.moving = false;
+      clearMovementPath(actor);
       return;
     }
-    var step = Math.min(distanceLeft - stopDistance,
+    var waypoint = combatWaypoint(encounter, actor, intent);
+    if (!waypoint) {
+      actor.components.movement.moving = false;
+      return;
+    }
+    var moveDx = waypoint.x - actor.x;
+    var moveDy = waypoint.y - actor.y;
+    var waypointDistance = Math.sqrt(moveDx * moveDx + moveDy * moveDy);
+    if (waypointDistance < 0.001) {
+      actor.components.movement.moving = false;
+      return;
+    }
+    var step = Math.min(waypointDistance,
       Math.max(0, stat(actor, 'moveSpeed')) * encounter.rules.tickMs / 1000);
-    actor.x += dx / distanceLeft * step;
-    actor.y += dy / distanceLeft * step;
-    actor.dir = Game.util.dirOf(dx, dy);
-    actor.components.movement.moving = true;
+    if (waypoint.final) step = Math.min(step, distanceLeft - stopDistance);
+    var moved = moveActorBy(encounter, actor,
+      moveDx / waypointDistance * step,
+      moveDy / waypointDistance * step,
+      'movement');
+    actor.dir = Game.util.dirOf(moveDx, moveDy);
+    actor.components.movement.moving = moved > 0.001;
+    if (moved + 0.01 < step && actor.components.movement.path) {
+      actor.components.movement.path.expiresTick = encounter.tick;
+    }
   }
 
-  function separateCombatants(actors) {
+  function separateCombatants(encounter, actors) {
     // Movement intents solve range against one target. A crowded pack still
     // needs a deterministic physical pass so two allies cannot select the
     // same point on that target's engagement ring and render on top of each
@@ -950,10 +1087,8 @@
           var correction = (minimum - current) * 0.5;
           var nx = dx / directionLength;
           var ny = dy / directionLength;
-          left.x -= nx * correction;
-          left.y -= ny * correction;
-          right.x += nx * correction;
-          right.y += ny * correction;
+          moveActorBy(encounter, left, -nx * correction, -ny * correction, 'separation');
+          moveActorBy(encounter, right, nx * correction, ny * correction, 'separation');
           corrected = true;
         }
       }
@@ -1028,22 +1163,41 @@
     encounter.reactionCountsTick = {};
     reactionDepth = 0;
     var actors = encounter.participants.slice().sort().map(Game.actors.get).filter(alive);
+    actors.forEach(function (actor) { repairTerrainPosition(encounter, actor); });
     actors.forEach(function (actor) { expireStatuses(encounter, actor); });
     actors.forEach(function (actor) { periodicStatuses(encounter, actor); });
     actors.forEach(function (actor) { movementTick(encounter, actor); });
-    separateCombatants(actors);
-    if (encounter.context.leashActorId && encounter.context.leashAnchor &&
-        encounter.context.leashRadius > 0) {
+    separateCombatants(encounter, actors);
+    if (encounter.context.leashActorId) {
       var leashActor = Game.actors.get(encounter.context.leashActorId);
-      if (!alive(leashActor) || Game.util.dist(
-          leashActor.x, leashActor.y,
-          encounter.context.leashAnchor.x, encounter.context.leashAnchor.y
-        ) > encounter.context.leashRadius) {
-        Game.encounters.end(encounter.id, 'leash', {
-          winnerTeamId: null,
-          leashActorId: encounter.context.leashActorId
+      // 玩家死亡交由 objective / 世界死亡导演处理；这里只处理存活玩家
+      // 离开所有参战 pack 的合法 leash zone。
+      if (alive(leashActor)) {
+        var zones = (encounter.context.leashZones || []).filter(function (zone) {
+          return zone && zone.radius > 0 && Number.isFinite(zone.x) && Number.isFinite(zone.y);
         });
-        return;
+        if (!zones.length && encounter.context.leashAnchor && encounter.context.leashRadius > 0) {
+          zones.push({
+            x: encounter.context.leashAnchor.x,
+            y: encounter.context.leashAnchor.y,
+            radius: encounter.context.leashRadius
+          });
+        }
+        var outsideEveryZone = zones.length && !zones.some(function (zone) {
+          return Game.util.dist(leashActor.x, leashActor.y, zone.x, zone.y) <= zone.radius;
+        });
+        var livingEnemies = encounter.participants.map(Game.actors.get).filter(function (actor) {
+          return alive(actor) && actor.teamId === 'enemy';
+        });
+        if (outsideEveryZone && livingEnemies.length) {
+          if (encounter.context.world && Game.worldAggro &&
+              Game.worldAggro.beginEvade(encounter, 'leash')) return;
+          Game.encounters.end(encounter.id, 'leash', {
+            winnerTeamId: null,
+            leashActorId: encounter.context.leashActorId
+          });
+          return;
+        }
       }
     }
     actors.forEach(function (actor) { resourceTick(encounter, actor); });

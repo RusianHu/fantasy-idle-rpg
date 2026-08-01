@@ -492,6 +492,91 @@ for (let profileIndex = 0; profileIndex < compatibilityProfiles.length; profileI
   Game.encounters.remove(compatibility.id);
 }
 
+// Two world packs plus a formal enemy summon remain fixed-tick deterministic.
+function runMmoPackStability() {
+  const stable = Game.encounters.start('encounter.forest', {
+    id: 'test:mmo-pack-stability', seed: 0x4D4D4F, silent: true, fullLog: false,
+    world: true, initialPackId: 'pack-a', assistPackIds: ['pack-b'],
+    leashZones: [
+      { packId: 'pack-a', x: 100, y: 100, radius: 136 },
+      { packId: 'pack-b', x: 145, y: 130, radius: 136 }
+    ]
+  });
+  const specs = [
+    ['mmo:hero', 'adventurer', 'fighter', 'party', 100, 115],
+    ['mmo:a:beetle', 'beetle_mossback', null, 'enemy', 120, 100],
+    ['mmo:a:shaman', 'shaman_mosscap', null, 'enemy', 128, 118],
+    ['mmo:b:mushroom', 'mushroom_toxic', null, 'enemy', 150, 125],
+    ['mmo:b:treant', 'treant_sapling', null, 'enemy', 158, 143]
+  ];
+  const fixedActors = specs.map(([instanceId, archetypeId, classId, teamId, x, y], index) => {
+    const actor = Game.actors.spawn({
+      instanceId, archetypeId, classId, tier: 2, level: 40,
+      statValues: classId ? party(classId, 2)[0].statValues : undefined,
+      transform: { x, y }, controllerId: teamId === 'party' ? 'ai:player-auto' : 'ai:monster',
+      spawnSource: { kind: 'test', sourceId: 'mmo-pack-stability', sequence: index + 1 }
+    });
+    Game.encounters.join(stable.id, actor.id, teamId);
+    actor.hp = actor.maxHp = 1e12;
+    return actor;
+  });
+  const heroActor = fixedActors[0];
+  const summoner = fixedActors[2];
+  const summonAbility = Game.content.get('ability', 'shaman_mosscap.plant_spore_pod');
+  const summonEffect = summonAbility.effects.find((effect) => effect.type === 'summon');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    Game.combat.applyEffect({
+      encounterId: stable.id, sourceActorId: summoner.id,
+      targetActorId: heroActor.id, abilityId: summonAbility.id
+    }, summonEffect);
+  }
+  let summons = stable.participants.map(Game.actors.get).filter((actor) =>
+    actor && actor.spawnSource && actor.spawnSource.kind === 'summon');
+  assert.equal(summons.length, 1, 'maxActive prevents duplicate enemy summons');
+  assert.equal(summons[0].teamId, summoner.teamId);
+  assert.equal(summons[0].factionId, summoner.factionId);
+  assert.equal(summons[0].controllerId, summoner.controllerId);
+  assert.equal(summons[0].rewardAuthorized, false);
+  assert.equal(Number(summons[0].exp), 0);
+  assert.equal(Number(summons[0].gold), 0);
+
+  let peakSummons = summons.length;
+  for (let tick = 0; tick < 1200; tick++) {
+    Game.combat.tickFixed(stable.id);
+    summons = stable.participants.map(Game.actors.get).filter((actor) =>
+      actor && !actor.dead && actor.spawnSource && actor.spawnSource.kind === 'summon' &&
+      actor.spawnSource.ownerActorId === summoner.id &&
+      actor.spawnSource.sourceId === summonAbility.id);
+    peakSummons = Math.max(peakSummons, summons.length);
+    assert.ok(summons.length <= 1, 'maxActive remains bounded during autonomous ticks');
+  }
+  const snapshot = JSON.parse(JSON.stringify({
+    tick: stable.tick,
+    rngState: stable.rngState,
+    nextSpawnSequence: stable.nextSpawnSequence,
+    peakSummons,
+    participants: stable.participants.slice().sort(),
+    actions: stable.metrics.actions,
+    damage: stable.metrics.damage,
+    actors: stable.participants.map(Game.actors.get).filter(Boolean).map((actor) => ({
+      id: actor.id, hp: actor.hp, x: +actor.x.toFixed(4), y: +actor.y.toFixed(4),
+      dead: !!actor.dead, teamId: actor.teamId
+    })).sort((a, b) => a.id.localeCompare(b.id)),
+    scheduler: stable.scheduler.map((item) => ({
+      dueTick: item.dueTick, phase: item.phase, kind: item.kind,
+      actorId: item.actorId || null, abilityId: item.abilityId || null
+    }))
+  }));
+  Game.encounters.end(stable.id, 'test');
+  fixedActors.forEach((actor) => Game.actors.despawn(actor.id, 'test'));
+  Game.encounters.remove(stable.id);
+  return snapshot;
+}
+const mmoStabilityA = runMmoPackStability();
+const mmoStabilityB = runMmoPackStability();
+assert.deepEqual(mmoStabilityB, mmoStabilityA,
+  'two packs plus summons reproduce exactly with the same seed and fixed ticks');
+
 // Formal 4+8 Lab budget: active combat step P95 <= 2ms.
 const perfEncounter = Game.encounters.start('encounter.grassland', {
   id: 'test:performance', seed: 88, silent: true, fullLog: false

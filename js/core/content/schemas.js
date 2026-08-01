@@ -148,7 +148,9 @@
     climateProfile: { schemaVersion: 1, states: {} },
     engagementPolicy: {
       schemaVersion: 1, manualAttack: false, autoAggro: false,
-      groupPropagation: 'none', rewardEligible: false, memorySeconds: 0
+      groupPropagation: 'none', rewardEligible: false, memorySeconds: 0,
+      aggroRadius: 0, contactRadius: 0, assistRadius: 0,
+      maxAssistPacks: 0, requiresLineOfSight: true
     },
     interactionProfile: { schemaVersion: 1, actions: [] },
     merchantProfile: { schemaVersion: 1, regionIds: [], presentation: {} },
