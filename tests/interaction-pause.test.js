@@ -140,9 +140,13 @@ assert.equal(Game.interactions.isPaused('autoExplore'), false,
   'closing the panel releases immediately');
 
 function fakeNode(connectedRoot = false) {
+  const listeners = {};
   const node = {
     parentNode: null,
     children: [],
+    tag: '',
+    cls: '',
+    text: '',
     _connectedRoot: connectedRoot,
     appendChild(child) {
       child.parentNode = this;
@@ -155,8 +159,10 @@ function fakeNode(connectedRoot = false) {
       child.parentNode = null;
       return child;
     },
-    addEventListener() {},
-    setAttribute() {}
+    addEventListener(type, fn) { (listeners[type] ||= []).push(fn); },
+    setAttribute() {},
+    fire(type, event) { (listeners[type] || []).forEach((fn) => fn(event || {})); },
+    querySelector(selector) { return findNode(this, selector); }
   };
   Object.defineProperty(node, 'isConnected', {
     get() {
@@ -164,6 +170,32 @@ function fakeNode(connectedRoot = false) {
     }
   });
   return node;
+}
+
+function nodeMatches(node, selector) {
+  if (!node || !selector) return false;
+  if (selector[0] === '.') {
+    return !!(node.cls && node.cls.split(' ').indexOf(selector.slice(1)) >= 0);
+  }
+  return node.tag === selector;
+}
+
+function findNode(root, selector) {
+  for (const child of (root && root.children) || []) {
+    if (nodeMatches(child, selector)) return child;
+    const found = findNode(child, selector);
+    if (found) return found;
+  }
+  return null;
+}
+
+function findByCls(root, cls) {
+  if (nodeMatches(root, '.' + cls)) return root;
+  for (const child of (root && root.children) || []) {
+    const found = findByCls(child, cls);
+    if (found) return found;
+  }
+  return null;
 }
 
 const modalRoot = fakeNode(true);
@@ -176,7 +208,13 @@ const documentStub = {
 sandbox.document = documentStub;
 sandbox.window.document = documentStub;
 Game.reg = {};
-Game.util.el = () => fakeNode();
+Game.util.el = function (tag, cls, text) {
+  const node = fakeNode();
+  node.tag = tag || '';
+  node.cls = cls || '';
+  if (text !== undefined) node.text = String(text);
+  return node;
+};
 vm.runInContext(read('js/ui/modals.js'), sandbox, { filename: 'js/ui/modals.js' });
 Game.ui.modals.init();
 
@@ -393,11 +431,281 @@ world.handleTap(100, 100);
 assert.equal(actorActionCalls, 1);
 assert.equal(merchantTalkCalls, 1, 'clicking only the caravan enters merchant dialogue');
 
+/* === 移动行商第一层 actorActions 有限暂停 + 攻击 Engagement 交接租约 === */
+(function () {
+  Game.interactions.resetPauses('qa-merchant-actions-reset');
+  Game.ui.trade.close('qa-merchant-actions-reset');
+
+  const merchantEventId = 'merchant-event:actions-qa';
+  const merchantProfileId = 'merchant.windbell_lia';
+  let merchantState = 'available';
+  const merchantActor = {
+    id: 'merchant:actions-qa',
+    tags: ['merchant', 'wandering-merchant', 'nonlethal'],
+    blueprint: {
+      archetypeId: 'archetype.wandering-merchant',
+      resolvedProfiles: { interactionProfileId: 'interaction.wandering-merchant' }
+    },
+    merchantEventId: merchantEventId,
+    merchantProfileId: merchantProfileId,
+    dead: false,
+    lifecycle: 'active',
+    hp: 100,
+    maxHp: 100
+  };
+
+  Game.content = {
+    get(type, id) {
+      if (type === 'actorArchetype') {
+        return { identity: { nameKey: id + '.name', loreKey: id + '.lore' } };
+      }
+      if (type === 'interactionProfile') {
+        return { actions: [
+          { id: 'talk', kind: 'talk', primary: true },
+          { id: 'trade', kind: 'trade' },
+          { id: 'attack', kind: 'attack', requiresConfirmation: true }
+        ] };
+      }
+      return null;
+    }
+  };
+  Game.assets = { drawToDom() {} };
+  Game.util.esc = function (s) { return String(s); };
+  Game.actors = { get(id) { return id === merchantActor.id ? merchantActor : null; } };
+
+  let talkCalls = 0, tradeCalls = 0, attackCalls = 0;
+  let attackResult = { ok: true, queued: true, commandId: 'cmd:qa-attack' };
+  Game.merchants = {
+    activeEvent() {
+      return merchantState === 'gone' ? null : {
+        id: merchantEventId, state: merchantState, merchantProfileId: merchantProfileId
+      };
+    },
+    talk() {
+      talkCalls++;
+      return {
+        state: 'first', key: 'merchant.first.1', text: 'line',
+        profileId: merchantProfileId, nameKey: 'merchant.windbell_lia.name',
+        portraitId: 'portrait.windbell_lia'
+      };
+    },
+    openTrade() {
+      tradeCalls++;
+      // 真实 openTrade 会打开交易面板并取得 ui:trade 租约，此处复用生产 trade UI
+      Game.ui.trade.open('camp-supply');
+      return { ok: true, opened: true };
+    },
+    attack() { attackCalls++; return attackResult; }
+  };
+  Game.world = { hero: { id: 'hero', state: 'idle', encounterId: null, hp: 100, maxHp: 100 } };
+  Game.transitions = { isActive() { return false; }, isDeathActive() { return true; } };
+  Game.ending = { isActive() { return false; } };
+  const merchantHandlers = Game.interactions.handlers(merchantActor);
+
+  function actionList() { return findByCls(modalRoot, 'actor-action-list'); }
+
+  // 1. 打开 actorActions -> ui:merchant-actions 取得、context 正确并续租
+  Game.state.world.worldTime = 500;
+  let actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.ok(actionsApi, 'actorActions returns a modal api');
+  assert.equal(Game.interactions.isPaused('autoExplore'), true,
+    'the first merchant action layer acquires the autoExplore pause');
+  let lease = Game.interactions.pauseSnapshot().find((l) => l.id === 'ui:merchant-actions');
+  assert.ok(lease, 'the merchant-actions lease exists');
+  assert.deepEqual(Array.from(lease.scopes), ['autoExplore']);
+  assert.equal(lease.kind, 'merchant-actions');
+  assert.equal(lease.context.actorId, merchantActor.id);
+  assert.equal(lease.context.eventId, merchantEventId);
+  assert.equal(lease.context.merchantProfileId, merchantProfileId);
+  assert.equal(lease.context.regionId, 'grassland');
+  Game.state.world.worldTime = 501.6;
+  assert.equal(Game.ui.modals.updateInteractionPauses(), 1);
+  lease = Game.interactions.pauseSnapshot().find((l) => l.id === 'ui:merchant-actions');
+  assert.ok(lease.expiresAt > 501.6, 'the merchant-actions lease renews');
+  actionsApi.close();
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'closing the merchant action layer releases the pause');
+
+  // 2. 普通非行商 Actor 的 actorActions 不取得该租约
+  const neutralActor = {
+    id: 'npc:neutral', tags: ['npc'],
+    blueprint: {
+      archetypeId: 'archetype.npc',
+      resolvedProfiles: { interactionProfileId: 'interaction.npc' }
+    },
+    dead: false, lifecycle: 'active', hp: 100
+  };
+  const neutralApi = Game.ui.modals.actorActions(neutralActor, {});
+  assert.ok(neutralApi);
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'a non-wandering-merchant actor action panel does not pause auto explore');
+  assert.equal(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-actions'), false,
+    'no merchant-actions lease is created for a neutral actor');
+  neutralApi.close();
+
+  // 3a. 目标/事件失效（state 不再 available）释放
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  merchantState = 'assault';
+  assert.equal(Game.ui.modals.updateInteractionPauses(), 0,
+    'an invalidated merchant event closes the action layer');
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'invalidating the merchant event releases auto explore');
+  assert.equal(actionsApi.close(), false, 'action layer already cleaned up by guard');
+  merchantState = 'available';
+
+  // 3b. Actor 死亡释放
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  merchantActor.dead = true;
+  assert.equal(Game.ui.modals.updateInteractionPauses(), 0);
+  assert.equal(Game.interactions.isPaused('autoExplore'), false, 'a dead merchant releases the pause');
+  merchantActor.dead = false;
+
+  // 3c. 玩家进入战斗（hero.encounterId）释放
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  Game.world.hero.encounterId = 'enc:aggro';
+  assert.equal(Game.ui.modals.updateInteractionPauses(), 0);
+  assert.equal(Game.interactions.isPaused('autoExplore'), false, 'entering combat releases the action pause');
+  Game.world.hero.encounterId = null;
+
+  // 3d. 换区 / 死亡 / 结局 -> resetPauses 释放
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  Game.bus.emit('region:changed', { rid: 'forest' });
+  assert.equal(Game.interactions.isPaused('autoExplore'), false, 'region change releases the action pause');
+  actionsApi.close();
+  Game.bus.emit('player:death');
+  assert.equal(Game.interactions.isPaused('autoExplore'), false, 'player death keeps the action pause released');
+
+  // 4. 点击交谈 -> merchantDialogue 租约接管
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  actionList().children[0].fire('click');
+  assert.equal(talkCalls, 1, 'clicking talk invokes merchant talk');
+  assert.equal(Game.interactions.isPaused('autoExplore'), true, 'talk keeps auto explore paused');
+  assert.ok(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-dialogue'),
+    'merchantDialogue takes over the pause lease');
+  assert.equal(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-actions'), false,
+    'the first action layer lease is released after opening dialogue');
+  Game.ui.modals.closeInteractionModals('qa-dialogue-done');
+
+  // 4b. 点击查看货物 -> trade 租约接管
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  actionList().children[1].fire('click');
+  assert.equal(tradeCalls, 1, 'clicking trade opens the merchant trade panel');
+  assert.equal(Game.interactions.isPaused('autoExplore'), true, 'trade keeps auto explore paused');
+  assert.equal(Game.ui.trade.isOpen(), true);
+  assert.ok(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:trade'),
+    'the trade lease takes over after opening the shop');
+  assert.equal(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-actions'), false,
+    'the first action layer lease is released after opening trade');
+  Game.ui.trade.close('qa-trade-done');
+  assert.equal(Game.interactions.isPaused('autoExplore'), false);
+
+  // 5. 点击攻击 -> 确认窗仍保持暂停；取消后释放
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  actionList().children[2].fire('click');
+  assert.equal(attackCalls, 0, 'attack is not submitted until the confirm is acknowledged');
+  assert.equal(Game.interactions.isPaused('autoExplore'), true,
+    'the attack confirm keeps auto explore paused');
+  assert.ok(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-attack-confirm'),
+    'the attack confirm holds its own lease');
+  assert.equal(
+    Game.interactions.pauseSnapshot().some((l) => l.id === 'ui:merchant-actions'), false,
+    'the first action layer is released when the confirm opens');
+  Game.ui.modals.closeInteractionModals('qa-confirm-cancel');
+  assert.equal(attackCalls, 0, 'cancelling the confirm never submits the attack');
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'cancelling the confirm releases the pause');
+
+  // 6. 确认攻击 -> 交接租约保持至 engagement:committed/rejected
+  actionsApi = Game.ui.modals.actorActions(merchantActor, merchantHandlers);
+  actionList().children[2].fire('click');
+  const okBtn = findByCls(modalRoot, 'gold');
+  assert.ok(okBtn, 'the confirm exposes an OK button');
+  okBtn.fire('click');
+  assert.equal(attackCalls, 1, 'confirming submits the merchant attack');
+  assert.equal(Game.interactions.isPaused('autoExplore'), true,
+    'the handoff lease keeps auto explore paused after the confirm closes');
+  let handoff = Game.interactions.pauseSnapshot().find((l) => l.id === 'ui:merchant-attack-submit');
+  assert.ok(handoff, 'the engagement handoff lease is acquired');
+  assert.equal(handoff.kind, 'merchant-attack-submit');
+  assert.equal(handoff.context.commandId, 'cmd:qa-attack');
+  assert.equal(handoff.context.eventId, merchantEventId);
+  assert.equal(handoff.context.actorId, merchantActor.id);
+  Game.state.world.worldTime = 510;
+  assert.equal(Game.interactions.maintainHandoffs(), 1, 'the handoff registry still tracks the pending attack');
+  handoff = Game.interactions.pauseSnapshot().find((l) => l.id === 'ui:merchant-attack-submit');
+  assert.ok(handoff.expiresAt > 510, 'the handoff lease renews until the engagement resolves');
+
+  // 无关 commandId 的 committed/rejected 不影响
+  Game.bus.emit('engagement:committed', {
+    type: 'engagement:committed', encounterId: 'other',
+    payload: { ok: true, commandId: 'cmd:unrelated', encounterId: 'other' }
+  });
+  assert.equal(Game.interactions.isPaused('autoExplore'), true,
+    'an unrelated engagement:committed does not release the handoff');
+  Game.bus.emit('engagement:rejected', { ok: false, commandId: 'cmd:unrelated', reason: 'x' });
+  assert.equal(Game.interactions.isPaused('autoExplore'), true,
+    'an unrelated engagement:rejected does not release the handoff');
+  // 匹配的 committed 释放
+  Game.bus.emit('engagement:committed', {
+    type: 'engagement:committed', encounterId: 'enc:merchant',
+    payload: { ok: true, commandId: 'cmd:qa-attack', encounterId: 'enc:merchant' }
+  });
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'the matching engagement:committed releases the handoff lease');
+  assert.equal(Game.interactions.maintainHandoffs(), 0,
+    'the handoff registry is cleared after commit');
+
+  // 6b. rejected 路径
+  attackResult = { ok: true, queued: true, commandId: 'cmd:qa-attack-2' };
+  Game.interactions.acquireHandoff('cmd:qa-attack-2', {
+    eventId: merchantEventId, actorId: merchantActor.id
+  });
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  Game.bus.emit('engagement:rejected', { ok: false, commandId: 'cmd:qa-attack-2', reason: 'occupied' });
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'the matching engagement:rejected releases the handoff lease');
+
+  // 6c. TTL 兜底：停止续租并越过 TTL -> 自动释放
+  attackResult = { ok: true, queued: true, commandId: 'cmd:qa-attack-3' };
+  Game.interactions.acquireHandoff('cmd:qa-attack-3', {
+    eventId: merchantEventId, actorId: merchantActor.id
+  });
+  assert.equal(Game.interactions.isPaused('autoExplore'), true);
+  const acquiredAt = Game.state.world.worldTime;
+  Game.state.world.worldTime = acquiredAt + 3; // 超过 TTL=2 且不调用 maintainHandoffs
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'the handoff lease auto-expires via TTL when renewal stops');
+  Game.interactions.releaseHandoff('cmd:qa-attack-3', 'qa-cleanup');
+
+  // 6d. 同步失败（无 commandId）不取得交接租约
+  attackResult = { ok: false, reason: 'unavailable' };
+  Game.interactions.handlers(merchantActor).attack(merchantActor);
+  assert.equal(Game.interactions.isPaused('autoExplore'), false,
+    'a synchronously failed attack does not acquire the handoff lease');
+
+  Game.interactions.resetPauses('qa-merchant-actions-done');
+  Game.ui.modals.closeInteractionModals('qa-done');
+})();
+
 const tradeSource = read('js/systems/trade.js');
 const worldSource = read('js/systems/world.js');
 const aiSource = read('js/systems/expedition_ai.js');
 const modalSource = read('js/ui/modals.js');
 const loopSource = read('js/core/loop.js');
+const interactionsSource = read('js/systems/interactions.js');
 const zhSource = read('js/i18n/zh-CN.js');
 const enSource = read('js/i18n/en.js');
 
@@ -413,14 +721,30 @@ assert.match(worldSource, /explicitMove[\s\S]+explicitInteraction[\s\S]+explicit
   'explicit player movement, interaction and targeting remain available');
 assert.match(aiSource, /id: 'interaction'/,
   'the expedition diagnostic reports focused interaction instead of a stuck route');
-assert.match(modalSource, /id: 'ui:merchant-dialogue'/,
+assert.match(modalSource, /merchantPauseSpec\('ui:merchant-dialogue'/,
   'merchant dialogue declares an independent stable lease');
+assert.match(modalSource, /merchantPauseSpec\('ui:merchant-actions'/,
+  'the first merchant action layer declares its own lease');
+assert.match(modalSource, /merchantPauseSpec\('ui:merchant-attack-confirm'/,
+  'the merchant attack confirm declares its own lease');
+assert.match(modalSource, /if \(options && options\.pause\) showOpts\.pause = options\.pause;/,
+  'M.confirm forwards an optional pause spec to M.show');
 assert.match(modalSource, /id: 'ui:merchant-surrender'/,
   'merchant surrender declares an independent stable lease');
 assert.match(modalSource, /updateInteractionPauses:/,
   'generic modal lifecycle exposes pause renewal');
 assert.match(loopSource, /Game\.ui\.modals\.updateInteractionPauses\(\)/,
   'the simulation loop renews modal leases even during bounded catch-up');
+assert.match(loopSource, /Game\.interactions && Game\.interactions\.maintainHandoffs/,
+  'the simulation loop renews engagement handoff leases');
+assert.match(interactionsSource, /var HANDOFF_LEASE_ID = 'ui:merchant-attack-submit';/,
+  'the engagement handoff uses a stable lease id');
+assert.match(interactionsSource, /acquireHandoff\(result\.commandId/,
+  'the merchant attack handler acquires the handoff on successful enqueue');
+assert.match(interactionsSource, /releaseHandoff\(commandId, 'engagement:committed'\)/,
+  'the handoff releases on a matching engagement:committed');
+assert.match(interactionsSource, /releaseHandoff\(commandId, 'engagement:rejected'\)/,
+  'the handoff releases on a matching engagement:rejected');
 assert.match(zhSource, /interaction: '专注互动'/);
 assert.match(enSource, /interaction: 'Focused interaction'/);
 

@@ -71,6 +71,7 @@ assets/sprite-source/ 采集物与探索宝箱的生成式母版及运行时预�
 assets/sprites/       可独立复用的透明运行时 PNG（exploration/ 按稳定 ID 拆分）
 tech-demos/           双语生产 QA：Actor/战斗、地图放置、Hazard、导航、Weather/Climate、移动行商
 docs/content-authoring/ Actor 内容契约、示例与新增流程
+docs/tooling/          本地开发代理与工具操作参考
 js/
   vendor/             EasyStar.js 0.4.4（MIT，本地固定）
   core/content/       Pack/schema/引用/公式编译、严格审计、深冻结与 fingerprint

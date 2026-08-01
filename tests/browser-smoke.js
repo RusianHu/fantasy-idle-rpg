@@ -2217,9 +2217,60 @@ async function run() {
       const tradeUnlockedOnReturn = !document.querySelector('.trade-lock-banner');
       Game.ui.trade.close();
       const tradePauseReleasedOnClose = !Game.interactions.isPaused('autoExplore');
+
+      // 移动行商第一层 actorActions 有限暂停：真实暂停行为 + 自动模式不漂移。
+      if (Game.merchants && Game.merchants.activeEvent()) {
+        Game.merchants.finishEvent('smoke-merchant-prep');
+      }
+      hero.state = 'idle'; hero.target = null; hero.moveOrder = null;
+      hero.interactOrder = null; hero.encounterId = null;
+      Game.state.world.mode = 'battle';
+      const merchantDiscover = Game.merchants.debugForceDiscover();
+      let merchantActionsPauseActive = false;
+      let merchantActionsLeaseId = null;
+      let merchantActionsAutoMovePaused = false;
+      let merchantActionsReleased = false;
+      if (merchantDiscover && merchantDiscover.ok && merchantDiscover.actor) {
+        const merchantActor = merchantDiscover.actor;
+        const merchantApi = Game.ui.modals.actorActions(
+          merchantActor, Game.interactions.handlers(merchantActor)
+        );
+        merchantActionsPauseActive = Game.interactions.isPaused('autoExplore');
+        const lease = Game.interactions.pauseSnapshot()
+          .find((l) => l.id === 'ui:merchant-actions');
+        merchantActionsLeaseId = lease && lease.id || null;
+        W.setControlMode('auto');
+        const mOrigin = { x: hero.x, y: hero.y };
+        hero.moveOrder = {
+          x: merchantActor.x, y: merchantActor.y,
+          id: 'smoke:auto-merchant-drift', ai: true
+        };
+        W.updateHero(hero, 0.25);
+        merchantActionsAutoMovePaused = Math.hypot(
+          hero.x - mOrigin.x, hero.y - mOrigin.y
+        ) < 0.01 && !hero.moveOrder &&
+          Game.expeditionAI.intent().id === 'interaction';
+        W.setControlMode('manual');
+        if (merchantApi) merchantApi.close();
+        merchantActionsReleased = !Game.interactions.isPaused('autoExplore');
+        if (Game.merchants.activeEvent()) Game.merchants.finishEvent('smoke-merchant-done');
+      }
+      hero.state = 'idle'; hero.target = null; hero.moveOrder = null;
+      hero.interactOrder = null; hero.encounterId = null;
       const merchantDialoguePauseContract = /ui:merchant-dialogue/.test(
         Game.ui.modals.merchantDialogue.toString()
-      ) && typeof Game.ui.modals.updateInteractionPauses === 'function';
+      ) && /ui:merchant-actions/.test(Game.ui.modals.actorActions.toString()) &&
+        typeof Game.ui.modals.updateInteractionPauses === 'function' &&
+        typeof Game.interactions.maintainHandoffs === 'function' &&
+        merchantActionsPauseActive && merchantActionsLeaseId === 'ui:merchant-actions' &&
+        merchantActionsAutoMovePaused && merchantActionsReleased;
+      const merchantActionsDiagnostics = {
+        discovered: !!(merchantDiscover && merchantDiscover.ok),
+        pauseActive: merchantActionsPauseActive,
+        leaseId: merchantActionsLeaseId,
+        autoMovePaused: merchantActionsAutoMovePaused,
+        released: merchantActionsReleased
+      };
 
       // Material exchange domain engine path.
       Game.state.inv.materials.herb = Math.max(3, Game.inv.materialCount('herb'));
@@ -2298,7 +2349,7 @@ async function run() {
         tradePauseActive, tradeAutoMovePaused, tradePauseDiagnostics, tradePauseReleasedOnTab,
         exchangeOffersVisible, tradeLockedOnLeave, tradeUnlockedOnReturn,
         tradePauseReleasedOnClose,
-        merchantDialoguePauseContract,
+        merchantDialoguePauseContract, merchantActionsDiagnostics,
         exchangeOk: exchangeResult.ok, exchangeBlockedOutside,
         potionCardCount: potionCards.length, potionCardsTouchable, cooldownShared,
         autoCampStarted, autoCampResumed, autoCampSuppressed,
@@ -2326,6 +2377,9 @@ async function run() {
     assert.equal(v111Checks.tradeLockedOnLeave, true);
     assert.equal(v111Checks.tradeUnlockedOnReturn, true);
     assert.equal(v111Checks.tradePauseReleasedOnClose, true);
+    if (!v111Checks.merchantDialoguePauseContract) {
+      console.error('merchant actions pause diagnostics:', JSON.stringify(v111Checks.merchantActionsDiagnostics));
+    }
     assert.equal(v111Checks.merchantDialoguePauseContract, true);
     assert.equal(v111Checks.exchangeOk, true);
     assert.equal(v111Checks.exchangeBlockedOutside, true);

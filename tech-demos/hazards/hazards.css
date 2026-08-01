@@ -381,6 +381,6 @@ a { color: var(--gold); text-decoration: none; }
 }
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.9") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.10") format("woff2");
   font-display: swap;
 }

@@ -43,6 +43,49 @@
     return true;
   }
 
+  /* 移动行商交互链共享的有效性校验：第一层 actorActions、攻击二次确认
+   * 与交谈窗口都复用同一份 guard，避免各处对“事件仍可用 / Actor 仍存活 /
+   * 玩家未进战斗”的判断漂移。仅持有 autoExplore 有限暂停。 */
+  function merchantGuard(actor, profileId) {
+    return function () {
+      var active = Game.merchants && Game.merchants.activeEvent();
+      var hero = Game.world && Game.world.hero;
+      if (!active || active.state !== 'available') return false;
+      if (!actor) return false;
+      var liveActor = Game.actors && Game.actors.get ? Game.actors.get(actor.id) : actor;
+      if (!liveActor) return false;
+      if (actor.dead || actor.lifecycle !== 'active' || actor.hp <= 0) return false;
+      if (actor.merchantEventId !== active.id) return false;
+      var pid = profileId || actor.merchantProfileId;
+      if (pid && active.merchantProfileId !== pid) return false;
+      if (!hero || hero.encounterId ||
+          hero.state === 'dead' || hero.state === 'recover') return false;
+      if (Game.transitions && Game.transitions.isActive()) return false;
+      if (Game.ending && Game.ending.isActive && Game.ending.isActive()) return false;
+      return true;
+    };
+  }
+
+  function merchantPauseSpec(id, kind, actor, profileId) {
+    return {
+      id: id,
+      kind: kind,
+      scopes: ['autoExplore'],
+      ttl: 2,
+      context: function () {
+        var active = Game.merchants && Game.merchants.activeEvent();
+        return {
+          actorId: actor && actor.id || null,
+          eventId: active && active.id || null,
+          merchantProfileId: profileId || (actor && actor.merchantProfileId) ||
+            (active && active.merchantProfileId) || null,
+          regionId: Game.state && Game.state.world && Game.state.world.region || null
+        };
+      },
+      guard: merchantGuard(actor, profileId)
+    };
+  }
+
   Game.ui = Game.ui || {};
   var M = Game.ui.modals = {
     init: function () {
@@ -202,7 +245,7 @@
       return closing.length;
     },
 
-    confirm: function (msg, onOk, onCancel) {
+    confirm: function (msg, onOk, onCancel, options) {
       var t = Game.i18n.t;
       var c = U.el('div', '');
       c.innerHTML = '<h3>' + t('ui.confirmTitle') + '</h3><div class="modal-body">' + msg + '</div>';
@@ -211,9 +254,12 @@
       var yes = U.el('button', 'btn gold', t('ui.ok'));
       btns.appendChild(no); btns.appendChild(yes);
       c.appendChild(btns);
-      var api = M.show(c, { dismissable: false });
+      var showOpts = { dismissable: false };
+      if (options && options.pause) showOpts.pause = options.pause;
+      var api = M.show(c, showOpts);
       no.addEventListener('click', function () { api.close(); if (onCancel) onCancel(); });
       yes.addEventListener('click', function () { api.close(); if (onOk) onOk(); });
+      return api;
     },
 
     actorActions: function (actor, handlers) {
@@ -225,6 +271,11 @@
       if (!archetype || !profile || !(profile.actions || []).length) return null;
       var t = Game.i18n.t;
       var name = t(archetype.identity.nameKey);
+      var isMerchant = !!(actor.tags &&
+        actor.tags.indexOf('wandering-merchant') >= 0 && Game.merchants);
+      var actionsPause = isMerchant
+        ? merchantPauseSpec('ui:merchant-actions', 'merchant-actions', actor, actor.merchantProfileId)
+        : null;
       var descriptionKey = archetype.identity.loreKey || archetype.identity.descKey;
       var c = U.el('div', 'actor-actions');
       var heading = U.el('h3', '');
@@ -237,7 +288,7 @@
       }
       var list = U.el('div', 'actor-action-list');
       c.appendChild(list);
-      var api = M.show(c);
+      var api = M.show(c, actionsPause ? { pause: actionsPause } : null);
       (profile.actions || []).forEach(function (action) {
         if (['inspect', 'talk', 'trade', 'attack'].indexOf(action.kind) < 0) return;
         var labelKeys = {
@@ -278,11 +329,15 @@
             if (handlers.attack) handlers.attack(actor);
           };
           if (action.requiresConfirmation) {
-            var isMerchant = actor.tags &&
-              actor.tags.indexOf('wandering-merchant') >= 0;
+            /* 攻击二次确认属于同一交互链：确认窗等待期间以独立租约
+             * ui:merchant-attack-confirm 续接第一层暂停，避免确认窗
+             * 关闭到 Engagement 提交之间出现可观察的暂停断档。 */
+            var confirmOpts = isMerchant
+              ? { pause: merchantPauseSpec('ui:merchant-attack-confirm', 'merchant-attack-confirm', actor, actor.merchantProfileId) }
+              : null;
             M.confirm(t(isMerchant
               ? 'merchant.ui.attackConfirm'
-              : 'ui.actorAttackConfirm', { name: name }), submit);
+              : 'ui.actorAttackConfirm', { name: name }), submit, null, confirmOpts);
           } else {
             submit();
           }
@@ -320,32 +375,7 @@
       }
       c.appendChild(actions);
       var api = M.show(c, {
-        pause: {
-          id: 'ui:merchant-dialogue',
-          kind: 'merchant-dialogue',
-          scopes: ['autoExplore'],
-          context: function () {
-            var active = Game.merchants && Game.merchants.activeEvent();
-            return {
-              actorId: actor && actor.id || null,
-              eventId: active && active.id || null,
-              merchantProfileId: dialogue.profileId,
-              regionId: Game.state && Game.state.world && Game.state.world.region || null
-            };
-          },
-          guard: function () {
-            var active = Game.merchants && Game.merchants.activeEvent();
-            var hero = Game.world && Game.world.hero;
-            var liveActor = actor && Game.actors && Game.actors.get
-              ? Game.actors.get(actor.id) : actor;
-            return !!(active && active.state === 'available' && actor && liveActor &&
-              !actor.dead && actor.merchantEventId === active.id &&
-              active.merchantProfileId === dialogue.profileId && hero &&
-              !hero.encounterId && hero.state !== 'dead' && hero.state !== 'recover' &&
-              !(Game.transitions && Game.transitions.isActive()) &&
-              !(Game.ending && Game.ending.isActive && Game.ending.isActive()));
-          }
-        }
+        pause: merchantPauseSpec('ui:merchant-dialogue', 'merchant-dialogue', actor, dialogue.profileId)
       });
       closeButton.addEventListener('click', function () { api.close(); });
       return api;

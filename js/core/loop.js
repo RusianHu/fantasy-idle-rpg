@@ -45,6 +45,9 @@
     if (Game.ui && Game.ui.modals && Game.ui.modals.updateInteractionPauses) {
       Game.ui.modals.updateInteractionPauses();
     }
+    if (Game.interactions && Game.interactions.maintainHandoffs) {
+      Game.interactions.maintainHandoffs();
+    }
     if (Game.weather) Game.weather.update(dt, st.world.worldTime);
     Game.terrain.update(dt);
     if (Game.transitions) Game.transitions.update(dt);
