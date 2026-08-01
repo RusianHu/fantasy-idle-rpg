@@ -166,14 +166,15 @@
           regionOrder: regionOrder,
           routePlan: routePlan,
           worldSeed: worldSeed,
-          layoutVersion: 3,
+          layoutVersion: 4,
           mode: 'battle',
           restBuffT: 0,
           worldTime: 300,
           regionProg: {},
           nodeCooldowns: {},
           exploration: {},
-          hazards: { layoutVersion: 3, regions: {} },
+          hazards: { layoutVersion: 4, regions: {} },
+          guardSites: { version: 1, layoutVersion: 4, regions: {} },
           chestMimic: {
             rollOrdinal: 0,
             genuineOpenedSinceMimic: 0

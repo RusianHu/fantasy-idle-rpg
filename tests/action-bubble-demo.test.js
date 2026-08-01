@@ -167,6 +167,8 @@ async function run() {
       const buttons = sceneButtons.concat(walkButtons, [mmoButton]);
       return {
         catalog: api.catalog(), walks, scenes, combatPresentation, terrainAudit, mmoAudit,
+        guardCards: document.querySelectorAll('.guard-contact-card').length,
+        guardStatus: document.getElementById('guard-contact-status').textContent,
         evadeBubble,
         chainMatrix: chainResults.map(({ diagnostics: omitted, ...item }) => item),
         locale: document.documentElement.lang,
@@ -183,11 +185,13 @@ async function run() {
     })()`);
 
     assert.equal(diagnostics.catalog.complete, true);
-    assert.equal(diagnostics.catalog.actorCount, 58);
+    assert.equal(diagnostics.catalog.actorCount, 74);
     assert.equal(diagnostics.catalog.classCount, 5);
-    assert.equal(diagnostics.catalog.monsterCount, 41);
+    assert.equal(diagnostics.catalog.monsterCount, 57);
     assert.equal(diagnostics.catalog.summonCount, 9);
     assert.equal(diagnostics.catalog.encounterCount, 26);
+    assert.equal(diagnostics.guardCards, 16);
+    assert.match(diagnostics.guardStatus, /16\/16 sprites/i);
     assert.match(diagnostics.catalog.fingerprint, /^[0-9a-f]{8}$/);
     assert.ok(diagnostics.combatPresentation.adapter.records.some((record) =>
       ['combat:hit', 'combat:miss', 'combat:healed', 'combat:shielded'].includes(record.eventType)));

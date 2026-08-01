@@ -617,7 +617,11 @@ vm.runInContext(read('js/sprites/boss_landmarks.generated.js'), assetBox, {
 vm.runInContext(read('js/sprites/exploration_v3.manifest.js'), assetBox, { filename: 'js/sprites/exploration_v3.manifest.js' });
 const manifest = assetBox.window.Game.EXPLORATION_V3_ASSETS;
 const actualSourceHash = crypto.createHash('sha256')
-  .update(fs.readFileSync(path.join(ROOT, manifest.source.path)))
+  // Source-art provenance is defined over repository text, not the checkout's
+  // platform line ending.  Git checks this Markdown source out as CRLF on
+  // Windows, whereas the generated manifest is reproducibly built from LF.
+  .update(fs.readFileSync(path.join(ROOT, manifest.source.path), 'utf8')
+    .replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n'), 'utf8')
   .digest('hex');
 assert.equal(actualSourceHash, manifest.source.sha256);
 assert.equal(manifest.assets.length, 32);

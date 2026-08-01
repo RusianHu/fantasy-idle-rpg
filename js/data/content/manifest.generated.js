@@ -3,8 +3,98 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "76971fe7b7f50de7291958d1d8544a82b85b53503aa6d26540ef8e5351229a4a",
+  "sourceSetHash": "d07a51978ee2c59f14d5a64c431018e51affc4c022ee3fb529729e634b3efa68",
   "sources": [
+    {
+      "path": "js/data/packs/guardians/badger_brambleback.pack.js",
+      "kind": "pack",
+      "sha256": "c07ee318d097f73cfd86739c8a4c330de596181b9144970859ba826057536016"
+    },
+    {
+      "path": "js/data/packs/guardians/crab_oreplate.pack.js",
+      "kind": "pack",
+      "sha256": "28d61cca79c3f084890b5b17244e6c9fdb125e47cf159e4e406d783bbee41a9d"
+    },
+    {
+      "path": "js/data/packs/guardians/factory.support.js",
+      "kind": "support",
+      "sha256": "3f48d8adcf69452ade8e806798b05b18befafc79e41911ef9c703a9f51c94a5e"
+    },
+    {
+      "path": "js/data/packs/guardians/knight_cryptbound.pack.js",
+      "kind": "pack",
+      "sha256": "2913ceed0d52cb4cd68a56be3a1351597328fe2c4482627a4e2de36f7ceeac74"
+    },
+    {
+      "path": "js/data/packs/guardians/leopard_snowveil.pack.js",
+      "kind": "pack",
+      "sha256": "08949e0d05f64a61b21a119035547edd92b49feb407405199e80efa0c00471b9"
+    },
+    {
+      "path": "js/data/packs/guardians/lizard_reedstalker.pack.js",
+      "kind": "pack",
+      "sha256": "9fb01401a63695f4596a2adabfdcfd9f96c36372a3ea4052dea33e430c0d287a"
+    },
+    {
+      "path": "js/data/packs/guardians/mantis_vineblade.pack.js",
+      "kind": "pack",
+      "sha256": "c7fa0ec45c2a8e06d95db5f0c63984bcb1cd23e117568d68eef14656a2e0bdd0"
+    },
+    {
+      "path": "js/data/packs/guardians/minotaur_ironhorn.pack.js",
+      "kind": "pack",
+      "sha256": "c8d87d37b6fcdb7fe5768094595133134cc9121901d4cc3dc7259d7d4bfc1fbc"
+    },
+    {
+      "path": "js/data/packs/guardians/owlbear_mossclaw.pack.js",
+      "kind": "pack",
+      "sha256": "89ede9ebd074006a14095adc6a672b81ebc8f8c89a2901b1ef66705503ff8bfa"
+    },
+    {
+      "path": "js/data/packs/guardians/scorpion_cindertail.pack.js",
+      "kind": "pack",
+      "sha256": "d5007b3bf2ef8b643a7878fb53c3a5fabaa5295d5387eac7fe5e9eb9b0bd443b"
+    },
+    {
+      "path": "js/data/packs/guardians/serpent_cloudcoil.pack.js",
+      "kind": "pack",
+      "sha256": "bd1a268bc8c46ccb2fb979b5a3d0eab65f2fea4490b47da84359d0c384c2beda"
+    },
+    {
+      "path": "js/data/packs/guardians/spider_ossuary.pack.js",
+      "kind": "pack",
+      "sha256": "1014bcf4fa94611fe100011fc4a425dfd0257d0b5d29479ad29a0916512f5990"
+    },
+    {
+      "path": "js/data/packs/guardians/stalker_shadeclaw.pack.js",
+      "kind": "pack",
+      "sha256": "9d4c715afdb9b9d6fe7f53069fddc411ab4434d7104c21d8484bc19bfad13aa7"
+    },
+    {
+      "path": "js/data/packs/guardians/tortoise_basalt.pack.js",
+      "kind": "pack",
+      "sha256": "5cff91f737aba675a80e1d653f161c3fd7afeb071b56babe4a4294ef5820ae5a"
+    },
+    {
+      "path": "js/data/packs/guardians/troll_rimehide.pack.js",
+      "kind": "pack",
+      "sha256": "0398c5c5980553eb5b4e39d16bc815dc857961f56a2fd04506c63f059790a95c"
+    },
+    {
+      "path": "js/data/packs/guardians/warden_galeforged.pack.js",
+      "kind": "pack",
+      "sha256": "3c5ad1c0b172d33b6a1cd6ed752e8429618434bf163fa0ef38ef0e9fa977a491"
+    },
+    {
+      "path": "js/data/packs/guardians/worm_dustmaw.pack.js",
+      "kind": "pack",
+      "sha256": "1caff1a93c7b18d02c192776f88e7c7e0b748cbc273b3612c70759e42520f729"
+    },
+    {
+      "path": "js/data/packs/guardians/z_region_ecology.pack.js",
+      "kind": "pack",
+      "sha256": "ce404ee6c495fc45abf2fcaf80df7e41e3f4d1414cf41659c96393ad702960ac"
+    },
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
       "kind": "pack",
@@ -123,6 +213,21 @@
       ]
     },
     {
+      "id": "authoring.guard-monster-factory",
+      "version": "1.0.0",
+      "sourceFile": "js/data/packs/guardians/factory.support.js",
+      "requires": [
+        {
+          "id": "authoring.combat-formulas",
+          "range": "^1.0.0"
+        }
+      ],
+      "capabilities": [
+        "authoring.read",
+        "authoring.write"
+      ]
+    },
+    {
       "id": "authoring.region-catalog",
       "version": "1.0.0",
       "sourceFile": "js/data/packs/regions/catalog.support.js",
@@ -155,6 +260,11 @@
     {
       "kind": "factory",
       "id": "effect.damage",
+      "version": 1
+    },
+    {
+      "kind": "factory",
+      "id": "guard.monster.pack",
       "version": 1
     },
     {
@@ -204,6 +314,70 @@
       "version": "2.0.0"
     },
     {
+      "id": "monster.guard.badger_brambleback",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.crab_oreplate",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.knight_cryptbound",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.leopard_snowveil",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.lizard_reedstalker",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.mantis_vineblade",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.minotaur_ironhorn",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.owlbear_mossclaw",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.scorpion_cindertail",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.serpent_cloudcoil",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.spider_ossuary",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.stalker_shadeclaw",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.tortoise_basalt",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.troll_rimehide",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.warden_galeforged",
+      "version": "1.0.0"
+    },
+    {
+      "id": "monster.guard.worm_dustmaw",
+      "version": "1.0.0"
+    },
+    {
       "id": "region.darkcastle",
       "version": "2.1.0"
     },
@@ -240,6 +414,10 @@
       "version": "2.0.0"
     },
     {
+      "id": "world.encounter-pools-v4",
+      "version": "1.0.0"
+    },
+    {
       "id": "world.hoard-mimic",
       "version": "1.0.0"
     },
@@ -252,6 +430,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "a0664f1f"
+  "contentFingerprint": "2ee36b7a"
 });
 })();

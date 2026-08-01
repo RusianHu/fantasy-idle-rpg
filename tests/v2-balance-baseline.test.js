@@ -33,7 +33,7 @@ function load(file) { vm.runInContext(read(file), sandbox, { filename: file }); 
   'js/i18n/zh-CN.js', 'js/i18n/en.js',
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
-  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js',
+  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js', 'js/sprites/monsters_guards.js',
   'js/sprites/props.js',
   'js/sprites/ground-decorations/grassland.generated.js',
   'js/sprites/ground-decorations/forest.generated.js',
@@ -92,6 +92,7 @@ function party(classId, tier) {
 const report = {};
 for (const classId of Object.keys(classBase)) {
   const normalSeconds = [];
+  const gateSeconds = [];
   const bossSeconds = [];
   for (let tier = 1; tier <= regions.length; tier++) {
     const regionId = regions[tier - 1];
@@ -113,6 +114,18 @@ for (const classId of Object.keys(classBase)) {
       totalWeight += pack.weight;
     }
     normalSeconds.push(weightedSeconds / totalWeight);
+    const gate = Game.combatEstimator.evaluate({
+      partySnapshot: party(classId, tier),
+      encounterProfileId: `encounter.${regionId}`,
+      packId: `${regionId}.guardian`,
+      tier,
+      tacticsProfile: 'balanced',
+      sampleSeeds: [11, 29, 47],
+      maxTicks: 12000
+    });
+    assert.ok(gate.failureRate <= .25,
+      `${classId}/${regionId} boss gate is not hard-locked`);
+    gateSeconds.push(gate.averageSeconds);
     const boss = Game.combatEstimator.evaluate({
       partySnapshot: party(classId, tier),
       encounterProfileId: `encounter.${regionId}.boss`,
@@ -140,6 +153,7 @@ for (const classId of Object.keys(classBase)) {
     v2Minutes: v2MedianMinutes,
     deltaPct: delta * 100,
     normalSeconds: mean(normalSeconds),
+    gateSeconds: mean(gateSeconds),
     bossSeconds: mean(bossSeconds)
   };
 }

@@ -276,6 +276,55 @@
         };
         data.v = 17;
       }
+    },
+    {
+      // v17 -> v18: v4 nests and expedition-scoped guard sites require a clean
+      // exploration round. Character, route, economy, first kills and cumulative
+      // resources remain untouched; first-discovery rewards move to a ledger.
+      from: 17,
+      fn: function (data) {
+        data.world = data.world || {};
+        var order = Game.State.normalizeRegionOrder(data.world.regionOrder || []);
+        var exploration = data.world.exploration || {};
+        var highest = null, highestIndex = -1;
+        Object.keys(exploration).forEach(function (rid) {
+          var source = exploration[rid] || {};
+          var discovered = source.discovered || {};
+          var ledger = Object.assign({}, source.discoveryRewardLedger || {});
+          ['landmarks', 'resources', 'curios', 'ecology', 'threats', 'nests'].forEach(function (kind) {
+            Object.keys(discovered[kind] || {}).forEach(function (id) {
+              if (discovered[kind][id]) ledger[kind + ':' + id] = true;
+            });
+          });
+          if (discovered.guardian) ledger['guardian:' + rid + ':boss-gate-guard'] = true;
+          var explored = !!(source.fog && source.fog.data) || discovered.guardian ||
+            ['landmarks', 'resources', 'curios', 'ecology', 'threats'].some(function (kind) {
+              return Object.keys(discovered[kind] || {}).length > 0;
+            });
+          var index = order.indexOf(rid);
+          if (explored && index > highestIndex) { highest = rid; highestIndex = index; }
+          source.fog = null;
+          source.discovered = {
+            landmarks: {}, resources: {}, curios: {}, ecology: {}, threats: {}, nests: {},
+            guardian: false, curioChoices: {}
+          };
+          source.discoveryRewardLedger = ledger;
+          source.landmarkEffects = {};
+          source.threatCooldowns = {};
+          source.bossRetryAt = 0;
+          source.expeditionIndex = Math.max(0, Number(source.expeditionIndex) || 0) + 1;
+          source.expedition = null;
+          exploration[rid] = source;
+        });
+        data.world.exploration = exploration;
+        data.world.layoutVersion = 4;
+        data.world.hazards = { layoutVersion: 4, regions: {} };
+        data.world.guardSites = { version: 1, layoutVersion: 4, regions: {} };
+        data.world.migrationV18Gift = highest ? {
+          pending: true, claimed: false, regionId: highest, tier: highestIndex + 1
+        } : null;
+        data.v = 18;
+      }
     }
   ];
 
@@ -535,6 +584,50 @@
     return out;
   }
 
+  function normalizeGuardSites(saved, layoutVersion, exploration) {
+    var out = { version: 1, layoutVersion: 4, regions: {} };
+    if (layoutVersion !== 4 || !saved || saved.version !== 1 || saved.layoutVersion !== 4) return out;
+    Object.keys(saved.regions || {}).sort().forEach(function (rid) {
+      if (!Game.content || !Game.content.has('regionProfile', rid)) return;
+      var source = saved.regions[rid] || {};
+      var expectedIndex = Math.max(0, Number(exploration && exploration[rid] &&
+        exploration[rid].expeditionIndex) || 0);
+      if ((source.expeditionIndex | 0) !== expectedIndex) return;
+      var prefix = rid + ':';
+      function clean(list, kind) {
+        list = Array.isArray(list) ? list : [];
+        return list.filter(function (id, index) {
+          if (typeof id !== 'string' || id.indexOf(prefix) !== 0 || list.indexOf(id) !== index) return false;
+          if (kind === 'treasure') return new RegExp('^' + rid + ':nest-treasure:[0-1]$').test(id);
+          return new RegExp('^' + rid + ':(resource-guard:[A-Za-z0-9_.:-]+|nest-guard:[0-1]|boss-gate-guard)$').test(id);
+        }).sort();
+      }
+      out.regions[rid] = {
+        expeditionIndex: expectedIndex,
+        revealedIds: clean(source.revealedIds, 'site'),
+        clearedIds: clean(source.clearedIds, 'site'),
+        claimedTreasureIds: clean(source.claimedTreasureIds, 'treasure')
+      };
+    });
+    return out;
+  }
+
+  function grantMigrationV18Gift(state) {
+    var gift = state.world.migrationV18Gift;
+    if (!gift || !gift.pending || gift.claimed) return false;
+    var region = Game.reg.get('region', gift.regionId);
+    if (!region || !region.exploration) { gift.pending = false; return false; }
+    var tier = Math.max(1, Math.min(8, gift.tier | 0 || Game.State.regionTier(gift.regionId)));
+    state.economy.gold += Game.F.chestYield(tier, true).gold;
+    (region.exploration.resources || []).slice(0, 5).forEach(function (def) {
+      state.inv.materials[def.material] = (state.inv.materials[def.material] || 0) + 3;
+    });
+    state.inv.potions.potion_small = (state.inv.potions.potion_small || 0) + 2;
+    state.inv.potions.potion_large = (state.inv.potions.potion_large || 0) + 1;
+    gift.pending = false; gift.claimed = true;
+    return true;
+  }
+
   function normalizeChestMimic(saved) {
     saved = saved && typeof saved === 'object' ? saved : {};
     return {
@@ -590,6 +683,8 @@
           nodeCooldowns: st.world.nodeCooldowns,
           exploration: st.world.exploration,
           hazards: st.world.hazards,
+          guardSites: st.world.guardSites,
+          migrationV18Gift: st.world.migrationV18Gift || null,
           chestMimic: st.world.chestMimic,
           social: st.world.social,
           merchants: st.world.merchants,
@@ -728,7 +823,7 @@
       st.world.worldSeed = Number.isFinite(st.world.worldSeed)
         ? (st.world.worldSeed >>> 0)
         : U.strSeed('legacy:' + (data.createdAt || data.ts || 0));
-      st.world.layoutVersion = 3;
+      st.world.layoutVersion = 4;
       st.world.exploration = data.world && data.world.exploration &&
         typeof data.world.exploration === 'object' ? data.world.exploration : {};
       st.world.hazards = normalizeHazards(
@@ -736,6 +831,12 @@
         Math.max(0, Number(st.world.worldTime) || 0),
         st.world.layoutVersion
       );
+      st.world.guardSites = normalizeGuardSites(
+        data.world && data.world.guardSites,
+        st.world.layoutVersion,
+        st.world.exploration
+      );
+      st.world.migrationV18Gift = data.world && data.world.migrationV18Gift || null;
       st.world.chestMimic = normalizeChestMimic(
         data.world && data.world.chestMimic
       );
@@ -841,6 +942,7 @@
       Game.inv.setUidSeq(maxUid);
 
       Game.state = Game.State.attachCompatibility(st);
+      grantMigrationV18Gift(st);
       // 损坏或尺寸不匹配的 bitset 只重置对应区域探索，不影响角色档。
       if (Game.exploration) {
         Game.State.normalizeRegionOrder(st.world.regionOrder).forEach(function (rid) {

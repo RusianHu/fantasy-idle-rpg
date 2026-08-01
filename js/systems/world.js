@@ -156,6 +156,12 @@
       options = options || {};
       var hero = W.hero;
       if (!W.isHostileActor(hero, target)) return null;
+      if (target.guardSiteId && Game.guardSites && !options.guardSiteCommit) {
+        var guardStarted = Game.guardSites.trigger(target.guardSiteId, {
+          reason: options.reason || 'guard-contact'
+        });
+        return guardStarted && hero.encounterId ? Game.encounters.get(hero.encounterId) : null;
+      }
       if (hero.encounterId) {
         var current = Game.encounters.get(hero.encounterId);
         if (current && current.lifecycle === 'active' &&
@@ -250,6 +256,8 @@
       W.endEncounter('region-change');
       if (Game.worldAggro) Game.worldAggro.reset();
       if (Game.hazards) Game.hazards.reset();
+      if (Game.guardSites) Game.guardSites.reset();
+      if (Game.worldTreasures) Game.worldTreasures.reset();
       if (W.hero && Game.units) Game.units.commit(W.hero);
       if (Game.population) Game.population.reset(rid);
       Game.encounters.reset();
@@ -301,10 +309,12 @@
       hero.y = W.layout.camp.y + 26;
       W.entities.push(hero);
 
+      if (W.layout.version >= 3 && Game.expedition) Game.expedition.start(rid);
+
       var populationOptions = {
         tier: Game.State.regionTier(rid),
         worldSeed: Game.state.world.worldSeed,
-        expeditionIndex: Game.state.world.expedition && Game.state.world.expedition.index || 0,
+        expeditionIndex: Game.expedition && Game.expedition.current(rid).index || 0,
         affixFor: function (slot) {
           return slot.threat && (Game.expedition ? Game.expedition.threatAffix(slot.threat.id) : slot.threat.affix);
         }
@@ -325,19 +335,23 @@
             ? (W.layout.threats || []).length
             : Math.min(POPULATION, (W.layout.spawnCandidates || []).length),
           npc: Math.min(2, (W.layout.spawnCandidates || []).length),
-          guardian: W.layout.version >= 3 ? 1 : 0
+          rare: W.layout.version >= 4 ? 1 : 0,
+          guardian: W.layout.version >= 4 ? 0 : (W.layout.version >= 3 ? 1 : 0)
         }
       }));
       if (!mountPlan.ok) {
         throw new Error('[World] population mount failed: ' + JSON.stringify(mountPlan.failures));
       }
       if (W.layout.version >= 3) {
-        if (Game.expedition) Game.expedition.start(rid);
         if (Game.expeditionAI) Game.expeditionAI.reset();
         Game.population.mountChannel(rid, 'regular', W.layout, populationOptions).forEach(function (result) {
           Array.prototype.push.apply(W.entities, result.actors);
         });
-        W.spawnGuardian();
+        if (W.layout.version >= 4) {
+          Game.population.mountChannel(rid, 'rare', W.layout, populationOptions).forEach(function (result) {
+            Array.prototype.push.apply(W.entities, result.actors);
+          });
+        } else W.spawnGuardian();
         if (Game.exploration) Game.exploration.revealAt(hero.x, hero.y, { force: true, rid: rid });
       } else {
         Game.population.mountChannel(rid, 'regular', W.layout, populationOptions).forEach(function (result) {
@@ -348,6 +362,11 @@
         Array.prototype.push.apply(W.entities, result.actors);
       });
       if (Game.hazards && W.layout.version >= 3) Game.hazards.initRegion(rid, W.layout);
+      if (Game.guardSites && W.layout.version >= 4) Game.guardSites.initRegion(rid, W.layout);
+      if (Game.worldTreasures && W.layout.version >= 4) {
+        Game.worldTreasures.initRegion(rid, W.layout);
+        W.props = W.props.concat(Game.worldTreasures.list());
+      }
 
       if (Game.state.world.mode === 'rest') {
         hero.state = 'goCamp';
@@ -536,6 +555,7 @@
         var readiness = Game.exploration.readiness(region.id);
         var retryAt = Game.exploration.regionState(region.id).bossRetryAt || 0;
         if (!readiness.lair || readiness.total < 70 || Game.state.world.worldTime < retryAt) return false;
+        if (W.layout.version >= 4 && Game.guardSites && !Game.guardSites.isBossGateCleared()) return false;
       } else if (prog.kills < region.killTarget) return false;
       // 状态不佳时暂缓登场，避免登场即团灭的循环
       var hero = W.hero;
@@ -606,7 +626,6 @@
       prog.kills = Math.ceil(region.killTarget / 2);
       if (W.layout.version >= 3 && Game.exploration) {
         Game.exploration.regionState(region.id).bossRetryAt = Game.state.world.worldTime + 60;
-        if (Game.expedition && reason !== 'retreat') Game.expedition.finish('boss-failed', region.id);
       }
       if (W.bossEnt) {
         if (W.bossEnt.encounterId) W.endEncounter('boss-failed');
@@ -730,6 +749,13 @@
       if (hero.target && !hero.target.dead && hero.target.hp > 0) return false;
       if (!explicit && order.target && order.target.id && Game.expeditionAI &&
           Game.expeditionAI.isTargetBlocked(order.target.id)) return false;
+      if ((order.type === 'gather' || order.type === 'chest') && Game.guardSites) {
+        var guardSite = Game.guardSites.forTarget(order.target);
+        if (guardSite && !Game.guardSites.canInteract(order.target)) {
+          if (!explicit && guardSite.state !== 'concealed' &&
+              !Game.guardSites.autoEligible(guardSite)) return false;
+        }
+      }
       if (order.type === 'gather' && W.layout && W.layout.version >= 3 && Game.exploration) {
         var gatherTarget = order.target;
         if (!gatherTarget || !Game.exploration.isRevealed(gatherTarget.x, gatherTarget.y)) return false;
@@ -773,7 +799,7 @@
         return false;
       }
       var threat = W.contactThreat(hero);
-      if (threat) {
+      if (threat && !threat.guardSiteId) {
         W.cancelInteraction('combat');
         hero.target = threat;
         return false;
@@ -784,7 +810,8 @@
         W.cancelInteraction('missing');
         return false;
       }
-      if (order.type === 'chest' && Game.environment.chests().indexOf(target) < 0) {
+      if (order.type === 'chest' && Game.environment.chests().indexOf(target) < 0 &&
+          (!Game.worldTreasures || Game.worldTreasures.all().indexOf(target) < 0)) {
         W.cancelInteraction('missing');
         return false;
       }
@@ -799,6 +826,28 @@
       }
       var distance = U.dist(hero.x, hero.y, target.x, target.y);
       var reach = order.type === 'trade' ? Math.max(8, target.radius - 4) : 26;
+      if ((order.type === 'gather' || order.type === 'chest') && Game.guardSites) {
+        var site = Game.guardSites.forTarget(target);
+        if (site && !Game.guardSites.canInteract(target)) {
+          var guardDistance = U.dist(hero.x, hero.y, site.x, site.y);
+          var guardRadius = Game.guardSites.triggerRadius(site);
+          if (guardDistance <= guardRadius ||
+              (site.state === 'concealed' && distance <= reach + 2)) {
+            Game.guardSites.trigger(site, { targetId: target.id, reason: 'interaction' });
+            return false;
+          }
+          // A revealed guard is known information: approach its alarm radius
+          // once, without repeatedly clicking the still-locked target. A
+          // concealed site continues toward the target so its Hazard remains
+          // the only source of spatial information.
+          if (site.state !== 'concealed') {
+            hero.state = 'walk';
+            W.moveToward(hero, site.x, site.y, W.heroMoveSpeed(), dt,
+              'guard-approach:' + site.id);
+            return true;
+          }
+        }
+      }
       if (distance > reach) {
         hero.state = 'walk';
         W.moveToward(hero, target.x, target.y, W.heroMoveSpeed(), dt, 'interact:' + (target.id || order.areaId));
@@ -831,7 +880,8 @@
       if (order.type === 'gather') Game.environment.completeGather(target);
       hero.interactOrder = null;
       if (order.type === 'chest') {
-        var chestResult = Game.environment.openChest(target);
+        var chestResult = target.fixedNestChest && Game.worldTreasures
+          ? Game.worldTreasures.open(target) : Game.environment.openChest(target);
         if (!chestResult || chestResult.outcome !== 'mimic') hero.state = 'idle';
       } else {
         hero.state = 'idle';
@@ -855,6 +905,15 @@
         if (W.controlMode() !== 'auto' || !Game.environment.autoChestReady ||
             Game.environment.autoChestReady(chest.target)) {
           if (W.startInteraction({ type: 'chest', target: chest.target }, false)) return true;
+        }
+      }
+      var nestTreasure = Game.worldTreasures && Game.worldTreasures.nearest(
+        hero.x, hero.y, allowed
+      );
+      if (nestTreasure && (W.controlMode() === 'auto' || nestTreasure.distance <= 26)) {
+        var site = Game.guardSites && Game.guardSites.forTarget(nestTreasure.target);
+        if (!site || Game.guardSites.autoEligible(site)) {
+          if (W.startInteraction({ type: 'chest', target: nestTreasure.target }, false)) return true;
         }
       }
       if (W.controlMode() === 'auto' && Game.environment) {
@@ -1061,7 +1120,9 @@
         }
       }
       if (Game.environment) {
-        var chests = Game.environment.chests();
+        var chests = Game.environment.chests().concat(
+          Game.worldTreasures ? Game.worldTreasures.list() : []
+        );
         for (var chi = 0; chi < chests.length; chi++) {
           if (U.dist(wx, wy, chests[chi].x, chests[chi].y) <= 16) {
             W.startInteraction({ type: 'chest', target: chests[chi] }, true);
@@ -1463,6 +1524,7 @@
 
       W.updateHero(hero, dt);
       if (Game.hazards) Game.hazards.update(dt);
+      if (Game.guardSites) Game.guardSites.update(dt);
 
       // 怪物
       for (var i = W.entities.length - 1; i >= 0; i--) {

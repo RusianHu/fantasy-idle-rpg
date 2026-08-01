@@ -174,6 +174,19 @@
       crystalChance: rare ? 0.16 : 0
     };
   };
+  F.nestChestYield = function (tier, depth) {
+    tier = U.clamp(tier || 1, 1, 8);
+    var deep = depth === 'deep';
+    var common = F.chestYield(tier, false);
+    return {
+      gold: Math.round(common.gold * (deep ? 2.25 : 1.5)),
+      materialMin: deep ? 3 : 2,
+      materialMax: deep ? 5 : 4,
+      equipmentChance: deep ? 0.45 : 0.25,
+      equipmentRarityMin: deep ? 2 : 1,
+      crystalChance: 0
+    };
+  };
   F.exchangeRecipes = {
     exchange_potion: {
       costs: { herb: 3, berry: 2 },

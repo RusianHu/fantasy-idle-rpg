@@ -1765,11 +1765,49 @@
     if (uiTick <= 0) { uiTick = .15; updateUi(false); }
     requestAnimationFrame(loop);
   }
+  function renderGuardContactSheet() {
+    var sheet = $('guard-contact-sheet'), status = $('guard-contact-status');
+    if (!sheet || !status) return;
+    sheet.innerHTML = '';
+    var actors = Game.content.all('actorArchetype').filter(function (def) {
+      return (def.tags || []).indexOf('encounter-pool') >= 0;
+    }).sort(function (a, b) { return a.legacy.tier - b.legacy.tier || a.id.localeCompare(b.id); });
+    var ready = 0;
+    actors.forEach(function (def) {
+      var card = document.createElement('article'); card.className = 'guard-contact-card';
+      var canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = 88;
+      canvas.setAttribute('aria-label', def.id + ' idle frames');
+      var context = canvas.getContext('2d'); context.imageSmoothingEnabled = false;
+      context.fillStyle = '#080b17'; context.fillRect(0, 0, canvas.width, canvas.height);
+      var sprite = Game.assets.sprite(def.presentation.spriteId);
+      var frames = [sprite.frames.idle0, sprite.frames.idle1 || sprite.frames.idle0];
+      frames.forEach(function (frame, index) {
+        var scale = 3, x = index ? 94 : 24, y = 70 - frame.height * scale;
+        context.drawImage(frame, x, y, frame.width * scale, frame.height * scale);
+        context.fillStyle = '#7f8bb5'; context.font = '9px ui-monospace';
+        context.fillText('idle' + index, index ? 101 : 31, 83);
+      });
+      if (!sprite.isPlaceholder && frames[0] && frames[1]) ready++;
+      var info = document.createElement('div');
+      var name = document.createElement('strong'); name.textContent = Game.i18n.t(def.identity.nameKey);
+      var id = document.createElement('code'); id.textContent = def.id;
+      var special = Game.content.get('ability', def.id + '.special');
+      var ability = document.createElement('small'); ability.textContent = special ? Game.i18n.t(special.presentation.nameKey) : 'missing special';
+      var role = document.createElement('small');
+      role.textContent = (def.tags.indexOf('territory-guardian') >= 0 ? 'GUARD' : 'HUNTER') +
+        ' · T' + def.legacy.tier + ' · ' + frames.map(function (frame) { return frame.width + '×' + frame.height; }).join('/');
+      info.appendChild(name); info.appendChild(id); info.appendChild(ability); info.appendChild(role);
+      card.appendChild(canvas); card.appendChild(info); sheet.appendChild(card);
+    });
+    status.textContent = ready + '/' + actors.length + ' sprites · no placeholders';
+    status.classList.toggle('fail', ready !== actors.length);
+  }
   function boot() {
     var initial = params();
     $('locale').value = initial.lang === 'en' ? 'en' : 'zh-CN';
     var audit = Game.content.finalize({ strict: true });
     $('fingerprint').textContent = 'content ' + audit.fingerprint + ' · ' + audit.packs.length + ' packs';
+    renderGuardContactSheet();
     fillSelect($('encounter'), Game.content.all('encounterProfile'), initial.encounter, function (def) { return labelFor('encounterProfile', def); });
     fillSelect($('actor'), Game.content.all('actorArchetype'), initial.actor, function (def) { return labelFor('actorArchetype', def); });
     fillSelect($('class'), Game.content.all('class'), initial.classId, function (def) { return def.id; });
@@ -1845,7 +1883,7 @@
         updateUi(true);
       }]
     ].forEach(function (entry) { $(entry[0]).addEventListener('click', entry[1]); });
-    $('locale').addEventListener('change', function () { translate(); updateUrl(); });
+    $('locale').addEventListener('change', function () { translate(); renderGuardContactSheet(); updateUrl(); });
     $('tool-source').addEventListener('change', refreshAbilities);
     $('inspect-actor').addEventListener('change', updateInspector);
     $('catalog-type').addEventListener('change', updateCatalog);
@@ -1907,6 +1945,14 @@
           encounterCount: Game.content.all('encounterProfile').length,
           fingerprint: Game.content.fingerprint()
         };
+      },
+      guardContactSheet: function () {
+        return Game.content.all('actorArchetype').filter(function (def) {
+          return (def.tags || []).indexOf('encounter-pool') >= 0;
+        }).map(function (def) {
+          return { id: def.id, spriteReady: Game.assets.has(def.presentation.spriteId),
+            specialAbilityId: def.id + '.special' };
+        });
       }
     };
     requestAnimationFrame(loop);

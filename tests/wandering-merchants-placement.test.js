@@ -35,7 +35,7 @@ const load = (file) => vm.runInContext(read(file), sandbox, { filename: file });
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
   'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js',
-  'js/sprites/monsters_expansion.js', 'js/sprites/props.js',
+  'js/sprites/monsters_expansion.js', 'js/sprites/monsters_guards.js', 'js/sprites/props.js',
   'js/sprites/ground-decorations/grassland.generated.js',
   'js/sprites/ground-decorations/forest.generated.js',
   'js/sprites/ground-decorations/mine.generated.js',
@@ -55,7 +55,7 @@ Game.content.finalize({ strict: true });
 Game.assets.sprite = () => ({ w: 16, h: 20 });
 [
   'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
-  'js/systems/terrain.js', 'js/systems/terrain_v3.js', 'js/systems/nav.js',
+  'js/systems/terrain.js', 'js/systems/terrain_v3.js', 'js/systems/terrain_v4.js', 'js/systems/nav.js',
   'js/systems/world_population.js', 'js/systems/world.js'
 ].forEach(load);
 
@@ -109,18 +109,18 @@ function channelLimits(region, layout) {
   return {
     regular: layout.threats.length,
     npc: view.channels.npc ? view.channels.npc.capacity : 0,
-    guardian: layout.guardian ? 1 : 0,
+    guardian: layout.version >= 4 ? 0 : (layout.guardian ? 1 : 0),
     boss: 1,
-    rare: 0
+    rare: layout.version >= 4 ? 1 : 0
   };
 }
 
-function prepare(region, seed) {
+function prepare(region, seed, layoutVersion = 3) {
   Game.population.reset(region.id);
   Game.state.world.region = region.id;
   Game.state.world.worldSeed = seed >>> 0;
-  Game.state.world.layoutVersion = 3;
-  const layout = Game.terrain.generate(region, seed, 3);
+  Game.state.world.layoutVersion = layoutVersion;
+  const layout = Game.terrain.generate(region, seed, layoutVersion);
   Game.terrain.mount(layout, region);
   const plan = Game.population.prepareRegion(region.id, layout, {
     tier: region.tier,
@@ -189,6 +189,35 @@ for (const region of regions) {
       assert.deepEqual(repeat.chosen, audit.chosen, `${region.id}:${seed}:${hero.id} deterministic`);
       placementCases++;
     }
+  }
+}
+
+let v4PlacementCases = 0;
+for (const region of regions) {
+  for (const seed of seeds) {
+    const { layout, plan } = prepare(region, seed, 4);
+    const hero = heroPoints(layout)[1];
+    const audit = Game.merchants.inspectPlacement({
+      regionId: region.id,
+      seed: Game.util.strSeed(`${seed}|${region.id}|v4-reservation`),
+      layout,
+      heroPoint: hero,
+      reservations: plan.reservations,
+      full: false
+    });
+    assert.equal(audit.ok, true, `${region.id}:${seed}:v4 ${JSON.stringify(audit.failureCounts)}`);
+    for (const nest of layout.nests) {
+      const nx = (audit.chosen.x - nest.x) / (nest.rx * 1.2 + audit.chosen.occupancyRadius);
+      const ny = (audit.chosen.y - nest.y) / (nest.ry * 1.2 + audit.chosen.occupancyRadius);
+      assert.ok(nx * nx + ny * ny > 1, `${region.id}:${seed} merchant overlaps ${nest.id}`);
+    }
+    const reserved = [].concat(layout.treasureSites, layout.guardSites, layout.bossGatePoint);
+    reserved.forEach((site) => assert.ok(
+      Game.util.dist(audit.chosen.x, audit.chosen.y, site.x, site.y) >=
+        audit.chosen.occupancyRadius + (site.kind === 'guardSite' ? 72 : 64),
+      `${region.id}:${seed} merchant overlaps ${site.id}`
+    ));
+    v4PlacementCases++;
   }
 }
 
@@ -296,6 +325,6 @@ Game.population.close = originalClose;
 Game.world.attachActor = originalAttach;
 
 console.log(
-  `Wandering merchant placement passed: ${placementCases} v3 audits, ` +
+  `Wandering merchant placement passed: ${placementCases} v3 and ${v4PlacementCases} v4 audits, ` +
   `transaction rollback and ${maxPatrolDistance.toFixed(2)}px max patrol.`
 );

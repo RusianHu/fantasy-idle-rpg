@@ -219,9 +219,26 @@ assert.equal(disconnectedApi.close(), false);
 let surrenderState = 'surrendered';
 let surrenderPromptResets = 0;
 Game.i18n = {
-  t(key) { return key; },
-  fmtNum(value) { return String(value); }
+  t(key, vars) {
+    if (key === 'ui.nestChestOpened') return `${key}:${vars.gold}:${vars.count}`;
+    return key;
+  },
+  fmtNum(value) { return `fmt:${value}`; }
 };
+let nestChestToast = null;
+const originalToast = Game.ui.modals.toast;
+Game.ui.modals.toast = function (message, kind) {
+  nestChestToast = { message, kind };
+};
+assert.doesNotThrow(() => bus.emit('nestChest:opened', {
+  gold: 12345,
+  materialCount: 4
+}));
+assert.deepEqual(nestChestToast, {
+  message: 'ui.nestChestOpened:fmt:12345:4',
+  kind: 'gold'
+}, 'nest chest Toast formats through the live i18n object without listener errors');
+Game.ui.modals.toast = originalToast;
 Game.world = {
   hero: { hp: 100, maxHp: 100, state: 'idle', encounterId: null }
 };

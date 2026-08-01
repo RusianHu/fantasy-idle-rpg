@@ -32,7 +32,7 @@ const load = (file) => vm.runInContext(read(file), sandbox, { filename: file });
   'js/i18n/zh-CN.js', 'js/i18n/en.js',
   'js/i18n/combat-v2-zh-CN.js', 'js/i18n/combat-v2-en.js',
   'js/core/assets.js', 'js/sprites/palettes.js', 'js/sprites/hero.js',
-  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js',
+  'js/sprites/monsters_a.js', 'js/sprites/monsters_b.js', 'js/sprites/monsters_expansion.js', 'js/sprites/monsters_guards.js',
   'js/sprites/props.js',
   'js/sprites/ground-decorations/grassland.generated.js',
   'js/sprites/ground-decorations/forest.generated.js',
@@ -455,6 +455,28 @@ assert.equal(Game.population.update(1, Game.state.world.worldTime).spawned.lengt
 const delayedRespawn = Game.population.update(1, Game.state.world.worldTime).spawned[0];
 assert.equal(delayedRespawn.lease.spawnId, delayedSpawnId);
 assert.equal(delayedRespawn.lease.generation, 2);
+
+// External lifecycle owners (v4 guard sites) close their Population lease on
+// defeat without inheriting the profile's generic respawn timer.
+const guardOwned = Game.population.materialize('spawn.grassland.guardian', {
+  regionId: 'grassland', populationId: 'population.grassland',
+  layoutSlotKey: 'guard-site:respawn-owner',
+  spawnRequestKey: 'guard-site:respawn-owner',
+  x: 420, y: 260, tier: 1
+});
+assert.equal(guardOwned.ok, true);
+guardOwned.actors.forEach((actor) => {
+  actor.populationRespawnManaged = false;
+  actor.hp = 0;
+  actor.dead = true;
+  actor.components.vitals.hp = 0;
+});
+assert.ok(Game.population.onActorDefeated(guardOwned.primary));
+assert.equal(Game.population.lease(guardOwned.lease.spawnId), null);
+assert.equal(Game.population.mountPlan().respawnSchedules.length, 0,
+  'a cleared guard-owned lease cannot retain the guardian profile 120s respawn');
+assert.equal(Game.population.update(121, Game.state.world.worldTime + 121).spawned.length, 0,
+  'advancing beyond the legacy guardian delay cannot resurrect a cleared gate');
 
 // Escape closes the lease; worldTime respawn waits on the absolute clock and resets saved Variant.
 const worldTimeSlot = mountPlanB.slots.find((slot) =>

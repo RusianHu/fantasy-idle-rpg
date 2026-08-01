@@ -914,7 +914,9 @@
         if (!visibleDynamic[j].hazardConcealed) drawables.push(visibleDynamic[j]);
       }
       if (Game.environment) {
-        var sceneChests = Game.environment.chests();
+        var sceneChests = Game.environment.chests().concat(
+          Game.worldTreasures ? Game.worldTreasures.list() : []
+        );
         for (j = 0; j < sceneChests.length; j++) drawables.push(sceneChests[j]);
       }
       if (Game.trade) {
@@ -998,7 +1000,7 @@
         if (isActorEntity(e)) R.drawEntity(e);
         else if (e.kind === 'groundLoot') R.drawGroundLoot(e, t);
         else if (e.kind === 'gatherNode') R.drawGatherNode(e, t);
-        else if (e.kind === 'chest') R.drawChest(e, t);
+        else if (e.kind === 'chest' || e.fixedNestChest) R.drawChest(e, t);
         else if (e.kind === 'tradeProp') R.drawTradeProp(e, t);
         else R.drawProp(e, t);
       }
@@ -1347,9 +1349,10 @@
 
     drawChest: function (chest, t) {
       var motion = U.motionEnabled();
-      var remain = chest.ttl - chest.age;
+      var remain = chest.ttl === null || chest.ttl === undefined ? Infinity : chest.ttl - chest.age;
       var alpha = remain < 12 ? U.clamp(remain / 12, 0, 1) : 1;
-      var y = chest.y + (motion ? Math.sin(t * 1.7 + chest.phase) * 1.2 : 0);
+      var phase = Number(chest.phase) || 0;
+      var y = chest.y + (motion ? Math.sin(t * 1.7 + phase) * 1.2 : 0);
       var color = chest.rare ? '#c377e2' : '#d8a94d';
       var spriteId = chest.rare ? 'chest_rare' : 'chest_common';
       var sp = Game.assets.sprite(spriteId);
@@ -1365,20 +1368,31 @@
       ctx.globalCompositeOperation = 'source-over';
       Game.assets.draw(ctx, spriteId, 'idle0', chest.x, y, { alpha: alpha });
       if (chest.oddity) {
-        var tell = motion ? (((t * 3 + chest.phase) | 0) % 13 === 0) : true;
+        var tell = motion ? (((t * 3 + phase) | 0) % 13 === 0) : true;
         if (tell) {
           ctx.globalAlpha = alpha * .72;
           ctx.fillStyle = '#7f3037';
           ctx.fillRect(Math.round(chest.x + 3), Math.round(y - 8), 1, 1);
         }
       }
-      if (motion && (!chest.rare || (((t * 4 + chest.phase) | 0) % 9 < 2))) {
+      if (motion && (!chest.rare || (((t * 4 + phase) | 0) % 9 < 2))) {
         var sx = Math.round(chest.x + (chest.rare ? 7 : 5));
         var sy = Math.round(y - (chest.rare ? 12 : 10));
         ctx.globalAlpha = alpha * (chest.rare ? 0.95 : 0.55);
         ctx.fillStyle = chest.rare ? '#fff4b0' : '#f4dd8a';
         ctx.fillRect(sx, sy - 1, 1, 3);
         ctx.fillRect(sx - 1, sy, 3, 1);
+      }
+      if (chest.locked) {
+        ctx.globalAlpha = alpha * 0.92;
+        ctx.fillStyle = '#2a2530';
+        ctx.fillRect(Math.round(chest.x - 3), Math.round(y - 11), 7, 6);
+        ctx.strokeStyle = '#e8c76a';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.round(chest.x - 3) + 0.5, Math.round(y - 11) + 0.5, 6, 5);
+        ctx.beginPath();
+        ctx.arc(Math.round(chest.x), Math.round(y - 11), 2.5, Math.PI, 0);
+        ctx.stroke();
       }
       ctx.restore();
     },

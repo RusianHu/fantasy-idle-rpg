@@ -25,6 +25,7 @@ load('js/data/routes.js');
 load('js/systems/routes.js');
 load('js/systems/terrain.js');
 load('js/systems/terrain_v3.js');
+load('js/systems/terrain_v4.js');
 load('js/vendor/easystar-0.4.4.min.js');
 load('js/systems/nav.js');
 
@@ -259,7 +260,7 @@ const orderVariants = new Set(Array.from({ length: 32 }, (_, seed) =>
 assert.ok(orderVariants.size > 12, 'world seeds produce varied early-region orders');
 const freshState = Game.State.newGame();
 assert.equal(freshState.world.worldSeed, freshState.world.worldSeed >>> 0);
-assert.equal(freshState.world.layoutVersion, 3);
+assert.equal(freshState.world.layoutVersion, 4);
 assert.deepEqual(freshState.world.regionOrder, canonicalOrder);
 assert.deepEqual(Game.routes.validate(freshState.world.routePlan), []);
 
@@ -310,7 +311,7 @@ function runSaveTests() {
   const migrated = Game.save.load();
   assert.equal(migrated.v, Game.SAVE_VERSION);
   assert.equal(migrated.world.worldSeed, expectedSeed);
-  assert.equal(migrated.world.layoutVersion, 3);
+  assert.equal(migrated.world.layoutVersion, 4);
   assert.deepEqual(migrated.world.regionOrder, old.world.regionOrder, 'migration preserves route order');
   assert.deepEqual(Game.routes.mainlineRegionOrder(migrated.world.routePlan), old.world.regionOrder,
     'migration compiles the preserved route into RoutePlan');
@@ -318,16 +319,16 @@ function runSaveTests() {
   Game.save.applyLoaded(migrated);
   const serialized = Game.save.serialize();
   assert.equal(serialized.world.worldSeed, expectedSeed);
-  assert.equal(serialized.world.layoutVersion, 3);
+  assert.equal(serialized.world.layoutVersion, 4);
   assert.deepEqual(Game.routes.validate(serialized.world.routePlan), []);
   const expectedLayout = JSON.stringify(Game.terrain.snapshotV3(
-    Game.terrain.build(Game.reg.get('region', serialized.world.region), expectedSeed, 3)
+    Game.terrain.build(Game.reg.get('region', serialized.world.region), expectedSeed, 4)
   ));
 
   const b64 = Game.save.exportB64();
   assert.equal(Game.save.importB64(b64).ok, true);
   assert.equal(Game.state.world.worldSeed, expectedSeed);
-  assert.equal(Game.state.world.layoutVersion, 3);
+  assert.equal(Game.state.world.layoutVersion, 4);
   const b64Layout = JSON.stringify(Game.terrain.snapshotV3(
     Game.terrain.build(Game.reg.get('region', Game.state.world.region), Game.state.world.worldSeed, Game.state.world.layoutVersion)
   ));
@@ -347,7 +348,7 @@ function runSaveTests() {
   const backup = JSON.parse(storage.get('firpg_save_backup'));
   assert.equal(primary.world.worldSeed, expectedSeed);
   assert.equal(primary.v, Game.SAVE_VERSION);
-  assert.equal(primary.world.layoutVersion, 3);
+  assert.equal(primary.world.layoutVersion, 4);
   assert.deepEqual(primary, backup, 'main and backup slots match');
 
   const v6 = v5Save();
@@ -359,9 +360,9 @@ function runSaveTests() {
   const upgradedV6 = Game.save.load();
   assert.equal(upgradedV6.v, Game.SAVE_VERSION);
   assert.equal(upgradedV6.world.worldSeed, 0x0BADCAFE);
-  assert.equal(upgradedV6.world.layoutVersion, 3, 'legacy layouts migrate once through v2 into open-map v3');
+  assert.equal(upgradedV6.world.layoutVersion, 4, 'legacy layouts migrate into the current guarded-nest layout');
   Game.save.applyLoaded(upgradedV6);
-  assert.equal(Game.save.serialize().world.layoutVersion, 3, 'current save reload keeps the migrated layout version');
+  assert.equal(Game.save.serialize().world.layoutVersion, 4, 'current save reload keeps the migrated layout version');
 }
 
 runSaveTests();

@@ -95,6 +95,9 @@ a { color: var(--gold); text-decoration: none; }
 .instance-controls label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
 .instance-controls select { min-width: 0; width: 100%; padding: 0 8px; }
 .instance-controls button { align-self: end; padding: 0 8px; }
+.guard-scenarios { grid-template-columns: auto repeat(5, minmax(94px, 1fr)) auto; align-items: center; border-top: 1px solid var(--line); }
+.guard-scenarios strong { color: var(--gold); font-size: 10px; }
+.guard-scenarios output { color: var(--muted); font: 9px/1.35 Consolas, monospace; overflow-wrap: anywhere; }
 .runtime-grid { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .runtime-grid div { min-width: 0; padding: 10px 12px; border-right: 1px solid var(--line); }
 .runtime-grid div:nth-child(3n) { border-right: 0; }
@@ -378,6 +381,6 @@ a { color: var(--gold); text-decoration: none; }
 }
 @font-face {
   font-family: "Fusion Pixel";
-  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.2") format("woff2");
+  src: url("../../assets/fonts/fusion-pixel.woff2?v=20260801.9") format("woff2");
   font-display: swap;
 }

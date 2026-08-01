@@ -20,6 +20,7 @@ const PRODUCTION_CONTENT_FILES = Object.freeze([
   'js/sprites/monsters_a.js',
   'js/sprites/monsters_b.js',
   'js/sprites/monsters_expansion.js',
+  'js/sprites/monsters_guards.js',
   'js/sprites/props.js',
   'js/sprites/ground-decorations/manifest.generated.js',
   'js/sprites/ground-decorations/grassland.generated.js',

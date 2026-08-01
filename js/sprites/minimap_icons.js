@@ -156,6 +156,46 @@
         '.............'
       ]
     },
+    nest: {
+      pal: { r: '#776071', h: '#b68f80', d: '#2a2433', g: '#6f8b55', e: '#e7c365' },
+      rows: [
+        '...hhhhh.....', '..hrrrrrh....', '.hrrdddrrh...', 'hrrdddddrrh..',
+        'hrrddgdddrrh.', 'rrddgggdddrr.', 'rrdddddddrrr.', 'hrrddddddrrh.',
+        '.hrrdddddrr..', '..hrrr..rr...', '...hh...hh...', '......e......', '.............'
+      ]
+    },
+    chestLocked: {
+      pal: { w: '#8d5a39', g: '#d8a947', h: '#ffe292', l: '#c9d4d1', d: '#44515c' },
+      rows: [
+        '....llll.....', '...ldddl.....', '...l...l.....', '..wwwwwwwww..',
+        '.wgggggggggw.', '.wghhhhhhhgw.', '.wgggglggggw.', '.wwwwwlwwwww.',
+        '.wgggglggggw.', '.wgggggggggw.', '..wwwwwwwww..', '.............', '.............'
+      ]
+    },
+    chestAvailable: {
+      pal: { w: '#8d5a39', g: '#d8a947', h: '#ffe292', e: '#fff1a8' },
+      rows: [
+        '......e......', '.....eee.....', '..wwwwwwwww..', '.wgggggggggw.',
+        '.wghhhhhhhgw.', '.wgggggggggw.', '.wwwwwwwwwww.', '.wgggghggggw.',
+        '.wggghhhgggw.', '.wgggghggggw.', '..wwwwwwwww..', '.............', '.............'
+      ]
+    },
+    ambushRevealed: {
+      pal: { r: '#d65b67', h: '#ff9b78', d: '#482b3d', e: '#f3d568' },
+      rows: [
+        '......e......', '.....eee.....', '......e......', '..rr.....rr..',
+        '.rhhrr.rrhhr.', 'rrhddrrrdhhrr', '.rrhddrdhrr..', '..rrhhrhrr...',
+        '...rrdrr.....', '....rrr......', '.....r.......', '.............', '.............'
+      ]
+    },
+    bossGate: {
+      pal: { i: '#69788b', h: '#d6ddd8', g: '#d5ad50', d: '#282b38', r: '#c9534d' },
+      rows: [
+        '.ii.......ii.', 'ihhi.....ihhi', 'ihhi.....ihhi', 'ihhiigggiihhi',
+        'ihhggggggghhi', 'ihggdddddgghi', 'ihgdrrrrrdghi', 'ihgdrrrrrdghi',
+        'ihgdrrrrrdghi', 'ihgdrrrrrdghi', 'iiiidddddiiii', '.iii.....iii.', '.............'
+      ]
+    },
     merchant: {
       pal: {
         t: '#4faeb0', h: '#98e1d5', c: '#efe0b8',

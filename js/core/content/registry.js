@@ -253,7 +253,7 @@
       if (['anchor', 'layoutEntity', 'candidate'].indexOf(placement.selector) < 0) issue(issues, 'spawn-placement-selector', { type: type, id: def.id, path: 'placement.selector' });
       var sourcesBySelector = {
         anchor: ['camp', 'bossPoint', 'bossSpawnPoint', 'summoner'],
-        layoutEntity: ['guardian', 'threat', 'landmark', 'ecology'],
+        layoutEntity: ['guardian', 'threat', 'landmark', 'ecology', 'encounterSite'],
         candidate: ['spawnCandidates', 'corridorCandidates', 'walkableNav']
       };
       if (sourcesBySelector[placement.selector] && sourcesBySelector[placement.selector].indexOf(placement.source) < 0) issue(issues, 'spawn-placement-source', { type: type, id: def.id, path: 'placement.source', ref: placement.source });
@@ -269,7 +269,7 @@
       if (placement.maxDanger !== undefined && (!Number.isFinite(placement.maxDanger) || placement.maxDanger < 0 || placement.maxDanger > 1)) issue(issues, 'spawn-placement-number', { type: type, id: def.id, path: 'placement.maxDanger' });
       var lifecycle = def.lifecycle || {};
       unexpectedFields(lifecycle, ['activation', 'unload', 'onDefeat', 'onEscape', 'respawn'], type, def, 'lifecycle', issues);
-      if (['regionActive', 'bossRequested', 'scripted'].indexOf(lifecycle.activation) < 0 || lifecycle.unload !== 'despawn' || lifecycle.onDefeat !== 'closeLease' || lifecycle.onEscape !== 'closeLease') issue(issues, 'spawn-lifecycle', { type: type, id: def.id, path: 'lifecycle' });
+      if (['regionActive', 'bossRequested', 'scripted', 'poolRequested'].indexOf(lifecycle.activation) < 0 || lifecycle.unload !== 'despawn' || lifecycle.onDefeat !== 'closeLease' || lifecycle.onEscape !== 'closeLease') issue(issues, 'spawn-lifecycle', { type: type, id: def.id, path: 'lifecycle' });
       var respawn = lifecycle.respawn || {};
       unexpectedFields(respawn, ['mode', 'delay', 'resetVariant'], type, def, 'lifecycle.respawn', issues);
       if (['none', 'delay', 'worldTime'].indexOf(respawn.mode) < 0 || typeof respawn.resetVariant !== 'boolean' ||
@@ -280,8 +280,113 @@
     if (type === 'worldPopulationProfile') {
       Object.keys(def.channels || {}).forEach(function (channel) {
         if (S.populationChannels.indexOf(channel) < 0) issue(issues, 'population-channel', { type: type, id: def.id, path: 'channels.' + channel });
-        var capacity = def.channels[channel] && def.channels[channel].capacity;
+        var config = def.channels[channel] || {};
+        unexpectedFields(config, ['capacity', 'selection', 'poolProfileId'], type, def,
+          'channels.' + channel, issues);
+        var capacity = config.capacity;
         if (!Number.isInteger(capacity) || capacity < 0) issue(issues, 'population-capacity', { type: type, id: def.id, path: 'channels.' + channel + '.capacity' });
+        if (config.poolProfileId) refExists(definitions, 'encounterPoolProfile',
+          config.poolProfileId, type, def, 'channels.' + channel + '.poolProfileId', issues);
+        if (config.poolProfileId && definitions.encounterPoolProfile &&
+            definitions.encounterPoolProfile[config.poolProfileId] &&
+            definitions.encounterPoolProfile[config.poolProfileId].regionId !== def.regionId) {
+          issue(issues, 'population-pool-region', { type: type, id: def.id,
+            path: 'channels.' + channel + '.poolProfileId', ref: config.poolProfileId });
+        }
+      });
+    }
+    if (type === 'encounterPoolProfile') {
+      if (S.encounterPoolCategories.indexOf(def.category) < 0) {
+        issue(issues, 'encounter-pool-category', { type: type, id: def.id, path: 'category', ref: def.category });
+      }
+      if (!Array.isArray(def.roles) || !def.roles.length || def.roles.some(function (role) {
+        return S.encounterPoolRoles.indexOf(role) < 0;
+      })) issue(issues, 'encounter-pool-roles', { type: type, id: def.id, path: 'roles' });
+      var poolRoleSeen = {};
+      (def.roles || []).forEach(function (role, index) {
+        if (poolRoleSeen[role]) issue(issues, 'encounter-pool-duplicate-role', {
+          type: type, id: def.id, path: 'roles.' + index, ref: role
+        });
+        poolRoleSeen[role] = true;
+      });
+      if (!Array.isArray(def.entries) || !def.entries.length) {
+        issue(issues, 'encounter-pool-empty', { type: type, id: def.id, path: 'entries' });
+      }
+      var poolEntrySeen = {};
+      (def.entries || []).forEach(function (entry, index) {
+        unexpectedFields(entry || {}, ['worldSpawnProfileId', 'weight', 'maxPerMount'],
+          type, def, 'entries.' + index, issues);
+        var spawnId = entry && entry.worldSpawnProfileId;
+        if (!spawnId || poolEntrySeen[spawnId]) issue(issues,
+          poolEntrySeen[spawnId] ? 'encounter-pool-duplicate-entry' : 'encounter-pool-entry',
+          { type: type, id: def.id, path: 'entries.' + index, ref: spawnId });
+        poolEntrySeen[spawnId] = true;
+        if (spawnId) refExists(definitions, 'worldSpawnProfile', spawnId, type, def,
+          'entries.' + index + '.worldSpawnProfileId', issues);
+        if (!entry || !Number.isInteger(entry.weight) || entry.weight < 1) {
+          issue(issues, 'encounter-pool-weight', { type: type, id: def.id, path: 'entries.' + index + '.weight' });
+        }
+        if (entry && entry.maxPerMount !== undefined &&
+            (!Number.isInteger(entry.maxPerMount) || entry.maxPerMount < 1)) {
+          issue(issues, 'encounter-pool-max', { type: type, id: def.id, path: 'entries.' + index + '.maxPerMount' });
+        }
+      });
+    }
+    if (type === 'guardSiteProfile') {
+      if (!Array.isArray(def.targetKinds) || !def.targetKinds.length ||
+          def.targetKinds.some(function (kind) { return S.guardTargetKinds.indexOf(kind) < 0; })) {
+        issue(issues, 'guard-site-target-kinds', { type: type, id: def.id, path: 'targetKinds' });
+      }
+      if (!Number.isFinite(def.coverage) || def.coverage < 0 || def.coverage > 1) {
+        issue(issues, 'guard-site-coverage', { type: type, id: def.id, path: 'coverage' });
+      }
+      var modeWeights = def.modeWeights || {};
+      if (!Number.isFinite(modeWeights.visible) || modeWeights.visible < 0 ||
+          !Number.isFinite(modeWeights.ambush) || modeWeights.ambush < 0 ||
+          modeWeights.visible + modeWeights.ambush <= 0) {
+        issue(issues, 'guard-site-mode-weights', { type: type, id: def.id, path: 'modeWeights' });
+      }
+      if (!Number.isFinite(def.triggerRadius) || def.triggerRadius < 20 || def.triggerRadius > 160) {
+        issue(issues, 'guard-site-trigger-radius', { type: type, id: def.id, path: 'triggerRadius' });
+      }
+      var guardDetection = def.detection || {};
+      if (!Number.isFinite(guardDetection.clueRadius) || !Number.isFinite(guardDetection.revealRadius) ||
+          guardDetection.clueRadius < guardDetection.revealRadius ||
+          guardDetection.revealRadius <= def.triggerRadius ||
+          !Number.isFinite(guardDetection.revealChance) ||
+          guardDetection.revealChance < 0 || guardDetection.revealChance > 1) {
+        issue(issues, 'guard-site-detection', { type: type, id: def.id, path: 'detection' });
+      }
+      if (def.resetPolicy !== 'expedition' || def.offlinePolicy !== 'block') {
+        issue(issues, 'guard-site-policy', { type: type, id: def.id, path: 'resetPolicy|offlinePolicy' });
+      }
+      ['visiblePoolId', 'ambushPoolId'].forEach(function (field) {
+        var linkedPool = definitions.encounterPoolProfile && definitions.encounterPoolProfile[def[field]];
+        if (linkedPool && linkedPool.regionId !== def.regionId) issue(issues,
+          'guard-site-pool-region', { type: type, id: def.id, path: field, ref: def[field] });
+      });
+    }
+    if (type === 'regionProfile') {
+      var poolMap = def.encounterPoolIds || {};
+      var expectedPoolRoles = ['roaming', 'rareRoaming', 'worldAmbush',
+        'resourceGuardVisible', 'resourceGuardAmbush', 'nestGuardVisible',
+        'nestGuardAmbush', 'bossGate', 'boss'];
+      if (Object.keys(poolMap).length) expectedPoolRoles.forEach(function (role) {
+        if (!poolMap[role]) issue(issues, 'region-encounter-pool-missing', {
+          type: type, id: def.id, path: 'encounterPoolIds.' + role
+        });
+      });
+      Object.keys(poolMap).forEach(function (role) {
+        if (expectedPoolRoles.indexOf(role) < 0) {
+          issue(issues, 'region-encounter-pool-role', { type: type, id: def.id,
+            path: 'encounterPoolIds.' + role });
+        }
+        refExists(definitions, 'encounterPoolProfile', poolMap[role], type, def,
+          'encounterPoolIds.' + role, issues);
+        var linkedPool = definitions.encounterPoolProfile && definitions.encounterPoolProfile[poolMap[role]];
+        if (linkedPool && linkedPool.regionId !== def.id) issue(issues,
+          'region-encounter-pool-region', { type: type, id: def.id,
+            path: 'encounterPoolIds.' + role, ref: poolMap[role] });
       });
     }
     if (type === 'climateProfile') {
@@ -438,9 +543,17 @@
           issue(issues, 'hazard-pulse-interval', { type: type, id: def.id, path: 'outcome.intervalTicks' });
         }
       }
-      if (hazardOutcome.type === 'startEncounter' &&
+      if (hazardOutcome.type === 'startEncounter' && !hazardOutcome.encounterPoolId &&
           (!Array.isArray(hazardOutcome.encounterPackIds) || !hazardOutcome.encounterPackIds.length)) {
         issue(issues, 'hazard-encounter-packs', { type: type, id: def.id, path: 'outcome.encounterPackIds' });
+      }
+      if (hazardOutcome.encounterPoolId) refExists(definitions, 'encounterPoolProfile',
+        hazardOutcome.encounterPoolId, type, def, 'outcome.encounterPoolId', issues);
+      if (hazardOutcome.encounterPoolId && definitions.encounterPoolProfile &&
+          definitions.encounterPoolProfile[hazardOutcome.encounterPoolId] &&
+          definitions.encounterPoolProfile[hazardOutcome.encounterPoolId].regionId !== def.regionId) {
+        issue(issues, 'hazard-pool-region', { type: type, id: def.id,
+          path: 'outcome.encounterPoolId', ref: hazardOutcome.encounterPoolId });
       }
       unexpectedFields(hazardPlacement, [
         'source', 'count', 'minCampDistance', 'minLandmarkDistance', 'minSpacing',
@@ -857,7 +970,10 @@
     if (type === 'encounterPack') validateAdvanced(type, def, definitions, issues);
     if (type === 'actorVariant') validateAdvanced(type, def, definitions, issues);
     if (type === 'worldSpawnProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'encounterPoolProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'guardSiteProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'worldPopulationProfile') validateAdvanced(type, def, definitions, issues);
+    if (type === 'regionProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'engagementPolicy') validateAdvanced(type, def, definitions, issues);
     if (type === 'interactionProfile') validateAdvanced(type, def, definitions, issues);
     if (type === 'climateProfile') validateAdvanced(type, def, definitions, issues);
@@ -904,13 +1020,28 @@
         var config = C.clone(def.channels[channel] || { capacity: 0 });
         config.capacity = Math.max(0, config.capacity | 0);
         config.spawnRefs = [];
-        (def.baseSpawnRefs && def.baseSpawnRefs[channel] || []).forEach(function (entry) {
-          var profileId = typeof entry === 'string' ? entry : entry.profileId;
-          if (!refExists(definitions, 'worldSpawnProfile', profileId, 'worldPopulationProfile', def,
-              'baseSpawnRefs.' + channel, issues)) return;
-          config.spawnRefs.push(C.merge({ profileId: profileId, mode: 'weighted', weight: 1 },
-            typeof entry === 'string' ? {} : entry));
-        });
+        if (config.poolProfileId) {
+          var pool = definitions.encounterPoolProfile &&
+            definitions.encounterPoolProfile[config.poolProfileId];
+          if (pool) (pool.entries || []).forEach(function (entry) {
+            config.spawnRefs.push({
+              profileId: entry.worldSpawnProfileId,
+              mode: 'weighted', weight: entry.weight,
+              maxCount: entry.maxPerMount,
+              condition: {}, priority: 0,
+              sourcePoolId: pool.id,
+              sourcePackId: pool.sourcePackId
+            });
+          });
+        } else {
+          (def.baseSpawnRefs && def.baseSpawnRefs[channel] || []).forEach(function (entry) {
+            var profileId = typeof entry === 'string' ? entry : entry.profileId;
+            if (!refExists(definitions, 'worldSpawnProfile', profileId, 'worldPopulationProfile', def,
+                'baseSpawnRefs.' + channel, issues)) return;
+            config.spawnRefs.push(C.merge({ profileId: profileId, mode: 'weighted', weight: 1 },
+              typeof entry === 'string' ? {} : entry));
+          });
+        }
         channels[channel] = config;
       });
       views[id] = {
@@ -984,12 +1115,14 @@
           path: 'mountTo.' + item.index + '.condition.flags.' + flag
         });
       });
-      view.channels[mount.channel].spawnRefs.push({
-        profileId: profile.id, mode: mount.mode,
-        count: C.clone(mount.count), weight: mount.weight,
-        maxCount: mount.maxCount, condition: C.clone(condition),
-        priority: mount.priority | 0, sourcePackId: profile.sourcePackId
-      });
+      if (!view.channels[mount.channel].poolProfileId) {
+        view.channels[mount.channel].spawnRefs.push({
+          profileId: profile.id, mode: mount.mode,
+          count: C.clone(mount.count), weight: mount.weight,
+          maxCount: mount.maxCount, condition: C.clone(condition),
+          priority: mount.priority | 0, sourcePackId: profile.sourcePackId
+        });
+      }
     });
     Object.keys(views).forEach(function (id) {
       S.populationChannels.forEach(function (channel) {
@@ -1080,7 +1213,12 @@
         Object.keys(pack.definitions || {}).sort().forEach(function (type) {
           if (S.definitionTypes.indexOf(type) < 0 || !Array.isArray(pack.definitions[type])) return;
           pack.definitions[type].forEach(function (raw, index) {
-            var def = C.merge(C.clone(S.defaults[type] || {}), raw || {});
+            // A patch must only carry fields authored by the patch pack. Applying
+            // schema defaults here would silently overwrite the base definition
+            // (for example a Hazard's tuned detection chance).
+            var def = raw && raw.patch
+              ? C.clone(raw)
+              : C.merge(C.clone(S.defaults[type] || {}), raw || {});
             def.sourcePackId = pack.id;
             def.sourceFile = raw && raw.sourceFile || pack.sourceFile || pack.id;
             if (!def.id) {
