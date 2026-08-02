@@ -1,7 +1,7 @@
 /* ============================================================
- * sprites/hero.js — 职业精灵工厂（DnD 五职业）
- * 共用身体/腿部模板 + 每职业专属：头部造型、服装配色、武器。
- * 输出：hero_<class> 全帧组、face_<class> 头像、icon_w_<class> 武器图标。
+ * sprites/hero.js — 人形角色精灵工厂（DnD 五职业 + 移动行商）
+ * 共用整数像素身体/腿部合同；职业与行商各自拥有头部、服装、道具和调色板。
+ * 输出：职业全帧组/头像/武器图标，以及四名行商的独立全帧组与头像。
  * ============================================================ */
 (function () {
   'use strict';
@@ -189,6 +189,52 @@
     });
   }
 
+  /* ---------------- 移动行商精灵组装 ----------------
+   * 行商沿用职业单位的 16×20 字符网格和脚底锚点，但不复用任何职业
+   * sprite/portrait ID。idle 的第二帧、受击帧和左向帧由整数像素算法派生。
+   */
+  function merchantDef(id, portraitId, palette, parts) {
+    function frame(head, torso, legs) {
+      return head.concat([NECK], torso, legs);
+    }
+    D({
+      id: id,
+      source: 'js/sprites/hero.js#wandering-merchants',
+      pal: palette,
+      anchor: { x: 8, y: 19 },
+      frames: {
+        idle_d0: frame(parts.head.down, parts.torso.d, LEGS_IDLE),
+        idle_u0: frame(parts.head.up, parts.torso.u, LEGS_IDLE),
+        idle_r0: frame(parts.head.side, parts.torso.r, LEGS_IDLE),
+        walk_d0: frame(parts.head.down, parts.torso.d, LEGS_D0),
+        walk_d1: frame(parts.head.down, parts.torso.d, LEGS_D1),
+        walk_u0: frame(parts.head.up, parts.torso.u, LEGS_D0),
+        walk_u1: frame(parts.head.up, parts.torso.u, LEGS_D1),
+        walk_r0: frame(parts.head.side, parts.torso.r, LEGS_R0),
+        walk_r1: frame(parts.head.side, parts.torso.r, LEGS_R1),
+        attack_d: frame(parts.head.down, parts.attack.d, LEGS_ATK),
+        attack_u: frame(parts.head.up, parts.attack.u, LEGS_ATK),
+        attack_r: frame(parts.head.side, parts.attack.r, LEGS_ATK),
+        sit0: [BLANK, BLANK, BLANK].concat(parts.head.side, parts.sit || SIT_BODY)
+      },
+      derive: {
+        idle_d1: { from: 'idle_d0', op: 'squash' },
+        idle_u1: { from: 'idle_u0', op: 'squash' },
+        idle_r1: { from: 'idle_r0', op: 'squash' },
+        hurt_d: { from: 'idle_d0', op: 'bob', dy: 1 },
+        hurt_u: { from: 'idle_u0', op: 'bob', dy: 1 },
+        hurt_r: { from: 'idle_r0', op: 'bob', dy: 1 },
+        sit1: { from: 'sit0', op: 'squash' }
+      }
+    });
+    D({
+      id: portraitId,
+      source: 'js/sprites/hero.js#wandering-merchants',
+      pal: palette,
+      frames: { icon: parts.face }
+    });
+  }
+
   /* ================= 战士 Fighter（头盔重甲 + 长剑） ================= */
   var fighterPal = pal({ t: '#a04838', T: '#78321f', u: '#c86a50', p: '#3f3f5c', P: '#2c2c44' });
   heroDef('hero_fighter', fighterPal, {
@@ -371,6 +417,451 @@
       '.....Hssssss....'
     ]
   }, 'bow');
+
+  /* ================= 移动行商（独立代码网格资产） ================= */
+  var liaPal = pal({
+    t: '#4f8f70', T: '#315f50', u: '#78c4a1',
+    q: '#d8bc72', Q: '#9c7440', c: '#e9cf78', C: '#a87834',
+    h: '#a8673d', H: '#744228', a: '#82e0bd', A: '#439a7c',
+    l: '#8a5a32', L: '#5d3a24', p: '#514139', P: '#342a27',
+    g: '#795238', G: '#513522'
+  });
+  merchantDef('merchant_windbell_lia', 'face_merchant_windbell_lia', liaPal, {
+    head: {
+      down: [
+        '......qqqq......',
+        '....qqqqqqqq....',
+        '..cqqqqqqqqqqc..',
+        '...qHHHHHHHHq...',
+        '...hssessessh...',
+        '...hssssssssh...',
+        '....HssssssH....'
+      ],
+      up: [
+        '......qqqq......',
+        '....qqqqqqqq....',
+        '..cqqqqqqqqqqc..',
+        '...qhhhhhhhhq...',
+        '...qhhhhhhhhq...',
+        '...hHHHHHHHHh...',
+        '....HHHHHHHH....'
+      ],
+      side: [
+        '......qqq.c.....',
+        '....qqqqqqc.....',
+        '...qqqqqqqq.....',
+        '...qhhsssss.....',
+        '...qhssssess....',
+        '...hhssssss.c...',
+        '....Hssssss.c...'
+      ]
+    },
+    torso: {
+      d: [
+        '....uttttttu....',
+        '..aattttttttaa..',
+        '..AttttttttttA..',
+        '..AsttttttttsA..',
+        '...lttyyttttl...',
+        '...tttttttttt...',
+        '....TttttttT....'
+      ],
+      u: [
+        '....uttttttu....',
+        '..aattttttttaa..',
+        '..AttttttttttA..',
+        '..AttttttttttA..',
+        '...llttttttll...',
+        '...tttttttttt...',
+        '....TttttttT....'
+      ],
+      r: [
+        '....atttttta....',
+        '...atttttttta...',
+        '...AttttttttA...',
+        '...AsttttttsA...',
+        '...lttyyttttl...',
+        '...tttttttttt...',
+        '....TttttttT....'
+      ]
+    },
+    attack: {
+      d: [
+        '..c.ssttttss.c..',
+        '..d.tttttttt.d..',
+        '..d.stttttts.d..',
+        '..d.sttttttS.d..',
+        '..d..ltyytt..d..',
+        '..d..tttttt..d..',
+        '..c..TttttT..c..'
+      ],
+      u: [
+        '..c.ssttttss.c..',
+        '..d.tttttttt.d..',
+        '..d.stttttts.d..',
+        '..d.sttttttS.d..',
+        '..d..llttll..d..',
+        '..d..tttttt..d..',
+        '..c..TttttT..c..'
+      ],
+      r: [
+        '....tttttt..cc..',
+        '...utttttts.dd..',
+        '...tttttttssd...',
+        '...stttttt..d...',
+        '...lttyyttt.d...',
+        '....tttttt..d...',
+        '....TttttT..c...'
+      ]
+    },
+    face: [
+      '....qqqq....',
+      '..qqqqqqqq..',
+      'c.qqqqqqqq.c',
+      '.qHHHHHHHHq.',
+      '.hssessessh.',
+      '.hssssssssh.',
+      '..HssssssH..',
+      '...ssllss...',
+      '..atttttta..',
+      '.AtttyytttA.',
+      '..tttttttt..',
+      '...TttttT...'
+    ]
+  });
+
+  var brumPal = pal({
+    t: '#50616a', T: '#34434a', u: '#72828a',
+    c: '#c8793f', C: '#8b4828', r: '#e0a05f', R: '#a55d32',
+    b: '#8a4f2d', B: '#5d321f', k: '#252a2c',
+    p: '#463a34', P: '#2d2724', g: '#6c4a36', G: '#493126',
+    l: '#9b653b', L: '#654027'
+  });
+  merchantDef('merchant_copperwheel_brum', 'face_merchant_copperwheel_brum', brumPal, {
+    head: {
+      down: [
+        '....cccccccc....',
+        '...ccCCccCCcc...',
+        '..cmmccccccmmc..',
+        '..cmmsessessmc..',
+        '...bssssssssb...',
+        '..bbbbssssbbbb..',
+        '...BBBBBBBBBB...'
+      ],
+      up: [
+        '....cccccccc....',
+        '...ccCCccCCcc...',
+        '..cccccccccccc..',
+        '..cccccccccccc..',
+        '...bbbbbbbbbb...',
+        '..bbbbBBBBbbbb..',
+        '...BBBBBBBBBB...'
+      ],
+      side: [
+        '....ccccccc.....',
+        '...ccCCccccc....',
+        '...cmmccssss....',
+        '...cmmssesss....',
+        '...bbsssssss....',
+        '..bbbbssssss....',
+        '...BBBBBBBBB....'
+      ]
+    },
+    torso: {
+      d: [
+        '..uuttttttttuu..',
+        '.utttttttttttu..',
+        '.sttttttttttts..',
+        '.sttttccccTttS..',
+        '..llttcCCcttll..',
+        '..ttttccccTTtt..',
+        '...TTTTTTTT.....'
+      ],
+      u: [
+        '..uuttttttttuu..',
+        '.utttttttttttu..',
+        '.ttttttttttttt..',
+        '.ttttccccTtttt..',
+        '..lltcCCCCctll..',
+        '..tttccccTTttt..',
+        '...TTTTTTTT.....'
+      ],
+      r: [
+        '...uuttttttuu...',
+        '..utttttttttu...',
+        '..sttttttttts...',
+        '..stttccccTtS...',
+        '..llttcCCctl....',
+        '...tttccccTt....',
+        '....TTTTTTT.....'
+      ]
+    },
+    attack: {
+      d: [
+        '..mmsttttttsmm..',
+        '..ddttttttttdd..',
+        '..ddsttttttsdd..',
+        '..ddttccccTtdd..',
+        '..ddtcCCCCctdd..',
+        '..ddttccccTtdd..',
+        '..MM.TTTTTT.MM..'
+      ],
+      u: [
+        '..mmsttttttsmm..',
+        '..ddttttttttdd..',
+        '..ddttttttttdd..',
+        '..ddttccccTtdd..',
+        '..ddtcCCCCctdd..',
+        '..ddttccccTtdd..',
+        '..MM.TTTTTT.MM..'
+      ],
+      r: [
+        '...tttttt..cccc.',
+        '..utttttt.cCmmCc',
+        '..ttttttsscCmmCc',
+        '..stttttt.cCmmCc',
+        '..lttcccc..cccc.',
+        '...ttcccc...d...',
+        '...TTTTTT...d...'
+      ]
+    },
+    face: [
+      '..cccccccc..',
+      '.ccCCccCCcc.',
+      'cmmccccccmmc',
+      'cmmsessessmc',
+      '.bssssssssb.',
+      'bbbbssssbbbb',
+      '.BBBBBBBBBB.',
+      '..BBssssBB..',
+      '.uuttttttuu.',
+      'utttccccTttu',
+      '.ttcCCCCctt.',
+      '..TTTTTTTT..'
+    ]
+  });
+
+  var saphPal = pal({
+    t: '#426f8e', T: '#294b63', u: '#72a9c8',
+    i: '#8ed8e8', I: '#4f9cb8', f: '#dd6a3d', F: '#9f3929',
+    w: '#e9e3d3', W: '#bdb6a5', o: '#f3a43b', O: '#b9532d',
+    h: '#49383a', H: '#30282e', p: '#443947', P: '#2e2832',
+    g: '#675347', G: '#46382f', l: '#846044', L: '#593f30'
+  });
+  merchantDef('merchant_frostflame_saph', 'face_merchant_frostflame_saph', saphPal, {
+    head: {
+      down: [
+        '....iiiiFFFF....',
+        '...iiwwwwFFff...',
+        '..iiwwwwwwFFff..',
+        '..iwwsssssswFf..',
+        '..iwsessesswFf..',
+        '..iiwsssswFFf...',
+        '...IIwwwwFF.....'
+      ],
+      up: [
+        '....iiiiFFFF....',
+        '...iiwwwwFFff...',
+        '..iiwwwwwwFFff..',
+        '..iiwwwwwwFFff..',
+        '..iihhhhhhhFff..',
+        '..IIhHHHHHHFF...',
+        '...IIHHHHFF.....'
+      ],
+      side: [
+        '....iiiiFF......',
+        '...iiwwwFFFf....',
+        '..iiwwwwFFFff...',
+        '..iwwhsssssFf...',
+        '..iwhssssessFf..',
+        '..iiwsssssFFff..',
+        '...IIssssss.Fff.'
+      ]
+    },
+    torso: {
+      d: [
+        '...iittttffff...',
+        '..iittttttffff..',
+        '..IttttttttffF..',
+        '..IstttwwtttsF..',
+        '...llttyyttll...',
+        '...ttttfftttt...',
+        '....TTTTFFFF....'
+      ],
+      u: [
+        '...iittttffff...',
+        '..iittttttffff..',
+        '..IttttttttffF..',
+        '..IttttwwttttF..',
+        '...llttttttll...',
+        '...ttttfftttt...',
+        '....TTTTFFFF....'
+      ],
+      r: [
+        '....ittttfff....',
+        '...iitttttffff..',
+        '...IttttttffF...',
+        '...IsttwwttsF...',
+        '...llttyyttl....',
+        '....tttffttt....',
+        '....TTTFFFFF....'
+      ]
+    },
+    attack: {
+      d: [
+        '..ossttttssio...',
+        '..ffttttttii....',
+        '..FfstttttsII...',
+        '...stttwwttS....',
+        '....lttyyttl....',
+        '....tttffttt....',
+        '....TTTFFFFF....'
+      ],
+      u: [
+        '..ossttttssio...',
+        '..ffttttttii....',
+        '..FfttttttII....',
+        '...ttttwwtt.....',
+        '....llttttll....',
+        '....tttffttt....',
+        '....TTTFFFFF....'
+      ],
+      r: [
+        '...tttttt...o...',
+        '..uttttttssff...',
+        '..tttttttssFf...',
+        '..sttttww..Ff...',
+        '...lttyytt..f...',
+        '...tttfftt......',
+        '...TTTFFFF......'
+      ]
+    },
+    face: [
+      '..iiiiFFFF..',
+      '.iiwwwwFFff.',
+      'iiwwwwwwFFff',
+      'iwwsssssswFf',
+      'iwsessesswFf',
+      'iiwsssswFFf.',
+      '.IIwwwwFF...',
+      '..sswwss....',
+      '.iittttffff.',
+      'IttttwwttffF',
+      '.lttyyttttl.',
+      '..TTTTFFFF..'
+    ]
+  });
+
+  var noaPal = pal({
+    t: '#51467f', T: '#332d58', u: '#786aa7',
+    v: '#29243f', V: '#19172b', a: '#8f73d5', A: '#5d479d',
+    y: '#e7c65c', Y: '#a9852d', j: '#85e7dc', J: '#3e9a93',
+    h: '#d7d1e4', H: '#9b93ad', p: '#373047', P: '#252131',
+    g: '#554963', G: '#393243', l: '#6f5b49', L: '#4a3d34'
+  });
+  merchantDef('merchant_starkey_noa', 'face_merchant_starkey_noa', noaPal, {
+    head: {
+      down: [
+        '.......y........',
+        '.....vvvvv......',
+        '...vvvvvvvvv....',
+        '..vvyvvvvvyvv...',
+        '...vssessessv...',
+        '...vssssssssv...',
+        '....VssssssV....'
+      ],
+      up: [
+        '.......y........',
+        '.....vvvvv......',
+        '...vvvvvvvvv....',
+        '..vvyvvvvvyvv...',
+        '...vvvvvvvvvv...',
+        '...vVVVVVVVVv...',
+        '....VVVVVVVV....'
+      ],
+      side: [
+        '.......y........',
+        '.....vvvv.......',
+        '...vvvvvvvv.....',
+        '..vvyvvsssss....',
+        '...vvvssssess...',
+        '...vvvssssss.j..',
+        '....Vssssss..J..'
+      ]
+    },
+    torso: {
+      d: [
+        '....uttttttu....',
+        '...vtttyytttv...',
+        '..vvttttttttvv..',
+        '..VstttyytttsV..',
+        '...ltttyytttl...',
+        '...tttvvvtttt...',
+        '....TTTTTTTT....'
+      ],
+      u: [
+        '....uttttttu....',
+        '...vtttyytttv...',
+        '..vvttttttttvv..',
+        '..VtttyyyytttV..',
+        '...lttttttttl...',
+        '...tttvvvtttt...',
+        '....TTTTTTTT....'
+      ],
+      r: [
+        '....vtttttv.....',
+        '...vtttyyttv....',
+        '..vvtttttttV....',
+        '..VsttyytttS....',
+        '...ltttyyttl....',
+        '...tttvvvttt....',
+        '....TTTTTTT.....'
+      ]
+    },
+    attack: {
+      d: [
+        '..y.ssttttss.y..',
+        '..d.tttyyttt.d..',
+        '..d.stttttts.d..',
+        '..d.sttyyttS.d..',
+        '..d..ltyytt..d..',
+        '..d..ttvvtt..d..',
+        '..j..TTTTTT..j..'
+      ],
+      u: [
+        '..y.ssttttss.y..',
+        '..d.tttyyttt.d..',
+        '..d.tttttttt.d..',
+        '..d.tttyyttt.d..',
+        '..d..lttttl..d..',
+        '..d..ttvvtt..d..',
+        '..j..TTTTTT..j..'
+      ],
+      r: [
+        '....tttttt..yyy.',
+        '...utttttts.yy..',
+        '...tttyyttssy...',
+        '...stttttt..d...',
+        '...lttyyttt.d...',
+        '....ttvvtt..d...',
+        '....TTTTTT..j...'
+      ]
+    },
+    face: [
+      '.....y......',
+      '...vvvvv....',
+      '.vvvvvvvvv..',
+      'vvyvvvvvyvv.',
+      '.vssessessv.',
+      '.vssssssssv.',
+      '..VssssssV..',
+      '...ssyyss...',
+      '..vttttttv..',
+      '.VtttyytttV.',
+      '..tttvvvtt..',
+      '...TTTTTT...'
+    ]
+  });
 
   /* ---------------- HUD 头像（12×12） ---------------- */
   D({

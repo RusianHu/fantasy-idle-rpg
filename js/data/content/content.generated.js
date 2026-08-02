@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "d07a51978ee2c59f14d5a64c431018e51affc4c022ee3fb529729e634b3efa68",
+  "sourceSetHash": "86c925d0960f7b0eb372faa25a535c19cd4483f0ef93f9d3c0bb4e4ddd79126b",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -198,7 +198,7 @@
     {
       "path": "js/data/packs/world/merchants.pack.js",
       "kind": "pack",
-      "sha256": "0ff57ab8ee437aa8855317472155e4df0366447e1ae8970533bae76db845f0c1"
+      "sha256": "1507306d49e90b969a87a89b956e777193700e5f6a1a9e6219e50b685a0b04a8"
     }
   ],
   "supports": [
@@ -430,7 +430,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "2ee36b7a"
+  "contentFingerprint": "77514e73"
 });
 })();
 /* source: js/data/packs/guardians/factory.support.js */
@@ -5336,25 +5336,25 @@ window.Game.contentSupport.installAll();
 
   var MERCHANTS = [
     {
-      id: 'windbell_lia', spriteId: 'hero_ranger', portraitId: 'face_ranger',
+      id: 'windbell_lia', spriteId: 'merchant_windbell_lia', portraitId: 'face_merchant_windbell_lia',
       regions: ['grassland', 'forest'], materials: ['herb', 'berry', 'mushroom', 'resin'],
       affixes: ['spd', 'exp_pct'], signatureAbilityId: 'merchant.windbell_tonic',
       accent: '#6fd3a6'
     },
     {
-      id: 'copperwheel_brum', spriteId: 'hero_fighter', portraitId: 'face_fighter',
+      id: 'copperwheel_brum', spriteId: 'merchant_copperwheel_brum', portraitId: 'face_merchant_copperwheel_brum',
       regions: ['mine', 'graveyard'], materials: ['ore', 'crystal_cluster', 'ghost_flower', 'grave_dust'],
       affixes: ['def_flat', 'gold_pct'], signatureAbilityId: 'merchant.copper_guard',
       accent: '#d69a58'
     },
     {
-      id: 'frostflame_saph', spriteId: 'hero_rogue', portraitId: 'face_rogue',
+      id: 'frostflame_saph', spriteId: 'merchant_frostflame_saph', portraitId: 'face_merchant_frostflame_saph',
       regions: ['snowpass', 'lavacave'], materials: ['ice_crystal', 'frost_herb', 'fire_core', 'obsidian'],
       affixes: ['hp_pct', 'critdmg'], signatureAbilityId: 'merchant.frostfire_flask',
       accent: '#75bde8'
     },
     {
-      id: 'starkey_noa', spriteId: 'hero_mage', portraitId: 'face_mage',
+      id: 'starkey_noa', spriteId: 'merchant_starkey_noa', portraitId: 'face_merchant_starkey_noa',
       regions: ['skyruins', 'darkcastle'], materials: ['rune_stone', 'aether_shard', 'miasma_crystal', 'demon_horn'],
       affixes: ['crit', 'critdmg'], signatureAbilityId: 'merchant.starkey_ward',
       accent: '#b58ae8'

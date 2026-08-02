@@ -9,25 +9,25 @@
 
   var MERCHANTS = [
     {
-      id: 'windbell_lia', spriteId: 'hero_ranger', portraitId: 'face_ranger',
+      id: 'windbell_lia', spriteId: 'merchant_windbell_lia', portraitId: 'face_merchant_windbell_lia',
       regions: ['grassland', 'forest'], materials: ['herb', 'berry', 'mushroom', 'resin'],
       affixes: ['spd', 'exp_pct'], signatureAbilityId: 'merchant.windbell_tonic',
       accent: '#6fd3a6'
     },
     {
-      id: 'copperwheel_brum', spriteId: 'hero_fighter', portraitId: 'face_fighter',
+      id: 'copperwheel_brum', spriteId: 'merchant_copperwheel_brum', portraitId: 'face_merchant_copperwheel_brum',
       regions: ['mine', 'graveyard'], materials: ['ore', 'crystal_cluster', 'ghost_flower', 'grave_dust'],
       affixes: ['def_flat', 'gold_pct'], signatureAbilityId: 'merchant.copper_guard',
       accent: '#d69a58'
     },
     {
-      id: 'frostflame_saph', spriteId: 'hero_rogue', portraitId: 'face_rogue',
+      id: 'frostflame_saph', spriteId: 'merchant_frostflame_saph', portraitId: 'face_merchant_frostflame_saph',
       regions: ['snowpass', 'lavacave'], materials: ['ice_crystal', 'frost_herb', 'fire_core', 'obsidian'],
       affixes: ['hp_pct', 'critdmg'], signatureAbilityId: 'merchant.frostfire_flask',
       accent: '#75bde8'
     },
     {
-      id: 'starkey_noa', spriteId: 'hero_mage', portraitId: 'face_mage',
+      id: 'starkey_noa', spriteId: 'merchant_starkey_noa', portraitId: 'face_merchant_starkey_noa',
       regions: ['skyruins', 'darkcastle'], materials: ['rune_stone', 'aether_shard', 'miasma_crystal', 'demon_horn'],
       affixes: ['crit', 'critdmg'], signatureAbilityId: 'merchant.starkey_ward',
       accent: '#b58ae8'

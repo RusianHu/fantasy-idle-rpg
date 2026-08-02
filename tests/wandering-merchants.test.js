@@ -300,6 +300,31 @@ function bootCombatMerchant(seed = 0xA11CE55) {
 const deterministicA = boot();
 const deterministicB = boot();
 assert.equal(deterministicA.Game.content.all('merchantProfile').length, 4);
+const merchantVisuals = deterministicA.Game.content.all('merchantProfile').map((profile) => {
+  const spawn = deterministicA.Game.content.get(
+    'worldSpawnProfile', profile.spawnProfileId
+  );
+  const archetype = deterministicA.Game.content.get(
+    'actorArchetype', spawn.actorRef.archetypeId
+  );
+  return {
+    profileId: profile.id,
+    spriteId: archetype.presentation.spriteId,
+    portraitId: archetype.presentation.portraitId
+  };
+});
+assert.equal(new Set(merchantVisuals.map((visual) => visual.spriteId)).size, 4,
+  'each wandering merchant owns a distinct world sprite');
+assert.equal(new Set(merchantVisuals.map((visual) => visual.portraitId)).size, 4,
+  'each wandering merchant owns a distinct portrait');
+merchantVisuals.forEach((visual) => {
+  assert.match(visual.spriteId, /^merchant_/);
+  assert.match(visual.portraitId, /^face_merchant_/);
+  assert.equal(deterministicA.Game.assets.has(visual.spriteId), true,
+    `${visual.profileId} sprite is registered`);
+  assert.equal(deterministicA.Game.assets.has(visual.portraitId), true,
+    `${visual.profileId} portrait is registered`);
+});
 assert.equal(
   deterministicA.Game.merchants.profileForRegion('grassland').id,
   'merchant.windbell_lia'

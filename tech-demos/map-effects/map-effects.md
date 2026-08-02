@@ -1,6 +1,6 @@
 # 地图生成、渲染与放置 Lab
 
-入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面默认使用 `layoutVersion:4`，可切回 v3 基线，按 `terrain.generate / terrain_v4.compose / validate / mount → EncounterPool.resolve → Population.prepareRegion → Actor materialize → audit → renderer` 运行正式链路，但不调用 `Game.world.init()`。
+入口：`map-effects.html?seed=1234ABCD&region=forest&lang=zh-CN`。页面默认使用 `layoutVersion:4`，可切回 v3 基线，按 `Game.terrain.generate / validate / mount → Game.encounterPools.resolve → Game.population.prepareRegion / mountChannel → Actor materialize → audit → renderer` 运行正式公开链路，但不调用 `Game.world.init()`；v4 巢穴组合发生在 `Game.terrain.generate()` 内部，不存在公开的 `terrain_v4.compose` 接口。
 
 ## 验证范围
 

@@ -14,6 +14,7 @@
   var U = Game.util;
 
   var defs = {};    // id -> 定义
+  var order = [];   // 注册顺序；图鉴与审计不得依赖对象键排序
   var built = {};   // id -> { frames: {name: canvas}, white: {name: canvas}, w, h, anchor }
   var OUTLINE = '#16122b';
 
@@ -21,6 +22,10 @@
     var c = document.createElement('canvas');
     c.width = w; c.height = h;
     return c;
+  }
+
+  function remember(id) {
+    if (order.indexOf(id) < 0) order.push(id);
   }
 
   /** 字符网格 -> canvas（含 1px 外扩自动描边） */
@@ -143,11 +148,15 @@
     var first = frames[Object.keys(frames)[0]];
     var anchor = d.anchor || srcDef.anchor || { x: Math.floor(first.width / 2), y: first.height - 1 };
     var b = built[id] = {
+      id: id,
       frames: frames,
       white: {},
       w: first.width,
       h: first.height,
-      anchor: { x: anchor.x + 1, y: anchor.y + 1 } // 补偿描边外扩 1px
+      anchor: { x: anchor.x + 1, y: anchor.y + 1 }, // 补偿描边外扩 1px
+      source: d.source || srcDef.source || null,
+      variantOf: d.variantOf || null,
+      motion: d.motion || srcDef.motion || null
     };
     return b;
   }
@@ -168,6 +177,7 @@
     ctx.textBaseline = 'middle';
     ctx.fillText((id[0] || '?').toUpperCase(), 9, 10);
     return {
+      id: id,
       frames: { idle0: c },
       white: {},
       w: 18, h: 18,
@@ -177,16 +187,25 @@
   }
 
   var A = Game.assets = {
-    defineSprite: function (d) { defs[d.id] = d; },
+    defineSprite: function (d) {
+      if (!d || !d.id) return;
+      remember(d.id);
+      defs[d.id] = d;
+    },
 
     /** 直接注册已绘制画布帧（程序化植被等）；anchor 为画布坐标 */
     defineCanvas: function (id, obj) {
+      remember(id);
       var first = obj.frames[Object.keys(obj.frames)[0]];
       built[id] = {
+        id: id,
         frames: obj.frames,
         white: {},
         w: first.width, h: first.height,
-        anchor: obj.anchor || { x: Math.floor(first.width / 2), y: first.height - 1 }
+        anchor: obj.anchor || { x: Math.floor(first.width / 2), y: first.height - 1 },
+        source: obj.source || null,
+        variantOf: obj.variantOf || null,
+        motion: obj.motion || null
       };
     },
 
@@ -211,6 +230,133 @@
     hasFrame: function (id, name) {
       var s = A.sprite(id);
       return !!s.frames[name];
+    },
+
+    /** 所有注册精灵的稳定 ID；不会触发缺失精灵占位。 */
+    ids: function () { return order.slice(); },
+
+    /** 只读资产描述，供 QA 图鉴与审计使用。 */
+    describe: function (id) {
+      if (!A.has(id)) return null;
+      var s = A.sprite(id);
+      return {
+        id: id,
+        frameNames: Object.keys(s.frames),
+        width: s.w,
+        height: s.h,
+        anchor: { x: s.anchor.x, y: s.anchor.y },
+        source: s.source || null,
+        variantOf: s.variantOf || null,
+        motion: s.motion || null,
+        placeholder: !!s.isPlaceholder
+      };
+    },
+
+    catalog: function () {
+      return order.map(function (id) { return A.describe(id); });
+    },
+
+    /**
+     * 统一语义动作解析。原生帧优先，随后使用命名约定和安全回退；
+     * 结果带 coverage，演示页可明确区分 native / derived / fallback。
+     */
+    resolveMotion: function (id, request) {
+      request = request || {};
+      var s = A.sprite(id), frames = s.frames || {};
+      var state = request.state || 'idle';
+      var dir = request.direction || 'd';
+      var reduced = !!request.reducedMotion;
+      var time = Number(request.time) || 0;
+      var speed = Number(request.speed) || (state === 'move' ? 0.17 : 0.36);
+      var phase = reduced ? 0 : Math.max(0, Math.floor(time / speed));
+      var requestedNames = [];
+      var native = false;
+      var derived = false;
+      var flip = false;
+
+      function add(name) { if (name && requestedNames.indexOf(name) < 0) requestedNames.push(name); }
+      function dirNames(prefix, direction, suffix) {
+        suffix = suffix || '';
+        add(prefix + '_' + direction + suffix);
+        if (direction === 'l') add(prefix + '_r' + suffix);
+        if (direction === 'r') add(prefix + '_l' + suffix);
+      }
+      function findFrame(names) {
+        for (var i = 0; i < names.length; i++) {
+          if (frames[names[i]]) {
+            return names[i];
+          }
+        }
+        return null;
+      }
+
+      function chooseNative(names) {
+        var frameName = findFrame(names);
+        if (frameName) native = true;
+        return frameName;
+      }
+
+      function chooseDerived(names) {
+        var frameName = findFrame(names);
+        if (frameName) derived = true;
+        return frameName;
+      }
+
+      var frame = null;
+      if (state === 'sit' || state === 'gather') {
+        frame = chooseNative([phase % 2 ? 'sit1' : 'sit0', 'sit0']);
+        if (!frame) frame = chooseDerived(['idle_' + dir, 'walk_' + dir + '0', 'idle0']);
+        if (dir === 'l' && frame && frame.indexOf('_r') >= 0) flip = true;
+      } else if (state === 'move') {
+        dirNames('walk', dir, String(phase % 2));
+        dirNames('move', dir, String(phase % 2));
+        dirNames('walk', dir, '');
+        frame = chooseNative(requestedNames);
+        if (!frame) frame = chooseDerived([phase % 2 ? 'idle1' : 'idle0', 'idle0']);
+      } else if (state === 'attack' || state === 'cast' || state === 'hurt') {
+        // Only the requested semantic state counts as native. Reusing an
+        // attack pose for cast, or an idle pose for hurt, is derived motion.
+        dirNames(state, dir, String(phase % 2));
+        dirNames(state, dir, '');
+        if (state === 'hurt') {
+          dirNames('hit', dir, String(phase % 2));
+          dirNames('hit', dir, '');
+        }
+        frame = chooseNative(requestedNames);
+        if (!frame && (state === 'attack' || state === 'cast')) {
+          requestedNames.length = 0;
+          dirNames('attack', dir, String(phase % 2));
+          dirNames('attack', dir, '');
+          frame = chooseDerived(requestedNames);
+        }
+        if (!frame) frame = chooseDerived([phase % 2 ? 'idle1' : 'idle0', 'idle0']);
+      } else if (state === 'defeat') {
+        frame = chooseNative(['defeat_' + dir, 'dead_' + dir]);
+        if (!frame) frame = chooseDerived(['walk_' + dir + '0', 'idle_' + dir, 'idle0', 'idle1']);
+      } else {
+        dirNames('idle', dir, String(phase % 2));
+        dirNames('idle', dir, '');
+        frame = chooseNative(requestedNames);
+        if (!frame) {
+          requestedNames.length = 0;
+          dirNames('walk', dir, '0');
+          frame = chooseDerived(requestedNames);
+        }
+        if (!frame) frame = chooseDerived([phase % 2 ? 'idle1' : 'idle0', 'idle0']);
+      }
+
+      if (!frame) {
+        frame = Object.keys(frames)[0] || 'idle0';
+        if (!derived) derived = true;
+      }
+      // Generic creature sprites are authored facing left. The compiled asset
+      // already exposes *_l mirrors for directional frames; only apply a final
+      // mirror when the selected frame is the undirected base pose.
+      if (frame.indexOf('_r') >= 0 && dir === 'l') flip = true;
+      else if (frame.indexOf('_l') >= 0 && dir === 'r') flip = true;
+      else if (frame.indexOf('_r') < 0 && frame.indexOf('_l') < 0 && dir === 'r') flip = true;
+      if (native && !derived) return { frame: frame, flip: flip, coverage: 'native', state: state, direction: dir };
+      return { frame: frame, flip: flip, coverage: derived ? 'derived' : 'fallback', state: state, direction: dir };
     },
 
     /**

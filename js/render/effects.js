@@ -488,4 +488,92 @@
       ctx.textAlign = 'left';
     }
   };
+
+  /*
+   * Isolated visual QA previews. These adapters deliberately invoke the same
+   * production effect primitives used by gameplay, then reset their transient
+   * queues so a gallery repaint cannot leak into a live world.
+   */
+  var FX_PREVIEW_SPECS = {
+    // The production projectile is previewed across the whole card width.
+    // Its travel time is ~0.5s, so the loop ends just before impact instead
+    // of leaving an empty tail after the projectile is removed.
+    projectile: { duration: 0.48, mode: 'production', invoke: function (fx, x, y) {
+      fx.projectile(x - 60, y, { x: x + 60, y: y, spriteH: 0, hp: 1, dead: false }, 'bolt', function () {}, { allowDead: true });
+    } },
+    floatText: { duration: 1.1, mode: 'production', invoke: function (fx, x, y) { fx.floatText(x, y, '42', { crit: true }); } },
+    hitSpark: { duration: 0.28, mode: 'production', invoke: function (fx, x, y) { fx.hitSpark(x, y, true); } },
+    slash: { duration: 0.32, mode: 'production', invoke: function (fx, x, y) { fx.slash(x, y, true); } },
+    ring: { duration: 0.5, mode: 'production', invoke: function (fx, x, y) { fx.ring(x, y, 22, '#7ad0f0'); } },
+    heal: { duration: 0.95, mode: 'production', invoke: function (fx, x, y) { fx.heal(x, y); } },
+    poof: { duration: 0.65, mode: 'production', invoke: function (fx, x, y) { fx.poof(x, y); } },
+    zzz: { duration: 2.2, mode: 'production', invoke: function (fx, x, y) { fx.zzz(x, y); } },
+    teleport: { duration: 0.98, mode: 'production', invoke: function (fx, x, y, phase) { fx.teleport(x, y, phase < 0.46 ? 'out' : 'in'); } },
+    goldBurst: { duration: 0.85, mode: 'production', invoke: function (fx, x, y) { fx.goldBurst(x, y); } },
+    finaleBurst: { duration: 2.2, mode: 'production', invoke: function (fx, x, y, phase) { fx.finaleBurst(x, y, phase < 0.7 ? 'impact' : 'rise'); } },
+    travelBurst: { duration: 0.8, mode: 'production', invoke: function (fx, x, y, phase) { fx.travelBurst(x, y, phase < 0.4 ? 'out' : 'in'); } },
+    soulReturn: { duration: 1.1, mode: 'production', invoke: function (fx, x, y, phase) { fx.soulReturn(x, y, phase < 0.55 ? 'out' : 'in'); } },
+    revivePulse: { duration: 1.2, mode: 'production', invoke: function (fx, x, y, phase) { fx.revivePulse(x, y, Math.min(3, Math.floor(phase / 0.3))); } },
+    shake: { duration: 0.9, mode: 'adapted' },
+    flashScreen: { duration: 0.42, mode: 'adapted' },
+    banner: { duration: 2.1, mode: 'adapted' }
+  };
+
+  FX.previewInfo = function (id) {
+    var spec = FX_PREVIEW_SPECS[id];
+    return spec
+      ? { mode: spec.mode, duration: spec.duration }
+      : { mode: 'catalog', duration: 1 };
+  };
+
+  FX.preview = function (targetCtx, id, time) {
+    if (!targetCtx) return { mode: 'catalog' };
+    var spec = FX_PREVIEW_SPECS[id];
+    if (!spec) return { mode: 'catalog' };
+    var width = targetCtx.canvas && targetCtx.canvas.width || 96;
+    var height = targetCtx.canvas && targetCtx.canvas.height || 96;
+    var x = Math.round(width / 2);
+    var y = Math.round(height * 0.58);
+    var phase = ((Number(time) || 0) % spec.duration + spec.duration) % spec.duration;
+    FX.reset();
+    targetCtx.save();
+    try {
+      if (spec.invoke) {
+        spec.invoke(FX, x, y, phase);
+        FX.update(phase);
+        FX.drawShapes(targetCtx);
+        FX.drawFloats(targetCtx, 1);
+      } else if (id === 'shake') {
+        FX.shake(5, spec.duration);
+        FX.update(phase);
+        var offset = FX.shakeOffset();
+        targetCtx.translate(Math.round(offset.x), Math.round(offset.y));
+        targetCtx.strokeStyle = '#f0c060';
+        targetCtx.lineWidth = 2;
+        targetCtx.strokeRect(10, 10, width - 20, height - 20);
+        targetCtx.fillStyle = 'rgba(240,192,96,0.22)';
+        targetCtx.fillRect(18, 18, width - 36, height - 36);
+      } else if (id === 'flashScreen') {
+        targetCtx.fillStyle = 'rgba(235,62,62,' + (0.18 + 0.62 * Math.max(0, 1 - phase / spec.duration)).toFixed(3) + ')';
+        targetCtx.fillRect(0, 0, width, height);
+        targetCtx.strokeStyle = '#ffb26a';
+        targetCtx.strokeRect(8, 8, width - 16, height - 16);
+      } else if (id === 'banner') {
+        var label = Game.i18n && Game.i18n.t ? Game.i18n.t('ui.bossAppear', { name: 'Preview Boss' }) : 'Boss appears';
+        targetCtx.fillStyle = 'rgba(20,12,16,0.78)';
+        targetCtx.fillRect(4, Math.round(height * 0.32), width - 8, 24);
+        targetCtx.strokeStyle = '#f0c060';
+        targetCtx.strokeRect(5, Math.round(height * 0.32) + 1, width - 10, 22);
+        targetCtx.fillStyle = '#f0c060';
+        targetCtx.font = 'bold 7px monospace';
+        targetCtx.textAlign = 'center';
+        targetCtx.fillText(label, x, Math.round(height * 0.32) + 15);
+        targetCtx.textAlign = 'left';
+      }
+      return { mode: spec.mode, duration: spec.duration };
+    } finally {
+      targetCtx.restore();
+      FX.reset();
+    }
+  };
 })();

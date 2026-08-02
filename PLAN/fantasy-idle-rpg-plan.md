@@ -11,10 +11,10 @@
   - 正式战斗采用 50ms 整数 tick、Encounter seeded RNG、GCD/oGCD、队列、施法/引导/打断、行动锁、charge、职业资源、combo、Reaction、Status、Threat 与 Effect DSL；世界 Encounter 的追击在 tick 内同步复用局部 A*，突进/后撤/击退/拉拽、重叠分离和非法坐标恢复统一遵守 v3 硬阻挡；不存在独立攻速倒计时或按冷却旁路施法。
   - 内容层固定为 `Pack → schema/引用/公式审计 → 深冻结定义 → CompiledActorBlueprint`；运行时固定为 `ActorRecord → ActorInstance → EncounterInstance`。玩家、怪物、NPC、召唤物和可战斗 object 共用 `Game.actors`、Party 与 Relation。
   - 单位状态边界固定为：`ActorRecord` 持久化 HP 且同一 Record 最多绑定一个存活 `ActorInstance`，`ActorInstance.components.vitals` 保存实时 HP，`StatBlock` 是运行时派生上限的唯一来源；系统与 UI 统一通过 `Game.units` 读取轻量 Vitals/完整诊断快照，或提交伤害、治疗、死亡/复活、Modifier source 替换与无损重算。刷新保留同 ID 资源、SpawnSpec、Status 与外部 Modifier；禁止从旧派生值和实时组件拼接状态或直接修改 Ledger。
-  - 正式内容为 5 职业、30 Talent、58 个 ActorArchetype（41 个普通/Boss/噬宝匣怪物、9 个召唤物、6 个 NPC、1 个玩家 Actor、1 个可战斗 object）、16 个区域基础 EncounterProfile 与 8 个行商袭击 EncounterProfile，以及 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
+  - 正式内容为 5 职业、30 Talent、74 个 ActorArchetype（57 个普通/Boss/噬宝匣怪物、9 个召唤物、6 个 NPC、1 个玩家 Actor、1 个可战斗 object）、16 个区域基础 EncounterProfile 与 8 个行商袭击 EncounterProfile，以及 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v18，只持久化 Roster、经济、背包、世界（含 `RoutePlan`、`discoveryRewardLedger`、白名单化 social/Hazard/噬宝匣/行商数据，以及 `world.guardSites` 的本轮 revealed/cleared/claimed ID）、设置和战术；ActorInstance、SpawnLease、EngagementCommand、Encounter、守卫侦测中间相位、活动噬宝匣、行商运行时 Actor、RNG、威胁、施法、状态与护盾不入档。v17→v18 保留长期进度、重置瞬态探索并递增远征序号，旧探索档只获得一次无装备/魔晶石补偿。离线结算复用同内容 fingerprint 下的 `CombatEstimator` 摘要，且排除所有未清守卫目标。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
-  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置及移动行商选点、篷车锚定、巡游边界 Lab；`tech-demos/exploration-v3` 负责导航网格、长途路径、自动交互中断/失败缓存故障注入、结构化事件日志与多 Seed 审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；`tech-demos/merchants` 直接运行生产内容包、确定性库存和信誉/债务领域。正式入口及六个工作台只加载同一个确定性 `content.generated.js`。
+  - `tech-demos/units` 为 Actor / Summon / Deterministic Combat Lab；`tech-demos/map-effects` 为地图生成/渲染/Population 放置及移动行商选点、篷车锚定、巡游边界 Lab；`tech-demos/render-gallery` 直接聚合生产视觉注册表，以分类图鉴、1–4 项同步对比墙、整数倍率/背景/网格/锚点预览舞台、逐帧时间轴和检查器展示单位、装饰、地块、特效、头像、UI 与小地图标记，并审计动作 × 朝向的原生帧/整数像素派生/稳定回退；`tech-demos/exploration-v3` 负责导航网格、长途路径、自动交互中断/失败缓存故障注入、结构化事件日志与多 Seed 审计；`tech-demos/hazards` 为 Hazard 状态与特效 Lab；`tech-demos/weather-climate` 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；`tech-demos/merchants` 直接运行生产内容包、确定性库存和信誉/债务领域。正式入口及七个工作台只加载同一个确定性 `content.generated.js`。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）
@@ -41,7 +41,7 @@
   熔岩洞窟 → 浮空遗迹 → 魔王城。新档由 `lucia-campaign` 路线模板编排；全局开关 `Game.ROUTE_FEATURES.randomizeNewGameMainline` 当前默认关闭，因此按上述经典顺序创建。开关恢复后仅确定性洗牌模板中 `shuffleGroup:frontier` 的前 4 区，后 4 区固定；
   怪物强度、Boss 首杀奖励、药水价格、离线收益与推荐等级均按该区域在本档路线中的**推进位置**计算，而非绑定经典区域编号，
   保证随机路线仍按 1～8 阶平滑成长。**Boss 触发采用讨伐进度条**：击杀本区域普通怪积累进度（如 10 只）；讨伐条旁常驻紧凑的
-  「讨伐 Boss」按钮与「自动讨伐」开关。自动讨伐默认开启，当前 v3 要求生命不低于 80% 时 Boss 自动登场；关闭后满进度待命，由按钮手动
+  「讨伐 Boss」按钮与「自动讨伐」开关。自动讨伐默认开启，当前规则要求生命不低于 80% 时 Boss 自动登场；关闭后满进度待命，由按钮手动
   发起且不受该生命安全线限制。v1/v2 的 60% 门槛只作为兼容行为保留。Boss 从巢穴贴图前沿声明的合法入口点登场，镜头拉近与震屏期间双方保持原地，未建立 Encounter 前 Boss 不进入环境巡游；挑战失败则 Boss 撤场、进度保留，可重新积攒再战。击败 Boss
   解锁下一区域。**「自动推进」开关（默认开启）**：开启时击败 Boss 自动进入下一区域，关闭则原地继续刷本区域；
   支持随时手动回退刷低级区域。**魔王城采用可失守的特殊准入规则**：角色在魔王城内战败并回营时，立即退回本档路线的上一
@@ -231,13 +231,12 @@
   - 像素素材渲染时必须保持锐利：图片与 Canvas 均设置 `image-rendering: pixelated`，素材预缩放与 DOM 图标只用整数倍；世界摄像机可连续缩放，但 Canvas 必须关闭图像平滑，禁止插值模糊。
   - **Hazard 视觉合同**：九类机关以区域材质、环境线索、离散地砖警戒符、像素战斗铭牌、逐类攻击动作、命中碎屑与冷却残留形成六阶段演出，禁止退化为通用平滑 HUD 圆环或大块透明覆盖。范围地面层位于实体下方，机关/铭牌/命中层位于迷雾上方；减少动态效果时移除震屏与密集粒子，但保留范围、方向、危险等级和伤害窗口。
   - 正式资产由 `assets/` 中的来源母版、`assets/sprite-source/` 来源记录以及 `js/sprites/` 的程序化/编译像素模块共同维护；新增或重建资产必须保留稳定 ID、来源说明和可复现构建步骤，不依赖运行时 CDN。
-  - Actor 的正式 `spriteId` 必须指向已登记资产，缺失时由严格内容审计阻止启动；脚手架可显式引用已登记的 `actor_placeholder`，但应在内容验收前替换。`portraitId` 可选，缺失或不可用时战斗 HUD 依次回退到已登记战斗精灵和确定性像素剪影。
-  - 运行时色块/首字占位只用于旧档、下线内容和异常引用的防御性降级，不是绕过正式内容审计的“先无图上线”通道；UI 图标不得以 Emoji 或在线图标库替代项目像素资产。
+  - Actor 的正式 `spriteId` 必须指向已登记资产；当前严格内容审计会拒绝已声明但未登记的 ID，但尚未拒绝完全缺失的 `presentation.spriteId`，这是必须补齐的当前门禁缺口，不代表允许无图上线。脚手架可显式引用已登记的 `actor_placeholder`，但应在内容验收前替换。`portraitId` 可选，缺失或不可用时战斗 HUD 依次回退到已登记战斗精灵和确定性像素剪影。
+  - 运行时色块/首字占位只用于旧档、下线内容和异常引用的防御性降级，不是绕过正式内容审计的“先无图上线”通道；UI 图标不得以 Emoji 或在线图标库替代项目像素资产。当前旧面板、Toast 和离线摘要仍残留少量 Emoji/Unicode 状态符号，属于现行清理缺口，不构成新增 UI 的例外。
 
   ## 模块化 / 插件化架构（当前基础与未来扩展）
-  - **核心原则：引擎与内容分离，内容即数据**。引擎代码不写死任何具体区域/怪物/装备/技能，只面向「注册表 + 稳定字符串
-  ID」编程。
-  - **当前内容编译器与注册表**：正式内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义、Pack-local 中英文与条目，由编译器统一执行 schema/default、引用图、反向 Population 挂载、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。`js/data/packs/**/*.pack.js` 与 `*.support.js` 是文件系统真源；Support 只获得声明的 `authoring.read/write`、`rules.formula/handler` 能力，并通过版本化 `Game.contentAuthoring` 注册值或纯 factory，注册期/安装期改写其他 `Game` 表面均使构建失败。构建器在独立源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring、locales、挂载视图、fingerprint 和 `sourceSetHash`。`js/data/content/*.generated.js` 只是确定性校验/运行产物，禁止手改；正式入口和六个技术演示均只加载一个当前 `BUILD_ID` 的 `content.generated.js`，新增内容不修改 HTML 或手写清单。
+  - **核心原则：引擎与内容分离，内容即数据**。内容身份、引用、数值和玩法规则以「注册表 + 稳定字符串 ID」驱动；当前主体已遵守该边界，但天气渲染仍直接判断 `darkcastle`、天气默认值仍使用 `grassland`，Hazard 线索绘制仍按 profile ID 片段分支。这些表现层例外是待迁入 `ClimateProfile/HazardVisualProfile` 的当前技术债，不是推荐的扩展接口。
+  - **当前内容编译器与注册表**：正式内容通过 `Game.content.registerPack({...})` 注册；Pack 声明稳定 ID、版本、依赖、类型定义、Pack-local 中英文与条目，由编译器统一执行 schema/default、引用图、反向 Population 挂载、patch/replace、公式/handler 白名单、深冻结、审计及 fingerprint。`js/data/packs/**/*.pack.js` 与 `*.support.js` 是文件系统真源；Support 只获得声明的 `authoring.read/write`、`rules.formula/handler` 能力，并通过版本化 `Game.contentAuthoring` 注册值或纯 factory，注册期/安装期改写其他 `Game` 表面均使构建失败。构建器在独立源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring、locales、挂载视图、fingerprint 和 `sourceSetHash`。`js/data/content/*.generated.js` 只是确定性校验/运行产物，禁止手改；正式入口和七个技术演示均只加载一个当前 `BUILD_ID` 的 `content.generated.js`，新增内容不修改 HTML 或手写清单。
   - **Actor、遭遇池与世界生态合同**：ActorArchetype/Variant、EncounterPack、WorldSpawnProfile、EncounterPoolProfile、GuardSiteProfile、WorldPopulationProfile 与 RegionProfile 使用稳定 ID 串成完整反向引用链。`EncounterPoolProfile` 以 `regular/rare/elite/nest/boss` 分类和 `wander/patrol/ambush/resourceGuard/treasureGuard/bossGate` 职能组织 SpawnProfile；`Game.encounterPools.resolve(poolId,context)` 按世界种子、区域、布局、远征和站点 ID 确定性加权解析。编译器严格拒绝空池、非正权重、重复条目、跨区引用和未知 SpawnProfile。Population 通道的 `poolProfileId` 覆盖旧 `mountTo/baseSpawnRefs` 投影，旧字段继续为 v1–v3 内容和 NPC 服务。
   - **守卫站点合同**：`Game.guardSites` 只编排 Population、Encounter、Hazard 和奖励事务，不建立第二套战斗/重生系统。状态机为 `inactive → concealed/revealed → engaged → cleared`，宝箱为 `locked → available → claimed`；隐藏站点复用动态 Hazard 侦测。触发时原子取消交互与移动并提交 Encounter，胜利后重验远征/节点冷却/领取状态再恢复原目标，逃脱、团灭、换区或提交失败不消费目标。公开只读接口为 `snapshot/forTarget/canInteract/trigger/resetExpedition`，Actor ID、Encounter、SpawnLease 和侦测中间相位不入档。
   - **召唤、噬宝匣与 Hazard 合同**：区域召唤 Actor 不挂 Population，继承召唤者 faction/controller/team，以稳定 sequence 创建并挂载世界表现；`rewardAuthorized:false` 优先于队伍奖励资格。噬宝匣使用不反向挂载区域 Population 的 ephemeral SpawnProfile，由普通宝箱事务显式授权奖励，巢穴固定箱永不参与。非 Actor `HazardProfile/HazardVisualProfile` 由 `Game.hazards` 管理路线覆盖、固定 roll、shape-aware swept trigger/导航距离、50ms phase、外部 Effect 与池驱动 ambush Engagement；环境可见度 Provider 异常按 1 降级。
@@ -248,7 +247,7 @@
   - **面向未来**：转生、活动、新货币等尚未实现的新玩法应以监听器/插件形式接入，不侵入既有系统；本条是扩展约束，不代表这些玩法已经排期或上线。
   - **物品事务入口**：`Game.items.use(category,id,opts)` 按注册表统一执行数量、存活/忙碌状态和冷却校验，再处理效果、扣减、冷却及 `item:used` 事件。小/大治疗药水注册为 `heal`，共享 `potion` 组 8 秒冷却；自动喝药、背包药水卡和舞台快捷按钮复用该入口，满血或校验拒绝时不得消耗。
   - **动态交易域**：`Game.trade.registerDynamic(area,{ttl})` 注册不入档的临时交易域，负责到期移除并对上下文事件去重；固定与动态交易域共用同一交易 UI 和访问约束。
-  - **移动行商领域合同**：四个 `merchantProfile` 分别覆盖两区，并引用独立 `merchantStockPool`、`dialogueProfile`、Actor/Interaction/Engagement/Spawn/Encounter 内容链。会面从 v3 `walkableNav` 确定性选点，校验玩家距离、48px 净宽、危险度、营地/Boss 安全距离与 Population 预留；篷车及 58px 交易域固定在锚点，行商只在其周围 32px 内巡游。发现只累计真实移动时间：首次 50–80 秒、后续在基础 10 分钟冷却后累计 150–240 秒；离线追赶、页面隐藏、过场、战斗和交易不发现或消耗会面；首次 Boss 挑战前若本区尚未会面则先请求生成，失败只延迟并上报、不得软锁推进。Actor 实例化与世界挂载全部成功后方可提交发现状态，失败回滚 SpawnLease 并保留首次资格。事件固定持续 360 秒并持久化 8 槽库存；2 常备、4 旅行、1 招牌、1 稀有，购买前仅可付费重排旅行槽一次。信誉初值 50、范围 `-100..100`：`≥75` 九折，`40–74` 原价，`20–39` 加价 15% 且隐藏招牌/稀有，`<20` 拒绝交易；首次购买 `+5`。攻击承诺后信誉 `-25` 并登记一级装备箱价赔偿；行商低于 40% HP 施放 2 秒撤离，致死转投降且无常规奖励；除投降外的 Encounter 终止统一视为行商逃脱并清理运行时 Actor，债务与信誉保留。投降决定窗口持有可失效的 `autoExplore` 有限暂停，跨区返回或重载后可重新提示。宽恕 `+10` 并减免当次基础赔偿的一半，抢掠 `-15` 并追加所抢货物基础价两倍赔偿；任意信誉段有欠债均可主动结清，结清后信誉最低恢复至 20。累计违法按每次 2 分钟延长下一次会面冷却，最多三档，即 16 分钟。
+  - **移动行商领域合同**：四个 `merchantProfile` 分别覆盖两区，各自引用独立代码网格精灵与头像，禁止回退复用职业视觉资产；同时引用独立 `merchantStockPool`、`dialogueProfile`、Actor/Interaction/Engagement/Spawn/Encounter 内容链。会面从 v3 `walkableNav` 确定性选点，校验玩家距离、48px 净宽、危险度、营地/Boss 安全距离与 Population 预留；篷车及 58px 交易域固定在锚点，行商只在其周围 32px 内巡游。发现只累计真实移动时间：首次 50–80 秒、后续在基础 10 分钟冷却后累计 150–240 秒；离线追赶、页面隐藏、过场、战斗和交易不发现或消耗会面；首次 Boss 挑战前若本区尚未会面则先请求生成，失败只延迟并上报、不得软锁推进。Actor 实例化与世界挂载全部成功后方可提交发现状态，失败回滚 SpawnLease 并保留首次资格。事件固定持续 360 秒并持久化 8 槽库存；2 常备、4 旅行、1 招牌、1 稀有，购买前仅可付费重排旅行槽一次。信誉初值 50、范围 `-100..100`：`≥75` 九折，`40–74` 原价，`20–39` 加价 15% 且隐藏招牌/稀有，`<20` 拒绝交易；首次购买 `+5`。攻击承诺后信誉 `-25` 并登记一级装备箱价赔偿；行商低于 40% HP 施放 2 秒撤离，致死转投降且无常规奖励；除投降外的 Encounter 终止统一视为行商逃脱并清理运行时 Actor，债务与信誉保留。投降决定窗口持有可失效的 `autoExplore` 有限暂停，跨区返回或重载后可重新提示。宽恕 `+10` 并减免当次基础赔偿的一半，抢掠 `-15` 并追加所抢货物基础价两倍赔偿；任意信誉段有欠债均可主动结清，结清后信誉最低恢复至 20。累计违法按每次 2 分钟延长下一次会面冷却，最多三档，即 16 分钟。
   - **交互事件与保存**：掉落、拾取、物品使用、采集、宝箱和自动回营均通过事件总线广播；保存仅响应聚合事件，禁止每帧写档。
   - **目录分层**：`core/`（主循环、时钟、存档、事件总线、内容编译器）、`actors/`（Blueprint/Record/Instance/Roster/Party/Relation/属性账本）、`systems/`（战斗、移动索敌 AI、掉落、商店、成就……
   每系统一文件，系统间只通过事件与公共状态交互）、`render/`（Canvas 场景、镜头、特效、飘字）、`ui/`（各 Tab
@@ -258,14 +257,13 @@
   版本号字段，迁移采用「版本号 + 迁移函数数组」流水线，逐版本升级旧存档。区域推进顺序同样只保存稳定 ID 数组，
   不保存注册表下标；所有依赖关卡阶位的系统统一通过路线位置查询有效 tier。
   - **数值规则集中**：成长、经济和旧世界公式保留在 `data/formulas.js`；正式战斗公式与系数进入已审计的 combat rules / Pack 公式白名单。离线结算消费 `CombatEstimator` 摘要，自动加点/换装由共享角色预览的解析评分结合该摘要；不得再复制第三套战斗模拟或让解析评分脱离正式 Stat/Talent/装备数据。
-  - **资产清单化**：素材经 manifest（资产 ID → 文件路径）间接引用，内容配置里只写资产 ID。正式 `spriteId` 必须通过严格审计；运行时占位只承担防御性降级。
+  - **资产清单化**：素材经 manifest（资产 ID → 文件路径）间接引用，内容配置里只写资产 ID。正式 `spriteId` 仍以严格审计为强制合同；当前已校验“存在但未登记”的资产 ID，缺失字段及 `presentation.renderProfileId` 的嵌套引用门禁尚待补齐。运行时占位只承担防御性降级。
   - 加载方式注意：因需支持「双击 file:// 直接可玩」，模块化用**按序加载的普通 `<script>` 标签 + 全局命名空间
   `Game.*`** 实现（ES Modules 在 file:// 协议下会被浏览器 CORS 拦截）；若最终选 Vite 构建路线则直接使用 ES Modules。
 
   ## 国际化 i18n（必须，首发中英双语）
   - 首发支持 **简体中文（zh-CN，默认语言）+ 英文（en）** 两种语言；架构上按「可随时新增语言包」设计，但本期不做其他语言。
-  - **全部用户可见文本走 `t(key)` 翻译函数**，禁止在逻辑/UI 代码中硬编码文案；核心 UI 语言包按语言一文件存放（如
-  `i18n/zh-CN.js`、`i18n/en.js`），内容译文由定义它的 Pack 以 Pack-local `locales` 同时提供中英文，编译后汇入同一查询层。
+  - **全部用户可见文本走 `t(key)` 翻译函数**，禁止在逻辑/UI 代码中硬编码文案；核心 UI 语言包按语言一文件存放（如 `i18n/zh-CN.js`、`i18n/en.js`），内容译文由定义它的 Pack 以 Pack-local `locales` 同时提供中英文，编译后汇入同一查询层。当前启动审计失败页、语言徽标及少量旧 UI 文案尚未完全迁移，属于现行维护缺口，不构成新代码的豁免。
   - **内容文本同样走 key**：注册表条目（怪物/区域/装备/技能/成就）中不直接写名称与描述，只写文本
   key（或按约定由 ID 自动推导 key）；Pack locale 只允许提供本 Pack 实际引用的 key，缺中/英、冲突文本、越权或未使用 key 均由严格审计拒绝。
   - **语言切换**：设置面板内提供切换项，选择持久化到 localStorage，切换后即时刷新界面文案，无需重载页面（UI
@@ -277,7 +275,7 @@
   UI 面板与按钮排版需按英文最长文案校验一遍不溢出。
 
   ## 技术与质量要求
-  - `tech-demos/` 演示页必须持续直连并适配当前生产版本，历史兼容协议仅由自动测试保护，不得作为默认演示或保留失效示例。地图 v4 改造按 Units → Map Effects → Hazards → Exploration → 正式世界顺序验收；四页必须调用生产 Sprite、Terrain、Pool、GuardSite、Hazard、Population、Encounter 和 AI 模块，不得复制平行实现。
+  - `tech-demos/` 演示页必须持续直连并适配当前生产版本，历史兼容协议仅由自动测试保护，不得作为默认演示或保留失效示例。地图 v4 改造按 Units → Map Effects → Render Gallery → Hazards → Exploration → 正式世界顺序验收；Render Gallery 与 Map Effects 必须调用生产 Sprite、VisualCatalog、Terrain、Pool、GuardSite、Hazard、Population、Encounter 和 Renderer 模块，不得复制平行实现。
   - Actor / Combat Lab 必须展示 16 种代码网格新怪的双帧、轮廓、缩放、能力及守卫/猎手组合；Map Effects Lab 必须提供 v3/v4 开关、巢穴几何、守卫锚点、池解析和单 Seed/批量拓扑报告；Hazard Lab 必须覆盖显形、天气侦测、隐藏伏击、交互抢占和减少动态；Exploration Lab 必须覆盖资源守卫、单/双巢穴、Boss 门卫、战后恢复目标、三策略以及撤退/读档/换远征。Weather 与行商 Lab 继续覆盖各自生产合同。
   - 代码结构清晰：严格遵循上一节的模块化/插件化架构，数据配置（怪物表/装备表/区域表/技能表）与逻辑完全分离，便于扩展数值与内容。
   - 战斗逻辑严格由 50ms integer tick 和稳定 scheduler 驱动；`requestAnimationFrame` 仅负责渲染与有限追帧，页面不可见时按时间戳分片补偿，不依赖 `setInterval` 精度，也不把渲染帧率带入战斗结果。
@@ -288,4 +286,4 @@
   - 数值需自洽：给出一份简短的数值设计说明（升级曲线、DPS 与区域怪物血量的匹配关系、离线收益公式）。
   - **世界交互回归**：`tests/v1_11.test.js` 必须链接旧回归，并覆盖 800 张采集节点布局、掉落概率与保底、物品校验矩阵、合法位移、冷却/离线、兑换域、AI 次序、自动回营、动态交易域及 v8→v9；浏览器覆盖 390×844 中英文、44px 触控、减少动态效果，以及拾取/采集/宝箱/交易/用药/回营全链路。
   - **开放探索回归**：`tests/v1_13.test.js` 继续保护 v3 的八区 1,600 张布局、5,000 个模糊种子与黄金摘要；`tests/terrain-v4.test.js` 独立覆盖 v4 的 1,600 张完整布局、5,000 个快速种子、1–2 巢穴、双入口净宽、宝箱/守卫唯一性、营地可达、禁区、NaN、种子确定性和 v4 黄金摘要。v1/v2/v3 结果不得因 v4 变化。
-  - **Actor / Combat V2 与生态回归**：内容自动发现/双 VM/schema/引用/Pack-local i18n/资产/fingerprint、16 种新怪正式精灵反向可达、九类池完整注册、Population/SpawnLease/generation、守卫显形/伏击/侦测/提交失败/逃脱/团灭/换区/读档/跨远征、节点冷却、巢穴箱一次性事务、自动三策略、Boss 门卫与 60 秒 Boss 重试必须通过。存档覆盖 v17→v18、发现奖励账本、旧档一次补偿和白名单清理；浏览器验收正式入口及六个工作台的桌面/390px、中英文、减少动态、44px 触控与无横向溢出。
+  - **Actor / Combat V2 与生态回归**：内容自动发现/双 VM/schema/引用/Pack-local i18n/资产/fingerprint、16 种新怪正式精灵反向可达、九类池完整注册、Population/SpawnLease/generation、守卫显形/伏击/侦测/提交失败/逃脱/团灭/换区/读档/跨远征、节点冷却、巢穴箱一次性事务、自动三策略、Boss 门卫与 60 秒 Boss 重试必须通过。存档覆盖 v17→v18、发现奖励账本、旧档一次补偿和白名单清理。浏览器完整验收目标为正式入口及七个工作台的桌面/390px、中英文、减少动态、44px 触控与无横向溢出；当前 `browser-smoke.js` 覆盖正式入口、Actor、Map Effects、Hazards、Exploration 和 Weather，Render Gallery 由独立烟测覆盖，行商 Lab 页面级浏览器回归仍待接入且暂由正式入口交互烟测与 Node 领域测试保护。

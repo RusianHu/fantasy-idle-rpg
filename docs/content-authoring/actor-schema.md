@@ -35,7 +35,7 @@
 }
 ```
 
-稳定 ID 使用小写字母、数字、点、下划线和连字符。Definition 默认深冻结；重复 ID 必须显式 `patch: true` 或 `replace: true`。所有引用、公式、i18n 和资产在严格 `finalize()` 中一次审计。
+稳定 ID 使用小写字母、数字、点、下划线和连字符。Definition 默认深冻结；重复 ID 必须显式 `patch: true` 或 `replace: true`。严格 `finalize()` 当前审计 schema、公式、i18n、通用引用以及已声明资产 ID 的注册状态；已知门禁缺口是完全缺失的 `presentation.spriteId` 尚不会失败，`presentation.renderProfileId` 也尚未进入嵌套引用审计。作者合同仍要求 `presentation.spriteId` 必填且合法，并要求声明的 `presentation.renderProfileId` 引用合法；不能依赖运行时回退规避正式内容验收。
 
 ## SpawnSpec
 

@@ -34,7 +34,7 @@
 6. 可持久世界身份使用 `regionStable/worldStable`；召唤使用确定性 request key 的 `ephemeral`。存档和 EngagementCommand 不引用临时 ActorInstance ID。
 7. Variant 只覆盖白名单字段；挑衅武装、Boss phase 和脚本转换均走 `Game.actors.transitionVariant()`，不得直接改 Blueprint 或组件。
 8. Modifier、Status、Talent patch、公式和 objective handler 只能引用已注册数据；custom Objective 必须同时声明已注册 handler 的稳定 ID 与整数版本，handler 必须确定性。Card 中禁止函数、DOM、随机数和运行时实例。
-9. 正式 `spriteId` 必须已注册，缺失时严格审计会阻止启动；脚手架使用的是已注册 `actor_placeholder`，应在内容验收前替换。`portraitId` 可选，缺失或不可用时战斗 HUD 回退到已注册战斗精灵，再回退到确定性像素剪影。运行时降级不是绕过 `spriteId` 门禁的通道。
+9. 正式 `presentation.spriteId` 必须存在并指向已注册资产；当前严格审计会拒绝“已声明但未注册”的 ID，但尚不会因字段完全缺失而失败，因此作者审查和测试必须继续检查其存在性，这一门禁缺口不代表允许无图上线。脚手架使用的是已注册 `actor_placeholder`，应在内容验收前替换。若声明 `presentation.renderProfileId`，它必须引用已注册 RenderProfile；该嵌套引用当前尚未进入通用引用审计。`portraitId` 可选，缺失或不可用时战斗 HUD 回退到已注册战斗精灵，再回退到确定性像素剪影。运行时降级不是绕过正式资产合同的通道。
 
 纯作者展开逻辑放在 `*.support.js`：每个文件只能注册一个带稳定 ID/版本/依赖/能力列表的 `ContentSupport`，不得注册 Pack。可声明能力仅为 `authoring.read`、`authoring.write`、`rules.formula`、`rules.handler`；值和纯 factory 通过 `capabilities.authoring` 写入版本化 `Game.contentAuthoring`，Support 不接收完整 `Game`，也不得在闭包中改写它。普通内容优先保持单个 `*.pack.js` 胶囊。
 

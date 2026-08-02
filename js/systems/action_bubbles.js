@@ -212,6 +212,12 @@
 
     type: function (id) {
       return types[id] || null;
+    },
+
+    types: function () {
+      return Object.keys(types).sort().map(function (id) {
+        return JSON.parse(JSON.stringify(types[id]));
+      });
     }
   };
 

@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="build-id" content="20260802.20">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230c1010'/%3E%3Cpath d='M2 12V5h3l3-3 3 3h3v7H2z' fill='%23d4b65f'/%3E%3Crect x='7' y='8' width='2' height='4' fill='%230c1010'/%3E%3C/svg%3E">
+  <title data-demo-page-title="visual.pageTitle">图形与动效渲染 Lab · 幻境远征</title>
+  <link rel="stylesheet" href="render-gallery.css?v=20260802.20">
+</head>
+<body>
+<main class="visual-lab">
+  <header class="visual-header">
+    <div>
+      <p class="eyebrow">RENDER / ASSET / MOTION / QA</p>
+      <h1 data-demo-i18n="visual.title">图形与动效渲染 Lab</h1>
+      <p class="subtitle" data-demo-i18n="visual.subtitle">只读加载生产注册表，以可筛选图鉴、多资产同步对比与逐帧时间轴复刻原版图形、动作和动效。</p>
+    </div>
+    <div class="header-actions">
+      <a href="../index.html" data-demo-i18n="visual.back">返回演示中心</a>
+      <label class="locale-control"><span data-demo-i18n="common.language">语言</span>
+        <select id="locale-select" data-demo-i18n-aria="common.language"><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+      </label>
+    </div>
+  </header>
+
+  <section class="control-band" data-demo-i18n-aria="visual.controlsAria">
+    <label><span data-demo-i18n="visual.region">资产区域</span><select id="region-select"></select><small class="field-hint" data-demo-i18n="visual.regionHint">仅过滤目录，不生成地图</small></label>
+    <label><span data-demo-i18n="visual.category">分类</span><select id="category-select"></select></label>
+    <label><span data-demo-i18n="visual.search">搜索 ID / 名称</span><input id="search-input" type="search"></label>
+    <label><span data-demo-i18n="visual.motion">动作</span><select id="motion-select"></select></label>
+    <label><span data-demo-i18n="visual.direction">朝向</span><select id="direction-select"><option value="d">D</option><option value="u">U</option><option value="l">L</option><option value="r">R</option></select></label>
+    <label class="check-control"><input id="reduced-motion" type="checkbox"><span data-demo-i18n="visual.reduced">减少动态</span></label>
+    <button id="pause" type="button" data-demo-i18n="visual.pause">暂停</button>
+  </section>
+  <section class="category-band" aria-labelledby="category-tabs-title">
+    <div class="category-band-heading">
+      <span id="category-tabs-title" data-demo-i18n="visual.categoryTabs">视觉资产分类</span>
+      <small data-demo-i18n="visual.categoryTabsHint">按生产目录自动归类</small>
+    </div>
+    <nav id="category-tabs" class="category-tabs" role="tablist" data-demo-i18n-aria="visual.categoryTabs"></nav>
+  </section>
+
+  <section class="audit-band">
+    <div><span data-demo-i18n="visual.audit">目录审计</span><strong id="audit-count">--</strong></div>
+    <div><span data-demo-i18n="common.region">区域</span><strong id="region-count">--</strong></div>
+    <div><span data-demo-i18n="common.source">生产链路</span><strong id="source-status">--</strong></div>
+    <div><span data-demo-i18n="common.status">状态</span><strong id="status-line">--</strong></div>
+  </section>
+
+  <section class="gallery-layout">
+    <div class="gallery-column">
+      <section class="preview-window" id="preview-window" aria-live="polite">
+        <div class="preview-heading">
+          <div><p class="eyebrow">PREVIEW WINDOW / PRODUCTION DRAWER</p><h2 data-demo-i18n="visual.previewWindow">独立预览窗口</h2></div>
+          <div class="preview-actions">
+            <button id="compare-add" type="button" data-demo-i18n="visual.compareAdd">加入对比</button>
+            <button id="compare-clear" type="button" data-demo-i18n="visual.compareClear">清空对比</button>
+            <button id="preview-reset" type="button" data-demo-i18n="visual.previewReset">重置</button>
+            <button id="preview-popout" type="button" data-demo-i18n="visual.previewPopout">在新窗口打开</button>
+          </div>
+        </div>
+        <div class="preview-toolbar" data-demo-i18n-aria="visual.previewControls">
+          <label><span data-demo-i18n="visual.previewScale">整数倍率</span>
+            <select id="preview-scale"><option value="1">1×</option><option value="2">2×</option><option value="3">3×</option><option value="4">4×</option></select>
+          </label>
+          <label><span data-demo-i18n="visual.previewBackdrop">舞台背景</span>
+            <select id="preview-backdrop">
+              <option value="checker" data-demo-i18n="visual.backdropChecker">透明棋盘</option>
+              <option value="night" data-demo-i18n="visual.backdropNight">深夜</option>
+              <option value="grass" data-demo-i18n="visual.backdropGrass">草地</option>
+              <option value="paper" data-demo-i18n="visual.backdropPaper">羊皮纸</option>
+            </select>
+          </label>
+          <label><span data-demo-i18n="visual.previewSpeed">播放速度</span>
+            <select id="preview-speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+          </label>
+          <label class="check-control preview-check"><input id="preview-grid" type="checkbox"><span data-demo-i18n="visual.previewGrid">像素网格</span></label>
+          <label class="check-control preview-check"><input id="preview-guides" type="checkbox"><span data-demo-i18n="visual.previewGuides">锚点与边界</span></label>
+          <div class="scrub-control">
+            <button id="preview-step-back" type="button" data-demo-i18n-aria="visual.stepBack" data-demo-i18n-title="visual.stepBack">−</button>
+            <label><span data-demo-i18n="visual.timeline">时间轴</span><input id="preview-scrubber" type="range" min="0" max="1000" step="1" value="0"></label>
+            <button id="preview-step-forward" type="button" data-demo-i18n-aria="visual.stepForward" data-demo-i18n-title="visual.stepForward">+</button>
+            <output id="preview-frame-readout">0.00s</output>
+          </div>
+        </div>
+        <div class="preview-stage backdrop-checker" id="preview-stage"><div class="preview-canvas-scroll"><canvas id="preview-canvas" width="360" height="240" data-demo-i18n-aria="visual.previewWindow"></canvas></div><p id="preview-empty" class="preview-empty" data-demo-i18n="visual.previewEmpty">选择资产后在此循环预览</p></div>
+        <div class="preview-footer"><strong id="preview-name">--</strong><span id="preview-meta" data-demo-i18n="visual.previewNoSelection">尚未选择资产</span><output id="preview-status" data-demo-i18n="visual.ready">已加载生产视觉目录</output></div>
+        <section class="compare-dock" aria-labelledby="compare-title">
+          <div class="compare-heading"><div><p class="eyebrow">COMPARE WALL / SYNCHRONIZED MOTION</p><h3 id="compare-title" data-demo-i18n="visual.compareTitle">同步对比墙</h3></div><span id="compare-count" data-demo-i18n="visual.compareEmpty">可固定最多 4 个资产</span></div>
+          <div id="compare-wall" class="compare-wall" data-demo-i18n-aria="visual.compareTitle"><p class="compare-empty" data-demo-i18n="visual.compareHint">选择资产并点击“加入对比”，即可并排检查轮廓、动作和缩放。</p></div>
+        </section>
+      </section>
+      <section class="gallery-panel">
+        <div class="gallery-heading"><div><p class="eyebrow">ASSET ATLAS / AUTO ENUMERATION</p><h2 data-demo-i18n="visual.galleryAria">生产视觉资产图鉴</h2></div><output id="result-count" aria-live="polite">--</output></div>
+        <div id="gallery" class="gallery" data-demo-i18n-aria="visual.galleryAria"></div>
+      </section>
+    </div>
+    <aside class="inspector" id="inspector" aria-live="polite">
+      <p class="eyebrow">INSPECTOR</p><h2 data-demo-i18n="visual.inspector">资产检查器</h2>
+      <div id="inspector-content"><p class="muted" data-demo-i18n="visual.noResults">没有匹配条目</p></div>
+    </aside>
+  </section>
+</main>
+
+<script src="../../js/core/utils.js?v=20260802.20"></script>
+<script src="../../js/vendor/easystar-0.4.4.min.js?v=20260802.20"></script>
+<script src="../../js/core/eventbus.js?v=20260802.20"></script>
+<script src="../../js/core/registry.js?v=20260802.20"></script>
+<script src="../../js/i18n/i18n.js?v=20260802.20"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260802.20"></script>
+<script src="../../js/i18n/en.js?v=20260802.20"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260802.20"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260802.20"></script>
+<script src="../../js/core/assets.js?v=20260802.20"></script>
+<script src="../../js/data/formulas.js?v=20260802.20"></script>
+<script src="../../js/sprites/palettes.js?v=20260802.20"></script>
+<script src="../../js/sprites/hero.js?v=20260802.20"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260802.20"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260802.20"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260802.20"></script>
+<script src="../../js/sprites/monsters_guards.js?v=20260802.20"></script>
+<script src="../../js/sprites/props.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/manifest.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/grassland.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/forest.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/mine.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/graveyard.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/snowpass.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/lavacave.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/skyruins.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/ground-decorations/darkcastle.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration_v3.js?v=20260802.20"></script>
+<script src="../../js/sprites/boss_landmarks.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration_v3.manifest.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/manifest.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/grassland.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/forest.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/mine.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/graveyard.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/snowpass.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/lavacave.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/skyruins.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/darkcastle.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/exploration/chests.generated.js?v=20260802.20"></script>
+<script src="../../js/sprites/flora.js?v=20260802.20"></script>
+<script src="../../js/sprites/minimap_icons.js?v=20260802.20"></script>
+<script src="../../js/data/affixes.js?v=20260802.20"></script>
+<script src="../../js/data/items.js?v=20260802.20"></script>
+<script src="../../js/data/classes.js?v=20260802.20"></script>
+<script src="../../js/data/skills.js?v=20260802.20"></script>
+<script src="../../js/data/routes.js?v=20260802.20"></script>
+<script src="../../js/data/achievements.js?v=20260802.20"></script>
+<script src="../../js/core/content/rules.js?v=20260802.20"></script>
+<script src="../../js/core/content/schemas.js?v=20260802.20"></script>
+<script src="../../js/core/content/compiler.js?v=20260802.20"></script>
+<script src="../../js/core/content/audit.js?v=20260802.20"></script>
+<script src="../../js/core/content/registry.js?v=20260802.20"></script>
+<script src="../../js/core/content/support.js?v=20260802.20"></script>
+<script src="../../js/data/content/content.generated.js?v=20260802.20"></script>
+<script src="../../js/systems/routes.js?v=20260802.20"></script>
+<script src="../../js/systems/state.js?v=20260802.20"></script>
+<script src="../../js/systems/action_bubbles.js?v=20260802.20"></script>
+<script src="../../js/render/particles.js?v=20260802.20"></script>
+<script src="../../js/render/effects.js?v=20260802.20"></script>
+<script src="../../js/render/renderer.js?v=20260802.20"></script>
+<script src="../../js/render/visual_catalog.js?v=20260802.20"></script>
+<script src="../demo-i18n.js?v=20260802.20"></script>
+<script src="render-gallery.js?v=20260802.20"></script>
+</body>
+</html>

@@ -77,8 +77,8 @@
       rate: 9,
       make: function (p) {
         // 优先从熔岩格上升
-        var T = Game.terrain;
-        if (T.lavaCells.length && U.chance(0.7)) {
+        var T = Game.terrain || { lavaCells: [], gw: 1 };
+        if (T.lavaCells && T.lavaCells.length && U.chance(0.7)) {
           var idx = T.lavaCells[U.randInt(0, T.lavaCells.length - 1)];
           p.x = (idx % T.gw) * 8 + 4; p.y = ((idx / T.gw) | 0) * 8 + 4;
         } else { p.x = U.rand(0, world.w); p.y = U.rand(world.h * 0.5, world.h); }
@@ -166,7 +166,116 @@
     bursts.push(p);
   }
 
+  function drawParticleItem(ctx, q, isBurst) {
+    if (isBurst) {
+      var burstAlpha = 1 - q.t / q.life;
+      ctx.globalAlpha = q.fade ? burstAlpha * 0.5 : burstAlpha;
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x, q.y, q.size, q.size);
+      return;
+    }
+    var a = Math.min(1, 2 * (1 - q.t / q.life));
+    if (q.type === 'cloud') {
+      ctx.globalAlpha = a * 0.16;
+      ctx.fillStyle = q.color;
+      ctx.beginPath();
+      ctx.ellipse(q.x, q.y, q.size, q.size * 0.4, 0, 0, 6.29);
+      ctx.fill();
+    } else if (q.type === 'firefly') {
+      var tw = 0.5 + 0.5 * Math.sin(q.t * 6);
+      ctx.globalAlpha = a * tw;
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x, q.y, 2, 2);
+      ctx.globalAlpha = a * tw * 0.3;
+      ctx.fillRect(q.x - 1, q.y - 1, 4, 4);
+    } else {
+      ctx.globalAlpha = a * (q.type === 'wisp' ? 0.8 : 0.7);
+      ctx.fillStyle = q.color;
+      ctx.fillRect(q.x, q.y, q.size, q.size);
+    }
+  }
+
+  function previewStep(ctx, material, time, width, height) {
+    var colors = {
+      grass: '#8ad06a', snow: '#ffffff', sand: '#d8c090', water: '#bfe4ff',
+      lava: '#f07030', dirt: '#b09468', stone: '#b8b8c0', miasma: '#a060e0'
+    };
+    var color = colors[material] || '#d2b866';
+    for (var i = 0; i < 8; i++) {
+      var phase = (time * 1.8 + i * 0.17) % 1;
+      var x = width * (0.25 + (i % 4) * 0.17) + Math.sin(time * 2 + i) * 3;
+      var y = height * 0.66 - phase * 18 + (i % 2) * 3;
+      ctx.globalAlpha = 1 - phase;
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), Math.round(y), material === 'lava' ? 2 : 1, material === 'water' ? 2 : 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
   var Pt = Game.particles = {
+    catalog: function () {
+      var out = [];
+      Object.keys(AMBIENT_DEFS).forEach(function (id) {
+        out.push({ id: 'ambient:' + id, kind: 'ambient', particle: id, sourceRefs: ['Game.particles.update'] });
+      });
+      Object.keys(STEP_FX).forEach(function (id) {
+        out.push({ id: 'step:' + id, kind: 'step', material: id, sourceRefs: ['Game.particles.step'] });
+      });
+      out.push({ id: 'campfire', kind: 'campfire', sourceRefs: ['Game.particles.campfire'] });
+      return out;
+    },
+    previewInfo: function (id) {
+      var value = String(id || '');
+      if (value.indexOf('ambient:') === 0 && AMBIENT_DEFS[value.slice(8)]) return { mode: 'production', duration: 6 };
+      if (value.indexOf('step:') === 0 && STEP_FX[value.slice(5)]) return { mode: 'adapted', duration: 1 };
+      if (value === 'campfire') return { mode: 'adapted', duration: 2 };
+      return { mode: 'catalog', duration: 1 };
+    },
+    preview: function (ctx, id, time) {
+      if (!ctx) return { mode: 'catalog' };
+      var value = String(id || '');
+      var info = this.previewInfo(value);
+      var width = ctx.canvas && ctx.canvas.width || 96;
+      var height = ctx.canvas && ctx.canvas.height || 96;
+      var phase = ((Number(time) || 0) % info.duration + info.duration) % info.duration;
+      ctx.save();
+      try {
+        if (value.indexOf('ambient:') === 0 && AMBIENT_DEFS[value.slice(8)]) {
+          var previousWorld = world;
+          world = { w: width, h: height };
+          try {
+            var def = AMBIENT_DEFS[value.slice(8)];
+            for (var i = 0; i < 9; i++) {
+              var particle = { t: 0 };
+              def.make(particle, 0.7);
+              particle.x = Number.isFinite(particle.x) ? particle.x : width * 0.5;
+              particle.y = Number.isFinite(particle.y) ? particle.y : height * 0.5;
+              particle.t = (phase + i * 0.37) % Math.max(0.1, particle.life || 1);
+              drawParticleItem(ctx, particle);
+            }
+          } finally {
+            world = previousWorld;
+          }
+        } else if (value.indexOf('step:') === 0 && STEP_FX[value.slice(5)]) {
+          previewStep(ctx, value.slice(5), phase, width, height);
+        } else if (value === 'campfire') {
+          for (var ember = 0; ember < 8; ember++) {
+            drawParticleItem(ctx, {
+              type: 'ember', x: width * 0.5 + Math.sin(ember * 2.4) * 8,
+              y: height * 0.74 - (phase * 18 + ember * 3) % 22,
+              t: (phase + ember * 0.13) % 1, life: 1,
+              size: ember % 4 === 0 ? 2 : 1, color: ember % 2 ? '#f08838' : '#f8d060'
+            });
+          }
+          ctx.fillStyle = 'rgba(154,154,166,0.45)';
+          ctx.fillRect(Math.round(width * 0.5) - 1, Math.round(height * 0.57 - phase * 8), 2, 4);
+        }
+      } finally {
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+      return info;
+    },
     setEnabled: function (f) { enabled = !!f; if (!f) { ambient.length = 0; bursts.length = 0; } },
     isEnabled: function () { return enabled; },
     setAmbientScale: function (value) {
@@ -244,35 +353,14 @@
     /** 世界空间绘制（实体之上） */
     draw: function (ctx) {
       if (!enabled) return;
-      var i, q, a;
+      var i, q;
       for (i = 0; i < ambient.length; i++) {
         q = ambient[i];
-        a = Math.min(1, 2 * (1 - q.t / q.life));
-        if (q.type === 'cloud') {
-          ctx.globalAlpha = a * 0.16;
-          ctx.fillStyle = q.color;
-          ctx.beginPath();
-          ctx.ellipse(q.x, q.y, q.size, q.size * 0.4, 0, 0, 6.29);
-          ctx.fill();
-        } else if (q.type === 'firefly') {
-          var tw = 0.5 + 0.5 * Math.sin(q.t * 6);
-          ctx.globalAlpha = a * tw;
-          ctx.fillStyle = q.color;
-          ctx.fillRect(q.x, q.y, 2, 2);
-          ctx.globalAlpha = a * tw * 0.3;
-          ctx.fillRect(q.x - 1, q.y - 1, 4, 4);
-        } else {
-          ctx.globalAlpha = a * (q.type === 'wisp' ? 0.8 : 0.7);
-          ctx.fillStyle = q.color;
-          ctx.fillRect(q.x, q.y, q.size, q.size);
-        }
+        drawParticleItem(ctx, q, false);
       }
       for (i = 0; i < bursts.length; i++) {
         q = bursts[i];
-        a = 1 - q.t / q.life;
-        ctx.globalAlpha = q.fade ? a * 0.5 : a;
-        ctx.fillStyle = q.color;
-        ctx.fillRect(q.x, q.y, q.size, q.size);
+        drawParticleItem(ctx, q, true);
       }
       ctx.globalAlpha = 1;
     }

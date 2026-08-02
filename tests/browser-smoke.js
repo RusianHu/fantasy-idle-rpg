@@ -3553,7 +3553,7 @@ async function run() {
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 6, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 7, 'technical demo hub exposes every current workbench');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);

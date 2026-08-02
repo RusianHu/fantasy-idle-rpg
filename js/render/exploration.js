@@ -444,7 +444,9 @@
     viewT = viewT === undefined ? 0 : viewT;
     viewR = viewR === undefined ? layout.world.w : viewR;
     viewB = viewB === undefined ? layout.world.h : viewB;
-    var pad = layout.chunkSize;
+    // 只绘制当前视口相交的 chunk；整块预取范围会让密集森林每帧
+    // 额外搬运多圈静态地表，成为主帧热点。缺失 chunk 仍按需烘焙。
+    var pad = 1;
     for (var i = 0; i < layout.chunks.length; i++) {
       var chunk = layout.chunks[i];
       if (chunk.x > viewR + pad || chunk.y > viewB + pad ||

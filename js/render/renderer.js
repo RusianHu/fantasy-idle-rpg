@@ -23,6 +23,9 @@
   var stagePointerOrder = [];
   var stagePinch = null;
   var suppressStageTapUntil = 0;
+  var themePreviewLayout = null;
+  var themePreviewGround = null;
+  var themePreviewProps = null;
   var VIEW_SCALE_MIN = 0.75;
   var VIEW_SCALE_MAX = 1.35;
   var TAP_MOVE_THRESHOLD = 8;
@@ -337,22 +340,31 @@
     parallaxRegion = region.id;
   }
 
-  /* ================= 帧选择 ================= */
-  function heroFrame(h) {
-    var d = h.dir;
-    if (h.state === 'sitting' || h.state === 'recover' || h.state === 'gather') {
-      return (h.animT % 1.7) < 0.9 ? 'sit0' : 'sit1';
-    }
-    if (h.state === 'dead') return 'walk_d0';
-    if (h.state === 'fight' && h.lungeT > 0.05) return 'attack_' + d;
-    if (h.moving) {
-      return 'walk_' + d + (((h.animT / 0.17) | 0) % 2);
-    }
-    return 'walk_' + d + '0';
-  }
-
-  function monsterFrame(m) {
-    return ((m.animT / 0.36) | 0) % 2 === 0 ? 'idle0' : 'idle1';
+  /* ================= 语义动作帧选择 ================= */
+  function entityMotion(e) {
+    var action = e.components && e.components.actionState;
+    var actionState = action && action.state;
+    var state = 'idle';
+    if (e.dead || e.state === 'dead' || actionState === 'defeated') state = 'defeat';
+    else if (e.state === 'sitting' || e.state === 'recover') state = 'sit';
+    else if (e.state === 'gather') state = 'gather';
+    else if (actionState === 'casting' || actionState === 'channeling') state = 'cast';
+    else if (e.lungeT > 0.05 || actionState === 'resolving' || actionState === 'recovering' || e.state === 'fight') state = 'attack';
+    else if (e.moving) state = 'move';
+    var direction = e.dir || 'd';
+    var reduced = !U.motionEnabled();
+    var speed = state === 'move' ? 0.17 : 0.36;
+    var phase = reduced ? 0 : Math.max(0, Math.floor((Number(e.animT) || 0) / speed));
+    var key = state + '|' + direction + '|' + phase + '|' + (reduced ? '1' : '0');
+    if (e._motionKey === key && e._motionResult) return e._motionResult;
+    e._motionKey = key;
+    e._motionResult = Game.assets.resolveMotion(e.sprite, {
+      state: state,
+      direction: direction,
+      time: e.animT,
+      reducedMotion: reduced
+    });
+    return e._motionResult;
   }
 
   function isActorEntity(entity) {
@@ -656,6 +668,68 @@
       withinViewport: layout.withinViewport
     });
     ctx.restore();
+  }
+
+  function drawPropOnContext(targetCtx, p, t) {
+    var A = Game.assets;
+    if (!targetCtx || !p || !p.sprite) return;
+    if (p.campfire) {
+      var campFrame = 'f' + (((t / 0.14) | 0) % 4);
+      A.draw(targetCtx, 'campfire', campFrame, p.x, p.y, {});
+      return;
+    }
+    var sp = A.sprite(p.sprite);
+    var oy = 0;
+    if (p.bob) oy = Math.sin(t * 1.3 + (p.phase || 0)) * 2.2 - 3;
+    if (p.shadow) {
+      targetCtx.globalAlpha = 0.20;
+      targetCtx.fillStyle = '#101024';
+      targetCtx.beginPath();
+      targetCtx.ellipse(p.x, p.y + 1, Math.max(4, sp.w * 0.30), 2.6, 0, 0, 6.29);
+      targetCtx.fill();
+      targetCtx.globalAlpha = 1;
+    }
+    var frame = 'idle0';
+    if (sp.frames.idle1 && (p.sway || p.flicker)) {
+      frame = (((t / (p.animSpd || 1)) + (p.phase || 0)) | 0) % 2 === 0 ? 'idle0' : 'idle1';
+    }
+    A.draw(targetCtx, p.sprite, frame, p.x, p.y + oy, { flip: !!p.flipX });
+    if (p.steam && (!Game.particles || Game.particles.isEnabled())) {
+      targetCtx.save();
+      for (var si = 0; si < 3; si++) {
+        var steamK = (t * 0.42 + si * 0.34 + (p.phase || 0)) % 1;
+        targetCtx.globalAlpha = 0.36 * (1 - steamK);
+        targetCtx.fillStyle = '#efe6d2';
+        targetCtx.fillRect(
+          Math.round(p.x - 2 + si * 2 + Math.sin(t * 2.1 + si) * 1.5),
+          Math.round(p.y - 10 - steamK * 9),
+          steamK < 0.55 ? 1 : 2,
+          2
+        );
+      }
+      targetCtx.restore();
+    }
+  }
+
+  function prepareThemePreview(layout) {
+    if (themePreviewLayout === layout && themePreviewProps) return;
+    themePreviewLayout = layout;
+    themePreviewProps = (layout.props || []).concat(
+      layout.nodes || [], layout.landmarks || [], layout.curios || [], layout.ecology || []
+    ).slice().sort(function (a, b) { return (a.y || 0) - (b.y || 0); });
+    themePreviewGround = null;
+    if (!Game.terrain || !Game.terrain.drawGround ||
+        typeof document === 'undefined' || !document.createElement) return;
+    var width = Math.max(1, Math.ceil(layout.world.w));
+    var height = Math.max(1, Math.ceil(layout.world.h));
+    var ground = document.createElement('canvas');
+    ground.width = width;
+    ground.height = height;
+    var groundCtx = ground.getContext('2d');
+    if (!groundCtx) return;
+    groundCtx.imageSmoothingEnabled = false;
+    Game.terrain.drawGround(groundCtx, 0, 0, width, height);
+    themePreviewGround = ground;
   }
 
   /* ================= 渲染器 ================= */
@@ -1131,7 +1205,10 @@
     drawEntity: function (e) {
       var A = Game.assets;
       var sp = A.sprite(e.sprite);
-      e.spriteH = sp.h - 2;
+      var entityScale = e.components && e.components.presentation &&
+        Number(e.components.presentation.scale) > 0
+        ? Number(e.components.presentation.scale) : 1;
+      e.spriteH = Math.round((sp.h - 2) * entityScale);
 
       var mat = Game.terrain.materialAt(e.x, e.y);
       var sink = mat === 'water' ? 3 : 0;
@@ -1161,7 +1238,7 @@
       ctx.globalAlpha = 0.22 * alpha;
       ctx.fillStyle = '#101024';
       ctx.beginPath();
-      ctx.ellipse(e.x, e.y + 1, sp.w * 0.32, 2.4, 0, 0, 6.29);
+      ctx.ellipse(e.x, e.y + 1, sp.w * 0.32 * entityScale, 2.4 * entityScale, 0, 0, 6.29);
       ctx.fill();
       ctx.globalAlpha = 1;
 
@@ -1179,15 +1256,9 @@
         }
       }
 
-      var frame = e.kind === 'hero' ? heroFrame(e) : monsterFrame(e);
-      var flip = false;
-      if (isNonHeroActor(e)) {
-        // 怪物素材默认朝左；面向右时镜像
-        flip = (e.dir === 'r');
-      } else if ((e.state === 'sitting' || e.state === 'recover') && e.dir === 'l') {
-        // 坐姿素材朝右；面向篝火（左）时镜像
-        flip = true;
-      }
+      var motion = entityMotion(e);
+      var frame = motion.frame;
+      var flip = motion.flip;
 
       if (sceneStyle && sceneStyle.ghosts && alpha > 0.02) {
         for (var gi = sceneStyle.ghosts; gi >= 1; gi--) {
@@ -1195,7 +1266,8 @@
             alpha: Math.min(0.24, alpha * (0.08 + gi * 0.045)),
             white: 0.7,
             sinkPx: sink,
-            flip: flip
+            flip: flip,
+            scale: entityScale
           });
         }
       }
@@ -1204,7 +1276,8 @@
         alpha: alpha,
         white: e.flash > 0 ? Math.min(1, e.flash / 0.14) : 0,
         sinkPx: sink,
-        flip: flip
+        flip: flip,
+        scale: entityScale
       });
 
       // 头顶血条
@@ -1212,8 +1285,8 @@
         ? (!e.dead && (e.hp < e.maxHp || e.engaged || e.boss))
         : (e.hp < e.maxHp));
       if (showBar && alpha > 0.4) {
-        var bw = e.boss ? 26 : 14;
-        var bx = e.x - bw / 2, by = e.y - sp.h - 4;
+        var bw = (e.boss ? 26 : 14) * Math.max(1, entityScale * 0.9);
+        var bx = e.x - bw / 2, by = e.y - e.spriteH - 4;
         ctx.fillStyle = 'rgba(10,10,26,0.8)';
         ctx.fillRect(bx - 1, by - 1, bw + 2, 4);
         var pct = U.clamp(e.hp / e.maxHp, 0, 1);
@@ -1466,43 +1539,95 @@
     },
 
     drawProp: function (p, t) {
-      var A = Game.assets;
-      if (p.campfire) {
-        var f = 'f' + (((t / 0.14) | 0) % 4);
-        A.draw(ctx, 'campfire', f, p.x, p.y, {});
-        return;
-      }
-      var sp = A.sprite(p.sprite);
-      var oy = 0;
-      if (p.bob) oy = Math.sin(t * 1.3 + (p.phase || 0)) * 2.2 - 3;
-      if (p.shadow) {
-        ctx.globalAlpha = 0.20;
-        ctx.fillStyle = '#101024';
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 1, Math.max(4, sp.w * 0.30), 2.6, 0, 0, 6.29);
-        ctx.fill();
-        ctx.globalAlpha = 1;
-      }
-      var frame = 'idle0';
-      if (sp.frames.idle1 && (p.sway || p.flicker)) {
-        frame = (((t / (p.animSpd || 1)) + (p.phase || 0)) | 0) % 2 === 0 ? 'idle0' : 'idle1';
-      }
-      A.draw(ctx, p.sprite, frame, p.x, p.y + oy, { flip: !!p.flipX });
-      if (p.steam && (!Game.particles || Game.particles.isEnabled())) {
-        ctx.save();
-        for (var si = 0; si < 3; si++) {
-          var steamK = (t * 0.42 + si * 0.34 + (p.phase || 0)) % 1;
-          ctx.globalAlpha = 0.36 * (1 - steamK);
-          ctx.fillStyle = '#efe6d2';
-          ctx.fillRect(
-            Math.round(p.x - 2 + si * 2 + Math.sin(t * 2.1 + si) * 1.5),
-            Math.round(p.y - 10 - steamK * 9),
-            steamK < 0.55 ? 1 : 2,
-            2
-          );
+      drawPropOnContext(ctx, p, t);
+    },
+
+    drawPropPreview: function (targetCtx, p, t) {
+      drawPropOnContext(targetCtx, p, t || 0);
+    },
+
+    drawThemePreview: function (targetCtx, targetLayout, targetRegion, options) {
+      if (!targetCtx || !targetLayout) return false;
+      options = options || {};
+      prepareThemePreview(targetLayout);
+      targetCtx.save();
+      try {
+        targetCtx.imageSmoothingEnabled = false;
+        if (themePreviewGround) targetCtx.drawImage(themePreviewGround, 0, 0);
+        else if (Game.terrain.drawGround) Game.terrain.drawGround(targetCtx);
+        if (Game.terrain.drawLiquid) Game.terrain.drawLiquid(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
+        if (Game.terrain.drawDecals) Game.terrain.drawDecals(targetCtx);
+        if (Game.terrain.drawTufts) Game.terrain.drawTufts(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
+        if (Game.weatherRender && Game.weatherRender.drawSurface) {
+          Game.weatherRender.drawSurface(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
         }
-        ctx.restore();
+        if (Game.explorationRender && Game.explorationRender.drawWorldOverlay) {
+          Game.explorationRender.drawWorldOverlay(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h,
+            Game.terrain && Number(Game.terrain.time) || 0);
+        }
+        if (Game.hazardRender && Game.hazardRender.drawGround) {
+          Game.hazardRender.drawGround(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
+        }
+        var now = Game.terrain && Number(Game.terrain.time) || 0;
+        (themePreviewProps || []).forEach(function (prop) { drawPropOnContext(targetCtx, prop, options.reducedMotion ? 0 : now); });
+        (targetLayout.glows || []).forEach(function (glow) {
+          if (options.reducedMotion || !glow || !glow.glow) return;
+          var radius = Math.max(4, Number(glow.glow.r) || 12);
+          var texture = Game.assets.glowTex(glow.glow.color || '#f3c45c', radius);
+          targetCtx.globalAlpha = 0.22;
+          targetCtx.drawImage(texture, Math.round(glow.x - radius), Math.round(glow.y - radius));
+          targetCtx.globalAlpha = 1;
+        });
+        if (!options.reducedMotion && Game.weatherRender && Game.weatherRender.drawWorld) {
+          Game.weatherRender.drawWorld(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
+        }
+        if (Game.hazardRender && Game.hazardRender.drawOverlay) {
+          Game.hazardRender.drawOverlay(targetCtx, 0, 0, targetLayout.world.w, targetLayout.world.h);
+        }
+        return true;
+      } finally {
+        targetCtx.restore();
       }
+    },
+
+    /**
+     * 复用正式像素气泡绘制逻辑，为 Render Gallery 提供隔离预览。
+     * 不创建世界实体、不写入 action bubble 队列。
+     */
+    drawBubblePreview: function (targetCtx, type, time) {
+      if (!targetCtx || !Game.actionBubbles || !Game.actionBubbles.type) return false;
+      var def = Game.actionBubbles.type(type);
+      if (!def) return false;
+      var width = targetCtx.canvas && targetCtx.canvas.width || 96;
+      var height = targetCtx.canvas && targetCtx.canvas.height || 96;
+      var phase = ((Number(time) || 0) % def.duration + def.duration) % def.duration;
+      var bubble = {
+        id: 'preview:' + type,
+        type: type,
+        icon: def.icon,
+        duration: def.duration,
+        age: phase,
+        placement: def.placement,
+        side: 'auto',
+        style: { accent: def.accent, paper: def.paper, ink: def.ink }
+      };
+      var anchor = {
+        x: Math.round(width / 2),
+        y: Math.round(height * 0.76),
+        kind: 'hero',
+        dir: 'd',
+        spriteH: 18
+      };
+      var previousCtx = ctx;
+      ctx = targetCtx;
+      targetCtx.save();
+      try {
+        drawPixelBubble(bubble, anchor, 4, 4, width - 4, height - 4);
+      } finally {
+        targetCtx.restore();
+        ctx = previousCtx;
+      }
+      return true;
     }
   };
 })();

@@ -50,6 +50,8 @@
   var stagePointers = {};
   var miniDrag = false;
   var layers = {};
+  var visualSnapshot = null;
+  var visualBySprite = {};
 
   var copy = function (value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
@@ -123,6 +125,19 @@
 
   function actorName(definition) {
     return nameFromKey(definition && definition.identity && definition.identity.nameKey, definition && definition.id || 'actor');
+  }
+
+  function refreshVisualCatalog() {
+    visualSnapshot = Game.visualCatalog && Game.visualCatalog.snapshot
+      ? Game.visualCatalog.snapshot({ regionId: region && region.id }) : null;
+    visualBySprite = {};
+    (visualSnapshot && visualSnapshot.items || []).forEach(function (item) {
+      if (item.spriteId) visualBySprite[item.spriteId] = item;
+    });
+  }
+
+  function visualMeta(sprite) {
+    return sprite && visualBySprite[sprite] ? visualBySprite[sprite] : null;
   }
 
   function log(phase, message, data, level) {
@@ -1089,9 +1104,18 @@
   }
 
   function rebuildCatalog() {
+    refreshVisualCatalog();
     catalogItems = actorDefinitionCatalog();
     var catalogIndex = {};
-    catalogItems.forEach(function (item) { catalogIndex[item.key] = item; });
+    catalogItems.forEach(function (item) {
+      catalogIndex[item.key] = item;
+      var visual = visualMeta(item.sprite);
+      if (visual) {
+        item.visualGroup = visual.group;
+        item.visualSourceRefs = visual.sourceRefs || [];
+        item.visualCoverage = visual.motion || null;
+      }
+    });
 
     function define(item, regionId) {
       var existing = catalogIndex[item.key];
@@ -1105,6 +1129,12 @@
         }, item);
         catalogIndex[item.key] = existing;
         catalogItems.push(existing);
+      }
+      var visual = visualMeta(existing.sprite);
+      if (visual) {
+        existing.visualGroup = visual.group;
+        existing.visualSourceRefs = visual.sourceRefs || [];
+        existing.visualCoverage = visual.motion || null;
       }
       if (regionId && existing.regions.indexOf(regionId) < 0) existing.regions.push(regionId);
       if (regionId === region.id) existing.inRegion = true;
@@ -1120,7 +1150,9 @@
         id: definition.id,
         name: definition.nameKey ? nameFromKey(definition.nameKey, definition.id) : definition.id,
         sprite: definition.sprite || fallbackSprite || null,
-        data: definition
+        data: definition,
+        visualGroup: visualMeta(definition.sprite) && visualMeta(definition.sprite).group,
+        visualSourceRefs: visualMeta(definition.sprite) && visualMeta(definition.sprite).sourceRefs || []
       }, candidateRegion.id);
     }
 
@@ -1375,6 +1407,14 @@
         (categoryOrder[b.category] === undefined ? 99 : categoryOrder[b.category]) ||
         a.id.localeCompare(b.id);
     });
+    if (visualSnapshot) {
+      log('catalog', 'production visual catalog attached', {
+        assets: visualSnapshot.totalAssets,
+        entries: visualSnapshot.totalItems,
+        region: region.id,
+        groups: visualSnapshot.counts
+      });
+    }
     renderCatalog();
   }
 
@@ -1443,11 +1483,12 @@
     host.innerHTML = groups.map(function (group) {
       var groupInstances = group.items.reduce(function (sum, item) { return sum + (item.count || 0); }, 0);
       var items = group.items.map(function (item) {
+        var visualLabel = item.visualGroup ? ' · visual/' + item.visualGroup : '';
         return '<button type="button" class="catalog-item' + (selected && selected.key === item.key ? ' active' : '') +
           '" data-catalog-index="' + catalogItems.indexOf(item) + '">' +
           '<canvas width="36" height="36" data-catalog-sprite="' + esc(item.sprite || '') + '"></canvas>' +
           '<span class="catalog-copy"><strong>' + esc(item.name) + '</strong><small>' +
-          esc(item.id) + '</small></span><span class="catalog-count">×' + item.count + '</span></button>';
+          esc(item.id + visualLabel) + '</small></span><span class="catalog-count">×' + item.count + '</span></button>';
       }).join('');
       return '<section class="catalog-group" data-catalog-group="' + esc(group.category) + '">' +
         '<header class="catalog-group-header"><strong>' + esc(catalogCategoryLabel(group.category)) +

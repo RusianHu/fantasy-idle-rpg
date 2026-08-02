@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "d07a51978ee2c59f14d5a64c431018e51affc4c022ee3fb529729e634b3efa68",
+  "sourceSetHash": "86c925d0960f7b0eb372faa25a535c19cd4483f0ef93f9d3c0bb4e4ddd79126b",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -198,7 +198,7 @@
     {
       "path": "js/data/packs/world/merchants.pack.js",
       "kind": "pack",
-      "sha256": "0ff57ab8ee437aa8855317472155e4df0366447e1ae8970533bae76db845f0c1"
+      "sha256": "1507306d49e90b969a87a89b956e777193700e5f6a1a9e6219e50b685a0b04a8"
     }
   ],
   "supports": [
@@ -430,6 +430,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "2ee36b7a"
+  "contentFingerprint": "77514e73"
 });
 })();
