@@ -187,7 +187,17 @@
         var lv = s.player.level;
         var generated = [];
         for (var i = 0; i < sum.items; i++) {
-          generated.push(Game.inv.genLoot(lv));
+          var plan = Game.loot.plan({
+            sourceType: 'offline', sourceId: 'offline:' + s.world.region,
+            forceDrop: true, eligible: false, playerLevel: lv,
+            classId: s.player.classId, regionId: s.world.region,
+            tier: Game.State.regionTier(s.world.region),
+            worldSeed: s.world.worldSeed,
+            expeditionIndex: Game.expedition && Game.expedition.current
+              ? Game.expedition.current(s.world.region).index : 0,
+            rarityLuck: Game.player.derived().rarityLuck || 0
+          }, s.inv.loot);
+          Array.prototype.push.apply(generated, Game.loot.accept(plan));
         }
         var gotItems = Game.inv.addItems(generated, { offline: true, source: 'offline' });
         if (sum.potions > 0) Game.inv.addPotion('potion_small', sum.potions);

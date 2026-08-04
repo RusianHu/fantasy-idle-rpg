@@ -112,11 +112,29 @@
         Game.inv.addPotion(def.ref, 1);
       } else if (def.kind === 'gearbox') {
         var item;
+        var shopOrdinal = Game.inv.peekUidSeq();
+        var shopSeed = U.strSeed([
+          Game.state.world.worldSeed, 'shop', sid, shopOrdinal,
+          Game.state.player.classId
+        ].join('|'));
         if (def.quality === 'epic') {
           // 魔晶石箱：史诗保底，20% 出传说
-          item = Game.inv.genLoot(p.level, { rar: U.chance(0.2) ? 4 : 3 });
+          item = Game.loot.generateEquipment({
+            itemLevel: p.level, classId: p.classId,
+            rarityId: Game.loot.RARITY_IDS[shopSeed % 10000 < 2000 ? 4 : 3],
+            uid: Game.inv.allocateEquipmentUid(), seed: shopSeed,
+            sourceType: 'shop', sourceId: sid,
+            regionId: Game.state.world.region,
+            tier: Game.State.regionTier(Game.state.world.region)
+          });
         } else {
-          item = Game.inv.genLoot(p.level, { luck: 1.4 });
+          item = Game.loot.generateEquipment({
+            itemLevel: p.level, classId: p.classId, rarityLuck: .4,
+            uid: Game.inv.allocateEquipmentUid(), seed: shopSeed,
+            sourceType: 'shop', sourceId: sid,
+            regionId: Game.state.world.region,
+            tier: Game.State.regionTier(Game.state.world.region)
+          });
         }
         result.item = Game.inv.addItem(item, { source: 'shop' });
       } else if (def.kind === 'perm') {
@@ -134,9 +152,17 @@
         } else if (reward.kind === 'gold') {
           Game.player.addGold(reward.amount || 0);
         } else if (reward.kind === 'gear') {
-          var exchangeItem = Game.inv.genLoot(p.level, {
-            rarMin: reward.rarMin || 0,
-            luck: 1.6
+          var exchangeItem = Game.loot.generateEquipment({
+            itemLevel: p.level, classId: p.classId,
+            minimumRank: reward.rarMin || 0, rarityLuck: .6,
+            uid: Game.inv.allocateEquipmentUid(),
+            seed: U.strSeed([
+              Game.state.world.worldSeed, 'exchange', sid,
+              Game.inv.peekUidSeq(), Game.state.player.classId
+            ].join('|')),
+            sourceType: 'exchange', sourceId: sid,
+            regionId: Game.state.world.region,
+            tier: Game.State.regionTier(Game.state.world.region)
           });
           result.item = Game.inv.addItem(exchangeItem, { source: 'exchange' });
         } else if (reward.kind === 'perm') {

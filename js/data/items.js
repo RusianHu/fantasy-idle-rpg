@@ -6,10 +6,12 @@
   'use strict';
   var Game = window.Game;
 
-  /* ---------- 装备槽位（3 槽） ---------- */
+  /* ---------- 装备槽位（正式五槽；内容定义为权威来源） ---------- */
   Game.register('slot', { id: 'weapon', icon: 'icon_weapon', primary: 'atk' });
-  Game.register('slot', { id: 'armor',  icon: 'icon_armor',  primary: 'hpdef' });
-  Game.register('slot', { id: 'ring',   icon: 'icon_ring',   primary: 'mixed' });
+  Game.register('slot', { id: 'head', icon: 'icon_armor', primary: 'defense' });
+  Game.register('slot', { id: 'body', icon: 'icon_armor', primary: 'hpdef' });
+  Game.register('slot', { id: 'feet', icon: 'icon_skill_swift', primary: 'tempo' });
+  Game.register('slot', { id: 'accessory', icon: 'icon_ring', primary: 'mixed' });
 
   /* ---------- 药水 ---------- */
   Game.register('potion', { id: 'potion_small', icon: 'icon_potion_small' });

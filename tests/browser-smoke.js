@@ -548,6 +548,19 @@ async function run() {
     assert.ok(main.canvasColors > 20, 'main stage canvas is nonblank');
     assert.equal(main.noHorizontalOverflow, true, 'main mobile viewport has no horizontal overflow');
 
+    await cdp.evaluate(`Game.auto.optimizeEquipment({ reason: 'browser-slice-audit' })`);
+    let equipmentJobDiagnostics = null;
+    for (let attempt = 0; attempt < 100 && !equipmentJobDiagnostics; attempt++) {
+      equipmentJobDiagnostics = await cdp.evaluate(`Game.auto.equipmentJobDiagnostics || null`);
+      if (!equipmentJobDiagnostics) await delay(20);
+    }
+    assert.ok(equipmentJobDiagnostics, 'browser auto-equip publishes time-slice diagnostics');
+    assert.equal(equipmentJobDiagnostics.budgetMs, 4);
+    assert.ok(equipmentJobDiagnostics.maxSliceMs <= 4.5,
+      'browser auto-equip stays within the 4ms slice budget: ' +
+      JSON.stringify(equipmentJobDiagnostics));
+    console.log('equipment auto-equip diagnostics:', JSON.stringify(equipmentJobDiagnostics));
+
     // Force a real production Boss encounter so the formal V2 HUD, telegraph,
     // priority marker, interrupt label, and collision-safe engagement distance
     // are validated independently of the player's current power.
@@ -3548,12 +3561,14 @@ async function run() {
       cards: document.querySelectorAll('.demo-grid article').length,
       linksCarryLocale: Array.from(document.querySelectorAll('[data-demo-link]')).every((link) =>
         new URL(link.href).searchParams.get('lang') === 'en'),
+      hasLootLab: !!document.querySelector('a[href*="loot-lab/loot-lab.html"]'),
       title: document.querySelector('h1')?.textContent,
       controlsTouchable: Array.from(document.querySelectorAll('.hub-actions a, .hub-actions select, .demo-grid a'))
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 7, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 8, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.hasLootLab, true, 'technical demo hub exposes the production Loot Lab');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);

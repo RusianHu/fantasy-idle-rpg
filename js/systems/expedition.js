@@ -202,9 +202,16 @@
       } else if (def.reward === 'gold') {
         Game.player.addGold(Math.round(180 * Math.pow(1.8, tier - 1)));
       } else if (def.reward === 'gear') {
-        Game.inv.addItems([Game.inv.genLoot(Game.state.player.level, { rarMin: 2, luck: 1.6 })], {
-          source: 'commission'
-        });
+        var plan = Game.loot.plan({
+          sourceType: 'expedition', sourceId: 'commission:' + rid + ':' + id,
+          playerLevel: Game.state.player.level, minimumRank: 2,
+          classId: Game.state.player.classId, regionId: rid, tier: tier,
+          worldSeed: Game.state.world.worldSeed,
+          expeditionIndex: X.current(rid).index,
+          rarityLuck: Game.player.derived().rarityLuck || 0,
+          eligible: false
+        }, Game.state.inv.loot);
+        Game.loot.commit(plan, { source: 'commission' });
       } else if (def.reward === 'perm') {
         Game.state.player.perms[permKey] = (Game.state.player.perms[permKey] || 0) + 1;
         Game.player.recalc();

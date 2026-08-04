@@ -294,10 +294,17 @@
       Game.player.addCrystal(8 + tier * 4);
       rewardExp(rid, 0.08);
     }
-    if (Game.inv && Game.inv.genLoot && Game.inv.addItems) {
-      Game.inv.addItems([Game.inv.genLoot(Game.state.player.level, { rarMin: 2, luck: 2 })], {
-        source: 'region-complete'
-      });
+    if (Game.loot && Game.inv && Game.inv.addItems) {
+      var lootPlan = Game.loot.plan({
+        sourceType: 'expedition', sourceId: 'region-complete:' + rid,
+        playerLevel: Game.state.player.level, minimumRank: 2,
+        classId: Game.state.player.classId, regionId: rid, tier: tier,
+        worldSeed: Game.state.world.worldSeed,
+        expeditionIndex: rs.expeditionIndex || 0,
+        rarityLuck: Game.player.derived().rarityLuck || 0,
+        eligible: false
+      }, Game.state.inv.loot);
+      Game.loot.commit(lootPlan, { source: 'region-complete' });
     }
     bus.emit('region:completed100', { rid: rid });
     return true;

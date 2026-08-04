@@ -155,6 +155,20 @@
       compareOffense: '输出',
       compareSurvival: '生存',
       compareEconomy: '收益',
+      itemImplicitTitle: '底材隐含',
+      itemAffixTitle: '普通词条',
+      itemLegendaryTitle: '传奇效果',
+      itemSingleCompare: '单件属性差异',
+      itemBuildCompare: '整套模拟（固定 Seed）',
+      itemNoAffixes: '无普通词条',
+      reforgeTitle: '重铸',
+      reforgeNoLock: '不锁定词条',
+      reforgeLockHint: '可锁定一条普通词条；其余词条全部重掷。',
+      reforgeCost: '第 {n} 次 · {gold} 金币 · {count}×{material}',
+      reforgeAction: '确认重铸',
+      reforgeDone: '重铸完成',
+      reforgeUnavailable: '当前不可重铸：{reason}',
+      operationRejected: '操作失败：{reason}',
       slotLocked: '已锁定',
       slotUnlocked: '自动',
       lockSlot: '锁定此槽位',
@@ -266,14 +280,20 @@
       pickups: '地面拾取', gathers: '采集次数', materials: '累计素材', chests: '开启宝箱'
     },
 
-    slot: { weapon: '武器', armor: '护甲', ring: '饰品' },
+    slot: {
+      weapon: '武器', head: '头部', body: '身体', feet: '足部', accessory: '饰品',
+      armor: '护甲', ring: '饰品'
+    },
 
     rarity: { r0: '普通', r1: '精良', r2: '稀有', r3: '史诗', r4: '传说' },
 
     item: {
       pattern: '{mat}{base}',
       mat: { 1: '铜制', 2: '铁制', 3: '钢制', 4: '白银', 5: '秘银', 6: '炎金', 7: '星辉', 8: '龙魂' },
-      base: { weapon: '长剑', armor: '铠甲', ring: '戒指' },
+      base: {
+        weapon: '长剑', head: '头部装备', body: '身体装备', feet: '足部装备', accessory: '饰品',
+        armor: '铠甲', ring: '戒指'
+      },
       weapon: { fighter: '长剑', rogue: '短匕', mage: '法杖', cleric: '战锤', ranger: '长弓' },
       potion_small: { name: '小型治疗药水' },
       potion_large: { name: '大型治疗药水' },
@@ -309,6 +329,33 @@
     affix: {
       atk_pct: '攻击', hp_pct: '生命', atk_flat: '攻击', hp_flat: '生命', def_flat: '防御',
       spd: '速度', crit: '暴击率', critdmg: '暴击伤害', gold_pct: '金币获取', exp_pct: '经验获取'
+    },
+
+    equipment: {
+      stat: {
+        power: '威力', physicalPower: '物理威力', magicPower: '魔法威力', maxHp: '生命',
+        armor: '护甲', ward: 'Ward', accuracy: '命中', critChance: '暴击率',
+        critMultiplier: '暴击倍率', damageDoneMultiplier: '造成伤害', dodgeChance: '闪避',
+        damageReduction: '减伤', tenacity: '韧性', lifesteal: '吸血',
+        healthRegenPct: '每秒生命恢复', healingPower: '治疗效果', shieldPower: '护盾效果',
+        statusPotency: '状态效能', resourceRegen: '资源恢复', haste: '行动急速',
+        gcdSpeed: 'GCD 急速', castSpeed: '施法急速', autoAttackSpeed: '普攻急速',
+        cooldownRate: '冷却恢复', moveSpeed: '移动速度', goldMultiplier: '金币获取',
+        expMultiplier: '经验获取', dropMultiplier: '装备发现', rarityLuck: '稀有度幸运',
+        healingReceivedMultiplier: '受到治疗'
+      },
+      crit: {
+        chance: '{chance}%', guaranteed: '必定 {tier} 阶',
+        overflow: '必定 {tier} 阶，{chance}% 概率进入下一阶'
+      },
+      error: {
+        'encounter-active': '战斗进行中', 'not-at-camp': '仅可在营地进行',
+        'legacy-item': '旧版物品不可重铸', 'invalid-lock': '锁定词条无效',
+        'no-affixes': '该物品没有普通词条', 'nothing-to-reroll': '没有可重掷的词条',
+        gold: '金币不足', materials: '地区材料不足', unchanged: '重铸结果未发生变化',
+        rollback: '交易已回滚', 'missing-item': '物品不存在', 'class-mismatch': '职业不符',
+        unknown: '未知原因'
+      }
     },
 
     skill: {

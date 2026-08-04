@@ -94,6 +94,12 @@
       }],
       class: [{
         id: 'cleric', roles: ['healer', 'support'], tags: ['ranged', 'radiant'],
+        primaryPowerStat: 'magicPower',
+        baseStats: { maxHp: 135, power: 12, armor: 7, ward: 4.55, speed: 8.5, critChance: .05, critMultiplier: 1.5, range: 22 },
+        growth: { maxHp: 1.077, power: 1.066, armor: 1.068, ward: 1.068, speedPerLevel: .25, critChancePerLevel: .001, critMultiplierPerLevel: .01 },
+        equipmentTags: ['adventurer', 'cleric'], weaponAppearance: 'mace',
+        evaluationWeights: { offense: .45, survival: .50, economy: .05 },
+        statDots: { hp: 4, atk: 2, def: 4, spd: 1, burst: 2 },
         statProfileId: 'stats.cleric', resourceProfileIds: ['resources.cleric'],
         baseAbilityGrantIds: ['cleric.auto_attack', 'cleric.smite', 'cleric.judgment', 'cleric.prayer', 'cleric.holy_nova', 'cleric.aegis', 'cleric.radiant_interrupt'],
         traitIds: ['cleric.solo_ministry'], talentTreeId: 'talents.cleric',

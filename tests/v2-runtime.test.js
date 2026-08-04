@@ -112,6 +112,7 @@ assert.equal(audit.counts.actorArchetype, 74);
 assert.equal(audit.counts.encounterProfile, 24);
 
 [
+  'js/systems/equipment.js',
   'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
   'js/systems/actors/actors.js', 'js/systems/world_population.js',
   'js/systems/encounters.js', 'js/systems/engagement.js',
@@ -384,6 +385,129 @@ Game.combat.tickFixed(statusEncounter.id);
 assert.equal(beforePeriodic - channelTarget.hp, 8,
   'two periodic stacks must execute two deterministic pulses');
 Game.encounters.end(statusEncounter.id, 'test');
+
+// Shared critical math drives committed damage/healing event payloads. Direct
+// healing can crit once; periodic healing remains non-critical by default.
+const criticalEncounter = Game.encounters.start('encounter.grassland', {
+  id: 'test:critical-contracts', seed: 31, silent: true
+});
+const criticalSourceStats = Object.assign({}, party('fighter', 1)[0].statValues, {
+  critChance: 1, critMultiplier: 2
+});
+const criticalSource = Game.actors.spawn({
+  instanceId: 'test:critical-source', archetypeId: 'adventurer', classId: 'fighter',
+  level: 1, tier: 1, factionId: 'adventurers', statValues: criticalSourceStats,
+  transform: { x: 0, y: 0 },
+  spawnSource: { kind: 'test', sourceId: 'critical-contracts', sequence: 1 }
+});
+const criticalTarget = Game.actors.spawn({
+  instanceId: 'test:critical-target', archetypeId: 'slime_green',
+  level: 1, tier: 1, transform: { x: 12, y: 0 },
+  spawnSource: { kind: 'test', sourceId: 'critical-contracts', sequence: 2 }
+});
+Game.encounters.join(criticalEncounter.id, criticalSource.id, 'party');
+Game.encounters.join(criticalEncounter.id, criticalTarget.id, 'enemy');
+criticalTarget.components.vitals.maxHp = 1e6;
+criticalTarget.components.vitals.hp = 1e6;
+Game.combat.applyEffect({
+  encounterId: criticalEncounter.id, sourceActorId: criticalSource.id,
+  targetActorId: criticalTarget.id, abilityId: 'fixture.critical-damage'
+}, {
+  type: 'damage', damageTypeId: 'true', amount: 10, canCrit: true,
+  target: { relation: 'hostile', shape: 'single', range: 100 }
+});
+const hitEvent = criticalEncounter.eventLog.filter((event) => event.type === 'combat:hit').pop();
+assert.equal(hitEvent.payload.isCritical, true);
+assert.equal(hitEvent.payload.critTier, 1);
+assert.equal(hitEvent.payload.critMultiplierApplied, 2);
+for (const key of [
+  'isCritical', 'critTier', 'critChance', 'critMultiplier', 'critMultiplierApplied',
+  'baseRaw', 'critAdjustedRaw', 'afterDefense', 'afterResistance', 'absorbed',
+  'amount', 'overkill'
+]) assert.ok(Object.prototype.hasOwnProperty.call(hitEvent.payload, key), `damage payload ${key}`);
+
+criticalSource.components.vitals.hp = criticalSource.components.vitals.maxHp - 100;
+Game.combat.applyEffect({
+  encounterId: criticalEncounter.id, sourceActorId: criticalSource.id,
+  targetActorId: criticalSource.id, abilityId: 'fixture.critical-heal'
+}, {
+  type: 'heal', amount: 10,
+  target: { relation: 'self', shape: 'single', range: 0 }
+});
+let healEvent = criticalEncounter.eventLog.filter((event) => event.type === 'combat:healed').pop();
+assert.equal(healEvent.payload.isCritical, true);
+assert.equal(healEvent.payload.critTier, 1);
+assert.equal(healEvent.payload.critMultiplierApplied, 1.5);
+
+criticalSource.components.vitals.hp = criticalSource.components.vitals.maxHp - 100;
+Game.combat.applyEffect({
+  encounterId: criticalEncounter.id, sourceActorId: criticalSource.id,
+  targetActorId: criticalSource.id, abilityId: 'fixture.periodic-heal', periodic: true
+}, {
+  type: 'heal', amount: 10,
+  target: { relation: 'self', shape: 'single', range: 0 }
+});
+healEvent = criticalEncounter.eventLog.filter((event) => event.type === 'combat:healed').pop();
+assert.equal(healEvent.payload.isCritical, false);
+assert.equal(healEvent.payload.critTier, 0);
+
+// Equipment reactions are stably source-sorted, respect ICD/budgets, and do
+// not recursively trigger from proc damage unless content opts in.
+Game.units.setModifierSource(criticalSource, 'test:critical-overflow', [
+  { stat: 'critChance', phase: 'otherFlat', operation: 'add', value: 1 },
+  { stat: 'accuracy', phase: 'override', operation: 'set', value: 1 }
+]);
+Game.units.setModifierSource(criticalTarget, 'test:no-dodge', [
+  { stat: 'dodgeChance', phase: 'override', operation: 'set', value: 0 }
+]);
+criticalSource.components.equipmentEffects = [
+  {
+    sourceId: 'equipment:test:a:aegis', affixId: 'legendary.precision_aegis',
+    profile: Game.content.get('effectProfile', 'legendary.precision_aegis')
+  },
+  {
+    sourceId: 'equipment:test:z:echo', affixId: 'legendary.critical_echo',
+    profile: Game.content.get('effectProfile', 'legendary.critical_echo')
+  }
+];
+criticalTarget.components.vitals.maxHp = 1e6;
+criticalTarget.components.vitals.hp = 1e6;
+const procStart = criticalEncounter.eventLog.length;
+const procDamageContext = {
+  encounterId: criticalEncounter.id, sourceActorId: criticalSource.id,
+  targetActorId: criticalTarget.id, abilityId: 'fixture.proc-damage'
+};
+const procDamageEffect = {
+  type: 'damage', damageTypeId: 'true', amount: 10, canCrit: true,
+  target: { relation: 'hostile', shape: 'single', range: 100 }
+};
+Game.combat.applyEffect(procDamageContext, procDamageEffect);
+Game.combat.applyEffect(procDamageContext, procDamageEffect);
+const procEvents = criticalEncounter.eventLog.slice(procStart);
+const equipmentDamageEvents = procEvents.filter((event) => event.type === 'equipment:damage');
+const equipmentProcEvents = procEvents.filter((event) => event.type === 'equipment:proc');
+assert.equal(equipmentDamageEvents.length, 2,
+  'each tier-II hit produces exactly one non-recursive echo');
+assert.equal(criticalSource.components.vitals.shields.filter((shield) =>
+  shield.abilityId === 'equipment:test:a:aegis').length, 1, 'precision aegis ICD applies once in the same tick');
+assert.deepEqual(Array.from(equipmentProcEvents.slice(0, 2).map((event) =>
+  event.payload.originAffixId)), ['legendary.precision_aegis', 'legendary.critical_echo']);
+for (const event of equipmentDamageEvents) {
+  assert.equal(event.payload.isCritical, false);
+  assert.equal(event.context.procDepth, 1);
+  assert.ok(event.context.procChainId);
+  assert.equal(event.payload.originAffixId, 'legendary.critical_echo');
+}
+const blockedProcCount = criticalEncounter.eventLog.filter((event) =>
+  event.type === 'equipment:proc').length;
+criticalEncounter.reactionBudget = 0;
+Game.combat.applyEffect(procDamageContext, procDamageEffect);
+assert.equal(criticalEncounter.eventLog.filter((event) =>
+  event.type === 'equipment:proc').length, blockedProcCount, 'reaction budget blocks equipment procs');
+Game.encounters.end(criticalEncounter.id, 'test');
+Game.actors.despawn(criticalSource.id, 'test');
+Game.actors.despawn(criticalTarget.id, 'test');
+Game.encounters.remove(criticalEncounter.id);
 
 // Every Boss enters its immutable 50% phase rule.
 for (let index = 0; index < regions.length; index++) {

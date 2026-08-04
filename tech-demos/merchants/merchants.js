@@ -34,9 +34,13 @@
   function offerName(offer) {
     if (offer.kind === 'gear') {
       var tier = Game.util.clamp(Math.ceil(offer.item.ilvl / 8), 1, 8);
-      var base = offer.item.base === 'weapon'
-        ? gameText('item.weapon.' + Game.state.player.classId)
-        : gameText('item.base.' + offer.item.base);
+      var definition = Game.content.get('itemBase', offer.item.baseId);
+      var base = definition && definition.presentation
+        ? gameText(definition.presentation.nameKey)
+        : gameText('slot.' + Game.equipment.slotOf(offer.item));
+      if (Game.equipment.slotOf(offer.item) === 'weapon') {
+        base += ' · ' + gameText('item.weapon.' + offer.item.classId);
+      }
       return gameText('item.pattern', {
         mat: gameText('item.mat.' + tier),
         base: base
@@ -52,11 +56,15 @@
       return gameText('rarity.r' + offer.item.rar) + ' · Lv.' + offer.item.ilvl +
         (offer.item.affixes.length
           ? ' · ' + offer.item.affixes.map(function (affix) {
-            var def = Game.reg.get('affix', affix.id);
-            var value = def.kind === 'pct'
-              ? Math.round(affix.v * 100) + '%'
-              : (def.dec ? affix.v.toFixed(1) : Math.round(affix.v));
-            return gameText('affix.' + affix.id) + ' +' + value;
+            var def = Game.content.get('itemAffix', affix.definitionId);
+            var values = affix.values && affix.values.rolls || [];
+            var rendered = (def.modifiers || []).map(function (modifier, index) {
+              var value = Number.isFinite(values[index]) ? values[index] : Number(modifier.value) || 0;
+              var percent = modifier.roll && modifier.roll.kind === 'range' ||
+                modifier.operation === 'addPct' || Math.abs(value) < 1;
+              return percent ? Math.round(value * 1000) / 10 + '%' : fmt(value);
+            }).join('/');
+            return gameText(def.presentation.nameKey) + (rendered ? ' +' + rendered : '');
           }).join(' / ')
           : '');
     }

@@ -2,8 +2,7 @@
  * systems/state.js — 游戏状态与角色成长（多职业版）
  * 成长方案：升级自动成长（理由：挂机游戏应减少强制打断，
  * 玩家的主动决策集中在职业选择/技能加点/装备取舍/商店强化）。
- * 职业由 data/classes.js 注册表驱动：基础属性、复利成长、
- * 攻击距离、弹道、固有特性（治疗强化等）全部按职业推导。
+ * 职业由正式 Content Pack 驱动；旧注册表只读投影由 Game.builds 安装。
  * ============================================================ */
 (function () {
   'use strict';
@@ -149,8 +148,8 @@
               permanentUpgrades: {},
               persistentResources: { hp: 100 },
               loadout: {
-                equipment: { weapon: null, armor: null, ring: null },
-                lockedSlots: { weapon: false, armor: false, ring: false }
+                equipment: { weapon: null, head: null, body: null, feet: null, accessory: null },
+                lockedSlots: { weapon: false, head: false, body: false, feet: false, accessory: false }
               }
             }
           }
@@ -159,7 +158,8 @@
         inv: {
           items: [],
           potions: { potion_small: 3, potion_large: 0 },
-          materials: {}
+          materials: {},
+          loot: Game.loot ? Game.loot.defaultState() : null
         },
         world: {
           region: regionOrder[0],
@@ -225,7 +225,8 @@
     /** 当前职业定义（未选择时回退首个职业，仅用于占位渲染） */
     classDef: function () {
       var p = Game.state.player;
-      return reg.get('class', p.classId) || reg.all('class')[0];
+      return Game.builds && Game.builds.classProjection(p.classId) ||
+        reg.get('class', p.classId) || reg.all('class')[0];
     },
 
     hasClass: function () {
@@ -237,6 +238,24 @@
       if (!reg.has('class', cid)) return false;
       var s = Game.state;
       s.player.classId = cid;
+      var emptyLoadout = Object.keys(s.inv.equipped || {}).every(function (slot) {
+        return !s.inv.equipped[slot];
+      });
+      if (emptyLoadout && !s.inv.items.length && Game.loot) {
+        Game.equipment.SLOT_IDS.forEach(function (slot, index) {
+          var item = Game.loot.generateEquipment({
+            worldSeed: s.world.worldSeed, seed: Game.util.strSeed([
+              s.world.worldSeed, 'starter', cid, slot
+            ].join('|')),
+            sourceType: 'starter', sourceId: 'starter:' + cid,
+            ordinal: index, itemLevel: 1, rarityId: 'common',
+            classId: cid, slotId: slot, regionId: s.world.region, tier: 1,
+            uid: 'eq:starter:' + cid + ':' + slot
+          });
+          s.inv.items.push(item);
+          s.inv.equipped[slot] = item.uid;
+        });
+      }
       Player.recalc();
       s.player.hp = s.derived.maxHp;
       if (Game.units && Game.units.primary()) Game.units.restore(Game.units.primary());
@@ -256,11 +275,20 @@
       var level = opts.level !== undefined ? opts.level : p.level;
       var skills = opts.skills || p.skills;
       var equipped = opts.equipped || s.inv.equipped;
+      if (Game.builds && classId) {
+        return Game.builds.projectDerived(Game.builds.compileActorRecord({
+          classId: classId, level: level, talentRanks: skills,
+          permanentUpgrades: opts.perms || p.perms,
+          loadout: { equipment: equipped }
+        }, equipped));
+      }
       var base = F.playerBase(cls, level);
       var d = {
         maxHp: base.hp, atk: base.atk, def: base.def, spd: base.spd,
         crit: base.crit, critDmg: base.critDmg,
-        goldMul: 1, expMul: 1, dropMul: 1,
+        goldMul: 1, expMul: 1, dropMul: 1, rarityLuck: 0,
+        ward: Math.max(0, Math.round(base.def * .65)),
+        damageDoneMultiplier: 1, damageReduction: 0, healingReceivedMultiplier: 1,
         dodge: 0, lifesteal: 0, cdr: 0, healPow: 1, regen: 0,
         range: cls.range, projectile: cls.projectile || null
       };
@@ -284,6 +312,15 @@
         d.crit += st.crit || 0; d.critDmg += st.critDmg || 0;
         d.goldMul += st.goldMul || 0; d.expMul += st.expMul || 0;
         d.dropMul += st.dropMul || 0;
+        d.rarityLuck += st.rarityLuck || 0;
+        d.ward += st.ward || 0;
+        (st.formalModifiers || []).forEach(function (modifier) {
+          if (modifier.stat === 'damageDoneMultiplier') d.damageDoneMultiplier += modifier.value;
+          else if (modifier.stat === 'damageReduction') d.damageReduction += modifier.value;
+          else if (modifier.stat === 'healingReceivedMultiplier') d.healingReceivedMultiplier += modifier.value;
+          else if (modifier.stat === 'gcdSpeed' || modifier.stat === 'castSpeed' || modifier.stat === 'autoAttackSpeed') d.spd += modifier.value * 10;
+          else if (modifier.stat === 'cooldownRate') d.cdr += modifier.value;
+        });
         pctAcc.atkPct += st.atkPct || 0; pctAcc.hpPct += st.hpPct || 0;
       }
 
@@ -330,7 +367,7 @@
       d.maxHp = Math.round(d.maxHp * (1 + pctAcc.hpPct));
       d.def = Math.round(d.def * (1 + pctAcc.defPct));
       d.spd = +(d.spd * (1 + pctAcc.spdPct)).toFixed(2);
-      d.crit = Math.min(0.75, d.crit);
+      d.crit = Math.max(0, d.crit);
       d.dodge = Math.min(F.BAL.dodgeCap, d.dodge);
       d.cdr = Math.min(F.BAL.cdrCap, d.cdr);
 
@@ -366,6 +403,11 @@
           d.expMul = stats.expMultiplier;
           d.goldMul = stats.goldMultiplier;
           d.dropMul = stats.dropMultiplier;
+          d.rarityLuck = stats.rarityLuck || 0;
+          d.ward = stats.ward || 0;
+          d.damageDoneMultiplier = stats.damageDoneMultiplier || 1;
+          d.damageReduction = stats.damageReduction || 0;
+          d.healingReceivedMultiplier = stats.healingReceivedMultiplier || 1;
         }
       }
       s.derived = d;

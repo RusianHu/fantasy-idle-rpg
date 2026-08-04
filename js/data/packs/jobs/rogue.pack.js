@@ -90,6 +90,12 @@
       }],
       class: [{
         id: 'rogue', roles: ['melee-dps'], tags: ['melee', 'crit'],
+        primaryPowerStat: 'physicalPower',
+        baseStats: { maxHp: 105, power: 15, armor: 4, ward: 2.6, speed: 12.5, critChance: .12, critMultiplier: 1.7, range: 22 },
+        growth: { maxHp: 1.072, power: 1.071, armor: 1.06, ward: 1.06, speedPerLevel: .25, critChancePerLevel: .001, critMultiplierPerLevel: .01 },
+        equipmentTags: ['adventurer', 'rogue'], weaponAppearance: 'dagger',
+        evaluationWeights: { offense: .65, survival: .30, economy: .05 },
+        statDots: { hp: 2, atk: 4, def: 1, spd: 5, burst: 4 },
         statProfileId: 'stats.rogue', resourceProfileIds: ['resources.rogue'],
         baseAbilityGrantIds: ['rogue.auto_attack', 'rogue.quick_stab', 'rogue.poison_blade', 'rogue.backstab', 'rogue.eviscerate', 'rogue.fan_of_knives', 'rogue.evasion_action'],
         traitIds: ['rogue.opportunist'], talentTreeId: 'talents.rogue',

@@ -5,8 +5,50 @@
   var accumulatorMs = 0;
   var reactionDepth = 0;
 
+  // Some isolated V2 consumers deliberately omit the equipment module. Keep
+  // combat deterministic there while production uses the shared implementation.
+  if (!Game.combatMath) {
+    Game.combatMath = {
+      saturatingMultiply: function (left, right) {
+        var value = (Number(left) || 0) * (Number(right) || 0);
+        var saturated = !Number.isFinite(value) || Math.abs(value) > 1e300;
+        return { value: saturated ? Math.sign(value || 1) * 1e300 : value, saturated: saturated };
+      },
+      resolveCrit: function (spec) {
+        spec = spec || {};
+        var chance = Math.max(0, (Number(spec.critChance) || 0) +
+          (Number(spec.critChanceBonus) || 0) - (Number(spec.critAvoidance) || 0));
+        var roll = spec.random ? spec.random() : 0;
+        var tier = spec.canCrit === false ? 0 : spec.healing
+          ? (roll < Math.min(1, chance) ? 1 : 0)
+          : Math.floor(chance) + (roll + 1e-12 < chance - Math.floor(chance) ? 1 : 0);
+        var multiplier = spec.healing ? 1.5 : Math.max(1, Number(spec.critMultiplier) || 1.5);
+        var applied = Math.pow(multiplier, tier);
+        var saturated = !Number.isFinite(applied) || applied > 1e300;
+        return {
+          isCritical: tier > 0, critTier: tier, critChance: chance,
+          critMultiplier: multiplier,
+          critMultiplierApplied: saturated ? 1e300 : applied,
+          numericSaturated: saturated, roll: roll
+        };
+      },
+      mitigate: function (raw, defense, tier) {
+        raw = Math.max(0, Number(raw) || 0);
+        defense = Math.max(0, Number(defense) || 0);
+        var constant = 16 * Math.pow(1.9, Math.max(1, tier || 1) - 1);
+        var reduction = Math.min(.8, defense / Math.max(1e-12, defense + constant));
+        return { amount: raw * (1 - reduction), reduction: reduction, constant: constant };
+      }
+    };
+  }
+
   function encounterOf(actor) { return actor && Game.encounters.get(actor.encounterId); }
   function stat(actor, id) { return actor.components.statBlock.value(id); }
+  function statDefault(actor, id, fallback) {
+    var values = actor && actor.components && actor.components.statBlock &&
+      actor.components.statBlock.snapshot().values || {};
+    return Object.prototype.hasOwnProperty.call(values, id) ? Number(values[id]) : fallback;
+  }
   function alive(actor) {
     return !!(actor && actor.components.vitals && actor.components.vitals.hp > 0 &&
       actor.components.actionState && actor.components.actionState.state !== 'defeated');
@@ -34,6 +76,13 @@
   function timingTicks(actor, base, speedStat) {
     return Math.max(0, Math.round((base || 0) / Math.max(0.1, stat(actor, speedStat))));
   }
+  function combatTier(encounter, source, target) {
+    var profile = encounter && encounter.profile;
+    var regionId = profile && profile.regionId;
+    return Math.max(1, encounter && encounter.context && encounter.context.tier ||
+      source && source.tier || target && target.tier ||
+      Game.State && Game.State.regionTier && Game.State.regionTier(regionId) || 1);
+  }
 
   function resourceCanPay(actor, abilityDef) {
     return (abilityDef.costs || []).every(function (cost) {
@@ -51,12 +100,40 @@
     actor.components.actionState.reserved = reserved;
   }
   function commitResources(actor) {
+    var committed = [];
     (actor.components.actionState.reserved || []).forEach(function (cost) {
       var resource = actor.components.resources[cost.resourceId];
       resource.reserved = Math.max(0, resource.reserved - cost.amount);
       resource.value = Game.util.clamp(resource.value - cost.amount, resource.min, resource.max);
+      committed.push({
+        resourceId: cost.resourceId, amount: cost.amount,
+        value: resource.value, min: resource.min, max: resource.max
+      });
     });
     actor.components.actionState.reserved = [];
+    return committed;
+  }
+
+  function actionCommitEvents(encounter, actor, def, target, committed) {
+    var context = {
+      procChainId: encounter.id + ':action:' + actor.components.actionState.actionId,
+      procDepth: 0
+    };
+    (committed || []).forEach(function (cost) {
+      var spent = emit(encounter, 'resource:spent', {
+        phase: 'commit', sourceActorId: actor.id,
+        targetActorIds: [actor.id], abilityId: def.id,
+        payload: cost, context: context
+      });
+      triggerReactions(encounter, spent);
+    });
+    var action = emit(encounter, 'action:committed', {
+      phase: 'commit', sourceActorId: actor.id,
+      targetActorIds: target ? [target.id] : [actor.id],
+      abilityId: def.id,
+      payload: { actionType: def.actionType || 'gcd' }, context: context
+    });
+    triggerReactions(encounter, action);
   }
   function refund(actor, abilityDef) {
     var ratio = abilityDef.timing && abilityDef.timing.refundRatio;
@@ -299,9 +376,291 @@
     } finally {
       reactionDepth--;
     }
+    triggerEquipmentEffects(encounter, event);
   }
 
-  function damage(encounter, source, target, abilityDef, effect, effectIndex) {
+  function setEquipmentModifier(actor, sourceId, modifiers) {
+    if (!actor || !actor.components || !actor.components.modifierLedger) return;
+    actor.components.modifierLedger.removeSource(sourceId);
+    (modifiers || []).forEach(function (modifier) {
+      actor.components.modifierLedger.add(Object.assign({
+        phase: 'status', operation: 'add', value: 0
+      }, modifier, { sourceId: sourceId }));
+    });
+  }
+
+  function addEquipmentShield(encounter, actor, amount, durationTicks, sourceId, maxHpCap) {
+    if (!actor || !actor.components.vitals || amount <= 0) return;
+    if (maxHpCap > 0) {
+      var current = actor.components.vitals.shields.reduce(function (sum, shield) {
+        return sum + (shield.abilityId === sourceId ? Math.max(0, shield.amount) : 0);
+      }, 0);
+      amount = Math.min(amount, actor.components.vitals.maxHp * maxHpCap - current);
+      if (!(amount > 0)) return 0;
+    }
+    amount = Math.max(1, Math.round(amount));
+    actor.components.vitals.shields.push({
+      id: encounter.id + ':equipment:' + sourceId + ':' + encounter.nextSequence++,
+      sourceActorId: actor.id, abilityId: sourceId, amount: amount,
+      priority: 20, expiresTick: durationTicks ? encounter.tick + durationTicks : 0,
+      damageTypes: null
+    });
+    return amount;
+  }
+
+  function primaryResource(actor) {
+    var ids = Object.keys(actor && actor.components.resources || {});
+    return ids.length ? actor.components.resources[ids[0]] : null;
+  }
+
+  function equipmentDamage(encounter, owner, target, amount, entry, parentEvent, operation) {
+    if (!alive(target) || !(amount > 0)) return 0;
+    var hpBefore = target.components.vitals.hp;
+    var rounded = Math.max(1, Math.round(amount));
+    var result = Game.units.damage(target, rounded, { source: 'equipment-proc' });
+    var applied = result ? result.amount : Math.min(hpBefore, rounded);
+    var parentContext = parentEvent && parentEvent.context || {};
+    emit(encounter, 'equipment:damage', {
+      phase: 'reaction', sourceActorId: owner.id, targetActorIds: [target.id],
+      abilityId: entry.affixId,
+      context: {
+        procChainId: parentContext.procChainId ||
+          encounter.id + ':proc:' + encounter.nextSequence,
+        procDepth: Math.max(0, parentContext.procDepth | 0) + 1
+      },
+      payload: {
+        originAffixId: entry.affixId, operation: operation,
+        baseRaw: rounded, critAdjustedRaw: rounded,
+        afterDefense: rounded, afterResistance: rounded,
+        absorbed: 0, amount: applied, overkill: Math.max(0, rounded - hpBefore),
+        isCritical: false, critTier: 0, critChance: 0,
+        critMultiplier: 1, critMultiplierApplied: 1,
+        numericSaturated: false
+      }
+    });
+    if (target.components.vitals.hp <= 0) Game.combat.defeat(target.id, {
+      encounterId: encounter.id, sourceActorId: owner.id,
+      abilityId: entry.affixId, reason: operation
+    });
+    return applied;
+  }
+
+  function processEquipmentStates(encounter, owner) {
+    if (!owner || !owner.components) return;
+    var procState = owner.components.equipmentProcState || {};
+    Object.keys(procState).sort().forEach(function (sourceId) {
+      var state = procState[sourceId];
+      if (state.expiresTick && state.expiresTick <= encounter.tick) {
+        var marked = state.targetId && Game.actors.get(state.targetId);
+        if (marked) setEquipmentModifier(marked, sourceId, []);
+        state.expiresTick = 0; state.stacks = 0; state.targetId = null;
+      }
+      if (state.modifierUntil && state.modifierUntil <= encounter.tick) {
+        setEquipmentModifier(owner, sourceId, []);
+        state.modifierUntil = 0;
+      }
+      if (state.bleed && state.bleed.nextTick <= encounter.tick) {
+        var entry = (owner.components.equipmentEffects || []).filter(function (candidate) {
+          return candidate.sourceId === sourceId;
+        })[0];
+        var target = Game.actors.get(state.bleed.targetId);
+        if (entry && alive(target) && state.bleed.pulses > 0) {
+          equipmentDamage(encounter, owner, target, state.bleed.perPulse,
+            entry, state.bleed.parentEvent, 'bleedSnapshot');
+          state.bleed.pulses--;
+          state.bleed.nextTick += 20;
+        }
+        if (!alive(target) || state.bleed.pulses <= 0 ||
+            encounter.tick >= state.bleed.expiresTick) state.bleed = null;
+      }
+    });
+  }
+
+  function triggerEquipmentEffects(encounter, event) {
+    if (!event || encounter.reactionBudget <= 0) return;
+    var payload = event.payload || {};
+    encounter.participants.slice().sort().map(Game.actors.get).filter(alive).forEach(function (owner) {
+      var effects = owner.components.equipmentEffects || [];
+      effects.slice().sort(function (a, b) {
+        return (a.profile.priority || 100) - (b.profile.priority || 100) ||
+          a.sourceId.localeCompare(b.sourceId);
+      }).forEach(function (entry) {
+        var trigger = entry.profile.trigger || {};
+        var eventMatches = trigger.event === event.type ||
+          trigger.event === 'combat:damaged' && event.type === 'combat:hit';
+        if (!eventMatches) return;
+        if (trigger.owner === 'source' && event.sourceActorId !== owner.id) return;
+        if (trigger.owner === 'target' && (event.targetActorIds || []).indexOf(owner.id) < 0) return;
+        if (trigger.owner === 'self' && event.sourceActorId !== owner.id &&
+            (event.targetActorIds || []).indexOf(owner.id) < 0) return;
+        if (trigger.critical && !payload.isCritical) return;
+        if (trigger.minCritTier && (payload.critTier || 0) < trigger.minCritTier) return;
+        if (event.context && event.context.procDepth > 0 && entry.profile.allowProcFromProc !== true) return;
+        var procState = owner.components.equipmentProcState ||
+          (owner.components.equipmentProcState = {});
+        var state = procState[entry.sourceId] || (procState[entry.sourceId] = {});
+        if (state.icdUntil && state.icdUntil > encounter.tick) return;
+        if (trigger.chance !== undefined && random(encounter) >= Math.max(0, Math.min(1, trigger.chance))) return;
+        var limits = entry.profile.limits || {};
+        if (state.procTick !== encounter.tick) { state.procTick = encounter.tick; state.procTickCount = 0; }
+        if ((state.procTickCount || 0) >= (Number(limits.perTick) || Infinity) ||
+            (state.procEncounterCount || 0) >= (Number(limits.perEncounter) || Infinity)) return;
+        if (encounter.reactionBudget-- <= 0 || encounter.effectBudget-- <= 0) return;
+        var internalCooldown = Number(entry.profile.internalCooldownTicks ||
+          trigger.internalCooldownTicks) || 0;
+        var operation = entry.profile.operation;
+        var target = event.targetActorIds && Game.actors.get(event.targetActorIds[0]);
+        var didProc = false;
+        if (operation === 'echoDamage' && target && payload.amount > 0) {
+          var echo = Math.max(1, Math.round(payload.amount * (entry.profile.coefficient || .3)));
+          state.lastAmount = equipmentDamage(encounter, owner, target, echo,
+            entry, event, operation);
+          didProc = state.lastAmount > 0;
+        } else if (operation === 'critShield' && payload.isCritical) {
+          didProc = addEquipmentShield(encounter, owner,
+            owner.components.vitals.maxHp * (entry.profile.maxHpPerTier || .025) * Math.max(1, payload.critTier || 1),
+            100, entry.sourceId) > 0;
+        } else if (operation === 'healCritShield' && payload.isCritical) {
+          didProc = addEquipmentShield(encounter, target || owner,
+            payload.amount * (entry.profile.coefficient || .35), 100, entry.sourceId,
+            entry.profile.targetMaxHpCap || .20) > 0;
+        } else if (operation === 'overhealShield' && payload.overheal > 0) {
+          didProc = addEquipmentShield(encounter, target || owner,
+            payload.overheal * (entry.profile.coefficient || .35), 100, entry.sourceId,
+            entry.profile.targetMaxHpCap || .20) > 0;
+        } else if (operation === 'restorePrimaryResource' && payload.critTier > 1) {
+          var resource = primaryResource(owner);
+          if (resource) {
+            var before = resource.value;
+            resource.value = Game.util.clamp(resource.value + resource.max *
+              (entry.profile.maxResourcePerExtraTier || .04) * (payload.critTier - 1),
+              resource.min, resource.max);
+            didProc = resource.value > before;
+          }
+        } else if (operation === 'reduceCooldowns') {
+          var ticks = Math.max(0, Math.round((entry.profile.ticksPerTier || 2) * (payload.critTier || 1)));
+          if (!state.cooldownWindowTick || encounter.tick - state.cooldownWindowTick >= 20) {
+            state.cooldownWindowTick = encounter.tick; state.cooldownTicksUsed = 0;
+          }
+          ticks = Math.min(ticks, Math.max(0,
+            (entry.profile.perSecondLimitTicks || 20) - (state.cooldownTicksUsed || 0)));
+          Object.keys(owner.components.cooldowns.abilities || {}).forEach(function (id) {
+            var abilityDef = Game.actors.ability(owner, id);
+            if (abilityDef && abilityDef.actionType === 'auto') return;
+            owner.components.cooldowns.abilities[id] = Math.max(encounter.tick,
+              owner.components.cooldowns.abilities[id] - ticks);
+          });
+          state.cooldownTicksUsed = (state.cooldownTicksUsed || 0) + ticks;
+          didProc = ticks > 0;
+        } else if (operation === 'calibration') {
+          state.stacks = payload.isCritical ? 0 : Math.min(entry.profile.maxStacks || 5, (state.stacks || 0) + 1);
+          setEquipmentModifier(owner, entry.sourceId, [{
+            stat: 'critChance', operation: 'add', value: (state.stacks || 0) * (entry.profile.critChancePerStack || .08)
+          }]);
+          didProc = true;
+        } else if (operation === 'fracture' && target && payload.isCritical) {
+          if (state.targetId && state.targetId !== target.id) {
+            var previousTarget = Game.actors.get(state.targetId);
+            if (previousTarget) setEquipmentModifier(previousTarget, entry.sourceId, []);
+            state.stacks = 0;
+          }
+          state.targetId = target.id;
+          state.stacks = Math.min(entry.profile.maxStacks || 5,
+            (state.stacks || 0) + Math.max(1, payload.critTier || 1));
+          setEquipmentModifier(target, entry.sourceId, [{
+            stat: 'damageReduction', operation: 'add', value: -(state.stacks * (entry.profile.perTier || .02))
+          }]);
+          state.expiresTick = encounter.tick + (entry.profile.durationTicks || 120);
+          didProc = true;
+        } else if (operation === 'lowHealthModifier') {
+          var low = owner.components.vitals.hp / Math.max(1, owner.components.vitals.maxHp) <= (entry.profile.hpPct || .35);
+          if (state.active === low) return;
+          state.active = low;
+          setEquipmentModifier(owner, entry.sourceId, low ? [
+            { stat: 'damageReduction', operation: 'add', value: entry.profile.damageReduction || .15 },
+            { stat: 'healingReceivedMultiplier', operation: 'add', value: entry.profile.healingReceived || .25 }
+          ] : []);
+          didProc = true;
+        } else if (operation === 'heavyHitShield' && payload.amount >=
+            owner.components.vitals.maxHp * (entry.profile.thresholdMaxHp || .15)) {
+          didProc = addEquipmentShield(encounter, owner,
+            owner.components.vitals.maxHp * (entry.profile.shieldMaxHp || .20),
+            entry.profile.durationTicks || 100, entry.sourceId) > 0;
+        } else if (operation === 'distinctActionHaste') {
+          state.actions = (state.actions || []).filter(function (action) {
+            return encounter.tick - action.tick <= (entry.profile.windowTicks || 120);
+          });
+          if (!state.actions.some(function (action) { return action.id === event.abilityId; })) {
+            state.actions.push({ id: event.abilityId, tick: encounter.tick });
+          }
+          if (state.actions.length >= (entry.profile.distinctCount || 3)) {
+            setEquipmentModifier(owner, entry.sourceId, [
+              { stat: 'gcdSpeed', operation: 'addPct', value: entry.profile.haste || .15 },
+              { stat: 'castSpeed', operation: 'addPct', value: entry.profile.haste || .15 },
+              { stat: 'autoAttackSpeed', operation: 'addPct', value: entry.profile.haste || .15 }
+            ]);
+            state.modifierUntil = encounter.tick + (entry.profile.durationTicks || 120);
+            state.actions = [];
+            didProc = true;
+          }
+        } else if (operation === 'resourceSpendAccumulator') {
+          var mainResource = primaryResource(owner);
+          if (mainResource && payload.resourceId === mainResource.id && payload.amount > 0) {
+            state.accumulator = (state.accumulator || 0) + payload.amount / Math.max(1, mainResource.max);
+            if (state.accumulator >= (entry.profile.thresholdMax || 1)) {
+              state.accumulator -= entry.profile.thresholdMax || 1;
+              var resourceBefore = mainResource.value;
+              mainResource.value = Game.util.clamp(mainResource.value + mainResource.max *
+                (entry.profile.refundMax || .20), mainResource.min, mainResource.max);
+              didProc = mainResource.value > resourceBefore;
+            }
+          }
+        } else if (operation === 'bleedSnapshot' && target && payload.amount > 0) {
+          var perPulse = payload.amount * (entry.profile.coefficient || .40) / 4;
+          var previousBleed = state.bleed;
+          state.bleed = {
+            targetId: target.id,
+            perPulse: Math.max(perPulse, previousBleed && previousBleed.targetId === target.id
+              ? previousBleed.perPulse : 0),
+            pulses: 4, nextTick: encounter.tick + 20,
+            expiresTick: encounter.tick + (entry.profile.durationTicks || 80),
+            parentEvent: event
+          };
+          didProc = true;
+        } else if (operation === 'apex' && target) {
+          if (target.rank === 'boss' || target.boss) {
+            didProc = equipmentDamage(encounter, owner, target,
+              payload.amount * (entry.profile.bossEcho || .15), entry, event, operation) > 0;
+          } else if (target.components.vitals.hp / Math.max(1, target.components.vitals.maxHp) <
+              (entry.profile.executeHpPct || .15)) {
+            didProc = equipmentDamage(encounter, owner, target,
+              target.components.vitals.hp, entry, event, operation) > 0;
+          }
+        } else if (operation === 'movementChargeDamage' && payload.trailblazerConsumed) {
+          didProc = true;
+        }
+        if (!didProc) return;
+        state.icdUntil = internalCooldown ? encounter.tick + internalCooldown : 0;
+        state.procTickCount = (state.procTickCount || 0) + 1;
+        state.procEncounterCount = (state.procEncounterCount || 0) + 1;
+        var parentContext = event.context || {};
+        emit(encounter, 'equipment:proc', {
+          phase: 'reaction', sourceActorId: owner.id,
+          targetActorIds: event.targetActorIds || [owner.id],
+          context: {
+            procChainId: parentContext.procChainId ||
+              encounter.id + ':proc:' + encounter.nextSequence,
+            procDepth: Math.max(0, parentContext.procDepth | 0) + 1
+          },
+          payload: { originAffixId: entry.affixId, operation: operation,
+            procChainId: parentContext.procChainId || null,
+            procDepth: Math.max(0, parentContext.procDepth | 0) + 1 }
+        });
+      });
+    });
+  }
+
+  function damage(encounter, source, target, abilityDef, effect, effectIndex, context) {
     var type = Game.content.get('damageType', effect.damageTypeId || 'slashing');
     if (!type || !alive(target)) return null;
     var accuracy = Game.util.clamp(stat(source, 'accuracy') || 1, 0.05, 1);
@@ -312,26 +671,47 @@
         abilityId: abilityDef.id, effectIndex: effectIndex, payload: {}
       });
     }
-    var raw = effect.formulaId
+    var baseRaw = effect.formulaId
       ? Game.rules.evaluate(effect.formulaId, {
           sourceStats: source.components.statBlock.snapshot().values,
           targetStats: target.components.statBlock.snapshot().values
         }, effect.params || {})
       : Number(effect.amount) || 0;
-    var critChance = stat(source, 'critChance') + (Number(effect.critChanceBonus) || 0);
-    var crit = effect.canCrit !== false && random(encounter) <
-      Game.util.clamp(critChance, 0, 0.95);
-    if (crit) raw *= Math.max(1, stat(source, 'critMultiplier') || 1.5);
-    var afterDefense = raw;
+    var trailblazer = consumeTrailblazer(encounter, source);
+    if (trailblazer) baseRaw *= 1 + trailblazer.bonus;
+    var outgoingResult = Game.combatMath.saturatingMultiply(
+      baseRaw, Math.max(0, statDefault(source, 'damageDoneMultiplier', 1))
+    );
+    var critResult = Game.combatMath.resolveCrit({
+      critChance: stat(source, 'critChance'),
+      critChanceBonus: Number(effect.critChanceBonus) || 0,
+      critAvoidance: stat(target, 'critAvoidance'),
+      critMultiplier: stat(source, 'critMultiplier') || 1.5,
+      canCrit: effect.canCrit !== false,
+      random: function () { return random(encounter); }
+    });
+    var critAdjusted = Game.combatMath.saturatingMultiply(
+      outgoingResult.value, critResult.critMultiplierApplied
+    );
+    var raw = critAdjusted.value;
+    var afterDefense = raw, defenseReduction = 0;
     if (type.category === 'physical') {
       var armor = Math.max(0, stat(target, 'armor'));
-      afterDefense = raw * raw / Math.max(1, raw + armor);
+      var physicalMitigation = Game.combatMath.mitigate(raw, armor,
+        combatTier(encounter, source, target));
+      afterDefense = physicalMitigation.amount;
+      defenseReduction = physicalMitigation.reduction;
     } else if (type.category === 'magic') {
       var ward = Math.max(0, stat(target, 'ward'));
-      afterDefense = raw * raw / Math.max(1, raw + ward);
+      var magicMitigation = Game.combatMath.mitigate(raw, ward,
+        combatTier(encounter, source, target));
+      afterDefense = magicMitigation.amount;
+      defenseReduction = magicMitigation.reduction;
     }
     var resist = type.category === 'true' ? 0 : Game.util.clamp(resistance(target, type.id), -0.75, 0.85);
-    var finalDamage = Math.max(1, Math.round(afterDefense * (1 - resist)));
+    var afterResistance = afterDefense * (1 - resist);
+    var globalReduction = Game.util.clamp(stat(target, 'damageReduction') || 0, -.75, .8);
+    var finalDamage = Math.max(1, Math.round(afterResistance * (1 - globalReduction)));
     var remaining = finalDamage;
     var absorbed = 0;
     var shields = target.components.vitals.shields;
@@ -345,6 +725,8 @@
       absorbed += amount;
       if (shield.amount <= 0) shields.splice(si, 1);
     }
+    var hpBefore = target.components.vitals.hp;
+    var overkill = Math.max(0, remaining - hpBefore);
     var damageResult = Game.units.damage(target, remaining, { source: 'combat' });
     var appliedDamage = damageResult ? damageResult.amount : remaining;
     target.components.presentation.flash = 0.14;
@@ -356,19 +738,35 @@
       phase: 'commit', sourceActorId: source.id, targetActorIds: [target.id],
       abilityId: abilityDef.id, effectIndex: effectIndex,
       tags: (abilityDef.tags || []).concat([type.id]),
+      context: Object.assign({}, context || {}, {
+        procChainId: context && context.procChainId ||
+          encounter.id + ':action:' + (source.components.actionState.actionId || encounter.nextSequence),
+        procDepth: Math.max(0, context && context.procDepth | 0)
+      }),
       payload: {
-        raw: raw, afterDefense: afterDefense, resistance: resist,
-        absorbed: absorbed, amount: appliedDamage, crit: crit, damageTypeId: type.id
+        baseRaw: baseRaw, raw: raw, critAdjustedRaw: raw,
+        afterDefense: afterDefense, defenseReduction: defenseReduction,
+        afterResistance: afterResistance, resistance: resist,
+        damageReduction: globalReduction, absorbed: absorbed,
+        amount: appliedDamage, overkill: overkill,
+        isCritical: critResult.isCritical, crit: critResult.isCritical,
+        critTier: critResult.critTier, critChance: critResult.critChance,
+        critMultiplier: critResult.critMultiplier,
+        critMultiplierApplied: critResult.critMultiplierApplied,
+        numericSaturated: outgoingResult.saturated || critAdjusted.saturated ||
+          critResult.numericSaturated,
+        damageTypeId: type.id,
+        trailblazerConsumed: !!trailblazer
       }
     });
     var lifesteal = Game.util.clamp(stat(source, 'lifesteal') || 0, 0, 1);
     if (lifesteal > 0 && appliedDamage > 0) heal(encounter, source, source, abilityDef, {
-      amount: appliedDamage * lifesteal, threatScale: 0
+      amount: appliedDamage * lifesteal, threatScale: 0, canCrit: false
     }, effectIndex);
     if (effect.selfHealRatio && appliedDamage > 0) {
       heal(encounter, source, source, abilityDef, {
         amount: appliedDamage * Math.max(0, Number(effect.selfHealRatio) || 0),
-        threatScale: 0
+        threatScale: 0, canCrit: false
       }, effectIndex);
     }
     triggerReactions(encounter, event);
@@ -378,19 +776,34 @@
     return event;
   }
 
-  function heal(encounter, source, target, abilityDef, effect, effectIndex) {
+  function heal(encounter, source, target, abilityDef, effect, effectIndex, context) {
     if (!alive(target)) return null;
-    var amount = Number.isFinite(effect.maxHpCoefficient)
+    var baseAmount = Number.isFinite(effect.maxHpCoefficient)
       ? stat(source, 'maxHp') * effect.maxHpCoefficient
       : effect.formulaId
       ? Game.rules.evaluate(effect.formulaId, {
           sourceStats: source.components.statBlock.snapshot().values,
           targetStats: target.components.statBlock.snapshot().values
-        }, effect.params || {})
+      }, effect.params || {})
       : Number(effect.amount) || stat(source, 'healingPower') * (Number(effect.coefficient) || 1);
-    amount = Math.max(0, Math.round(amount));
+    var critResult = Game.combatMath.resolveCrit({
+      critChance: stat(source, 'critChance'),
+      critChanceBonus: Number(effect.critChanceBonus) || 0,
+      critAvoidance: stat(target, 'critAvoidance'),
+      canCrit: effect.canCrit === true || !(context && context.periodic) && effect.canCrit !== false,
+      healing: true,
+      random: function () { return random(encounter); }
+    });
+    var critAmount = Game.combatMath.saturatingMultiply(
+      baseAmount, critResult.critMultiplierApplied
+    );
+    var received = Math.max(0, statDefault(target, 'healingReceivedMultiplier', 1));
+    var receivedAmount = Game.combatMath.saturatingMultiply(critAmount.value, received);
+    var amount = Math.max(0, Math.round(receivedAmount.value));
+    var missingBefore = Math.max(0, target.components.vitals.maxHp - target.components.vitals.hp);
     var healResult = Game.units.heal(target, amount, { source: 'combat' });
     var effective = healResult ? healResult.delta : 0;
+    var overheal = Math.max(0, amount - missingBefore);
     encounter.metrics.healing[source.id] = (encounter.metrics.healing[source.id] || 0) + effective;
     Object.keys(encounter.threatTables).forEach(function (observerId) {
       var observer = Game.actors.get(observerId);
@@ -402,7 +815,24 @@
     var event = emit(encounter, 'combat:healed', {
       phase: 'commit', sourceActorId: source.id, targetActorIds: [target.id],
       abilityId: abilityDef.id, effectIndex: effectIndex,
-      payload: { requested: amount, amount: effective }
+      context: Object.assign({}, context || {}, {
+        procChainId: context && context.procChainId ||
+          encounter.id + ':action:' + (source.components.actionState.actionId || encounter.nextSequence),
+        procDepth: Math.max(0, context && context.procDepth | 0)
+      }),
+      payload: {
+        requested: amount, baseAmount: baseAmount,
+        baseRaw: baseAmount, critAdjustedRaw: critAmount.value,
+        afterDefense: critAmount.value, afterResistance: receivedAmount.value,
+        absorbed: 0, amount: effective, overkill: 0,
+        overheal: overheal, isCritical: critResult.isCritical,
+        crit: critResult.isCritical, critTier: critResult.critTier,
+        critChance: critResult.critChance,
+        critMultiplier: critResult.critMultiplier,
+        critMultiplierApplied: critResult.critMultiplierApplied,
+        numericSaturated: critResult.numericSaturated || critAmount.saturated ||
+          receivedAmount.saturated
+      }
     });
     triggerReactions(encounter, event);
     return event;
@@ -513,8 +943,12 @@
     if (!effect || encounter.effectBudget-- <= 0) return;
     var targets = targetList(encounter, source, primaryTarget, effect.target || abilityDef.target, context);
     if (!targets.length && (effect.target && effect.target.relation === 'self')) targets = [source];
-    if (effect.type === 'damage') targets.forEach(function (target) { damage(encounter, source, target, abilityDef, effect, effectIndex); });
-    else if (effect.type === 'heal') targets.forEach(function (target) { heal(encounter, source, target, abilityDef, effect, effectIndex); });
+    if (effect.type === 'damage') targets.forEach(function (target) {
+      damage(encounter, source, target, abilityDef, effect, effectIndex, context);
+    });
+    else if (effect.type === 'heal') targets.forEach(function (target) {
+      heal(encounter, source, target, abilityDef, effect, effectIndex, context);
+    });
     else if (effect.type === 'shield') targets.forEach(function (target) { shield(encounter, source, target, abilityDef, effect, effectIndex); });
     else if (effect.type === 'applyStatus') targets.forEach(function (target) { applyStatus(encounter, source, target, abilityDef, effect, effectIndex); });
     else if (effect.type === 'removeStatus') targets.forEach(function (target) {
@@ -712,10 +1146,13 @@
       return;
     }
     actor.components.actionState.state = 'resolving';
-    commitResources(actor);
+    var committed = commitResources(actor);
     commitCharge(actor);
+    actionCommitEvents(encounter, actor, def, target || actor, committed);
     applyEffects(encounter, actor, target || actor, def, def.effects || [], {
-      telegraph: item.telegraph || null
+      telegraph: item.telegraph || null,
+      procChainId: encounter.id + ':action:' + item.actionToken,
+      procDepth: 0
     });
     var event = emit(encounter, 'action:resolved', {
       phase: 'resolve', sourceActorId: actor.id,
@@ -745,8 +1182,9 @@
     state.state = 'channeling';
     state.channelStartedTick = encounter.tick;
     state.resolvesTick = encounter.tick + channelTicks;
-    commitResources(actor);
+    var committed = commitResources(actor);
     commitCharge(actor);
+    actionCommitEvents(encounter, actor, def, target || actor, committed);
     emit(encounter, 'action:channelStarted', {
       phase: 'resolve', sourceActorId: actor.id,
       targetActorIds: target ? [target.id] : [actor.id],
@@ -783,7 +1221,9 @@
       return;
     }
     applyEffects(encounter, actor, target || actor, def, def.effects || [], {
-      telegraph: item.telegraph || null, channel: true
+      telegraph: item.telegraph || null, channel: true,
+      procChainId: encounter.id + ':action:' + item.actionToken,
+      procDepth: 0
     });
     var event = emit(encounter, item.finalPulse ? 'action:resolved' : 'action:channelTick', {
       phase: 'resolve', sourceActorId: actor.id,
@@ -916,6 +1356,7 @@
     if (!terrainCollisionEnabled(encounter)) {
       actor.x += dx;
       actor.y += dy;
+      recordEquipmentMovement(actor, requested);
       return requested;
     }
     repairTerrainPosition(encounter, actor);
@@ -926,12 +1367,41 @@
     actor.y = swept.y;
     var moved = Number.isFinite(swept.moved)
       ? swept.moved : Math.sqrt(dx * dx + dy * dy);
+    recordEquipmentMovement(actor, moved);
     if (moved + 0.01 < requested) {
       var metrics = movementMetrics(encounter);
       if (kind === 'displacement') metrics.displacementClamps++;
       else metrics.blockedSteps++;
     }
     return moved;
+  }
+
+  function recordEquipmentMovement(actor, distanceMoved) {
+    if (!(distanceMoved > 0) || !actor || !actor.components) return;
+    (actor.components.equipmentEffects || []).forEach(function (entry) {
+      if (!entry.profile || entry.profile.operation !== 'movementChargeDamage') return;
+      var procState = actor.components.equipmentProcState ||
+        (actor.components.equipmentProcState = {});
+      var state = procState[entry.sourceId] || (procState[entry.sourceId] = {});
+      state.distance = (state.distance || 0) + distanceMoved;
+      if (state.distance >= (Number(entry.profile.distance) || 64)) state.ready = true;
+    });
+  }
+
+  function consumeTrailblazer(encounter, actor) {
+    var effects = actor && actor.components && actor.components.equipmentEffects || [];
+    for (var i = 0; i < effects.length; i++) {
+      var entry = effects[i];
+      if (!entry.profile || entry.profile.operation !== 'movementChargeDamage') continue;
+      var procState = actor.components.equipmentProcState ||
+        (actor.components.equipmentProcState = {});
+      var state = procState[entry.sourceId] || (procState[entry.sourceId] = {});
+      if (!state.ready && (state.distance || 0) < (Number(entry.profile.distance) || 64)) continue;
+      state.ready = false;
+      state.distance = 0;
+      return { bonus: Number(entry.profile.damageBonus) || .25, sourceId: entry.sourceId };
+    }
+    return null;
   }
 
   function displaceActor(encounter, actor, dx, dy) {
@@ -1162,7 +1632,9 @@
     encounter.effectBudget = encounter.rules.effectBudgetPerTick || 512;
     encounter.reactionCountsTick = {};
     reactionDepth = 0;
-    var actors = encounter.participants.slice().sort().map(Game.actors.get).filter(alive);
+    var allActors = encounter.participants.slice().sort().map(Game.actors.get).filter(Boolean);
+    allActors.forEach(function (actor) { processEquipmentStates(encounter, actor); });
+    var actors = allActors.filter(alive);
     actors.forEach(function (actor) { repairTerrainPosition(encounter, actor); });
     actors.forEach(function (actor) { expireStatuses(encounter, actor); });
     actors.forEach(function (actor) { periodicStatuses(encounter, actor); });
@@ -1201,6 +1673,12 @@
       }
     }
     actors.forEach(function (actor) { resourceTick(encounter, actor); });
+    actors.forEach(function (actor) {
+      triggerEquipmentEffects(encounter, {
+        type: 'combat:tick', sourceActorId: actor.id,
+        targetActorIds: [actor.id], payload: {}
+      });
+    });
     Game.encounters.due(encounter.id, 'resolve').forEach(function (item) {
       if (item.kind === 'telegraphResolve') telegraphResolve(encounter, item);
       else if (item.kind === 'channelStart') beginChannel(encounter, item);
@@ -1479,18 +1957,28 @@
         }, effect.params || {})
       : Number(effect.amount) || 0;
     var afterDefense = raw;
+    var defenseReduction = 0;
     if (effect.defenseMode !== 'resistanceOnly') {
       if (type.category === 'physical') {
         var armor = Math.max(0, stat(target, 'armor'));
-        afterDefense = raw * raw / Math.max(1, raw + armor);
+        var physical = Game.combatMath.mitigate(raw, armor,
+          Math.max(1, Number(context.regionTier) || target.tier || 1));
+        afterDefense = physical.amount;
+        defenseReduction = physical.reduction;
       } else if (type.category === 'magic') {
         var ward = Math.max(0, stat(target, 'ward'));
-        afterDefense = raw * raw / Math.max(1, raw + ward);
+        var magical = Game.combatMath.mitigate(raw, ward,
+          Math.max(1, Number(context.regionTier) || target.tier || 1));
+        afterDefense = magical.amount;
+        defenseReduction = magical.reduction;
       }
     }
     var resist = type.category === 'true' ? 0 :
       Game.util.clamp(resistance(target, type.id), -0.75, 0.85);
-    var remaining = Math.max(1, Math.round(afterDefense * (1 - resist)));
+    var afterResistance = afterDefense * (1 - resist);
+    var globalReduction = Game.util.clamp(stat(target, 'damageReduction') || 0, -.75, .8);
+    var remaining = Math.max(1,
+      Math.round(afterResistance * (1 - globalReduction)));
     var absorbed = 0;
     var shields = target.components.vitals.shields || [];
     shields.sort(function (a, b) { return b.priority - a.priority || a.id.localeCompare(b.id); });
@@ -1507,8 +1995,15 @@
     var amount = result ? result.amount : remaining;
     target.components.presentation.flash = 0.14;
     var event = externalLog(context, 'external:hit', target, {
-      raw: raw, afterDefense: afterDefense, resistance: resist,
-      absorbed: absorbed, amount: amount, damageTypeId: type.id
+      raw: raw, baseRaw: raw, critAdjustedRaw: raw,
+      afterDefense: afterDefense, defenseReduction: defenseReduction,
+      afterResistance: afterResistance, resistance: resist,
+      damageReduction: globalReduction,
+      absorbed: absorbed, amount: amount,
+      overkill: Math.max(0, remaining - (result && result.before || 0)),
+      isCritical: false, critTier: 0, critChance: 0,
+      critMultiplier: 1, critMultiplierApplied: 1,
+      numericSaturated: false, damageTypeId: type.id
     });
     if (target.hp <= 0) {
       var encounter = context.encounterId && Game.encounters.get(context.encounterId);

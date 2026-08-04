@@ -55,12 +55,19 @@ Game.terrain = {
 Game.State = { regionTier: () => 1 };
 Game.player = {
   addGold(value) { gold += value; },
-  addCrystal(value) { crystals += value; }
+  addCrystal(value) { crystals += value; },
+  derived() { return { dropMul: 1, rarityLuck: 0 }; }
 };
 Game.inv = {
   addMaterial(id, value) { if (id) materials += value; },
-  genLoot: () => ({ uid: 'test-equipment' }),
   deliverDrops() {}
+};
+Game.loot = {
+  plan(context, state) { return { items: [], nextState: state || {} }; },
+  accept(plan) {
+    Game.state.inv.loot = plan.nextState;
+    return plan.items.slice();
+  }
 };
 Game.fx = { ring() {}, poof() {} };
 Game.population = {
@@ -87,7 +94,8 @@ Game.state = {
     effects: false, groundLoot: false,
     expeditionStrategy: 'balanced'
   },
-  player: { level: 1 },
+  player: { level: 1, classId: 'fighter' },
+  inv: { loot: {} },
   world: {
     mode: 'battle', region: 'grassland', worldSeed: 0x1234abcd,
     nodeCooldowns: {},

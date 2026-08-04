@@ -63,11 +63,13 @@
       };
     }
     if (def.kind === 'gear') {
+      var rarityRank = Game.equipment ? Game.equipment.rarityRank(def.item) : def.item.rar;
+      var itemLevel = Game.equipment ? Game.equipment.levelOf(def.item) : def.item.ilvl;
       return {
         name: Game.ui.itemName(def.item),
         desc: t('merchant.ui.gearOfferDesc', {
-          rarity: t('rarity.r' + def.item.rar),
-          level: def.item.ilvl,
+          rarity: t('rarity.r' + rarityRank),
+          level: itemLevel,
           affixes: (def.item.affixes || []).map(Game.ui.affixLine).join(' · ')
         })
       };
@@ -224,9 +226,10 @@
     var items = Game.state.inv.items;
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      if (Game.inv.isEquipped(item.uid) || item.rar > maxRar) continue;
+      var rank = Game.equipment ? Game.equipment.rarityRank(item) : item.rar;
+      if (Game.inv.isEquipped(item.uid) || rank > maxRar) continue;
       count++;
-      gold += Game.F.sellPrice(item.ilvl, item.rar);
+      gold += Game.equipment ? Game.equipment.sellPrice(item) : Game.F.sellPrice(item.ilvl, item.rar);
     }
     return { count: count, gold: gold };
   }
@@ -236,9 +239,10 @@
     var items = Game.state.inv.items;
     for (var i = 0; i < items.length; i++) {
       var item = items[i];
-      if (Game.inv.isEquipped(item.uid) || item.rar !== 4) continue;
+      var rank = Game.equipment ? Game.equipment.rarityRank(item) : item.rar;
+      if (Game.inv.isEquipped(item.uid) || rank !== 4) continue;
       count++;
-      crystal += Game.F.salvageCrystal(item.ilvl);
+      crystal += Game.equipment ? Game.equipment.salvageCrystal(item) : Game.F.salvageCrystal(item.ilvl);
     }
     return { count: count, crystal: crystal };
   }
@@ -268,7 +272,8 @@
     legendBtn.disabled = locked || !legends.count;
     legendBtn.addEventListener('click', function () {
       var list = Game.state.inv.items.filter(function (item) {
-        return item.rar === 4 && !Game.inv.isEquipped(item.uid);
+        return (Game.equipment ? Game.equipment.rarityRank(item) : item.rar) === 4 &&
+          !Game.inv.isEquipped(item.uid);
       });
       for (var i = 0; i < list.length; i++) Game.inv.sell(list[i].uid);
       Game.ui.modals.toast(t('ui.tradeSalvaged', { n: list.length, c: fmt(legends.crystal) }));

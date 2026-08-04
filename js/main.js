@@ -78,12 +78,6 @@
       if (Game.player.hasClass()) { if (cb) cb(); return; }
       Game.ui.title.classSelect(function (cid) {
         Game.player.setClass(cid);
-        // 公会配发：职业武器（仅背包为空时）
-        if (!Game.state.inv.items.length) {
-          var starter = Game.inv.genLoot(1, { base: 'weapon', rar: 0 });
-          Game.inv.addItem(starter, { silent: true, skipAuto: true, source: 'starter' });
-          Game.inv.equip(starter.uid);
-        }
         if (Game.units.primary()) Game.units.restore(Game.units.primary(), { source: 'class' });
         else Game.state.player.hp = Game.state.derived.maxHp;
         Game.world.syncHeroStats();

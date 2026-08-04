@@ -328,6 +328,7 @@ assert.deepEqual(
 const systemsBox = makeSandbox([
   ...PRODUCTION_CONTENT_FILES,
   'js/data/formulas.js',
+  'js/systems/equipment.js',
   'js/systems/terrain.js',
   'js/systems/terrain_v3.js',
   'js/systems/exploration.js',
@@ -343,8 +344,11 @@ let crystals = 0;
 let rareRewards = 0;
 G.state = {
   settings: { expeditionStrategy: 'balanced', controlMode: 'auto' },
-  player: { level: 1, perms: {} },
-  inv: { materials: {}, potions: {} },
+  player: { level: 1, classId: 'fighter', gold: 0, perms: {} },
+  inv: {
+    items: [], materials: {}, potions: {}, loot: G.loot.defaultState(),
+    equipped: { weapon: null, head: null, body: null, feet: null, accessory: null }
+  },
   world: {
     region: 'grassland', regionOrder: regions.map((r) => r.id),
     worldSeed: 424242, worldTime: 300, mode: 'battle',
@@ -359,11 +363,11 @@ G.State = {
 };
 G.player = {
   addExp: (n) => { expAwarded += n; },
-  addCrystal: (n) => { crystals += n; }
+  addCrystal: (n) => { crystals += n; },
+  derived: () => ({ rarityLuck: 0 })
 };
 G.inv = {
-  genLoot: () => ({ id: 'test-rare' }),
-  addItems: () => { rareRewards++; }
+  addItems: (items) => { rareRewards += items.length; return items; }
 };
 G.world = {
   layout: explorationLayout,

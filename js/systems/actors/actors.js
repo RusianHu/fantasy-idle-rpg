@@ -35,45 +35,9 @@
   }
 
   function baseStats(blueprint, spec, record) {
-    if (record && record.classId && Game.player) {
-      // Every classed ActorRecord uses the same base/equipment/permanent builder.
-      // Talents are deliberately excluded here: the Actor ledger and ability/status
-      // books below are their sole runtime owners.
-      var derived = Game.player.previewDerived({
-        classId: record.classId,
-        level: record.level,
-        skills: {},
-        equipped: record.loadout.equipment,
-        perms: record.permanentUpgrades
-      });
-      var recordStats = {
-        maxHp: derived.maxHp,
-        armor: derived.def,
-        ward: Math.max(0, Math.round(derived.def * 0.65)),
-        physicalPower: derived.atk,
-        magicPower: derived.atk,
-        accuracy: 0.94,
-        gcdSpeed: 1 + Math.max(0, derived.spd - 10) * 0.012,
-        castSpeed: 1 + Math.max(0, derived.spd - 10) * 0.009,
-        autoAttackSpeed: 1 + Math.max(0, derived.spd - 10) * 0.018,
-        cooldownRate: 1 + derived.cdr,
-        moveSpeed: 56,
-        range: derived.range,
-        critChance: derived.crit,
-        critMultiplier: derived.critDmg,
-        dodgeChance: derived.dodge,
-        healingPower: derived.atk * derived.healPow,
-        shieldPower: derived.maxHp,
-        lifesteal: derived.lifesteal,
-        statusPotency: 1,
-        tenacity: 0,
-        interruptPower: 1,
-        threatMultiplier: blueprint.classId === 'fighter' ? 2.2 : 1,
-        resourceRegen: 1,
-        expMultiplier: derived.expMul,
-        goldMultiplier: derived.goldMul,
-        dropMultiplier: derived.dropMul
-      };
+    if (record && record.classId && Game.builds) {
+      // Every non-base contribution is installed below as an explicit Ledger source.
+      var recordStats = Game.builds.compileActorRecord(record, {}).baseValues;
       Object.keys(spec.statValues || {}).forEach(function (id) {
         if (Number.isFinite(spec.statValues[id])) recordStats[id] = spec.statValues[id];
       });
@@ -129,7 +93,10 @@
       });
       Object.keys(out).forEach(function (id) {
         var def = Game.content.get('stat', id);
-        if (def) out[id] = Game.util.clamp(out[id], def.min, def.max);
+        if (def) {
+          out[id] = Math.max(def.min, out[id]);
+          if (def.max !== null && def.max !== undefined) out[id] = Math.min(def.max, out[id]);
+        }
         if (id === 'maxHp') out[id] = Math.round(out[id]);
       });
       cache = out;
@@ -299,27 +266,20 @@
   }
 
   function applyBuildModifiers(components, blueprint, record, spec) {
+    components.equipmentEffects = [];
+    if (record && record.classId && Game.builds) {
+      var compiledBuild = Game.builds.compileActorRecord(record);
+      compiledBuild.modifiers.forEach(function (modifier) {
+        components.modifierLedger.add(modifier);
+      });
+      components.equipmentEffects = compiledBuild.equipmentEffects.slice();
+    }
     blueprint.resolvedTraits.forEach(function (traitId) {
       var trait = Game.content.get('trait', traitId);
       (trait && trait.modifiers || []).forEach(function (modifier, index) {
         components.modifierLedger.add(Object.assign({}, modifier, {
           sourceId: 'trait:' + traitId + ':' + index
         }));
-      });
-    });
-    Object.keys(talentRanks(record, spec)).sort().forEach(function (talentId) {
-      var talent = Game.content.get('talent', talentId);
-      var rank = Game.util.clamp(talentRanks(record, spec)[talentId] | 0, 0,
-        talent && talent.maxRank || 0);
-      if (!talent || talent.classId !== blueprint.classId) return;
-      (talent && talent.modifiers || []).forEach(function (modifier, index) {
-        components.modifierLedger.add({
-          sourceId: 'talent:' + talentId + ':' + index,
-          stat: modifier.stat,
-          phase: modifier.phase || 'addPct',
-          operation: modifier.operation || 'addPct',
-          value: Number(modifier.perRank || modifier.value || 0) * rank
-        });
       });
     });
     (spec.modifiers || []).forEach(function (modifier, index) {
@@ -675,6 +635,7 @@
         components.cooldowns = { abilities: {}, groups: {}, charges: {} };
         components.comboState = { id: null, step: 0, expiresTick: 0, markedTargetId: null };
         components.statuses = [];
+        components.equipmentProcState = {};
         components.targeting = { currentTargetId: null, priorityTargetId: null };
       }
       var instance = {

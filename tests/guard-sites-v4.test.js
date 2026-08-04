@@ -62,7 +62,7 @@ const aiPauses = [];
 
 Game.state = {
   settings: { expeditionStrategy: 'balanced', groundLoot: true },
-  player: { level: 9 }, inv: { materials: {} },
+  player: { level: 9, classId: 'fighter' }, inv: { materials: {}, loot: {} },
   world: { worldSeed: 0xA17B00, layoutVersion: 4, worldTime: 100,
     region: 'grassland', guardSites: { version: 1, layoutVersion: 4, regions: {} } },
   meta: { stats: { chests: 0 } }
@@ -71,7 +71,12 @@ Game.State = { regionTier: () => 1 };
 Game.expedition = { current: () => ({ index: expeditionIndex }) };
 Game.player = {
   hpPct: () => hpPct,
-  addGold: (amount) => { Game.state.player.gold = (Game.state.player.gold || 0) + amount; }
+  addGold: (amount) => { Game.state.player.gold = (Game.state.player.gold || 0) + amount; },
+  derived: () => ({ dropMul: 1, rarityLuck: 0 })
+};
+Game.loot = {
+  plan(context, state) { return { items: [], nextState: state || {} }; },
+  accept(plan) { Game.state.inv.loot = plan.nextState; return plan.items.slice(); }
 };
 Game.actors = { get: (id) => actors.get(id) || null };
 Game.population = {
@@ -105,7 +110,6 @@ Game.expeditionAI = { pause(reason) { aiPauses.push(reason); } };
 Game.collection = { record() {} };
 Game.inv = {
   materials: Game.state.inv.materials,
-  genLoot: () => ({ id: 'guard-test-equipment', rarity: 'uncommon' }),
   addMaterial(id, amount) { Game.state.inv.materials[id] = (Game.state.inv.materials[id] || 0) + amount; },
   deliverDrops() {}
 };

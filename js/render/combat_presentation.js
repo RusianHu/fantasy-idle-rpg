@@ -79,6 +79,22 @@
     );
   }
 
+  function romanTier(value) {
+    value = Math.max(1, Math.floor(Number(value) || 1));
+    if (value > 20) return String(value);
+    var rows = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+    var out = '';
+    for (var i = 0; i < rows.length; i++) {
+      while (value >= rows[i][0]) { out += rows[i][1]; value -= rows[i][0]; }
+    }
+    return out;
+  }
+
+  function critPrefix(payload) {
+    return payload && payload.isCritical
+      ? 'CRIT ' + romanTier(payload.critTier) + ' ' : '';
+  }
+
   function isProjectile(def) {
     return def && def.presentation && def.presentation.projectile;
   }
@@ -123,8 +139,8 @@
     var color = sourceIsHero
       ? (payload.crit ? '#ffd85a' : '#ffffff')
       : (payload.absorbed > 0 ? '#7ad0f0' : (hostile ? '#ff8a7a' : '#ffffff'));
-    floatNumber(target, '-' + Game.i18n.fmtNum(shown), {
-      color: color, crit: !!payload.crit
+    floatNumber(target, critPrefix(payload) + '-' + Game.i18n.fmtNum(shown), {
+      color: color, crit: !!payload.isCritical
     });
     Game.fx.hitSpark(point.x, point.y, !!payload.crit || sourceIsHero);
     if (!isProjectile(def)) {
@@ -133,7 +149,8 @@
     addRecord(event, isProjectile(def) ? 'projectile-impact' : 'melee-impact',
       source, target, {
         amount: shown,
-        crit: !!payload.crit,
+        crit: !!payload.isCritical,
+        critTier: Math.max(0, Number(payload.critTier) || 0),
         absorbed: Math.max(0, Number(payload.absorbed) || 0)
       });
   }
@@ -166,8 +183,14 @@
     if (!target || !Game.fx || amount <= 0) return;
     var point = positionOf(target);
     Game.fx.heal(point.x, point.y);
-    floatNumber(target, '+' + Game.i18n.fmtNum(amount), { color: '#7ef07e' });
-    addRecord(event, 'heal', source, target, { amount: amount });
+    var payload = event.payload || {};
+    floatNumber(target, critPrefix(payload) + '+' + Game.i18n.fmtNum(amount), {
+      color: payload.isCritical ? '#c9ff7e' : '#7ef07e', crit: !!payload.isCritical
+    });
+    addRecord(event, 'heal', source, target, {
+      amount: amount, crit: !!payload.isCritical,
+      critTier: Math.max(0, Number(payload.critTier) || 0)
+    });
   }
 
   function shield(event) {

@@ -957,6 +957,9 @@
             ? Game.expedition.currentModifier().drop : 1;
           Game.inv.rollDrops(ent.tier, ent.boss, {
             source: ent.boss ? 'boss' : 'combat',
+            sourceType: ent.boss ? 'boss' : ent.guardian ? 'guardian' :
+              ent.rank === 'rare' ? 'rare' : 'regular',
+            sourceId: ent.spawnId || ent.worldSpawnProfileId || ent.mid,
             x: ent.x,
             y: ent.y,
             luck: Math.max(0, (expeditionDrop - 1) * 2)

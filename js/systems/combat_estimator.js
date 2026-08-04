@@ -32,6 +32,9 @@
       spawnSource: { kind: 'estimator', sourceId: encounter.profileId, sequence: index + (teamId === 'party' ? 1 : 100) }
     });
     actor.tacticsProfileId = spec.tacticsProfileId;
+    if (spec.equipmentEffects) {
+      actor.components.equipmentEffects = Game.contentCompiler.clone(spec.equipmentEffects);
+    }
     if (spec.statMultipliers) {
       var modifiers = Object.keys(spec.statMultipliers).map(function (statId) {
         return {
@@ -131,45 +134,23 @@
     cacheSize: function () { return Object.keys(cache).length; },
     partySnapshotFromState: function (opts) {
       opts = opts || {};
-      var baseOpts = Object.assign({}, opts, { skills: {} });
-      var derived = Game.player.previewDerived(baseOpts);
       var classId = opts.classId === undefined ? Game.state.player.classId : opts.classId;
       var ranks = opts.skills || Game.state.player.skills;
+      var loadout = opts.equipped || Game.state.inv.equipped;
+      var compiled = Game.builds.compileActorRecord({
+        classId: classId, level: opts.level || Game.state.player.level,
+        talentRanks: ranks || {}, permanentUpgrades: opts.perms || Game.state.player.perms || {},
+        loadout: { equipment: loadout }
+      }, loadout);
       return [{
         archetypeId: 'adventurer',
         classId: classId,
         level: opts.level || Game.state.player.level,
         talentRanks: Game.contentCompiler.clone(ranks || {}),
+        equipmentEffects: Game.contentCompiler.clone(compiled.equipmentEffects),
         factionId: 'adventurers',
         controllerId: 'ai:player-auto',
-        statValues: {
-          maxHp: derived.maxHp,
-          armor: derived.def,
-          ward: Math.max(0, Math.round(derived.def * 0.65)),
-          physicalPower: derived.atk,
-          magicPower: derived.atk,
-          accuracy: 0.94,
-          gcdSpeed: 1 + Math.max(0, derived.spd - 10) * 0.012,
-          castSpeed: 1 + Math.max(0, derived.spd - 10) * 0.009,
-          autoAttackSpeed: 1 + Math.max(0, derived.spd - 10) * 0.018,
-          cooldownRate: 1 + derived.cdr,
-          moveSpeed: 56,
-          range: derived.range,
-          critChance: derived.crit,
-          critMultiplier: derived.critDmg,
-          dodgeChance: derived.dodge,
-          healingPower: derived.atk * derived.healPow,
-          shieldPower: derived.maxHp,
-          lifesteal: derived.lifesteal,
-          statusPotency: 1,
-          tenacity: 0,
-          interruptPower: 1,
-          threatMultiplier: classId === 'fighter' ? 2.2 : 1,
-          resourceRegen: 1,
-          expMultiplier: derived.expMul,
-          goldMultiplier: derived.goldMul,
-          dropMultiplier: derived.dropMul
-        }
+        statValues: Game.contentCompiler.clone(compiled.values)
       }];
     },
     evaluateCurrent: function (opts) {

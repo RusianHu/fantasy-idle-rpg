@@ -155,6 +155,20 @@
       compareOffense: 'Offense',
       compareSurvival: 'Survival',
       compareEconomy: 'Rewards',
+      itemImplicitTitle: 'Base Implicits',
+      itemAffixTitle: 'Normal Affixes',
+      itemLegendaryTitle: 'Legendary Effect',
+      itemSingleCompare: 'Item Stat Difference',
+      itemBuildCompare: 'Full Build Simulation (Fixed Seeds)',
+      itemNoAffixes: 'No normal affixes',
+      reforgeTitle: 'Reforge',
+      reforgeNoLock: 'Do not lock an affix',
+      reforgeLockHint: 'Lock up to one normal affix; all other affixes are rerolled.',
+      reforgeCost: 'Reforge {n} · {gold} gold · {count}× {material}',
+      reforgeAction: 'Confirm Reforge',
+      reforgeDone: 'Reforge complete',
+      reforgeUnavailable: 'Cannot reforge: {reason}',
+      operationRejected: 'Action failed: {reason}',
       slotLocked: 'Locked',
       slotUnlocked: 'Auto',
       lockSlot: 'Lock this slot',
@@ -267,14 +281,20 @@
       materials: 'Materials Earned', chests: 'Chests Opened'
     },
 
-    slot: { weapon: 'Weapon', armor: 'Armor', ring: 'Ring' },
+    slot: {
+      weapon: 'Weapon', head: 'Head', body: 'Body', feet: 'Feet', accessory: 'Accessory',
+      armor: 'Armor', ring: 'Ring'
+    },
 
     rarity: { r0: 'Common', r1: 'Fine', r2: 'Rare', r3: 'Epic', r4: 'Legendary' },
 
     item: {
       pattern: '{mat} {base}',
       mat: { 1: 'Copper', 2: 'Iron', 3: 'Steel', 4: 'Silver', 5: 'Mithril', 6: 'Flamegold', 7: 'Starlight', 8: 'Dragonsoul' },
-      base: { weapon: 'Sword', armor: 'Armor', ring: 'Ring' },
+      base: {
+        weapon: 'Sword', head: 'Headgear', body: 'Body Armor', feet: 'Footwear', accessory: 'Accessory',
+        armor: 'Armor', ring: 'Ring'
+      },
       weapon: { fighter: 'Sword', rogue: 'Dagger', mage: 'Staff', cleric: 'Mace', ranger: 'Longbow' },
       potion_small: { name: 'Small Healing Potion' },
       potion_large: { name: 'Large Healing Potion' },
@@ -312,6 +332,33 @@
     affix: {
       atk_pct: 'ATK', hp_pct: 'HP', atk_flat: 'ATK', hp_flat: 'HP', def_flat: 'DEF',
       spd: 'SPD', crit: 'Crit Rate', critdmg: 'Crit DMG', gold_pct: 'Gold Gain', exp_pct: 'EXP Gain'
+    },
+
+    equipment: {
+      stat: {
+        power: 'Power', physicalPower: 'Physical Power', magicPower: 'Magic Power', maxHp: 'HP',
+        armor: 'Armor', ward: 'Ward', accuracy: 'Accuracy', critChance: 'Crit Chance',
+        critMultiplier: 'Crit Multiplier', damageDoneMultiplier: 'Damage Done', dodgeChance: 'Dodge',
+        damageReduction: 'Damage Reduction', tenacity: 'Tenacity', lifesteal: 'Lifesteal',
+        healthRegenPct: 'HP Regen per Second', healingPower: 'Healing', shieldPower: 'Shielding',
+        statusPotency: 'Status Potency', resourceRegen: 'Resource Recovery', haste: 'Action Haste',
+        gcdSpeed: 'GCD Haste', castSpeed: 'Cast Haste', autoAttackSpeed: 'Auto Attack Haste',
+        cooldownRate: 'Cooldown Recovery', moveSpeed: 'Move Speed', goldMultiplier: 'Gold Gain',
+        expMultiplier: 'EXP Gain', dropMultiplier: 'Equipment Find', rarityLuck: 'Rarity Luck',
+        healingReceivedMultiplier: 'Healing Received'
+      },
+      crit: {
+        chance: '{chance}%', guaranteed: 'Guaranteed tier {tier}',
+        overflow: 'Guaranteed tier {tier}, {chance}% chance for the next tier'
+      },
+      error: {
+        'encounter-active': 'an encounter is active', 'not-at-camp': 'available only at camp',
+        'legacy-item': 'legacy items cannot be reforged', 'invalid-lock': 'the locked affix is invalid',
+        'no-affixes': 'this item has no normal affixes', 'nothing-to-reroll': 'there are no affixes to reroll',
+        gold: 'not enough gold', materials: 'not enough regional materials', unchanged: 'the roll did not change',
+        rollback: 'the transaction was rolled back', 'missing-item': 'the item no longer exists',
+        'class-mismatch': 'class requirement not met', unknown: 'unknown reason'
+      }
     },
 
     skill: {

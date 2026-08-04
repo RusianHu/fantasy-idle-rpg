@@ -29,17 +29,28 @@
   UI.itemName = function (item) {
     var t = Game.i18n.t;
     var tier = U.clamp(Math.ceil(item.ilvl / 8), 1, 8);
-    var baseName = item.base === 'weapon'
-      ? t('item.weapon.' + (Game.state.player.classId || 'fighter'))
-      : t('item.base.' + item.base);
+    var baseName;
+    if (Game.equipment && Game.equipment.isV2(item)) {
+      var base = Game.content.get('itemBase', item.baseId);
+      baseName = base && base.presentation && base.presentation.nameKey
+        ? t(base.presentation.nameKey) : t('item.base.' + Game.equipment.slotOf(item));
+      if (Game.equipment.slotOf(item) === 'weapon') {
+        baseName += ' · ' + t('item.weapon.' + (item.classId || Game.state.player.classId || 'fighter'));
+      }
+    } else {
+      baseName = item.base === 'weapon'
+        ? t('item.weapon.' + (Game.state.player.classId || 'fighter'))
+        : t('item.base.' + item.base);
+    }
     return t('item.pattern', { mat: t('item.mat.' + tier), base: baseName });
   };
 
   UI.itemIcon = function (item) {
-    if (item.base === 'weapon') {
+    var slotId = Game.equipment ? Game.equipment.slotOf(item) : item.base;
+    if (slotId === 'weapon') {
       return 'icon_w_' + (Game.state.player.classId || 'fighter');
     }
-    var slot = reg.get('slot', item.base);
+    var slot = reg.get('slot', slotId) || Game.content && Game.content.get('itemSlot', slotId);
     return slot ? slot.icon : 'icon_weapon';
   };
 
@@ -58,11 +69,58 @@
   }
 
   UI.affixLine = function (af) {
+    if (af && af.definitionId && Game.content) {
+      var formal = Game.content.get('itemAffix', af.definitionId);
+      if (!formal) return '';
+      var parts = UI.modifierLines(formal, af.values && af.values.rolls || []).join(' · ');
+      return Game.i18n.t(formal.presentation && formal.presentation.nameKey || formal.id) +
+        (parts ? ' ' + parts : '');
+    }
     var def = reg.get('affix', af.id);
     if (!def) return '';
     var t = Game.i18n.t;
     var v = def.kind === 'pct' ? '+' + Math.round(af.v * 100) + '%' : '+' + (def.dec ? af.v.toFixed(1) : Game.i18n.fmtNum(af.v));
     return t('affix.' + af.id) + ' ' + v;
+  };
+
+  UI.modifierLines = function (definition, values) {
+    values = values || [];
+    var modifiers = definition && (definition.implicitModifiers || definition.modifiers) || [];
+    return modifiers.map(function (modifier, index) {
+      var value = Number(values[index]);
+      if (!Number.isFinite(value)) value = Number(modifier.value) || 0;
+      var key = modifier.stat === 'classPower' ? 'power' : modifier.stat;
+      var label = Game.i18n.t('equipment.stat.' + key);
+      var percentStats = ['critChance', 'damageDoneMultiplier', 'dodgeChance', 'damageReduction',
+        'tenacity', 'lifesteal', 'healthRegenPct', 'healingPower', 'shieldPower',
+        'statusPotency', 'resourceRegen', 'haste', 'gcdSpeed', 'castSpeed', 'autoAttackSpeed',
+        'cooldownRate', 'moveSpeed', 'goldMultiplier', 'expMultiplier', 'dropMultiplier',
+        'rarityLuck', 'healingReceivedMultiplier'];
+      var sign = value >= 0 ? '+' : '';
+      var display = modifier.stat === 'critMultiplier'
+        ? sign + value.toFixed(2) + 'x'
+        : percentStats.indexOf(modifier.stat) >= 0 || modifier.operation === 'addPct'
+          ? sign + (value * 100).toFixed(1) + '%' : sign + Game.i18n.fmtNum(value);
+      return label + ' ' + display;
+    });
+  };
+
+  UI.critChanceText = function (chance) {
+    chance = Math.max(0, Number(chance) || 0);
+    var guaranteed = Math.floor(chance + 1e-9);
+    var fraction = Math.max(0, Math.min(99.9, (chance - guaranteed) * 100));
+    if (!guaranteed) return Game.i18n.t('equipment.crit.chance', {
+      chance: Math.round(chance * 1000) / 10
+    });
+    if (fraction < .05) return Game.i18n.t('equipment.crit.guaranteed', { tier: guaranteed });
+    return Game.i18n.t('equipment.crit.overflow', {
+      tier: guaranteed, chance: Math.round(fraction * 10) / 10
+    });
+  };
+
+  UI.equipmentError = function (reason) {
+    var key = 'equipment.error.' + (reason || 'unknown');
+    return Game.i18n.t(key) === key ? Game.i18n.t('equipment.error.unknown') : Game.i18n.t(key);
   };
 
   /* ================= Tab 框架 ================= */
@@ -173,8 +231,8 @@
         [t('stat.atk'), fmt(d.atk)],
         [t('stat.def'), fmt(d.def)],
         [t('stat.spd'), d.spd.toFixed(1)],
-        [t('stat.crit'), Math.round(d.crit * 100) + '%'],
-        [t('stat.critDmg'), Math.round(d.critDmg * 100) + '%'],
+        [t('stat.crit'), UI.critChanceText(d.crit)],
+        [t('stat.critDmg'), 'x' + d.critDmg.toFixed(2)],
         [t('stat.goldMul'), '+' + Math.round((d.goldMul - 1) * 100) + '%'],
         [t('stat.expMul'), '+' + Math.round((d.expMul - 1) * 100) + '%']
       ];
@@ -286,7 +344,7 @@
 
     // 已装备
     var strip = U.el('div', 'equip-strip');
-    reg.ids('slot').forEach(function (slotId) {
+    (Game.equipment ? Game.equipment.SLOT_IDS : reg.ids('slot')).forEach(function (slotId) {
       var uid = inv.equipped[slotId];
       var item = uid ? Game.inv.byUid(uid) : null;
       var slotDef = reg.get('slot', slotId);
@@ -303,7 +361,8 @@
       }
       var locked = !!inv.lockedSlots[slotId];
       var lockBtn = U.el('button', 'slot-lock-btn' + (locked ? ' on' : ''),
-        (locked ? '🔒 ' + t('ui.slotLocked') : '🔓 ' + t('ui.slotUnlocked')));
+        '<span class="lock-glyph" aria-hidden="true"></span><span>' +
+        (locked ? t('ui.slotLocked') : t('ui.slotUnlocked')) + '</span>');
       lockBtn.title = locked
         ? t('ui.unlockSlotNamed', { slot: t('slot.' + slotId) })
         : t('ui.lockSlotNamed', { slot: t('slot.' + slotId) });

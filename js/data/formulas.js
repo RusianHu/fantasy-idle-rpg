@@ -21,9 +21,8 @@
 
   /* ---------------- 平衡常数 ---------------- */
   F.BAL = {
-    // 玩家逐级通用成长（职业基础值与复利见 data/classes.js）
+    // 玩家逐级通用成长（职业基础值与成长由正式职业 Pack 定义）
     spdPerLv: 0.25, critPerLv: 0.001, critDmgPerLv: 0.01,
-    critCap: 0.4,
     // 全局上限
     dodgeCap: 0.35, cdrCap: 0.4,
     // 经验曲线
@@ -67,6 +66,18 @@
 
   /** 职业定义 + 等级 → 裸属性（不含装备/技能/永久强化） */
   F.playerBase = function (cls, lv) {
+    var formal = Game.content && Game.content.get('class', cls && cls.id);
+    if (formal && Game.builds) {
+      var values = Game.builds.baseValues(formal.id, lv);
+      return {
+        hp: values.maxHp,
+        atk: values[formal.primaryPowerStat] || 0,
+        def: values.armor,
+        spd: +(10 + (values.autoAttackSpeed - 1) / .018).toFixed(2),
+        crit: values.critChance,
+        critDmg: values.critMultiplier
+      };
+    }
     var g = lv - 1;
     var b = cls.base, gr = cls.grow;
     return {
@@ -74,7 +85,7 @@
       atk: Math.round(b.atk * Math.pow(gr.atk, g)),
       def: Math.round(b.def * Math.pow(gr.def, g)),
       spd: +(b.spd + B.spdPerLv * g).toFixed(2),
-      crit: Math.min(B.critCap, b.crit + B.critPerLv * g),
+      crit: b.crit + B.critPerLv * g,
       critDmg: b.critDmg + B.critDmgPerLv * g
     };
   };

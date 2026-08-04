@@ -61,7 +61,7 @@
         permanentUpgrades: Object.assign({}, spec.permanentUpgrades || {}),
         persistentResources: Object.assign({}, spec.persistentResources || {}),
         loadout: {
-          equipment: Object.assign({ weapon: null, armor: null, ring: null },
+          equipment: Object.assign({ weapon: null, head: null, body: null, feet: null, accessory: null },
             spec.loadout && spec.loadout.equipment || {}),
           lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
             spec.loadout && spec.loadout.lockedSlots || {})

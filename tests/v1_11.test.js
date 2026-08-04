@@ -164,15 +164,15 @@ IG.bus.on('potion:used', (payload) => itemEvents.push({ name: 'potion:used', pay
 IG.entryState = 'active';
 IG.state = {
   settings: { groundLoot: true, potionThreshold: 0.3 },
-  player: { hp: 100, level: 10, gold: 0, crystal: 0, perms: {} },
+  player: { hp: 100, level: 10, classId: 'fighter', gold: 0, crystal: 0, perms: {} },
   inv: {
     items: [],
-    equipped: { weapon: null, armor: null, ring: null },
-    lockedSlots: { weapon: false, armor: false, ring: false },
+    equipped: { weapon: null, head: null, body: null, feet: null, accessory: null },
+    lockedSlots: { weapon: false, head: false, body: false, feet: false, accessory: false },
     potions: { potion_small: 2, potion_large: 1 },
-    materials: {}
+    materials: {}, loot: {}
   },
-  world: { mode: 'battle', region: 'r1' },
+  world: { mode: 'battle', region: 'r1', worldSeed: 0x12345678 },
   meta: {
     stats: {
       potions: 0, materials: 0, drops: 0, legendaries: 0,
@@ -199,6 +199,24 @@ IG.world = {
 };
 IG.transitions = { isActive: () => false };
 IG.ending = { isActive: () => false };
+IG.State = { regionProg: () => ({ firstKill: false }) };
+const lootPlans = [];
+let lootUid = 0;
+IG.loot = {
+  plan(context, state) {
+    lootPlans.push(context);
+    const drops = context.sourceType === 'boss' || IG.util.chance(0.08);
+    return {
+      items: drops ? [{
+        schemaVersion: 2, uid: 'eq:test:' + (++lootUid), baseId: 'weapon.duelist',
+        classId: 'fighter', itemLevel: context.playerLevel, rarityId: 'common',
+        implicitRolls: [], affixes: [], reforge: { count: 0, lockedAffixInstanceId: null }
+      }] : [],
+      nextState: state
+    };
+  },
+  accept(plan) { return plan.items; }
+};
 
 assert.equal(IG.items.use('potion', 'potion_small', { source: 'manual' }).reason, 'full');
 assert.equal(IG.state.inv.potions.potion_small, 2, 'full HP never consumes a potion');
@@ -229,7 +247,7 @@ IG.items.update(IG.F.BAL.potionCd);
 assert.equal(IG.items.use('potion', 'potion_large').reason, 'busy');
 IG.world.hero.state = 'idle';
 
-// Statistical guard: the judgement phase retains 16% equipment / 7% potion rates.
+// Inventory delegates the v19 regular-Encounter 8% chance and retains the 7% potion roll.
 const originalChance = IG.util.chance;
 let equipRolls = 0;
 let potionRolls = 0;
@@ -238,8 +256,9 @@ for (let i = 0; i < 40000; i++) {
   if (results.some((drop) => drop.category === 'equipment')) equipRolls++;
   if (results.some((drop) => drop.category === 'potion')) potionRolls++;
 }
-assert.ok(Math.abs(equipRolls / 40000 - IG.F.BAL.dropEquip) < 0.012);
+assert.ok(Math.abs(equipRolls / 40000 - 0.08) < 0.01);
 assert.ok(Math.abs(potionRolls / 40000 - IG.F.BAL.dropPotion) < 0.009);
+assert.equal(lootPlans[0].sourceType, 'regular');
 
 // Deterministic delivery split: normal combat lands, switch-off and Boss bank directly.
 IG.util.chance = () => true;
@@ -256,6 +275,7 @@ const beforeBoss = IG.state.inv.items.length;
 IG.state.settings.groundLoot = true;
 IG.inv.rollDrops(1, true, { source: 'boss', x: 10, y: 10 });
 assert.equal(IG.state.inv.items.length, beforeBoss + 1, 'Boss loot bypasses the ground layer');
+assert.equal(lootPlans[lootPlans.length - 1].sourceType, 'boss');
 IG.util.chance = originalChance;
 
 // Material exchange consumes the formula-owned recipe and remains trade-domain guarded.
@@ -415,9 +435,9 @@ EG.bus.on('chest:expired', (p) => envEvents.push({ name: 'chest:expired', p }));
 EG.bus.on('gather:done', (p) => envEvents.push({ name: 'gather:done', p }));
 EG.state = {
   settings: {},
-  player: { level: 10 },
-  inv: { materials: {} },
-  world: { mode: 'battle', region: 'r1', nodeCooldowns: {} },
+  player: { level: 10, classId: 'fighter' },
+  inv: { materials: {}, loot: {} },
+  world: { mode: 'battle', region: 'r1', worldSeed: 0x87654321, nodeCooldowns: {} },
   meta: { stats: { materials: 0, gathers: 0, chests: 0 } }
 };
 EG.State = { regionTier: () => 3 };
@@ -449,14 +469,25 @@ EG.inv = {
     EG.state.inv.materials[id] = (EG.state.inv.materials[id] || 0) + n;
     EG.state.meta.stats.materials += n;
   },
-  genLoot() { return { uid: 'chest-gear', rar: 2 }; },
   delivered: [],
   deliverDrops(results, opts) { this.delivered.push({ results, opts }); },
   materialCount(id) { return EG.state.inv.materials[id] || 0; }
 };
+const chestLootPlans = [];
+EG.loot = {
+  plan(context, state) {
+    chestLootPlans.push(context);
+    return {
+      items: [{ schemaVersion: 2, uid: 'eq:chest:test', rarityId: 'rare' }],
+      nextState: state
+    };
+  },
+  accept(plan) { return plan.items; }
+};
 EG.player = {
   addGold() {},
-  addCrystal() {}
+  addCrystal() {},
+  derived() { return { dropMul: 1, rarityLuck: 0 }; }
 };
 
 assert.equal(EG.environment.isLegalChestSpot(360, 300), true);
@@ -505,6 +536,9 @@ EG.state.settings.groundLoot = false;
 const rareChest = EG.environment.spawnChest();
 assert.ok(rareChest && rareChest.rare);
 EG.environment.openChest(rareChest);
+assert.equal(chestLootPlans.at(-1).sourceType, 'rareChest');
+assert.equal(chestLootPlans.at(-1).minimumRank, 2);
+assert.equal(chestLootPlans.at(-1).eligible, false);
 assert.equal(
   EG.inv.delivered.at(-1).opts.forceGround,
   false,

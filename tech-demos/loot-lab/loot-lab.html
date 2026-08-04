@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#101411">
+<meta name="build-id" content="20260804.1">
+<title data-demo-page-title="loot.pageTitle">掉落与装备 Lab · 幻境远征</title>
+<link rel="stylesheet" href="loot-lab.css?v=20260804.1">
+</head>
+<body>
+<main class="lab-shell">
+  <header class="lab-header">
+    <div>
+      <p class="eyebrow">FANTASY IDLE RPG / LOOT-V19 / QA</p>
+      <h1 data-demo-i18n="loot.title">掉落与装备 Lab</h1>
+      <p data-demo-i18n="loot.subtitle">直接运行生产 Content Bundle、装备生成器、掉落状态机、重铸事务与暴击数学。</p>
+    </div>
+    <nav class="header-actions">
+      <label><span data-demo-i18n="common.language">语言</span>
+        <select data-demo-locale><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+      </label>
+      <a href="../index.html" data-demo-i18n="common.demoHub">演示中心</a>
+      <a href="../../index.html" data-demo-i18n="common.backGame">返回游戏</a>
+    </nav>
+  </header>
+
+  <section class="contract-band">
+    <div><span data-demo-i18n="loot.contract">生产契约</span><strong>5 SLOTS / 17 BASES / 24 AFFIXES / 16 LEGENDARIES</strong></div>
+    <div><span data-demo-i18n="common.build">构建</span><strong id="build-id">20260804.1</strong></div>
+  </section>
+
+  <section class="panel controls">
+    <div class="section-head"><div><p class="eyebrow">SEEDED SOURCE</p><h2 data-demo-i18n="loot.scenario">掉落场景</h2></div>
+      <button id="run" class="primary" type="button" data-demo-i18n="loot.run">运行批量掉落</button></div>
+    <div class="control-grid">
+      <label><span data-demo-i18n="loot.class">职业</span><select id="class"></select></label>
+      <label><span data-demo-i18n="loot.level">角色等级</span><input id="level" type="number" min="1" max="200" value="32"></label>
+      <label><span data-demo-i18n="loot.tier">区域阶位</span><input id="tier" type="number" min="1" max="8" value="4"></label>
+      <label><span data-demo-i18n="loot.source">掉落来源</span><select id="source"></select></label>
+      <label><span data-demo-i18n="common.seed">世界种子</span><input id="seed" value="1234ABCD" maxlength="8"></label>
+      <label><span data-demo-i18n="loot.samples">批量次数</span><input id="samples" type="number" min="1" max="10000" value="1000"></label>
+    </div>
+  </section>
+
+  <section class="workspace">
+    <div class="main-column">
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">PITY / WEIGHTS</p><h2 data-demo-i18n="loot.distribution">稀有度与槽位分布</h2></div><strong id="drop-summary"></strong></div>
+        <div id="distribution" class="distribution"></div>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">BUILD LEDGER</p><h2 data-demo-i18n="loot.loadout">五槽构筑快照</h2></div></div>
+        <p class="section-note" data-demo-i18n="loot.loadoutHint">每槽使用本批次最后一件候选；缺槽时由相同 Seed 强制补齐。</p>
+        <div id="loadout" class="loadout-grid"></div>
+        <dl id="build-values" class="build-values"></dl>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">EFFECT DSL</p><h2 data-demo-i18n="loot.proc">传奇 Proc 编译日志</h2></div></div>
+        <p class="section-note" data-demo-i18n="loot.procHint">日志来自 compileItem 输出的稳定 source ID 与正式 EffectProfile。</p>
+        <ol id="proc-log" class="proc-log"></ol>
+      </section>
+    </div>
+
+    <aside class="side-column">
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">CAMP TRANSACTION</p><h2 data-demo-i18n="loot.reforge">营地重铸事务</h2></div></div>
+        <p class="section-note" data-demo-i18n="loot.reforgeHint">锁定至多一条普通词条，其余词条使用正式 Seed 重掷。</p>
+        <div id="reforge-item"></div>
+        <label><span data-demo-i18n="loot.lockAffix">锁定词条</span><select id="reforge-lock"></select></label>
+        <div id="reforge-quote" class="quote"></div>
+        <button id="reforge" class="primary full" type="button" data-demo-i18n="loot.execute">执行重铸</button>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">CRIT OVERFLOW</p><h2 data-demo-i18n="loot.crit">多阶暴击探针</h2></div></div>
+        <div class="crit-grid">
+          <label><span data-demo-i18n="loot.critChance">暴击率</span><input id="crit-chance" type="number" min="0" max="100000" step="1" value="145"></label>
+          <label><span data-demo-i18n="loot.critMultiplier">暴击倍率</span><input id="crit-multiplier" type="number" min="1" max="1000" step="0.05" value="1.8"></label>
+          <label><span data-demo-i18n="loot.roll">固定 Roll</span><input id="crit-roll" type="number" min="0" max="0.999999" step="0.01" value="0.44"></label>
+        </div>
+        <button id="resolve-crit" type="button" data-demo-i18n="loot.resolve">解析暴击</button>
+        <output id="crit-result" class="crit-result"></output>
+      </section>
+      <section class="panel">
+        <div class="section-head"><div><p class="eyebrow">POOL AUDIT</p><h2 data-demo-i18n="loot.audit">非法池诊断</h2></div></div>
+        <p class="section-note" data-demo-i18n="loot.auditHint">检查引用、槽位资格、重复定义、数量合同和生成验证。</p>
+        <ul id="audit" class="audit-list"></ul>
+      </section>
+    </aside>
+  </section>
+</main>
+
+<script src="../../js/core/utils.js?v=20260804.1"></script>
+<script src="../../js/core/eventbus.js?v=20260804.1"></script>
+<script src="../../js/core/registry.js?v=20260804.1"></script>
+<script src="../../js/i18n/i18n.js?v=20260804.1"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260804.1"></script>
+<script src="../../js/i18n/en.js?v=20260804.1"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260804.1"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260804.1"></script>
+<script src="../../js/core/assets.js?v=20260804.1"></script>
+<script src="../../js/data/formulas.js?v=20260804.1"></script>
+<script src="../../js/sprites/palettes.js?v=20260804.1"></script>
+<script src="../../js/sprites/hero.js?v=20260804.1"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260804.1"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260804.1"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260804.1"></script>
+<script src="../../js/sprites/monsters_guards.js?v=20260804.1"></script>
+<script src="../../js/sprites/props.js?v=20260804.1"></script>
+<script src="../../js/data/items.js?v=20260804.1"></script>
+<script src="../../js/data/skills.js?v=20260804.1"></script>
+<script src="../../js/core/content/rules.js?v=20260804.1"></script>
+<script src="../../js/core/content/schemas.js?v=20260804.1"></script>
+<script src="../../js/core/content/compiler.js?v=20260804.1"></script>
+<script src="../../js/core/content/audit.js?v=20260804.1"></script>
+<script src="../../js/core/content/registry.js?v=20260804.1"></script>
+<script src="../../js/core/content/support.js?v=20260804.1"></script>
+<script src="../../js/data/content/content.generated.js?v=20260804.1"></script>
+<script>window.LOOT_CONTENT_AUDIT = Game.content.finalize({ strict: true });</script>
+<script src="../../js/systems/equipment.js?v=20260804.1"></script>
+<script src="../../js/ui/panels_main.js?v=20260804.1"></script>
+<script src="../demo-i18n.js?v=20260804.1"></script>
+<script src="loot-lab.js?v=20260804.1"></script>
+</body>
+</html>

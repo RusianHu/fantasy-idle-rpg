@@ -67,7 +67,8 @@ function boot(seed = 0x1234ABCD) {
   Game.content.finalize({ strict: true });
   Game.assets.sprite = () => ({ w: 16, h: 20 });
   [
-    'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js'
+    'js/systems/equipment.js', 'js/systems/routes.js',
+    'js/systems/state.js', 'js/systems/inventory.js'
   ].forEach(load);
   Game.state = Game.State.newGame();
   Game.state.world.worldSeed = seed >>> 0;
@@ -206,7 +207,8 @@ function bootCombatMerchant(seed = 0xA11CE55) {
   Game.content.finalize({ strict: true });
   Game.assets.sprite = () => ({ w: 16, h: 20 });
   [
-    'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
+    'js/systems/equipment.js', 'js/systems/routes.js',
+    'js/systems/state.js', 'js/systems/inventory.js',
     'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
     'js/systems/actors/actors.js', 'js/systems/world_population.js',
     'js/systems/encounters.js', 'js/systems/engagement.js',

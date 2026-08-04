@@ -40,12 +40,25 @@
     var material = resources.length ? resources[Math.floor(stableRoll(treasure.id, 'material') * resources.length)].material : null;
     var count = reward.materialMin + Math.floor(stableRoll(treasure.id, 'count') *
       (reward.materialMax - reward.materialMin + 1));
-    var equipment = stableRoll(treasure.id, 'equipment') < reward.equipmentChance
-      ? Game.inv.genLoot(Game.state.player.level, { rarMin: reward.equipmentRarityMin,
-        luck: treasure.depth === 'deep' ? 1.55 : 1.18 }) : null;
+    var sourceType = treasure.depth === 'deep' ? 'nestDeep' : 'nestShallow';
+    var plan = Game.loot.plan({
+      sourceType: sourceType, sourceId: treasure.id,
+      playerLevel: Game.state.player.level,
+      minimumRank: reward.equipmentRarityMin || 0,
+      classId: Game.state.player.classId, regionId: regionId, tier: tier,
+      worldSeed: Game.state.world.worldSeed,
+      expeditionIndex: Game.expedition && Game.expedition.current
+        ? Game.expedition.current(regionId).index : 0,
+      dropMultiplier: Game.player.derived().dropMul,
+      rarityLuck: Game.player.derived().rarityLuck || 0
+    }, Game.state.inv.loot);
+    var equipmentItems = Game.loot.accept(plan);
+    var equipment = equipmentItems[0] || null;
     Game.player.addGold(reward.gold);
     if (material) Game.inv.addMaterial(material, count);
-    if (equipment) Game.inv.deliverDrops([{ category: 'equipment', item: equipment }], {
+    if (equipmentItems.length) Game.inv.deliverDrops(equipmentItems.map(function (item) {
+      return { category: 'equipment', item: item };
+    }), {
       source: 'nest-chest', forceGround: Game.state.settings.groundLoot !== false,
       x: treasure.x, y: treasure.y
     });

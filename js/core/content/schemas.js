@@ -7,6 +7,8 @@
     'stat', 'statProfile', 'damageType', 'resistanceProfile', 'resource',
     'resourceProfile', 'faction', 'combatRules', 'renderProfile',
     'actorArchetype', 'class', 'equipmentProfile', 'talentTree', 'talent',
+    'itemSlot', 'itemBase', 'itemRarity', 'itemAffix', 'itemAffixPool',
+    'lootTable', 'reforgeProfile', 'effectProfile',
     'ability', 'trait', 'status', 'aiProfile', 'tacticsProfile',
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
     'actorVariant', 'encounterPack', 'worldSpawnProfile',
@@ -17,13 +19,24 @@
   ];
 
   var required = {
-    stat: ['id', 'defaultValue', 'min', 'max'],
+    stat: ['id', 'defaultValue', 'min'],
     damageType: ['id', 'category'],
     resource: ['id', 'min', 'max', 'initial'],
     faction: ['id', 'relations'],
     combatRules: ['id', 'tickMs', 'baseGcdTicks'],
     actorArchetype: ['id', 'category', 'identity', 'presentation', 'body', 'defaultFactionId'],
-    class: ['id', 'roles', 'statProfileId', 'baseAbilityGrantIds', 'talentTreeId'],
+    class: [
+      'id', 'roles', 'statProfileId', 'baseAbilityGrantIds', 'talentTreeId',
+      'equipmentProfileId', 'primaryPowerStat', 'baseStats', 'growth'
+    ],
+    itemSlot: ['id', 'order', 'icon'],
+    itemBase: ['id', 'slotId', 'implicitModifiers'],
+    itemRarity: ['id', 'rank', 'implicitMultiplier', 'normalAffixCount'],
+    itemAffix: ['id', 'kind', 'family', 'weight'],
+    itemAffixPool: ['id', 'affixIds', 'familyLimits'],
+    lootTable: ['id', 'rarityWeights', 'equipmentChance'],
+    reforgeProfile: ['id', 'goldBaseFactor', 'goldLinearFactor', 'goldQuadraticFactor'],
+    effectProfile: ['id', 'trigger'],
     talent: ['id', 'classId', 'unlockLevel', 'maxRank', 'costs'],
     ability: ['id', 'kind', 'target', 'presentation'],
     trait: ['id', 'kind', 'presentation'],
@@ -78,6 +91,10 @@
       aiProfileId: 'aiProfile', tacticsProfileIds: 'tacticsProfile',
       evaluationProfileId: 'evaluationProfile'
     },
+    equipmentProfile: { slots: 'itemSlot' },
+    itemBase: { slotId: 'itemSlot', classIds: 'class' },
+    itemAffix: { effectProfileId: 'effectProfile' },
+    itemAffixPool: { affixIds: 'itemAffix' },
     talentTree: { talentIds: 'talent' },
     talent: { classId: 'class', abilityIds: 'ability', traitIds: 'trait' },
     trait: { statusIds: 'status', abilityIds: 'ability' },
@@ -114,7 +131,36 @@
     },
     class: {
       schemaVersion: 1, tags: [], roles: [], resourceProfileIds: [],
-      baseAbilityGrantIds: [], traitIds: [], tacticsProfileIds: []
+      baseAbilityGrantIds: [], traitIds: [], tacticsProfileIds: [],
+      equipmentProfileId: null, primaryPowerStat: 'physicalPower',
+      baseStats: {}, growth: {}, equipmentTags: [], evaluationWeights: {},
+      weaponAppearance: null, statDots: {}
+    },
+    itemSlot: { schemaVersion: 1, tags: [] },
+    itemBase: {
+      schemaVersion: 1, tags: [], classIds: [], implicitModifiers: [],
+      presentation: {}
+    },
+    itemRarity: {
+      schemaVersion: 1, legendaryAffixCount: 0, sellMultiplier: 1,
+      presentation: {}
+    },
+    itemAffix: {
+      schemaVersion: 1, tags: [], slots: [], modifiers: [], grants: {},
+      uniqueEquipped: false, presentation: {}
+    },
+    itemAffixPool: { schemaVersion: 1, affixIds: [], familyLimits: {} },
+    lootTable: {
+      schemaVersion: 1, rarityWeights: [], equipmentChance: {},
+      equipmentPity: 10, epicPity: 12, legendaryPity: 40
+    },
+    reforgeProfile: {
+      schemaVersion: 1, goldBaseFactor: 0.35, goldLinearFactor: 0.18,
+      goldQuadraticFactor: 0.04, materialMax: 8
+    },
+    effectProfile: {
+      schemaVersion: 1, priority: 100, conditions: [], effects: [],
+      allowProcFromProc: false, uniqueEquipped: true, presentation: {}
     },
     talent: {
       schemaVersion: 1, maxRank: 10, costs: [1], grants: {},

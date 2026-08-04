@@ -1410,6 +1410,9 @@
         legacy.boss = archetype.rank === 'boss';
         Game.reg.register('monster', C.deepFreeze(legacy));
       });
+      if (Game.builds && typeof Game.builds.installClassProjections === 'function') {
+        Game.builds.installClassProjections();
+      }
       finalized = true;
       return lastAudit;
     },

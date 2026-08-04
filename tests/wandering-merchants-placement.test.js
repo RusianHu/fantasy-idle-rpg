@@ -54,7 +54,8 @@ const Game = sandbox.Game;
 Game.content.finalize({ strict: true });
 Game.assets.sprite = () => ({ w: 16, h: 20 });
 [
-  'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
+  'js/systems/equipment.js', 'js/systems/routes.js',
+  'js/systems/state.js', 'js/systems/inventory.js',
   'js/systems/terrain.js', 'js/systems/terrain_v3.js', 'js/systems/terrain_v4.js', 'js/systems/nav.js',
   'js/systems/world_population.js', 'js/systems/world.js'
 ].forEach(load);

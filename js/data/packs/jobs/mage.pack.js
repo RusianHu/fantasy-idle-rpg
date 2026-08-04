@@ -80,6 +80,12 @@
       }],
       class: [{
         id: 'mage', roles: ['ranged-dps'], tags: ['ranged', 'magic'],
+        primaryPowerStat: 'magicPower',
+        baseStats: { maxHp: 92, power: 17, armor: 3, ward: 1.95, speed: 10, critChance: .06, critMultiplier: 1.6, range: 72 },
+        growth: { maxHp: 1.07, power: 1.075, armor: 1.055, ward: 1.055, speedPerLevel: .25, critChancePerLevel: .001, critMultiplierPerLevel: .01 },
+        equipmentTags: ['adventurer', 'mage'], weaponAppearance: 'staff',
+        evaluationWeights: { offense: .65, survival: .30, economy: .05 },
+        statDots: { hp: 1, atk: 5, def: 1, spd: 3, burst: 5 },
         statProfileId: 'stats.mage', resourceProfileIds: ['resources.mage'],
         baseAbilityGrantIds: ['mage.auto_attack', 'mage.arcane_bolt', 'mage.fireball', 'mage.arcane_nova', 'mage.arcane_barrage', 'mage.barrier_action', 'mage.mana_font'],
         traitIds: ['mage.arcane_mastery'], talentTreeId: 'talents.mage',

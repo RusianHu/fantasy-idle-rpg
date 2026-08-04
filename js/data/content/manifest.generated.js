@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "86c925d0960f7b0eb372faa25a535c19cd4483f0ef93f9d3c0bb4e4ddd79126b",
+  "sourceSetHash": "cadb7b0ac128abf8b128f6a246aeb1b133e5e18dcd64ded908deb46bce64872a",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -98,27 +98,27 @@
     {
       "path": "js/data/packs/jobs/cleric.pack.js",
       "kind": "pack",
-      "sha256": "0d26adfb2db2bb357afd871392b04d15cd319447c16aefa3a9d49e99bb25df39"
+      "sha256": "48ab618294f68417574374ae4797136991393e652ca74dae37a706f8ec40762d"
     },
     {
       "path": "js/data/packs/jobs/fighter.pack.js",
       "kind": "pack",
-      "sha256": "b3d398af18421754580e887b30f7c0df9f89f9b41f190b949aec7895a5943b18"
+      "sha256": "d528a10c77a1b667ce8ba9e86f748b82e48f72a1ec931f27e6a27c4ba84e93c1"
     },
     {
       "path": "js/data/packs/jobs/mage.pack.js",
       "kind": "pack",
-      "sha256": "fe3697376795c0f5bcaad276f55348b6a52b0e0a3187d9c9ec5d93761f51cd48"
+      "sha256": "158d78e79581def60013be08ec1bc0215325369c2ed8a873bcebc899a6cd9235"
     },
     {
       "path": "js/data/packs/jobs/ranger.pack.js",
       "kind": "pack",
-      "sha256": "32dafa2abdc1d3e26fc58ec8d3397c51ed7b3a6242773a2bdf9e6ac160ff1ea0"
+      "sha256": "11953a9773ce9b09876f2df8c5fd2f36e20c0431cade6156106d8834cf5db342"
     },
     {
       "path": "js/data/packs/jobs/rogue.pack.js",
       "kind": "pack",
-      "sha256": "42976a962a9ef7c973634afb8bbe6f6fd5e7900e505562adee7d85123739acb5"
+      "sha256": "4e20e3e650d05efbd9da10c4ecea47a5546ec1e3ef25cb2053412497322094f5"
     },
     {
       "path": "js/data/packs/regions/catalog.support.js",
@@ -178,7 +178,12 @@
     {
       "path": "js/data/packs/rules/core.pack.js",
       "kind": "pack",
-      "sha256": "6fbb553b913384cb80f09475efcbeb002cc52a36f9417126bec68aba84b50cf5"
+      "sha256": "5a38556ac273bc848c2d0bb8a13425ec891af9ced2d946a7bc0137626d4e262e"
+    },
+    {
+      "path": "js/data/packs/rules/equipment.pack.js",
+      "kind": "pack",
+      "sha256": "83e8ca2226513f5c5122459cb69ff0d7515816dc2987cee2d24801045947ee72"
     },
     {
       "path": "js/data/packs/world/actors.pack.js",
@@ -292,6 +297,10 @@
     {
       "id": "core.combat",
       "version": "2.0.0"
+    },
+    {
+      "id": "core.equipment",
+      "version": "1.0.0"
     },
     {
       "id": "job.cleric",
@@ -430,6 +439,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "77514e73"
+  "contentFingerprint": "d280def3"
 });
 })();

@@ -21,8 +21,20 @@
     return out;
   }
 
-  function expectedDamage(atk, def) {
-    return atk * atk / (atk + Math.max(0, def));
+  function expectedDamage(raw, defense, tier) {
+    return Game.combatMath.mitigate(Math.max(0, raw), Math.max(0, defense), tier || 1).amount;
+  }
+
+  function expectedCritMultiplier(chance, multiplier) {
+    chance = Math.max(0, Number(chance) || 0);
+    multiplier = Math.max(1, Number(multiplier) || 1);
+    var guaranteed = Math.floor(chance);
+    var fraction = chance - guaranteed;
+    var guaranteedMultiplier = Game.combatMath.saturatingPow
+      ? Game.combatMath.saturatingPow(multiplier, guaranteed).value
+      : Math.min(1e300, Math.pow(multiplier, guaranteed));
+    return Game.combatMath.saturatingMultiply(guaranteedMultiplier,
+      1 + fraction * (multiplier - 1)).value;
   }
 
   function regionContext(rid) {
@@ -50,16 +62,15 @@
     opts = opts || {};
     var state = Game.state, p = state.player;
     var classId = opts.classId !== undefined ? opts.classId : p.classId;
-    var cls = reg.get('class', classId) || Game.player.classDef();
+    var cls = Game.builds.classProjection(classId);
     var level = opts.level !== undefined ? opts.level : p.level;
     var skills = opts.skills || p.skills;
     var equipped = opts.equipped || state.inv.equipped;
-    var d = Game.player.previewDerived({
-      classId: classId,
-      level: level,
-      skills: skills,
-      equipped: equipped
-    });
+    var d = Game.builds.projectDerived(Game.builds.compileActorRecord({
+      classId: classId, level: level, talentRanks: skills,
+      permanentUpgrades: opts.perms || p.perms,
+      loadout: { equipment: equipped }
+    }, equipped));
     var ctx = regionContext(opts.regionId || state.world.region);
     var actives = reg.all('skill').filter(function (sk) {
       return sk.cls === classId && sk.type === 'active' && level >= (sk.unlockLv || 1);
@@ -83,9 +94,9 @@
     var atk = d.atk * (1 + avg.atkPct);
     var def = d.def * (1 + avg.defPct);
     var spd = d.spd * (1 + avg.spdPct);
-    var crit = Math.min(0.95, d.crit + avg.crit);
-    var critMult = 1 + crit * (d.critDmg - 1);
-    var hit = expectedDamage(atk, ctx.normalDef);
+    var crit = Math.max(0, d.crit + avg.crit);
+    var critMult = expectedCritMultiplier(crit, d.critDmg);
+    var hit = expectedDamage(atk, ctx.normalDef, ctx.tier);
     var directDps = hit * critMult / F.atkInterval(spd);
     var dotDps = 0;
     var healingPerSec = 0;
@@ -96,8 +107,8 @@
       var rank = skills[sk.id] || 0;
       var cd = Math.max(0.1, sk.cd * (1 - d.cdr));
       if (sk.kind === 'strike') {
-        var skillCrit = Math.min(0.95, crit + (sk.critBonus || 0));
-        var skillCritMult = 1 + skillCrit * (d.critDmg - 1);
+        var skillCrit = Math.max(0, crit + (sk.critBonus || 0));
+        var skillCritMult = expectedCritMultiplier(skillCrit, d.critDmg);
         var strikeDps = hit * F.skillVal(sk.mult, rank) * skillCritMult / cd;
         directDps += strikeDps;
         if (sk.healOfDmg) healingPerSec += strikeDps * sk.healOfDmg * d.healPow;
@@ -116,7 +127,7 @@
     }
 
     var offense = Math.max(0.001, directDps + dotDps);
-    var bossHit = expectedDamage(ctx.bossAtk, def);
+    var bossHit = expectedDamage(ctx.bossAtk, def, ctx.tier);
     var incoming = bossHit / F.atkInterval(ctx.bossSpd) * (1 - d.dodge);
     var naturalRegen = d.maxHp * (0.004 + (d.regen || 0)) * d.healPow;
     var lifesteal = directDps * d.lifesteal * d.healPow;
@@ -137,7 +148,7 @@
       w.survival * Math.log(survival) +
       w.economy * Math.log(economy);
     var estimator = null;
-    if (Game.combatEstimator && Game.content && Game.content.isFinalized()) {
+    if (opts.skipEstimator !== true && Game.combatEstimator && Game.content && Game.content.isFinalized()) {
       estimator = Game.combatEstimator.evaluateCurrent({
         regionId: ctx.rid,
         classId: classId,
@@ -145,8 +156,8 @@
         skills: skills,
         equipped: equipped,
         tacticsProfile: state.settings.combatStrategy || 'balanced',
-        sampleSeeds: [71],
-        maxTicks: 6000
+        sampleSeeds: opts.sampleSeeds || [11, 29, 47],
+        maxTicks: opts.maxTicks || 6000
       });
       if (estimator && Number.isFinite(estimator.averageDps) && estimator.averageDps > 0) {
         offense = estimator.averageDps;
@@ -211,6 +222,272 @@
     }
   }
 
+  var EQUIPMENT_SLICE_MS = 4;
+  var equipmentJobSequence = 0;
+
+  function supportsEquipmentSlicing() {
+    return !Game.AUTOMATION_FORCE_SYNC && typeof window.requestAnimationFrame === 'function' &&
+      typeof window.performance === 'object' && typeof window.performance.now === 'function';
+  }
+
+  function equipmentStateSignature(state, slots) {
+    var payload = {
+      classId: state.player.classId,
+      regionId: state.world.region,
+      autoEquip: state.settings.autoEquip,
+      equipped: slots.map(function (slot) { return state.inv.equipped[slot] || null; }),
+      locks: slots.map(function (slot) { return !!state.inv.lockedSlots[slot]; }),
+      items: state.inv.items.map(function (item) {
+        return [item.uid, item.baseId || item.base, item.classId || null,
+          item.itemLevel || item.ilvl, item.rarityId || item.rar,
+          item.reforge && item.reforge.count || 0, item.affixes || null];
+      })
+    };
+    var serialized = Game.contentCompiler && Game.contentCompiler.stableStringify
+      ? Game.contentCompiler.stableStringify(payload) : JSON.stringify(payload);
+    return U.fnv1a(serialized);
+  }
+
+  function createEquipmentJob(opts) {
+    var s = Game.state;
+    var locks = s.inv.lockedSlots || {};
+    var initial = copyMap(s.inv.equipped);
+    var regionId = s.world.region;
+    var slots = Game.equipment ? Game.equipment.SLOT_IDS.slice() : reg.ids('slot');
+    var signature = equipmentStateSignature(s, slots);
+    var candidates = {};
+
+    function staticScore(item) {
+      var st = Game.inv.itemStats(item);
+      return (st.atk || 0) * 2 + (st.hp || 0) * .2 +
+        (st.def || 0) + (st.ward || 0) +
+        ((st.crit || 0) * 180 + (st.critDmg || 0) * 90 +
+        (st.dodge || 0) * 120 + (st.lifesteal || 0) * 120 +
+        (st.cdr || 0) * 100 + (st.healPow || 0) * 80 +
+        (st.goldMul || 0) * 25 + (st.expMul || 0) * 25 +
+        (st.dropMul || 0) * 45 + (st.rarityLuck || 0) * 45);
+    }
+    slots.forEach(function (slot) {
+      if (locks[slot]) { candidates[slot] = [initial[slot] || null]; return; }
+      var rows = s.inv.items.filter(function (item) {
+        return (Game.equipment ? Game.equipment.slotOf(item) : item.base) === slot &&
+          (!item.classId || item.classId === s.player.classId);
+      }).sort(function (left, right) {
+        return staticScore(right) - staticScore(left) || left.uid.localeCompare(right.uid);
+      });
+      var ids = [initial[slot] || null];
+      rows.slice(0, 8).forEach(function (item) {
+        if (ids.indexOf(item.uid) < 0) ids.push(item.uid);
+      });
+      candidates[slot] = ids;
+    });
+    function keyOf(loadout) {
+      return slots.map(function (slot) { return loadout[slot] || '-'; }).join('|');
+    }
+    function sortBeams(rows) {
+      rows.sort(function (left, right) {
+        return right.evaluation.utility - left.evaluation.utility ||
+          keyOf(left.loadout).localeCompare(keyOf(right.loadout));
+      });
+      var seen = {};
+      return rows.filter(function (beam) {
+        var key = keyOf(beam.loadout);
+        if (seen[key]) return false;
+        seen[key] = true;
+        return true;
+      }).slice(0, 32);
+    }
+
+    var stage = 'expand';
+    var slotIndex = 0, beamIndex = 0, candidateIndex = 0, finalistIndex = 0;
+    var expanded = [], finalists = [], evaluated = [];
+    var beams = [{
+      loadout: copyMap(initial),
+      evaluation: F.evaluateBuild({ equipped: initial, regionId: regionId, skipEstimator: true })
+    }];
+    var job = {
+      id: ++equipmentJobSequence,
+      opts: opts,
+      done: false,
+      result: null,
+      slices: 0,
+      maxSliceMs: 0,
+      operations: 0,
+      step: function () {
+        if (job.done) return true;
+        job.operations++;
+        if (stage === 'expand') {
+          if (slotIndex >= slots.length) { stage = 'prepare-finalists'; return false; }
+          var slot = slots[slotIndex];
+          var beam = beams[beamIndex];
+          var uid = candidates[slot][candidateIndex];
+          var trial = copyMap(beam.loadout);
+          trial[slot] = uid;
+          expanded.push({
+            loadout: trial,
+            evaluation: F.evaluateBuild({
+              equipped: trial, regionId: regionId, skipEstimator: true
+            })
+          });
+          candidateIndex++;
+          if (candidateIndex >= candidates[slot].length) {
+            candidateIndex = 0;
+            beamIndex++;
+          }
+          if (beamIndex >= beams.length) {
+            beams = sortBeams(expanded);
+            expanded = [];
+            beamIndex = 0;
+            slotIndex++;
+          }
+          return false;
+        }
+        if (stage === 'prepare-finalists') {
+          var initialKey = keyOf(initial);
+          var preservedInitial = beams.filter(function (beam) {
+            return keyOf(beam.loadout) === initialKey;
+          })[0];
+          if (!preservedInitial) {
+            preservedInitial = {
+              loadout: copyMap(initial),
+              evaluation: F.evaluateBuild({
+                equipped: initial, regionId: regionId, skipEstimator: true
+              })
+            };
+            beams.push(preservedInitial);
+          }
+          beams = sortBeams(beams);
+          finalists = beams.slice(0, 8);
+          if (!finalists.some(function (beam) { return keyOf(beam.loadout) === initialKey; })) {
+            finalists.push(preservedInitial);
+          }
+          finalists = finalists.filter(Boolean);
+          stage = 'estimate';
+          return false;
+        }
+        if (stage === 'estimate') {
+          var finalist = finalists[finalistIndex++];
+          evaluated.push({
+            loadout: finalist.loadout,
+            evaluation: F.evaluateBuild({
+              equipped: finalist.loadout, regionId: regionId,
+              sampleSeeds: [11, 29, 47]
+            })
+          });
+          if (finalistIndex >= finalists.length) stage = 'commit';
+          return false;
+        }
+
+        var currentSignature = equipmentStateSignature(s, slots);
+        if (currentSignature !== signature) {
+          job.result = { changes: [], gain: 0, ok: false, reason: 'stale-build' };
+          job.done = true;
+          return true;
+        }
+        if (Game.world && Game.world.hero && Game.world.hero.encounterId) {
+          job.result = { changes: [], gain: 0, ok: false, reason: 'encounter-active' };
+          job.done = true;
+          return true;
+        }
+        var finalInitialKey = keyOf(initial);
+        evaluated.sort(function (left, right) {
+          var delta = right.evaluation.utility - left.evaluation.utility;
+          if (Math.abs(delta) > VALUE_EPS) return delta;
+          if (keyOf(left.loadout) === finalInitialKey) return -1;
+          if (keyOf(right.loadout) === finalInitialKey) return 1;
+          return keyOf(left.loadout).localeCompare(keyOf(right.loadout));
+        });
+        var best = evaluated[0];
+        var initialBeam = evaluated.filter(function (beam) {
+          return keyOf(beam.loadout) === finalInitialKey;
+        })[0];
+        if (!best || !initialBeam ||
+            best.evaluation.utility - initialBeam.evaluation.utility < EQUIP_MIN_GAIN) {
+          job.result = { changes: [], gain: 0 };
+          job.done = true;
+          return true;
+        }
+
+        var changes = [];
+        slots.forEach(function (slotId) {
+          if (initial[slotId] === best.loadout[slotId]) return;
+          changes.push({
+            slot: slotId,
+            previous: initial[slotId] ? Game.inv.byUid(initial[slotId]) : null,
+            item: best.loadout[slotId] ? Game.inv.byUid(best.loadout[slotId]) : null
+          });
+        });
+        if (!changes.length) {
+          job.result = { changes: [], gain: 0 };
+          job.done = true;
+          return true;
+        }
+        var comparison = F.compareBuilds(initialBeam.evaluation, best.evaluation);
+        s.inv.equipped = copyMap(best.loadout);
+        Game.player.recalc();
+        if (Game.world && Game.world.hero) Game.world.syncHeroStats();
+        changes.forEach(function (change) {
+          if (change.item) bus.emit('item:equipped', {
+            item: change.item, previous: change.previous, auto: true
+          });
+        });
+        bus.emit('equipment:autoChanged', {
+          changes: changes, gain: comparison.overall, reason: opts.reason || 'auto'
+        });
+        recordSummary({
+          reason: opts.reason || 'auto', gearChanges: changes, gain: comparison.overall
+        });
+        job.result = { changes: changes, gain: comparison.overall };
+        job.done = true;
+        return true;
+      }
+    };
+    return job;
+  }
+
+  function completeEquipmentJob(job, ticket) {
+    ticket.pending = false;
+    ticket.result = job.result;
+    ticket.slices = job.slices;
+    ticket.maxSliceMs = job.maxSliceMs;
+    Game.auto.equipmentJobDiagnostics = {
+      id: job.id, slices: job.slices, operations: job.operations,
+      maxSliceMs: job.maxSliceMs, budgetMs: EQUIPMENT_SLICE_MS,
+      result: job.result
+    };
+    if (typeof job.opts.onComplete === 'function') job.opts.onComplete(job.result);
+  }
+
+  function runEquipmentJob(job) {
+    var ticket = { pending: true, jobId: job.id, result: null };
+    if (!supportsEquipmentSlicing()) {
+      while (!job.done) job.step();
+      completeEquipmentJob(job, ticket);
+      return job.result;
+    }
+    function slice() {
+      var started = window.performance.now();
+      try {
+        do {
+          job.step();
+        } while (!job.done && window.performance.now() - started < EQUIPMENT_SLICE_MS);
+      } catch (error) {
+        job.done = true;
+        job.result = {
+          changes: [], gain: 0, ok: false, reason: 'automation-error',
+          error: String(error && error.message || error)
+        };
+      }
+      var elapsed = window.performance.now() - started;
+      job.slices++;
+      job.maxSliceMs = Math.max(job.maxSliceMs, elapsed);
+      if (job.done) completeEquipmentJob(job, ticket);
+      else window.setTimeout(slice, 0);
+    }
+    window.setTimeout(slice, 0);
+    return ticket;
+  }
+
   var Auto = Game.auto = {
     frontierRegion: function () {
       var order = Game.State.regionOrder();
@@ -247,88 +524,26 @@
       if (!item || !Game.state) return null;
       var loadout = copyMap(Game.state.inv.equipped);
       var base = F.evaluateBuild({ equipped: loadout, regionId: Game.state.world.region });
-      loadout[item.base] = item.uid;
+      loadout[Game.equipment ? Game.equipment.slotOf(item) : item.base] = item.uid;
       var candidate = F.evaluateBuild({ equipped: loadout, regionId: Game.state.world.region });
       return F.compareBuilds(base, candidate);
     },
 
-    /** 坐标优化未锁槽位；严格增益保证不会循环。 */
+    /** 五槽 beam search；浏览器按 4ms 切片，最终候选才运行正式模拟。 */
     optimizeEquipment: function (opts) {
       opts = opts || {};
       var s = Game.state;
-      if (!s || !s.settings.autoEquip || !Game.player.hasClass()) return { changes: [], gain: 0 };
-      var locks = s.inv.lockedSlots || {};
-      var initial = copyMap(s.inv.equipped);
-      var loadout = copyMap(initial);
-      var regionId = s.world.region;
-      var currentEval = F.evaluateBuild({ equipped: loadout, regionId: regionId });
-
-      for (var pass = 0; pass < 5; pass++) {
-        var changedThisPass = false;
-        var slots = reg.ids('slot');
-        for (var si = 0; si < slots.length; si++) {
-          var slot = slots[si];
-          if (locks[slot]) continue;
-          var bestUid = loadout[slot] || null;
-          var bestEval = currentEval;
-          for (var ii = 0; ii < s.inv.items.length; ii++) {
-            var item = s.inv.items[ii];
-            if (item.base !== slot || item.uid === bestUid) continue;
-            var trial = copyMap(loadout);
-            trial[slot] = item.uid;
-            var ev = F.evaluateBuild({ equipped: trial, regionId: regionId });
-            if (ev.utility > bestEval.utility + VALUE_EPS) {
-              bestUid = item.uid;
-              bestEval = ev;
-            }
-          }
-          if (bestUid !== loadout[slot] && bestEval.utility - currentEval.utility >= EQUIP_MIN_GAIN) {
-            loadout[slot] = bestUid;
-            currentEval = bestEval;
-            changedThisPass = true;
-          }
-        }
-        if (!changedThisPass) break;
+      if (!s || !s.settings.autoEquip || !Game.player.hasClass()) {
+        var unavailable = { changes: [], gain: 0 };
+        if (typeof opts.onComplete === 'function') opts.onComplete(unavailable);
+        return unavailable;
       }
-
-      var changes = [];
-      var slotIds = reg.ids('slot');
-      for (var k = 0; k < slotIds.length; k++) {
-        var slotId = slotIds[k];
-        if (initial[slotId] === loadout[slotId]) continue;
-        changes.push({
-          slot: slotId,
-          previous: initial[slotId] ? Game.inv.byUid(initial[slotId]) : null,
-          item: loadout[slotId] ? Game.inv.byUid(loadout[slotId]) : null
-        });
+      if (Game.world && Game.world.hero && Game.world.hero.encounterId) {
+        var active = { changes: [], gain: 0, ok: false, reason: 'encounter-active' };
+        if (typeof opts.onComplete === 'function') opts.onComplete(active);
+        return active;
       }
-      if (!changes.length) return { changes: [], gain: 0 };
-
-      var initialEval = F.evaluateBuild({ equipped: initial, regionId: regionId });
-      var comparison = F.compareBuilds(initialEval, currentEval);
-      s.inv.equipped = loadout;
-      Game.player.recalc();
-      if (Game.world && Game.world.hero) Game.world.syncHeroStats();
-      for (var ci = 0; ci < changes.length; ci++) {
-        if (changes[ci].item) {
-          bus.emit('item:equipped', {
-            item: changes[ci].item,
-            previous: changes[ci].previous,
-            auto: true
-          });
-        }
-      }
-      bus.emit('equipment:autoChanged', {
-        changes: changes,
-        gain: comparison.overall,
-        reason: opts.reason || 'auto'
-      });
-      recordSummary({
-        reason: opts.reason || 'auto',
-        gearChanges: changes,
-        gain: comparison.overall
-      });
-      return { changes: changes, gain: comparison.overall };
+      return runEquipmentJob(createEquipmentJob(opts));
     },
 
     /** 对每个可用技能的下一点做完整模拟，并在每次提交后重新评估。 */
@@ -402,6 +617,24 @@
 
     /** 旧档/升级等协调：先换装，再加点，最后按新构筑复核换装。 */
     reconcile: function (reason) {
+      if (supportsEquipmentSlicing()) {
+        Auto.beginBatch(reason || 'auto');
+        var ticket = { pending: true, summary: null };
+        function finish() {
+          ticket.pending = false;
+          ticket.summary = Auto.endBatch();
+        }
+        Auto.optimizeEquipment({
+          reason: reason || 'auto',
+          onComplete: function () {
+            var skills = Auto.allocateSkills({ reason: reason || 'auto' });
+            if (skills.count > 0) {
+              Auto.optimizeEquipment({ reason: reason || 'auto', onComplete: finish });
+            } else finish();
+          }
+        });
+        return ticket;
+      }
       Auto.beginBatch(reason || 'auto');
       var summary = null;
       try {

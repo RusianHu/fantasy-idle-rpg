@@ -42,7 +42,7 @@ const audit = JSON.parse(execFileSync(process.execPath, ['tools/audit-content.js
   cwd: ROOT, encoding: 'utf8'
 }));
 assert.equal(audit.ok, true);
-assert.equal(audit.packs.length, 35);
+assert.equal(audit.packs.length, 36);
 assert.equal(audit.counts.encounterPoolProfile, 72);
 assert.equal(audit.counts.guardSiteProfile, 24);
 assert.match(audit.fingerprint, /^[0-9a-f]{8}$/);

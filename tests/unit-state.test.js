@@ -47,13 +47,14 @@ function load(file) {
   'js/sprites/ground-decorations/skyruins.generated.js',
   'js/sprites/ground-decorations/darkcastle.generated.js',
   'js/sprites/exploration_v3.js',
-  'js/data/formulas.js', 'js/data/affixes.js', 'js/data/items.js',
-  'js/data/classes.js', 'js/data/skills.js', 'js/data/routes.js',
+  'js/data/formulas.js', 'js/data/items.js',
+  'js/data/skills.js', 'js/data/routes.js',
   'js/core/content/support.js', 'js/data/content/content.generated.js'
 ].forEach(load);
 sandbox.Game.content.finalize({ strict: true });
 [
-  'js/systems/routes.js', 'js/systems/state.js', 'js/systems/inventory.js',
+  'js/systems/routes.js', 'js/systems/state.js', 'js/systems/equipment.js',
+  'js/systems/inventory.js',
   'js/systems/actors/relations.js', 'js/systems/actors/parties.js',
   'js/systems/actors/roster.js', 'js/systems/actors/actors.js'
 ].forEach(load);

@@ -245,6 +245,8 @@ runV1CompatibilitySnapshots();
 runSubseedIsolation();
 runNavLifecycle();
 
+load('js/data/formulas.js');
+load('js/systems/equipment.js');
 load('js/systems/state.js');
 
 const canonicalOrder = Game.reg.ids('region');

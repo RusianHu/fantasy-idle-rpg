@@ -331,8 +331,14 @@ Game.effects.resolveExternal({
   targetIds: [hero.id], effects: [{ type: 'applyStatus', statusId: 'grassland.bleeding' }],
   worldTick: 0, tick: 0, regionTier: 1
 });
+const periodicEvents = [];
+const offPeriodicHit = Game.bus.on('external:hit', (event) => periodicEvents.push(event));
 Game.effects.cleanupExternal(20);
+offPeriodicHit();
 assert.ok(hero.hp < periodicHp, 'out-of-encounter Hazard Status resolves periodic damage');
+assert.equal(periodicEvents[0].payload.amount, 1,
+  'external periodic damage keeps the minimum committed-damage contract');
+assert.equal(periodicEvents[0].payload.isCritical, false);
 Game.effects.cleanupExternal(120);
 assert.equal(hero.components.statuses.some((status) => status.key === 'external:periodic:test:grassland.bleeding'), false);
 

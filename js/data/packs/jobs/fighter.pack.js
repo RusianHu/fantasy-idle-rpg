@@ -122,6 +122,12 @@
       ],
       class: [{
         id: 'fighter', schemaVersion: 1, roles: ['tank'], tags: ['melee'],
+        primaryPowerStat: 'physicalPower',
+        baseStats: { maxHp: 150, power: 13, armor: 8, ward: 5.2, speed: 9, critChance: .05, critMultiplier: 1.5, range: 22 },
+        growth: { maxHp: 1.078, power: 1.068, armor: 1.068, ward: 1.068, speedPerLevel: .25, critChancePerLevel: .001, critMultiplierPerLevel: .01 },
+        equipmentTags: ['adventurer', 'fighter'], weaponAppearance: 'sword',
+        evaluationWeights: { offense: .45, survival: .50, economy: .05 },
+        statDots: { hp: 5, atk: 3, def: 5, spd: 2, burst: 2 },
         statProfileId: 'stats.fighter', resourceProfileIds: ['resources.fighter'],
         baseAbilityGrantIds: [
           'fighter.auto_attack', 'fighter.vanguard_slash', 'fighter.rising_cut',

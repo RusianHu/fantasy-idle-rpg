@@ -325,6 +325,126 @@
         } : null;
         data.v = 18;
       }
+    },
+    {
+      // v18 -> v19: replace every legacy item with a deterministic five-slot
+      // item. Equipped items keep level/rarity and UID; the rest are currency.
+      from: 18,
+      fn: function (data) {
+        if (!Game.loot || !Game.equipment) return;
+        var inv = data.inv = data.inv || {};
+        var economy = data.economy = data.economy || { gold: 0, crystal: 0 };
+        var roster = data.roster = data.roster || { actors: {} };
+        var actors = roster.actors || {};
+        var primaryId = roster.primaryActorId || 'player-main';
+        var primary = actors[primaryId] || actors['player-main'];
+        var classId = primary && primary.classId || 'fighter';
+        var equippedIds = {};
+        Object.keys(actors).forEach(function (actorId) {
+          var loadout = actors[actorId] && actors[actorId].loadout || {};
+          var equipment = loadout.equipment || {};
+          Object.keys(equipment).forEach(function (slot) {
+            if (equipment[slot]) equippedIds[equipment[slot]] = { actorId: actorId, slot: slot };
+          });
+        });
+        var replacements = [];
+        var itemByUid = {};
+        (Array.isArray(inv.items) ? inv.items : []).forEach(function (old) {
+          if (!old || !old.uid) return;
+          var owner = equippedIds[old.uid];
+          if (!owner) {
+            if ((old.rar | 0) === 4) {
+              economy.crystal = (economy.crystal || 0) + Game.F.salvageCrystal(old.ilvl);
+            } else {
+              economy.gold = (economy.gold || 0) + Game.F.sellPrice(old.ilvl, old.rar | 0);
+            }
+            return;
+          }
+          var oldSlot = old.base === 'armor' ? 'body' : old.base === 'ring' ? 'accessory' : old.base;
+          if (['weapon', 'body', 'accessory'].indexOf(oldSlot) < 0) {
+            if ((old.rar | 0) === 4) economy.crystal = (economy.crystal || 0) + Game.F.salvageCrystal(old.ilvl);
+            else economy.gold = (economy.gold || 0) + Game.F.sellPrice(old.ilvl, old.rar | 0);
+            return;
+          }
+          var ownerRecord = owner && actors[owner.actorId];
+          var item = Game.loot.generateEquipment({
+            seed: U.strSeed([data.world && data.world.worldSeed || 0, 'migration-v19', old.uid].join('|')),
+            uid: old.uid, sourceType: 'migration', sourceId: old.uid,
+            classId: ownerRecord && ownerRecord.classId || classId,
+            slotId: oldSlot, itemLevel: Math.max(1, old.ilvl | 0),
+            rarityId: Game.loot.RARITY_IDS ? Game.loot.RARITY_IDS[Math.max(0, Math.min(4, old.rar | 0))] : null,
+            regionId: data.world && data.world.region, tier: data.world && data.world.regionTier || 1,
+            worldSeed: data.world && data.world.worldSeed
+          });
+          replacements.push(item); itemByUid[item.uid] = item;
+        });
+        var mapped = {};
+        Object.keys(actors).forEach(function (actorId) {
+          var record = actors[actorId];
+          var loadout = record.loadout = record.loadout || {};
+          var oldEquipment = loadout.equipment || {};
+          var nextEquipment = { weapon: null, head: null, body: null, feet: null, accessory: null };
+          ['weapon', 'armor', 'ring'].forEach(function (slot) {
+            var uid = oldEquipment[slot];
+            var nextSlot = slot === 'armor' ? 'body' : slot === 'ring' ? 'accessory' : slot;
+            if (uid && itemByUid[uid]) nextEquipment[nextSlot] = uid;
+          });
+          var oldLocks = loadout.lockedSlots || {};
+          loadout.equipment = nextEquipment;
+          loadout.lockedSlots = {
+            weapon: !!oldLocks.weapon, head: false, body: !!oldLocks.armor,
+            feet: false, accessory: !!oldLocks.ring
+          };
+          mapped[actorId] = nextEquipment;
+        });
+        if (primary) {
+          var levels = replacements.filter(function (item) {
+            return mapped[primaryId] && Object.keys(mapped[primaryId]).some(function (slot) {
+              return mapped[primaryId][slot] === item.uid;
+            });
+          }).map(function (item) { return item.itemLevel; });
+          var rarities = replacements.filter(function (item) {
+            return mapped[primaryId] && Object.keys(mapped[primaryId]).some(function (slot) {
+              return mapped[primaryId][slot] === item.uid;
+            });
+          }).map(function (item) { return Game.loot.RARITY_IDS.indexOf(item.rarityId); });
+          var medianLevel = levels.length ? levels.sort(function (a, b) { return a - b; })[Math.floor(levels.length / 2)] : Math.max(1, primary.level | 0);
+          var medianRarity = rarities.length ? Math.min(2, rarities.sort(function (a, b) { return a - b; })[Math.floor(rarities.length / 2)]) : 0;
+          ['head', 'feet'].forEach(function (slot, index) {
+            var item = Game.loot.generateEquipment({
+              seed: U.strSeed([data.world && data.world.worldSeed || 0, 'migration-v19', primaryId, slot].join('|')),
+              uid: 'eq:migration-v19:' + primaryId + ':' + slot, sourceType: 'migration', sourceId: primaryId + ':' + slot,
+              classId: classId, slotId: slot, itemLevel: medianLevel,
+              rarityId: Game.loot.RARITY_IDS[medianRarity], regionId: data.world && data.world.region,
+              tier: data.world && data.world.regionTier || 1
+            });
+            replacements.push(item); primary.loadout.equipment[slot] = item.uid;
+          });
+        }
+        inv.items = replacements;
+        inv.loot = Game.loot.defaultState();
+        inv.uidSeq = Math.max(1, inv.uidSeq | 0);
+        var merchantRegions = data.world && data.world.merchants && data.world.merchants.regions || {};
+        Object.keys(merchantRegions).forEach(function (rid) {
+          var event = merchantRegions[rid] && merchantRegions[rid].activeEvent;
+          if (!event || !Array.isArray(event.offers)) return;
+          event.offers.forEach(function (offer, index) {
+            if (!offer || offer.kind !== 'gear') return;
+            var minRank = index >= 6 ? 2 : index === 5 ? 1 : 0;
+            offer.item = Game.loot.generateEquipment({
+              seed: U.strSeed([event.seed >>> 0, event.stockRevision | 0 || 1,
+                'merchant-v19', index].join('|')),
+              uid: null, sourceType: 'merchant', sourceId: event.id + ':offer:' + index,
+              ordinal: index, classId: classId, itemLevel: Math.max(1, primary && primary.level | 0 || 1),
+              minimumRank: minRank, regionId: rid,
+              worldSeed: data.world && data.world.worldSeed
+            });
+          });
+        });
+        data.meta = data.meta || {};
+        data.meta.migrationV19Equipment = { completed: true, compensated: true };
+        data.v = 19;
+      }
     }
   ];
 
@@ -335,7 +455,9 @@
 
   function runMigrations(data) {
     var guard = 0;
-    while (data.v < Game.SAVE_VERSION && guard++ < 20) {
+    var targetVersion = Game.loot && Game.equipment ? Game.SAVE_VERSION :
+      Math.min(Game.SAVE_VERSION, 18);
+    while (data.v < targetVersion && guard++ < 20) {
       var found = false;
       for (var i = 0; i < MIGRATIONS.length; i++) {
         if (MIGRATIONS[i].from === data.v) {
@@ -344,7 +466,7 @@
           break;
         }
       }
-      if (!found) { data.v = Game.SAVE_VERSION; }
+      if (!found) { data.v = targetVersion; }
     }
     return data;
   }
@@ -412,6 +534,21 @@
 
   function normalizeMerchantItem(item) {
     if (!item || typeof item !== 'object') return null;
+    if (Game.equipment && Game.equipment.isV2(item)) {
+      var base = Game.content.get('itemBase', item.baseId);
+      var rarityDef = Game.content.get('itemRarity', item.rarityId);
+      if (!base || !rarityDef || !Game.content.has('class', item.classId)) return null;
+      var clean = Game.contentCompiler.clone(item);
+      clean.uid = null;
+      clean.itemLevel = Math.max(1, Math.min(9999, clean.itemLevel | 0 || 1));
+      clean.affixes = (clean.affixes || []).filter(function (rolled) {
+        var def = rolled && Game.content.get('itemAffix', rolled.definitionId);
+        return def && (!def.slots.length || def.slots.indexOf(base.slotId) >= 0) &&
+          rolled.values && Array.isArray(rolled.values.rolls) &&
+          rolled.values.rolls.every(Number.isFinite);
+      }).slice(0, rarityDef.normalAffixCount + (rarityDef.legendaryAffixCount || 0));
+      return Game.equipment.normalizeCompatibility(clean);
+    }
     if (['weapon', 'armor', 'ring'].indexOf(item.base) < 0) return null;
     var rarity = Math.max(0, Math.min(4, item.rar | 0));
     var affixes = [];
@@ -658,7 +795,7 @@
         Game.units.commit(Game.world.hero);
       }
       return {
-        v: Game.SAVE_VERSION,
+        v: Game.loot && Game.equipment ? Game.SAVE_VERSION : Math.min(Game.SAVE_VERSION, 18),
         ts: U.now(),
         createdAt: st.createdAt,
         settings: st.settings,
@@ -668,6 +805,7 @@
           items: st.inv.items,
           potions: st.inv.potions,
           materials: st.inv.materials,
+          loot: st.inv.loot,
           uidSeq: Game.inv.peekUidSeq()
         },
         world: {
@@ -788,9 +926,9 @@
           persistentResources: Number.isFinite(loadedHp)
             ? { hp: Math.max(0, loadedHp) } : {},
           loadout: {
-            equipment: Object.assign({ weapon: null, armor: null, ring: null },
+            equipment: Object.assign({ weapon: null, head: null, body: null, feet: null, accessory: null },
               loadedRecord.loadout && loadedRecord.loadout.equipment || {}),
-            lockedSlots: Object.assign({ weapon: false, armor: false, ring: false },
+            lockedSlots: Object.assign({ weapon: false, head: false, body: false, feet: false, accessory: false },
               loadedRecord.loadout && loadedRecord.loadout.lockedSlots || {})
           }
         };
@@ -818,6 +956,7 @@
         st.inv.items = Array.isArray(data.inv.items) ? data.inv.items : [];
         U.merge(st.inv.potions, data.inv.potions || {});
         U.merge(st.inv.materials, data.inv.materials || {});
+        st.inv.loot = Game.loot ? Game.loot.normalizeState(data.inv.loot) : data.inv.loot;
       }
       U.merge(st.world, data.world || {});
       st.world.worldSeed = Number.isFinite(st.world.worldSeed)
@@ -908,7 +1047,12 @@
       var validItems = [];
       for (var i = 0; i < st.inv.items.length; i++) {
         var it = st.inv.items[i];
-        if (Game.reg.has('slot', it.base)) validItems.push(it);
+        var v2Validation = Game.equipment && Game.equipment.isV2(it)
+          ? Game.equipment.validateItem(it) : null;
+        if (v2Validation && v2Validation.ok || !v2Validation && Game.reg.has('slot', it.base)) {
+          if (v2Validation) Game.equipment.normalizeCompatibility(it);
+          validItems.push(it);
+        }
         else st.player.gold += 50;
       }
       st.inv.items = validItems;

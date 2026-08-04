@@ -62,20 +62,35 @@
     ) < MIMIC_CHANCE_PER_10000;
   }
 
-  function draftChestReward(chest) {
+  function draftChestReward(chest, sourceType) {
     var tier = Game.State.regionTier(Game.state.world.region);
     var reward = F.chestYield(tier, chest.rare);
     var gatherDefs = Game.world.layout && Game.world.layout.version >= 3
       ? Game.world.region.exploration.resources
       : Game.world.region.gather && Game.world.region.gather.nodes || [];
+    sourceType = sourceType || (chest.rare ? 'rareChest' : 'chest');
+    var lootPlan = Game.loot.plan({
+      sourceType: sourceType,
+      sourceId: chest.id,
+      playerLevel: Game.state.player.level,
+      minimumRank: sourceType === 'rareChest' || sourceType === 'mimic' ? 2 : 0,
+      classId: Game.state.player.classId,
+      regionId: Game.state.world.region,
+      tier: tier,
+      worldSeed: Game.state.world.worldSeed,
+      expeditionIndex: Game.expedition && Game.expedition.current
+        ? Game.expedition.current(Game.state.world.region).index : 0,
+      dropMultiplier: Game.player.derived().dropMul,
+      rarityLuck: Game.player.derived().rarityLuck || 0,
+      eligible: sourceType !== 'mimic' && sourceType !== 'rareChest'
+    }, Game.state.inv.loot);
     return {
       id: chest.id, rare: chest.rare, gold: reward.gold,
       material: gatherDefs.length ? U.choice(gatherDefs).material : null,
       materialCount: U.randInt(reward.materialMin, reward.materialMax),
       crystal: reward.crystalChance && U.chance(reward.crystalChance) ? 1 : 0,
-      equipment: chest.rare
-        ? Game.inv.genLoot(Game.state.player.level, { rarMin: 2, luck: 1.8 })
-        : null,
+      lootPlan: lootPlan,
+      equipment: lootPlan.items[0] || null,
       x: chest.x, y: chest.y
     };
   }
@@ -84,9 +99,11 @@
     Game.player.addGold(draft.gold);
     if (draft.material) Game.inv.addMaterial(draft.material, draft.materialCount);
     if (draft.crystal) Game.player.addCrystal(draft.crystal);
-    if (draft.equipment) {
+    var plannedItems = draft.lootPlan ? Game.loot.accept(draft.lootPlan) :
+      draft.equipment ? [draft.equipment] : [];
+    if (plannedItems.length) {
       Game.inv.deliverDrops(
-        [{ category: 'equipment', item: draft.equipment }],
+        plannedItems.map(function (item) { return { category: 'equipment', item: item }; }),
         {
           source: source || 'chest',
           forceGround: Game.state.settings.groundLoot !== false,
@@ -99,7 +116,7 @@
       outcome: 'loot',
       id: draft.id, rare: draft.rare, gold: draft.gold,
       material: draft.material, materialCount: draft.materialCount,
-      crystal: draft.crystal, equipment: draft.equipment,
+      crystal: draft.crystal, equipment: plannedItems[0] || null,
       source: source || 'chest'
     };
     bus.emit('chest:opened', result);
@@ -410,7 +427,8 @@
       };
       var mimic = !chest.rare && !!chest.oddity && isMimicRoll(chest);
       if (!chest.rare) state.rollOrdinal++;
-      var reward = draftChestReward(chest);
+      var reward = draftChestReward(chest, mimic ? 'mimic' :
+        (chest.rare ? 'rareChest' : 'chest'));
       if (mimic) {
         state.genuineOpenedSinceMimic = 0;
         var reveal = revealMimic(chest, reward);

@@ -14,44 +14,15 @@
 
     setUidSeq: function (n) { uidSeq = Math.max(uidSeq, n | 0); },
     peekUidSeq: function () { return uidSeq; },
-
-    /* ---------------- 生成随机装备 ---------------- */
-    genLoot: function (ilvl, opts) {
-      opts = opts || {};
-      var random = typeof opts.rng === 'function' ? opts.rng : Math.random;
-      function rand(min, max) { return min + random() * (max - min); }
-      function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
-      var slots = reg.ids('slot');
-      var base = opts.base || slots[randInt(0, slots.length - 1)];
-      var rar = opts.rar !== undefined ? opts.rar : F.rollRarity(opts.luck, random);
-      if (opts.rarMin !== undefined && rar < opts.rarMin) rar = opts.rarMin;
-      var nAffix = F.RARITY[rar].affixes;
-      var pool = reg.all('affix').slice();
-      var affixes = [];
-      for (var i = 0; i < nAffix && pool.length; i++) {
-        var idx = randInt(0, pool.length - 1);
-        var a = pool.splice(idx, 1)[0];
-        affixes.push({ id: a.id, v: Inv.rollAffixValue(a, ilvl, random) });
-      }
-      return {
-        uid: opts.allocateUid === false ? null : 'i' + (uidSeq++),
-        base: base,
-        ilvl: Math.max(1, Math.round(ilvl)),
-        rar: rar,
-        affixes: affixes
-      };
-    },
-
-    rollAffixValue: function (a, ilvl, rng) {
-      var random = typeof rng === 'function' ? rng : Math.random;
-      function rand(min, max) { return min + random() * (max - min); }
-      if (a.kind === 'pct') return +(rand(a.min, a.max)).toFixed(3);
-      var v = (a.base + a.perLv * ilvl) * rand(0.85, 1.15);
-      return a.dec ? +v.toFixed(1) : Math.round(v);
-    },
+    allocateEquipmentUid: function () { return 'eq:i' + (uidSeq++); },
 
     materializePreview: function (preview) {
       if (!preview) return null;
+      if (Game.equipment && Game.equipment.isV2(preview)) {
+        var v2 = Game.contentCompiler.clone(preview);
+        v2.uid = preview.uid || 'eq:i' + (uidSeq++);
+        return Game.equipment.normalizeCompatibility(v2);
+      }
       return {
         uid: preview.uid || 'i' + (uidSeq++),
         base: preview.base,
@@ -65,6 +36,7 @@
 
     /* ---------------- 属性折算 ---------------- */
     itemStats: function (item) {
+      if (Game.equipment && Game.equipment.isV2(item)) return Game.equipment.itemStats(item);
       var st = {
         atk: 0, hp: 0, def: 0, spd: 0, crit: 0, critDmg: 0,
         goldMul: 0, expMul: 0, dropMul: 0, atkPct: 0, hpPct: 0
@@ -103,7 +75,7 @@
 
     isEquipped: function (uid) {
       var eq = Game.state.inv.equipped;
-      return eq.weapon === uid || eq.armor === uid || eq.ring === uid;
+      return Object.keys(eq || {}).some(function (slot) { return eq[slot] === uid; });
     },
 
     /* ---------------- 获得 / 穿戴 / 出售 ---------------- */
@@ -134,9 +106,10 @@
           if (Inv.isEquipped(it.uid)) continue;
           if (!lowest || it.rar < lowest.rar) { lowest = it; li = i; }
         }
-        if (!lowest) break; // 理论上最多仅 3 件装备被保护，保底避免死循环。
+        if (!lowest) break;
         inv.items.splice(li, 1);
-        Game.player.addGold(F.sellPrice(lowest.ilvl, lowest.rar), { raw: false });
+        Game.player.addGold(Game.equipment ? Game.equipment.sellPrice(lowest) :
+          F.sellPrice(lowest.ilvl, lowest.rar), { raw: false });
         bus.emit('inv:autosell', { item: lowest });
       }
 
@@ -159,21 +132,32 @@
     equip: function (uid, opts) {
       opts = opts || {};
       var item = Inv.byUid(uid);
-      if (!item) return false;
-      var previous = Inv.byUid(Game.state.inv.equipped[item.base]);
-      Game.state.inv.equipped[item.base] = uid;
+      if (!item) return { ok: false, reason: 'missing-item' };
+      if (Game.world && Game.world.hero && Game.world.hero.encounterId) {
+        return { ok: false, reason: 'encounter-active' };
+      }
+      if (item.classId && item.classId !== Game.state.player.classId) {
+        return { ok: false, reason: 'class-mismatch' };
+      }
+      var slot = Game.equipment ? Game.equipment.slotOf(item) : item.base;
+      var previous = Inv.byUid(Game.state.inv.equipped[slot]);
+      Game.state.inv.equipped[slot] = uid;
       Game.player.recalc();
       if (Game.world && Game.world.hero) Game.world.syncHeroStats();
       bus.emit('item:equipped', { item: item, previous: previous, auto: !!opts.auto });
-      return true;
+      return { ok: true, item: item, previous: previous, slot: slot };
     },
 
     unequip: function (slot) {
+      if (Game.world && Game.world.hero && Game.world.hero.encounterId) {
+        return { ok: false, reason: 'encounter-active' };
+      }
       var previous = Inv.byUid(Game.state.inv.equipped[slot]);
       Game.state.inv.equipped[slot] = null;
       Game.player.recalc();
       if (Game.world && Game.world.hero) Game.world.syncHeroStats();
       bus.emit('item:unequipped', { slot: slot, item: previous });
+      return { ok: true, item: previous, slot: slot };
     },
 
     /** 出售：传说分解为魔晶石，其余折金币 */
@@ -181,19 +165,22 @@
       var inv = Game.state.inv;
       var item = Inv.byUid(uid);
       if (!item) return null;
+      if (Inv.isEquipped(uid) && Game.world && Game.world.hero && Game.world.hero.encounterId) {
+        return { ok: false, reason: 'encounter-active' };
+      }
       if (Inv.isEquipped(uid)) {
-        inv.equipped[item.base] = null;
+        inv.equipped[Game.equipment ? Game.equipment.slotOf(item) : item.base] = null;
         Game.player.recalc();
         if (Game.world && Game.world.hero) Game.world.syncHeroStats();
       }
       inv.items.splice(inv.items.indexOf(item), 1);
       Game.state.meta.stats.sells++;
-      if (item.rar === 4) {
-        var c = F.salvageCrystal(item.ilvl);
+      if ((Game.equipment ? Game.equipment.rarityRank(item) : item.rar) === 4) {
+        var c = Game.equipment ? Game.equipment.salvageCrystal(item) : F.salvageCrystal(item.ilvl);
         Game.player.addCrystal(c);
         return { crystal: c };
       }
-      var g = F.sellPrice(item.ilvl, item.rar);
+      var g = Game.equipment ? Game.equipment.sellPrice(item) : F.sellPrice(item.ilvl, item.rar);
       Game.player.addGold(g, { raw: true });
       bus.emit('gold:changed', { delta: g, total: Game.state.player.gold });
       return { gold: g };
@@ -205,9 +192,9 @@
       var gold = 0, n = 0;
       for (var i = inv.items.length - 1; i >= 0; i--) {
         var it = inv.items[i];
-        if (it.rar > maxRar) continue;
+        if ((Game.equipment ? Game.equipment.rarityRank(it) : it.rar) > maxRar) continue;
         if (Inv.isEquipped(it.uid)) continue;
-        gold += F.sellPrice(it.ilvl, it.rar);
+        gold += Game.equipment ? Game.equipment.sellPrice(it) : F.sellPrice(it.ilvl, it.rar);
         inv.items.splice(i, 1);
         n++;
       }
@@ -272,17 +259,31 @@
     },
 
     /* ---------------- 掉落判定 / 发放（严格拆分） ---------------- */
-    rollDropResults: function (tier, isBoss) {
+    rollDropResults: function (tier, isBoss, opts) {
+      opts = opts || {};
       var results = [];
       var d = Game.player.derived();
-      var dropMul = Game.player.restMults().drop * d.dropMul;
       var lv = Game.state.player.level;
-      if (isBoss || U.chance(F.BAL.dropEquip * dropMul)) {
-        results.push({
-          category: 'equipment',
-          item: Inv.genLoot(lv, isBoss ? { rarMin: 2, luck: 2 } : {})
-        });
-      }
+      var sourceType = isBoss ? 'boss' : opts.sourceType || 'regular';
+      var plan = Game.loot.plan({
+        sourceType: sourceType,
+        sourceId: opts.sourceId || (isBoss ? 'boss:' : 'combat:') +
+          (Game.state.world.region || 'unknown'),
+        playerLevel: lv, tier: tier,
+        minimumRank: isBoss ? 2 : 0,
+        dropMultiplier: Game.player.restMults().drop * d.dropMul,
+        rarityLuck: (d.rarityLuck || 0) + Math.max(0, Number(opts.rarityLuck) ||
+          (Number(opts.luck) || 1) - 1),
+        classId: Game.state.player.classId,
+        regionId: Game.state.world.region,
+        worldSeed: Game.state.world.worldSeed,
+        expeditionIndex: Game.expedition && Game.expedition.current
+          ? Game.expedition.current(Game.state.world.region).index : 0,
+        firstKill: isBoss && !Game.State.regionProg(Game.state.world.region).firstKill
+      }, Game.state.inv.loot);
+      Game.loot.accept(plan).forEach(function (item) {
+        results.push({ category: 'equipment', item: item });
+      });
       if (U.chance(F.BAL.dropPotion * (isBoss ? 3 : 1))) {
         results.push({
           category: 'potion',
@@ -335,7 +336,7 @@
     rollDrops: function (tier, isBoss, opts) {
       opts = opts || {};
       if (!opts.source) opts.source = isBoss ? 'boss' : 'combat';
-      return Inv.deliverDrops(Inv.rollDropResults(tier, isBoss), opts);
+      return Inv.deliverDrops(Inv.rollDropResults(tier, isBoss, opts), opts);
     }
   };
 })();

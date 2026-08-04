@@ -505,61 +505,189 @@
     /* ---------------- 装备详情（含对比） ---------------- */
     itemDetail: function (item) {
       var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
-      var equippedUid = Game.state.inv.equipped[item.base];
+      var isV2 = !!(Game.equipment && Game.equipment.isV2(item));
+      var slotId = Game.equipment ? Game.equipment.slotOf(item) : item.base;
+      var rarityRank = Game.equipment ? Game.equipment.rarityRank(item) : item.rar;
+      var itemLevel = Game.equipment ? Game.equipment.levelOf(item) : item.ilvl;
+      var equippedUid = Game.state.inv.equipped[slotId];
       var equipped = equippedUid ? Game.inv.byUid(equippedUid) : null;
       var isEquipped = equippedUid === item.uid;
 
-      function statLines(it) {
+      function statValues(it) {
         var st = Game.inv.itemStats(it);
-        var lines = [];
-        if (st.atk) lines.push(t('stat.atk') + ' +' + fmt(st.atk));
-        if (st.hp) lines.push(t('stat.hp') + ' +' + fmt(st.hp));
-        if (st.def) lines.push(t('stat.def') + ' +' + fmt(st.def));
-        return lines;
+        return [
+          ['atk', 'equipment.stat.power', st.atk, 'flat'],
+          ['hp', 'stat.hp', st.hp, 'flat'],
+          ['def', 'equipment.stat.armor', st.def, 'flat'],
+          ['ward', 'equipment.stat.ward', st.ward, 'flat'],
+          ['crit', 'equipment.stat.critChance', st.crit, 'pct'],
+          ['critDmg', 'equipment.stat.critMultiplier', st.critDmg, 'mult'],
+          ['dodge', 'equipment.stat.dodgeChance', st.dodge, 'pct'],
+          ['lifesteal', 'equipment.stat.lifesteal', st.lifesteal, 'pct'],
+          ['cdr', 'equipment.stat.cooldownRate', st.cdr, 'pct'],
+          ['healPow', 'equipment.stat.healingPower', st.healPow, 'pct'],
+          ['regen', 'equipment.stat.healthRegenPct', st.regen, 'pct'],
+          ['goldMul', 'equipment.stat.goldMultiplier', st.goldMul, 'pct'],
+          ['expMul', 'equipment.stat.expMultiplier', st.expMul, 'pct'],
+          ['dropMul', 'equipment.stat.dropMultiplier', st.dropMul, 'pct'],
+          ['rarityLuck', 'equipment.stat.rarityLuck', st.rarityLuck, 'pct']
+        ];
       }
 
-      var c = U.el('div', '');
-      var html = '<h3 class="rar-r' + item.rar + '">' + Game.ui.itemName(item) + '</h3>' +
-        '<div class="modal-body">' +
-        '<div style="text-align:center;margin-bottom:8px;">' +
-        '<canvas width="40" height="40" data-icon="' + Game.ui.itemIcon(item) + '"></canvas></div>' +
-        '<div style="text-align:center;font-size:11px;" class="rar-r' + item.rar + '">' +
-        t('rarity.r' + item.rar) + ' · ' + t('ui.itemLevel', { lv: item.ilvl }) +
-        (isEquipped ? ' · ' + t('ui.equippedTag') : '') + '</div><hr style="border-color:var(--panel-line);margin:8px 0">';
+      function signed(value, kind) {
+        var sign = value >= 0 ? '+' : '';
+        if (kind === 'flat') return sign + fmt(value);
+        if (kind === 'mult') return sign + value.toFixed(2) + 'x';
+        return sign + (value * 100).toFixed(1) + '%';
+      }
 
-      statLines(item).forEach(function (l) { html += '<div>' + l + '</div>'; });
-      item.affixes.forEach(function (af) {
-        html += '<div style="color:#8ad0ff">' + Game.ui.affixLine(af) + '</div>';
-      });
+      function compareStatHtml() {
+        var baseValues = equipped && !isEquipped ? statValues(equipped) : [];
+        var old = {};
+        baseValues.forEach(function (row) { old[row[0]] = row[2]; });
+        var rows = statValues(item).map(function (row) {
+          return [row[1], row[2] - (old[row[0]] || 0), row[3]];
+        }).filter(function (row) { return Math.abs(row[1]) > 1e-9; });
+        if (!rows.length) return '';
+        return '<section class="item-detail-section"><h4>' + t('ui.itemSingleCompare') +
+          '</h4><div class="item-stat-diff">' + rows.map(function (row) {
+            return '<span>' + U.esc(t(row[0])) + '</span><strong class="' +
+              (row[1] >= 0 ? 'positive' : 'negative') + '">' + signed(row[1], row[2]) + '</strong>';
+          }).join('') + '</div></section>';
+      }
 
-      // 对比
-      if (equipped && !isEquipped) {
+      function simulationHtml() {
+        if (!equipped || isEquipped || !Game.auto) return '';
         var diff = Game.auto.compareItem(item);
-        function pct(v) {
-          var positive = v >= 0;
-          return '<span style="color:var(--' + (positive ? 'ok' : 'danger') + ')">' +
-            (positive ? '▲ +' : '▼ ') + (v * 100).toFixed(1) + '%</span>';
+        if (!diff) return '';
+        function pct(value) {
+          var positive = value >= 0;
+          return '<span class="' + (positive ? 'positive' : 'negative') + '">' +
+            (positive ? '+' : '') + (value * 100).toFixed(1) + '%</span>';
         }
-        html += '<hr style="border-color:var(--panel-line);margin:8px 0">' +
-          '<div style="font-size:11px;color:var(--ink-dim)">' + t('ui.compareWith') +
-          ' <span class="rar-r' + equipped.rar + '">' + Game.ui.itemName(equipped) + '</span>' +
-          '</div><div class="compare-grid">' +
+        return '<section class="item-detail-section"><h4>' + t('ui.itemBuildCompare') + '</h4>' +
+          '<div class="compare-caption">' + t('ui.compareWith') + ' <span class="rar-r' +
+          (Game.equipment ? Game.equipment.rarityRank(equipped) : equipped.rar) + '">' +
+          U.esc(Game.ui.itemName(equipped)) + '</span></div><div class="compare-grid">' +
           '<span>' + t('ui.compareOverall') + '</span>' + pct(diff.overall) +
           '<span>' + t('ui.compareOffense') + '</span>' + pct(diff.offense) +
           '<span>' + t('ui.compareSurvival') + '</span>' + pct(diff.survival) +
           '<span>' + t('ui.compareEconomy') + '</span>' + pct(diff.economy) +
-          '</div>';
+          '</div></section>';
       }
-      if (Game.state.inv.lockedSlots[item.base]) {
-        html += '<div class="locked-note">🔒 ' + t('ui.lockedSlotHint') + '</div>';
+
+      function formalSections() {
+        if (!isV2) return '';
+        var base = Game.content.get('itemBase', item.baseId);
+        var implicitValues = (item.implicitRolls || []).map(function (roll) {
+          return roll.values && roll.values.value;
+        });
+        var normal = [], legendary = [];
+        (item.affixes || []).forEach(function (roll) {
+          var def = Game.content.get('itemAffix', roll.definitionId);
+          (def && def.kind === 'legendary' ? legendary : normal).push({ roll: roll, def: def });
+        });
+        var implicit = Game.ui.modifierLines(base, implicitValues).map(function (line) {
+          return '<div class="item-modifier">' + U.esc(line) + '</div>';
+        }).join('');
+        var normalHtml = normal.length ? normal.map(function (entry) {
+          return '<div class="item-modifier affix">' + U.esc(Game.ui.affixLine(entry.roll)) + '</div>';
+        }).join('') : '<div class="item-empty-affix">' + t('ui.itemNoAffixes') + '</div>';
+        var legendaryHtml = legendary.map(function (entry) {
+          var name = Game.ui.affixLine(entry.roll);
+          var descKey = entry.def && entry.def.presentation && entry.def.presentation.descKey;
+          return '<div class="legendary-effect"><strong>' + U.esc(name) + '</strong>' +
+            (descKey ? '<p>' + U.esc(t(descKey)) + '</p>' : '') + '</div>';
+        }).join('');
+        return '<section class="item-detail-section"><h4>' + t('ui.itemImplicitTitle') + '</h4>' +
+          implicit + '</section><section class="item-detail-section"><h4>' +
+          t('ui.itemAffixTitle') + '</h4>' + normalHtml + '</section>' +
+          (legendaryHtml ? '<section class="item-detail-section legendary"><h4>' +
+            t('ui.itemLegendaryTitle') + '</h4>' + legendaryHtml + '</section>' : '');
+      }
+
+      var c = U.el('div', '');
+      var html = '<h3 class="rar-r' + rarityRank + '">' + U.esc(Game.ui.itemName(item)) + '</h3>' +
+        '<div class="modal-body">' +
+        '<div class="item-detail-icon">' +
+        '<canvas width="40" height="40" data-icon="' + Game.ui.itemIcon(item) + '"></canvas></div>' +
+        '<div class="item-detail-meta rar-r' + rarityRank + '">' +
+        t('rarity.r' + rarityRank) + ' · ' + t('ui.itemLevel', { lv: itemLevel }) +
+        (isEquipped ? ' · ' + t('ui.equippedTag') : '') + '</div>' +
+        formalSections() + compareStatHtml() + simulationHtml();
+      if (Game.state.inv.lockedSlots[slotId]) {
+        html += '<div class="locked-note"><span class="lock-glyph" aria-hidden="true"></span>' +
+          t('ui.lockedSlotHint') + '</div>';
       }
       html += '</div>';
       c.innerHTML = html;
 
+      var selectedLockId = isV2 && item.reforge && item.reforge.lockedAffixInstanceId || null;
+      var reforgeBox = null;
+      var reforgeButton = null;
+      var reforgeCost = null;
+      if (isV2) {
+        var normalAffixes = (item.affixes || []).filter(function (roll) {
+          var def = Game.content.get('itemAffix', roll.definitionId);
+          return def && def.kind === 'normal';
+        });
+        reforgeBox = U.el('section', 'item-detail-section reforge-panel');
+        reforgeBox.appendChild(U.el('h4', '', t('ui.reforgeTitle')));
+        reforgeBox.appendChild(U.el('p', 'reforge-hint', t('ui.reforgeLockHint')));
+        var choices = U.el('div', 'reforge-affix-list');
+        var options = [{ instanceId: null, label: t('ui.reforgeNoLock') }].concat(
+          normalAffixes.map(function (roll) {
+            return { instanceId: roll.instanceId, label: Game.ui.affixLine(roll) };
+          })
+        );
+        options.forEach(function (option) {
+          var button = U.el('button', 'reforge-affix-choice',
+            '<span class="choice-mark" aria-hidden="true"></span><span>' + U.esc(option.label) + '</span>');
+          button.type = 'button';
+          button.classList.toggle('selected', selectedLockId === option.instanceId);
+          button.setAttribute('aria-pressed', selectedLockId === option.instanceId ? 'true' : 'false');
+          button.addEventListener('click', function () {
+            selectedLockId = option.instanceId;
+            Array.prototype.forEach.call(choices.children, function (node) {
+              var active = node === button;
+              node.classList.toggle('selected', active);
+              node.setAttribute('aria-pressed', active ? 'true' : 'false');
+            });
+            updateReforgeQuote();
+          });
+          choices.appendChild(button);
+        });
+        reforgeBox.appendChild(choices);
+        reforgeCost = U.el('div', 'reforge-cost');
+        reforgeBox.appendChild(reforgeCost);
+        reforgeButton = U.el('button', 'btn gold reforge-submit', t('ui.reforgeAction'));
+        reforgeBox.appendChild(reforgeButton);
+        c.querySelector('.modal-body').appendChild(reforgeBox);
+
+        function updateReforgeQuote() {
+          var quote = Game.reforge.quote(item, selectedLockId);
+          if (!quote.ok) {
+            reforgeCost.textContent = t('ui.reforgeUnavailable', {
+              reason: Game.ui.equipmentError(quote.reason)
+            });
+            reforgeButton.disabled = true;
+            return;
+          }
+          var materialName = quote.materialId ? t('material.' + quote.materialId) : '-';
+          reforgeCost.textContent = t('ui.reforgeCost', {
+            n: (item.reforge && item.reforge.count || 0) + 1,
+            gold: fmt(quote.gold), count: quote.materialCount, material: materialName
+          });
+          reforgeButton.disabled = Game.state.player.gold < quote.gold ||
+            !!quote.materialId && Game.inv.materialCount(quote.materialId) < quote.materialCount;
+        }
+        updateReforgeQuote();
+      }
+
       var btns = U.el('div', 'modal-btns');
-      var sellTxt = item.rar === 4
-        ? t('ui.salvage', { n: Game.F.salvageCrystal(item.ilvl) })
-        : t('ui.sellFor', { g: fmt(Game.F.sellPrice(item.ilvl, item.rar)) });
+      var sellTxt = rarityRank === 4
+        ? t('ui.salvage', { n: Game.equipment ? Game.equipment.salvageCrystal(item) : Game.F.salvageCrystal(itemLevel) })
+        : t('ui.sellFor', { g: fmt(Game.equipment ? Game.equipment.sellPrice(item) : Game.F.sellPrice(itemLevel, rarityRank)) });
       var btnSell = U.el('button', 'btn danger', sellTxt);
       btns.appendChild(btnSell);
       var btnEquip = U.el('button', 'btn gold', isEquipped ? t('ui.unequip') : t('ui.equip'));
@@ -569,17 +697,39 @@
       var api = M.show(c);
       Game.ui.renderIcons(c);
 
+      if (reforgeButton) reforgeButton.addEventListener('click', function () {
+        var result = Game.reforge.execute(item.uid, selectedLockId);
+        if (!result.ok) {
+          M.toast(t('ui.operationRejected', { reason: Game.ui.equipmentError(result.reason) }), 'warn');
+          updateReforgeQuote();
+          return;
+        }
+        M.toast(t('ui.reforgeDone'), 'gold');
+        api.close();
+        Game.ui.tabs.queueRerender();
+        M.itemDetail(item);
+      });
+
       btnSell.addEventListener('click', function () {
         var r = Game.inv.sell(item.uid);
+        if (r && r.ok === false) {
+          M.toast(t('ui.operationRejected', { reason: Game.ui.equipmentError(r.reason) }), 'warn');
+          return;
+        }
         if (r) {
-          M.toast(r.crystal ? '💎 +' + r.crystal : '🪙 +' + fmt(r.gold));
+          M.toast(r.crystal
+            ? '+' + r.crystal + ' ' + t('ui.crystal')
+            : '+' + fmt(r.gold) + ' ' + t('ui.gold'));
         }
         api.close();
         Game.ui.tabs.queueRerender();
       });
       btnEquip.addEventListener('click', function () {
-        if (isEquipped) Game.inv.unequip(item.base);
-        else Game.inv.equip(item.uid);
+        var result = isEquipped ? Game.inv.unequip(slotId) : Game.inv.equip(item.uid);
+        if (result && result.ok === false) {
+          M.toast(t('ui.operationRejected', { reason: Game.ui.equipmentError(result.reason) }), 'warn');
+          return;
+        }
         api.close();
         Game.ui.tabs.queueRerender();
       });

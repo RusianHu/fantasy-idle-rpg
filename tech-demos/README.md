@@ -11,11 +11,12 @@
 | Weather / Climate Lab | `weather-climate/weather-climate.html?seed=1234ABCD&region=forest&time=300&mode=forced&front=volatile&intensity=0.85&lang=zh-CN` | 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；支持时间线/强制天气锋、强度、过渡、层开关、减少动态、雷击、五锋对照、八区暴露审计及可见度/风力/湿润度/性能报告 |
 | 移动行商机制 Lab | `merchants/merchants.html?seed=1234ABCD&region=grassland&lang=zh-CN` | 直接运行四个正式行商 Profile、八槽确定性库存、付费议价、信誉价格带、购买/赔偿事务，以及撤离、投降、宽恕和抢掠的非致死结算 |
 | 图形与动效渲染 Lab | `render-gallery/render-gallery.html?region=forest&lang=zh-CN` | 自动枚举生产单位、装饰、地块、特效、头像、图标和小地图标记；通过可筛选图鉴、1–4 项同步对比墙、整数倍率舞台、背景/网格/锚点辅助线、逐帧时间轴和检查器审计动作覆盖的原生帧、整数像素派生与回退 |
+| 掉落与装备 Lab | `loot-lab/loot-lab.html?seed=1234ABCD&class=fighter&source=boss&lang=zh-CN` | 直接运行正式五槽底材/词条内容、seeded 掉落保底、构筑编译、营地重铸、多阶暴击与传奇 EffectProfile，并执行 17/24/16 数量及非法池诊断 |
 
 ## 维护约束
 
 - 优先加载正式注册表、系统和渲染模块；不得复制一套脱离生产代码的模拟实现。
-- 正式入口与七个工作台只加载一个当前 `BUILD_ID` 的 `js/data/content/content.generated.js`；不得直接加载 `*.pack.js`、`*.support.js` 或内容侧 `js/data/content/manifest.generated.js`。生产使用的探索资产 manifest 不受此限制。
+- 正式入口与八个工作台只加载一个当前 `BUILD_ID` 的 `js/data/content/content.generated.js`；不得直接加载 `*.pack.js`、`*.support.js` 或内容侧 `js/data/content/manifest.generated.js`。生产使用的探索资产 manifest 不受此限制。
 - 新页面与现有页面平级，并登记到 `tech-demos/index.html`；页面专属 CSS/JS/说明文件放入同名子目录。Render Gallery 与 Map Effects 共用 `Game.visualCatalog`，避免维护第二套静态资产分类。
 - 新增和维护的 QA 文案优先使用 `demo-i18n.js`，游戏内容名称读取编译后的核心/Pack-local `Game.i18n` 查询层。Actor / Combat、Map Effects 与 Weather Lab 当前仍保留内嵌双语字典或原生控件，统一迁移到共享 locale 层属于现行维护缺口；不得在新页面继续扩大平行字典。
 - 页面不得读写正式存档；世界种子、区域、职业和交互状态仅存在于当前 QA 页面。
@@ -23,6 +24,6 @@
 
 ## 自动验证
 
-完整浏览器验收目标覆盖正式入口、Actor、Map Effects、Render Gallery、Hazards、Exploration、Weather 与行商工作台，并检查非空 Canvas、无横向溢出、有效 44px 触控目标、中英文切换、减少动态和关键状态按钮。当前 `tests/browser-smoke.js` 覆盖正式入口、Actor、Map Effects、Hazards、Exploration 与 Weather，Render Gallery 由 `tests/render-gallery-browser-smoke.test.js` 独立覆盖；行商工作台页面级回归仍待接入，现由正式入口行商交互烟测和 `tests/wandering-merchants*.test.js` 领域回归保护。地图 v4 的权威批量验收位于 `tests/terrain-v4.test.js`，池/守卫分别位于 `tests/encounter-pools-v4.test.js` 与 `tests/guard-sites-v4.test.js`。
+完整浏览器验收目标覆盖正式入口及八个工作台，并检查非空 Canvas、无横向溢出、有效 44px 触控目标、中英文切换、减少动态和关键状态按钮。当前 `tests/browser-smoke.js` 覆盖正式入口、Actor、Map Effects、Hazards、Exploration 与 Weather，Render Gallery 由 `tests/render-gallery-browser-smoke.test.js` 独立覆盖；行商与 Loot Lab 页面级回归由本次 v19 浏览器验收补充，领域不变量分别由 `tests/wandering-merchants*.test.js` 与 `tests/equipment-*.test.js` 保护。地图 v4 的权威批量验收位于 `tests/terrain-v4.test.js`，池/守卫分别位于 `tests/encounter-pools-v4.test.js` 与 `tests/guard-sites-v4.test.js`。
 
-天气 Lab 另由 `tests/weather-climate-browser-smoke.test.js` 验证 URL 恢复、四阶段截图、八区气候、强制雷暴、确定性、性能诊断与零存档副作用；`tests/weather-climate-system.test.js` 覆盖内容绑定、天气锋/过渡、跨区微气候、雷击序列、Hazard Provider 和当前 v18 存档不变量。
+天气 Lab 另由 `tests/weather-climate-browser-smoke.test.js` 验证 URL 恢复、四阶段截图、八区气候、强制雷暴、确定性、性能诊断与零存档副作用；`tests/weather-climate-system.test.js` 覆盖内容绑定、天气锋/过渡、跨区微气候、雷击序列和 Hazard Provider，不依赖装备存档版本。

@@ -88,6 +88,12 @@
       }],
       class: [{
         id: 'ranger', roles: ['ranged-dps'], tags: ['ranged', 'physical'],
+        primaryPowerStat: 'physicalPower',
+        baseStats: { maxHp: 112, power: 14, armor: 5, ward: 3.25, speed: 11, critChance: .08, critMultiplier: 1.6, range: 72 },
+        growth: { maxHp: 1.073, power: 1.071, armor: 1.06, ward: 1.06, speedPerLevel: .25, critChancePerLevel: .001, critMultiplierPerLevel: .01 },
+        equipmentTags: ['adventurer', 'ranger'], weaponAppearance: 'bow',
+        evaluationWeights: { offense: .55, survival: .30, economy: .15 },
+        statDots: { hp: 3, atk: 3, def: 2, spd: 4, burst: 3 },
         statProfileId: 'stats.ranger', resourceProfileIds: ['resources.ranger'],
         baseAbilityGrantIds: ['ranger.auto_attack', 'ranger.aimed_shot', 'ranger.mark_target', 'ranger.power_shot', 'ranger.multi_shot', 'ranger.hawk_eye_action', 'ranger.disengage'],
         traitIds: ['ranger.fieldcraft'], talentTreeId: 'talents.ranger',

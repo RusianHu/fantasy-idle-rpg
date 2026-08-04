@@ -7,11 +7,14 @@
     ['physicalPower', 0, 1e12], ['magicPower', 0, 1e12], ['accuracy', 0.05, 1],
     ['gcdSpeed', 0.1, 8], ['castSpeed', 0.1, 8], ['autoAttackSpeed', 0.1, 8],
     ['cooldownRate', 0.1, 8], ['moveSpeed', 0, 1000], ['range', 0, 1000],
-    ['critChance', 0, 0.95], ['critMultiplier', 1, 10], ['dodgeChance', 0, 0.35],
+    ['critChance', 0, null], ['critMultiplier', 1, null], ['critAvoidance', 0, null],
+    ['dodgeChance', 0, 0.35],
     ['healingPower', 0, 1e12], ['shieldPower', 0, 1e15], ['lifesteal', 0, 1],
     ['statusPotency', 0, 10], ['tenacity', 0, 10], ['interruptPower', 0, 10],
     ['threatMultiplier', 0, 20], ['resourceRegen', 0, 20],
-    ['healthRegenPct', 0, 1],
+    ['healthRegenPct', 0, 1], ['damageDoneMultiplier', 0, 100],
+    ['damageReduction', -1, 0.8], ['healingReceivedMultiplier', 0, 100],
+    ['rarityLuck', 0, 100],
     ['expMultiplier', 0, 100], ['goldMultiplier', 0, 100], ['dropMultiplier', 0, 100]
   ].map(function (row) {
     return {
@@ -182,8 +185,8 @@
         { id: 'evaluation.ranger', schemaVersion: 1, weights: { offense: 0.55, survival: 0.30, economy: 0.15 } }
       ],
       equipmentProfile: [{
-        id: 'equipment.adventurer', schemaVersion: 1,
-        slots: ['weapon', 'armor', 'ring']
+        id: 'equipment.adventurer', schemaVersion: 2,
+        slots: ['weapon', 'head', 'body', 'feet', 'accessory']
       }],
       rewardProfile: [
         { id: 'reward.none', schemaVersion: 1, exp: 0, gold: 0, dropBudget: 0 }

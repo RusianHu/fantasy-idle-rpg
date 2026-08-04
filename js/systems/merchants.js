@@ -147,29 +147,16 @@
 
   function gearOffer(eventId, index, role, rng, rarity, pool) {
     var level = stockLevel();
-    var item = Game.inv.genLoot(level, {
-      rng: rng,
-      allocateUid: false,
-      rar: rarity
+    var item = Game.loot.generateEquipment({
+      itemLevel: level, classId: Game.state.player.classId,
+      rng: rng, uid: 'preview:' + eventId + ':' + index,
+      rarityId: Game.loot.RARITY_IDS[rarity],
+      sourceType: 'merchant',
+      sourceId: eventId + ':offer:' + index,
+      regionId: Game.state.world.region,
+      tier: Game.State.regionTier(Game.state.world.region)
     });
-    if (role === 'signature') {
-      var selected = [];
-      (pool.signatureAffixes || []).forEach(function (affixId) {
-        var def = Game.reg.get('affix', affixId);
-        if (def && selected.length < F.RARITY[item.rar].affixes) {
-          selected.push({ id: affixId, v: Game.inv.rollAffixValue(def, level, rng) });
-        }
-      });
-      var fallback = Game.reg.all('affix').filter(function (def) {
-        return !selected.some(function (affix) { return affix.id === def.id; });
-      });
-      while (selected.length < F.RARITY[item.rar].affixes && fallback.length) {
-        var at = Math.floor(rng() * fallback.length);
-        var chosen = fallback.splice(at, 1)[0];
-        selected.push({ id: chosen.id, v: Game.inv.rollAffixValue(chosen, level, rng) });
-      }
-      item.affixes = selected;
-    }
+    item.uid = null;
     return {
       id: offerId(eventId, index),
       role: role,
