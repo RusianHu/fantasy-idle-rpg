@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#101411">
-<meta name="build-id" content="20260805.2">
+<meta name="build-id" content="20260805.3">
 <title data-demo-page-title="loot.pageTitle">掉落与装备 Lab · 幻境远征</title>
-<link rel="stylesheet" href="loot-lab.css?v=20260805.2">
+<link rel="stylesheet" href="loot-lab.css?v=20260805.3">
 </head>
 <body>
 <main class="lab-shell">
@@ -27,7 +27,7 @@
 
   <section class="contract-band">
     <div><span data-demo-i18n="loot.contract">生产契约</span><strong>5 SLOTS / 40 BASES / 24 AFFIXES / 16 LEGENDARIES</strong></div>
-    <div><span data-demo-i18n="common.build">构建</span><strong id="build-id">20260805.2</strong></div>
+    <div><span data-demo-i18n="common.build">构建</span><strong id="build-id">20260805.3</strong></div>
   </section>
 
   <section class="panel controls">
@@ -37,10 +37,54 @@
       <label><span data-demo-i18n="loot.class">职业</span><select id="class"></select></label>
       <label><span data-demo-i18n="loot.level">角色等级</span><input id="level" type="number" min="1" max="200" value="32"></label>
       <label><span data-demo-i18n="loot.tier">区域阶位</span><input id="tier" type="number" min="1" max="8" value="4"></label>
+      <label><span data-demo-i18n="loot.enemy">敌对单位</span><select id="enemy"></select></label>
       <label><span data-demo-i18n="loot.source">掉落来源</span><select id="source"></select></label>
+      <label><span data-demo-i18n="loot.findMultiplier">装备发现倍率</span><input id="drop-multiplier" type="number" min="0.000001" max="10" step="0.05" value="1"></label>
       <label><span data-demo-i18n="common.seed">世界种子</span><input id="seed" value="1234ABCD" maxlength="8"></label>
       <label><span data-demo-i18n="loot.samples">批量次数</span><input id="samples" type="number" min="1" max="10000" value="1000"></label>
     </div>
+  </section>
+
+  <section class="panel drop-observatory" aria-labelledby="drop-observatory-title">
+    <div class="section-head observatory-head">
+      <div><p class="eyebrow">HOSTILE UNIT / DROP ROLL / PITY</p><h2 id="drop-observatory-title" data-demo-i18n="loot.observatory">敌对单位掉落观测场</h2></div>
+      <div class="observatory-actions">
+        <button id="reset-kills" type="button" data-demo-i18n="loot.resetKills">重置观测</button>
+        <button id="kill-ten" type="button" data-demo-i18n="loot.killTen">连续击败 10 次</button>
+        <button id="kill-one" class="primary" type="button" data-demo-i18n="loot.killOne">击败 1 次</button>
+      </div>
+    </div>
+    <p class="section-note" data-demo-i18n="loot.observatoryHint">每次击败都调用生产掉落 Trace；竖线是本次 Roll，亮区是有效掉落阈值，保底沿同一状态连续推进。</p>
+    <div class="observatory-grid">
+      <div id="enemy-stage" class="enemy-stage">
+        <div class="enemy-platform" aria-hidden="true"></div>
+        <canvas id="enemy-canvas" width="128" height="128" aria-label="Enemy sprite"></canvas>
+        <div class="enemy-copy"><strong id="enemy-name"></strong><span id="enemy-source"></span></div>
+        <div class="enemy-hp" aria-hidden="true"><i></i></div>
+        <div id="drop-burst" class="drop-burst" aria-live="polite">
+          <canvas id="latest-drop" width="96" height="96"></canvas>
+          <strong id="latest-outcome"></strong><small id="latest-item"></small>
+        </div>
+      </div>
+      <div class="probability-console">
+        <dl class="probability-stats">
+          <div><dt data-demo-i18n="loot.theoreticalRate">理论概率</dt><dd id="theoretical-rate">0%</dd></div>
+          <div><dt data-demo-i18n="loot.observedRate">实测频率</dt><dd id="observed-rate">0%</dd></div>
+          <div><dt data-demo-i18n="loot.pityProgress">掉落保底</dt><dd id="pity-progress">0 / 10</dd></div>
+          <div><dt data-demo-i18n="loot.itemCount">装备件数</dt><dd id="observed-items">0</dd></div>
+        </dl>
+        <div class="probability-readout">
+          <div class="probability-label"><span id="threshold-label">P(drop) 0%</span><strong id="roll-label">ROLL --</strong></div>
+          <div id="probability-track" class="probability-track" role="img" aria-label="Drop probability and current roll">
+            <i id="probability-threshold"></i><b id="probability-roll"></b>
+          </div>
+          <div class="probability-scale"><span>0.00</span><span>0.25</span><span>0.50</span><span>0.75</span><span>1.00</span></div>
+        </div>
+        <div class="observed-meter"><i id="observed-meter-fill"></i></div>
+        <p id="observatory-summary" class="observatory-summary"></p>
+      </div>
+    </div>
+    <div id="kill-history" class="kill-history" aria-live="polite"></div>
   </section>
 
   <section class="workspace">
@@ -90,36 +134,37 @@
   </section>
 </main>
 
-<script src="../../js/core/utils.js?v=20260805.2"></script>
-<script src="../../js/core/eventbus.js?v=20260805.2"></script>
-<script src="../../js/core/registry.js?v=20260805.2"></script>
-<script src="../../js/i18n/i18n.js?v=20260805.2"></script>
-<script src="../../js/i18n/zh-CN.js?v=20260805.2"></script>
-<script src="../../js/i18n/en.js?v=20260805.2"></script>
-<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260805.2"></script>
-<script src="../../js/i18n/combat-v2-en.js?v=20260805.2"></script>
-<script src="../../js/core/assets.js?v=20260805.2"></script>
-<script src="../../js/data/formulas.js?v=20260805.2"></script>
-<script src="../../js/sprites/palettes.js?v=20260805.2"></script>
-<script src="../../js/sprites/hero.js?v=20260805.2"></script>
-<script src="../../js/sprites/monsters_a.js?v=20260805.2"></script>
-<script src="../../js/sprites/monsters_b.js?v=20260805.2"></script>
-<script src="../../js/sprites/monsters_expansion.js?v=20260805.2"></script>
-<script src="../../js/sprites/monsters_guards.js?v=20260805.2"></script>
-<script src="../../js/sprites/props.js?v=20260805.2"></script>
-<script src="../../js/data/items.js?v=20260805.2"></script>
-<script src="../../js/data/skills.js?v=20260805.2"></script>
-<script src="../../js/core/content/rules.js?v=20260805.2"></script>
-<script src="../../js/core/content/schemas.js?v=20260805.2"></script>
-<script src="../../js/core/content/compiler.js?v=20260805.2"></script>
-<script src="../../js/core/content/audit.js?v=20260805.2"></script>
-<script src="../../js/core/content/registry.js?v=20260805.2"></script>
-<script src="../../js/core/content/support.js?v=20260805.2"></script>
-<script src="../../js/data/content/content.generated.js?v=20260805.2"></script>
+<script src="../../js/core/utils.js?v=20260805.3"></script>
+<script src="../../js/core/eventbus.js?v=20260805.3"></script>
+<script src="../../js/core/registry.js?v=20260805.3"></script>
+<script src="../../js/i18n/i18n.js?v=20260805.3"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260805.3"></script>
+<script src="../../js/i18n/en.js?v=20260805.3"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260805.3"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260805.3"></script>
+<script src="../../js/core/assets.js?v=20260805.3"></script>
+<script src="../../js/data/formulas.js?v=20260805.3"></script>
+<script src="../../js/sprites/palettes.js?v=20260805.3"></script>
+<script src="../../js/sprites/hero.js?v=20260805.3"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260805.3"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260805.3"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260805.3"></script>
+<script src="../../js/sprites/monsters_guards.js?v=20260805.3"></script>
+<script src="../../js/sprites/props.js?v=20260805.3"></script>
+<script src="../../js/data/items.js?v=20260805.3"></script>
+<script src="../../js/data/skills.js?v=20260805.3"></script>
+<script src="../../js/core/content/rules.js?v=20260805.3"></script>
+<script src="../../js/core/content/schemas.js?v=20260805.3"></script>
+<script src="../../js/core/content/compiler.js?v=20260805.3"></script>
+<script src="../../js/core/content/audit.js?v=20260805.3"></script>
+<script src="../../js/core/content/registry.js?v=20260805.3"></script>
+<script src="../../js/core/content/support.js?v=20260805.3"></script>
+<script src="../../js/data/content/content.generated.js?v=20260805.3"></script>
 <script>window.LOOT_CONTENT_AUDIT = Game.content.finalize({ strict: true });</script>
-<script src="../../js/systems/equipment.js?v=20260805.2"></script>
-<script src="../../js/ui/panels_main.js?v=20260805.2"></script>
-<script src="../demo-i18n.js?v=20260805.2"></script>
-<script src="loot-lab.js?v=20260805.2"></script>
+<script src="../../js/systems/equipment.js?v=20260805.3"></script>
+<script src="../../js/render/equipment_visuals.js?v=20260805.3"></script>
+<script src="../../js/ui/panels_main.js?v=20260805.3"></script>
+<script src="../demo-i18n.js?v=20260805.3"></script>
+<script src="loot-lab.js?v=20260805.3"></script>
 </body>
 </html>

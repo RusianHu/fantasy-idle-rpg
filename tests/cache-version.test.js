@@ -15,6 +15,7 @@ const demoFiles = [
   ['tech-demos/hazards/hazards.html', 'tech-demos/hazards/hazards.css'],
   ['tech-demos/exploration-v3/exploration-v3.html', 'tech-demos/exploration-v3/exploration-v3.css'],
   ['tech-demos/units/units.html', 'tech-demos/units/units.css'],
+  ['tech-demos/loot-lab/loot-lab.html', 'tech-demos/loot-lab/loot-lab.css'],
   ['tech-demos/roguelike-equipment/roguelike-equipment.html', 'tech-demos/roguelike-equipment/roguelike-equipment.css']
 ].map(([html, css]) => ({ html, css, source: read(html), style: read(css) }));
 const unitsDemo = read('tech-demos/units/units.html');

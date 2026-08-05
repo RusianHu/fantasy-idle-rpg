@@ -90,9 +90,9 @@ js/
 
 **探索素材维护**：16 个基础采集物与 2 个宝箱使用透明母版管线：在 `tools/build-exploration-sprites.py` 的 `SPECS` 中登记稳定 ID/格位/尺寸，并在 `GROUPS` 指定所属区域；运行 `python tools\build-exploration-sprites.py` 重建 18 张单图、来源清单和区域模块，提交前用 `--check` 验证源图哈希与产物一致。24 个 v3 新资源及地标/奇物/生态标记由 `js/sprites/exploration_v3.js` 提供，来源和分组记录在 `assets/sprite-source/exploration-v3-source.md`。八区各 6 件地表装饰以 `assets/sprite-source/ground-decorations/<region>/<stable-id>.png` 的 48 张独立透明图为维护源；运行 `python tools\build-ground-decorations.py` 重建逐件生产 PNG、八区模块、来源清单和联系表，提交前用 `--check` 校验。初始提示词与精准替换步骤记录在 `ground-decorations-source.md`，`v3Only` 声明保证旧布局不消费它们。八区 Boss 领地使用 `assets/sprite-source/boss-territories/` 的透明 ImageGen 母版；运行 `python tools\build-boss-landmarks.py` 重建 8 个主地标、24 个装饰精灵、运行时联系表和来源清单，提交前同样用 `--check` 校验。`*.generated.js` 不直接手改。
 
-**扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与八个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
+**扩展方式**：新增 Actor 使用 `tools/scaffold-actor.ps1` 生成 `monster`、`boss`、`npc`、`peaceful-creature`、`combat-npc` 或 `summon` 内容胶囊；其他内容按 `docs/content-authoring/adding-actor.md` 创建或扩展 `*.pack.js`。纯作者展开逻辑放入 `*.support.js`，只通过声明的 `authoring.read/write`、`rules.formula/handler` 能力访问版本化 `Game.contentAuthoring`，不得改写其他 `Game` 表面。构建器递归扫描文件系统，在源 VM 与纯 Bundle VM 中比较 Pack、Support、authoring 注册项、Pack-local 中英文、Population 挂载视图、fingerprint 与 `sourceSetHash`；生成 manifest/Bundle 只用于校验和运行，不是手写真源。正式入口与九个技术演示只加载 `js/data/content/content.generated.js`，新增内容无需修改 HTML。常规扩展不修改 combat/world/renderer，所有引用使用稳定字符串 ID，已下线内容在读档时安全降级。
 
-**地图与视觉 QA 分工**：`tech-demos/units` 先审查 16 种代码网格新怪的 idle 双帧、轮廓、缩放、能力和守卫/猎手组合；`tech-demos/map-effects` 直连 `terrain_v4`，叠加巢穴几何、宝箱、守卫锚点和池解析，并提供确定性复验与批量拓扑报告；`tech-demos/render-gallery` 通过 `Game.visualCatalog` 自动枚举生产单位、装饰、地块、特效、头像、图标和小地图标记，以 1–4 项同步对比、整数倍率舞台、背景/网格/锚点辅助线和逐帧时间轴验证动作 × 朝向覆盖及原生/派生/回退来源；`tech-demos/hazards` 验证明示、天气侦测、隐藏伏击和交互抢占；`tech-demos/exploration-v3` 验证资源守卫、巢穴、Boss 门卫、战后恢复目标、三种自动策略及远征/读档重置。演示页只调用生产模块，不维护平行实现。
+**地图与视觉 QA 分工**：`tech-demos/units` 先审查 16 种代码网格新怪的 idle 双帧、轮廓、缩放、能力和守卫/猎手组合；`tech-demos/map-effects` 直连 `terrain_v4`，叠加巢穴几何、宝箱、守卫锚点和池解析，并提供确定性复验与批量拓扑报告；`tech-demos/render-gallery` 通过 `Game.visualCatalog` 自动枚举生产单位、装饰、地块、特效、头像、图标和小地图标记，以 1–4 项同步对比、整数倍率舞台、背景/网格/锚点辅助线和逐帧时间轴验证动作 × 朝向覆盖及原生/派生/回退来源；`tech-demos/loot-lab` 自动枚举敌对 Actor，用逐次击败、概率轨道、实测频率、连续保底和真实装备像素记录验证单位掉落；`tech-demos/hazards` 验证明示、天气侦测、隐藏伏击和交互抢占；`tech-demos/exploration-v3` 验证资源守卫、巢穴、Boss 门卫、战后恢复目标、三种自动策略及远征/读档重置。演示页只调用生产模块，不维护平行实现。
 
 **交易扩展**：区域以 `tradeAreas[]` 声明地点、实体、半径、优先级与目录，商店条目以 `catalogs[]` 声明供应渠道；`Game.trade.registerDynamic(area,{ttl})` 可注入不入档的临时地点。当前八区营地提供 `camp-general` 与 `camp-exchange`；移动行商由 `Game.merchants.tradeAreas()` 投影持久事件，动态商品通过同一商店能力边界完成校验、扣款与发货，并在正式区域地图以代码网格绘制的青金篷车图标标记固定交易锚点。点击篷车会解析同事件的存活行商 Actor 并先进入交谈，商店只由交谈动作继续打开。交易面板及行商交谈窗以短 TTL 续租 `autoExplore` 暂停，只抑制自动移动、索敌、回营与自动 Boss 触发；关闭、切页、离域/目标失效或调用方失联后自动释放，手动指令、世界时钟、环境与既有战斗不受影响。
 
@@ -182,6 +182,7 @@ node tests\equipment-content.test.js
 node tests\equipment-generation.test.js
 node tests\equipment-auto-equip.test.js
 node tests\equipment-trace.test.js
+node tests\loot-lab-contract.test.js
 node tests\roguelike-equipment-lab.test.js
 node tests\equipment-migration.test.js
 node tests\critical-math.test.js
@@ -209,17 +210,18 @@ node tests\weather-climate-browser-smoke.test.js
 node tests\visual-catalog.test.js
 node tests\render-gallery-contract.test.js
 node tests\render-gallery-browser-smoke.test.js
+node tests\loot-lab-browser-smoke.test.js
 node tests\roguelike-equipment-browser-smoke.test.js
 node tests\browser-smoke.js
 node tests\cache-version.test.js
 node tools\capture-equipment-contact-sheet.js
 ```
 
-除 `action-bubble-demo.test.js`、`weather-climate-browser-smoke.test.js`、`render-gallery-browser-smoke.test.js`、`roguelike-equipment-browser-smoke.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
+除 `action-bubble-demo.test.js`、`weather-climate-browser-smoke.test.js`、`render-gallery-browser-smoke.test.js`、`loot-lab-browser-smoke.test.js`、`roguelike-equipment-browser-smoke.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
 测试链同时保护旧世界与 V2：v4 独立覆盖八区 1,600 张完整巢穴布局和 5,000 个快速种子，v3 继续覆盖同规模黄金矩阵，另有 384 次双向长途行程。内容链验证双 VM/schema/引用/i18n/正式资产、74 个 Actor，以及 40/24/16 装备内容合同和 40 个视觉配置；运行时覆盖 v1→v19、seeded 掉落/保底/重铸/迁移、程序化装备像素、分层暴击、防御、Proc、Population/SpawnLease、Hazard、行商、五职业门卫与 Boss 平衡及 4,000 组样本。
 
-**当前浏览器回归状态**：完整验收目标是正式入口和九个工作台的移动/桌面中英文、减少动态、44px 触控与无横向溢出。`browser-smoke.js` 覆盖正式入口、Hub 及主要世界工作台，Render Gallery、Weather 与 Roguelike 装备机制 Lab 各有独立烟测；Loot Lab 保留大样本分布、重铸、多阶暴击和非法池审计，新装备 Lab 负责生产 Trace、程序化像素外观与静态效果/构筑差值，并与 `tests/equipment-*.test.js` 共同保护。
+**当前浏览器回归状态**：完整验收目标是正式入口和九个工作台的移动/桌面中英文、减少动态、44px 触控与无横向溢出。`browser-smoke.js` 覆盖正式入口、Hub 及主要世界工作台，Render Gallery、Weather、Loot Lab 与 Roguelike 装备机制 Lab 各有独立烟测；Loot Lab 覆盖敌对单位逐次掉落、理论/实测概率、保底、真实装备像素、大样本分布、重铸、多阶暴击和非法池审计，新装备 Lab 负责生产 Trace、程序化像素外观与静态效果/构筑差值，并与 `tests/equipment-*.test.js` 共同保护。
 
 ---
 

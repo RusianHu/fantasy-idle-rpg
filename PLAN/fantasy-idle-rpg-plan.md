@@ -16,7 +16,7 @@
   - 正式内容为 5 职业、30 Talent、74 个 ActorArchetype（57 个普通/Boss/噬宝匣怪物、9 个召唤物、6 个 NPC、1 个玩家 Actor、1 个可战斗 object）、16 个区域基础 EncounterProfile 与 8 个行商袭击 EncounterProfile，以及 16 个非 Actor Hazard；普通 pack 初始 1–3 敌人，含召唤者时初始至多 2 人且同源 `maxActive:1`，Boss 具备三 Action、50% 阶段、预警/打断与有限增援。
   - 存档当前为 v19，只持久化 Roster、经济、v2 装备/五槽 loadout、掉落保底与 ordinal、背包、世界、设置和战术；ActorInstance、SpawnLease、Encounter、RNG、威胁、施法、状态与护盾不入档。v18→v19 将旧三槽装备确定性替换为同 UID/ilvl/稀有度物品，补齐头足、补偿未装备旧物并重建活动行商报价，一次性迁移账本防止重复执行。
   - 八区生态由编译后的 Population 与 WorldSpawnProfile 生成；稳定 `spawnId + generation` 管理 SpawnLease 和旧命令隔离，Encounter 内召唤物走确定性 ephemeral sequence、默认零奖励并随战斗挂载/回收。方向性 Relation、Engagement 原子事务、多队伍 Objective、奖励授权与持久 Variant 共用正式固定 tick。
-  - 九个技术工作台均直接加载生产 `content.generated.js` 与生产运行时：Actor、Map Effects、Render Gallery、Exploration、Hazards、Weather、Merchants、`loot-lab`，以及 Roguelike 装备机制与渲染 Lab。`loot-lab` 负责大样本分布、重铸、多阶暴击和非法池审计；新装备 Lab 负责只读掉落/生成 Trace、实验覆盖、语义像素外观及静态 Modifier/EffectProfile/五槽构筑差值，不维护平行玩法实现或真实 Proc 模拟。
+  - 九个技术工作台均直接加载生产 `content.generated.js` 与生产运行时：Actor、Map Effects、Render Gallery、Exploration、Hazards、Weather、Merchants、`loot-lab`，以及 Roguelike 装备机制与渲染 Lab。`loot-lab` 自动枚举敌对 Actor，以逐次/连续击败展示生产掉落 Trace 的 Roll、理论阈值、实测频率、保底及真实装备像素，并负责大样本分布、重铸、多阶暴击和非法池审计；新装备 Lab 负责只读掉落/生成 Trace、实验覆盖、语义像素外观及静态 Modifier/EffectProfile/五槽构筑差值，不维护平行玩法实现或真实 Proc 模拟。
   - 正式战斗 HUD 两侧为 Actor 驱动的友方/敌方肖像槽：职业使用专用 `portraitId`，怪物允许复用已登记战斗精灵，缺图绘制确定性像素剪影；Lab 必须复用同一渲染器并报告来源与非空像素。
 
   ## 世界观设定（叙事包装）
@@ -254,6 +254,7 @@
   - **单位作者入口**：新增单位以独立 `*.pack.js` 内容胶囊注册；本期 16 种新怪各自注册 Actor、能力、状态、奖励、EncounterPack 和通用 SpawnProfile，再由区域生态包引用并组装 `roaming/rareRoaming/worldAmbush/resourceGuardVisible/resourceGuardAmbush/nestGuardVisible/nestGuardAmbush/bossGate/boss` 九类池。新怪精灵仅使用字符像素网格、主题调色板、手绘 `idle0`、算法派生 `idle1` 和自动描边，不得使用生成式图片或 placeholder。
   - **Modifier / Status / Talent 合同**：内容 Modifier 必须显式声明已注册 `stat`、合法 `phase`、`operation` 与有限数值；`add/addPct` 按层线性累加，`multiply` 按层幂次相乘，`set` 不随层放大。`refresh/unique` 只允许一层，`stack` 声明正整数上限，周期效果按实例层数执行。Talent patch 只能指向已注册 Ability/Status 的现有数值路径，非法 stat、phase、operation、成本、层数、周期或 patch 在严格审计时阻止启动。
   - **装备诊断与视觉合同**：`Game.loot.inspectPlan(context,state)` 与 `inspectGeneration(context)` 必须与正式 `plan/generateEquipment` 共用实现并返回版本化、有序的只读 Trace；诊断不得额外消费 RNG、改变 UID、输入/全局状态、装备实例、存档、事件或 Content Bundle。Lab 候选覆盖一次正式计划只推进一次 ordinal、保底与槽位 drought；额外候选以正式生成器派生同槽、同稀有度、同等级装备。`Game.equipmentVisuals` 是 Lab、Render Gallery、背包、装备栏、详情、动态货物与地面掉落共用的唯一渲染实现；以 UID/来源 Seed 固定 20×20 核心轮廓和 10×10 语义缩图，128 帧 LRU 不写入 `Game.assets`。重铸保持底材、轮廓、部件及细节，仅随词缀族更新边缘纹样；传奇两帧低频切换，减少动态固定首帧。
+  - **单位掉落观测合同**：Loot Lab 的敌人列表必须来自编译后的 `actorArchetype`，敌人预览读取正式 `presentation.spriteId`；普通、守卫、Boss 与噬宝匣默认映射正式来源且允许显式切换。单次/连续击败只能调用 `inspectPlan` 并延续其 `nextState`，概率轨道直接读取 Trace `roll/threshold/reason`，装备预览直接调用 `Game.equipmentVisuals`；不得复制掉落概率、伪造保底或启动正式存档事务。
   - **事件总线（EventBus）**：引擎在关键节点广播事件（`monster:killed`、`player:levelup`、`item:dropped`、
   `boss:defeated`、`region:unlocked`、`save:before` 等）；成就、任务、统计等系统一律实现为事件监听器，与战斗核心解耦；
   - **面向未来**：转生、活动、新货币等尚未实现的新玩法应以监听器/插件形式接入，不侵入既有系统；本条是扩展约束，不代表这些玩法已经排期或上线。

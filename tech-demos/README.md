@@ -11,7 +11,7 @@
 | Weather / Climate Lab | `weather-climate/weather-climate.html?seed=1234ABCD&region=forest&time=300&mode=forced&front=volatile&intensity=0.85&lang=zh-CN` | 直接加载生产 `ClimateProfile`、天气调度与四层渲染器；支持时间线/强制天气锋、强度、过渡、层开关、减少动态、雷击、五锋对照、八区暴露审计及可见度/风力/湿润度/性能报告 |
 | 移动行商机制 Lab | `merchants/merchants.html?seed=1234ABCD&region=grassland&lang=zh-CN` | 直接运行四个正式行商 Profile、八槽确定性库存、付费议价、信誉价格带、购买/赔偿事务，以及撤离、投降、宽恕和抢掠的非致死结算 |
 | 图形与动效渲染 Lab | `render-gallery/render-gallery.html?region=forest&lang=zh-CN` | 自动枚举生产单位、装饰、地块、特效、头像、图标、小地图标记，以及 72 个底材/职业形态与 16 个传奇效果装备条目；通过可筛选图鉴、1–4 项同步对比墙、整数倍率舞台、背景/网格/锚点辅助线、逐帧时间轴和检查器审计动作覆盖的原生帧、整数像素派生与回退 |
-| 掉落与装备 Lab | `loot-lab/loot-lab.html?seed=1234ABCD&class=fighter&source=boss&lang=zh-CN` | 直接运行正式五槽底材/词条内容、seeded 掉落保底、构筑编译、营地重铸、多阶暴击与传奇 EffectProfile，并执行 40/24/16 数量、40 视觉配置及非法池诊断 |
+| 掉落与装备 Lab | `loot-lab/loot-lab.html?seed=1234ABCD&class=fighter&enemy=slime_green&source=regular&lang=zh-CN` | 自动枚举生产敌对 Actor，以逐次/连续击败直观显示掉落 Roll、理论阈值、实测频率与连续保底；掉落装备使用生产程序化像素渲染器，并保留批量分布、构筑、重铸、多阶暴击、传奇 EffectProfile 及非法池诊断 |
 | Roguelike 装备机制与渲染 Lab | `roguelike-equipment/roguelike-equipment.html?seed=1234ABCD&class=fighter&level=32&tier=4&source=boss&samples=1000&lang=zh-CN` | 通过只读 Trace 逐步检查生产掉落与装备生成；对比正式基线和仅使用生产输入的实验覆盖，直接调用正式装备像素渲染器检查图层、相邻 Seed 与传奇双帧，并静态检查 Modifier、EffectProfile 与五槽构筑差值。大样本分布、重铸、多阶暴击和非法池审计仍由掉落与装备 Lab 负责 |
 
 ## 维护约束
@@ -25,7 +25,7 @@
 
 ## 自动验证
 
-完整浏览器验收目标覆盖正式入口及九个工作台，并检查非空 Canvas、无横向溢出、有效 44px 触控目标、中英文切换、减少动态和关键状态按钮。当前 `tests/browser-smoke.js` 覆盖正式入口、Hub、Actor、Map Effects、Hazards、Exploration 与 Weather，Render Gallery 和 Roguelike 装备机制 Lab 各有独立浏览器烟测；行商与 Loot Lab 页面级回归由 v19 浏览器验收补充，领域不变量分别由 `tests/wandering-merchants*.test.js` 与 `tests/equipment-*.test.js` 保护。地图 v4 的权威批量验收位于 `tests/terrain-v4.test.js`，池/守卫分别位于 `tests/encounter-pools-v4.test.js` 与 `tests/guard-sites-v4.test.js`。
+完整浏览器验收目标覆盖正式入口及九个工作台，并检查非空 Canvas、无横向溢出、有效 44px 触控目标、中英文切换、减少动态和关键状态按钮。当前 `tests/browser-smoke.js` 覆盖正式入口、Hub、Actor、Map Effects、Hazards、Exploration 与 Weather；Render Gallery、Loot Lab 和 Roguelike 装备机制 Lab 各有独立浏览器烟测，其中 Loot Lab 明确覆盖敌对单位来源映射、理论/实测概率、第 10 次保底、敌人/装备非空像素和桌面/移动布局。行商领域不变量由 `tests/wandering-merchants*.test.js` 保护。地图 v4 的权威批量验收位于 `tests/terrain-v4.test.js`，池/守卫分别位于 `tests/encounter-pools-v4.test.js` 与 `tests/guard-sites-v4.test.js`。
 
 `node tools/capture-equipment-contact-sheet.js` 通过生产 Render Gallery 链输出 88 项 PNG 接触表和 JSON 像素报告，默认写入系统临时目录；可用 `--url` 和 `--output` 覆盖服务地址与输出目录。
 

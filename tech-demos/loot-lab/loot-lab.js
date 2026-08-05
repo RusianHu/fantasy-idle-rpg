@@ -15,6 +15,12 @@
   var lastItems = [];
   var loadoutItems = {};
   var reforgeItem = null;
+  var hostileUnits = [];
+  var observationState = null;
+  var observationRecords = [];
+  var observationKills = 0;
+  var observationDropKills = 0;
+  var observationItems = 0;
 
   function tr(key, vars) { return DemoI18n.t('loot.' + key, vars); }
   function esc(value) { return Game.util.esc(String(value)); }
@@ -62,10 +68,164 @@
     $('source').innerHTML = sources.map(function (id, index) {
       return '<option value="' + id + '">' + esc(sourceNames[locale()][index]) + '</option>';
     }).join('');
+    hostileUnits = Game.content.all('actorArchetype').filter(function (definition) {
+      return definition.category === 'monster' && definition.presentation && definition.presentation.spriteId;
+    }).sort(function (a, b) {
+      return (a.legacy && a.legacy.tier || 99) - (b.legacy && b.legacy.tier || 99) ||
+        a.id.localeCompare(b.id);
+    });
+    $('enemy').innerHTML = hostileUnits.map(function (definition) {
+      var name = Game.i18n.t(definition.identity.nameKey);
+      var tier = definition.legacy && definition.legacy.tier;
+      return '<option value="' + esc(definition.id) + '">' +
+        esc((tier ? 'T' + tier + ' · ' : '') + name) + '</option>';
+    }).join('');
     var params = new URLSearchParams(location.search);
     if (params.get('class') && Game.content.has('class', params.get('class'))) $('class').value = params.get('class');
     if (params.get('source') && sources.indexOf(params.get('source')) >= 0) $('source').value = params.get('source');
+    if (params.get('enemy') && hostileUnits.some(function (entry) { return entry.id === params.get('enemy'); })) {
+      $('enemy').value = params.get('enemy');
+    }
     if (params.get('seed')) $('seed').value = params.get('seed');
+  }
+  function currentEnemy() {
+    return hostileUnits.filter(function (definition) { return definition.id === $('enemy').value; })[0] || hostileUnits[0];
+  }
+  function sourceForEnemy(definition) {
+    if (!definition) return 'regular';
+    if (definition.rank === 'boss' || (definition.tags || []).indexOf('boss') >= 0) return 'boss';
+    if ((definition.tags || []).indexOf('mimic') >= 0) return 'mimic';
+    if ((definition.tags || []).indexOf('territory-guardian') >= 0) return 'guardian';
+    return 'regular';
+  }
+  function sourceLabel(id) {
+    var index = sources.indexOf(id);
+    return index >= 0 ? sourceNames[locale()][index] : id;
+  }
+  function observationContext() {
+    var enemy = currentEnemy();
+    return {
+      worldSeed: seedValue(), expeditionIndex: 0, sourceType: $('source').value,
+      sourceId: 'loot-lab:hostile:' + (enemy && enemy.id || 'unknown'), classId: $('class').value,
+      playerLevel: Math.max(1, Number($('level').value) || 1),
+      tier: Math.max(1, Math.min(8, Number($('tier').value) || 1)),
+      regionId: 'grassland', dropMultiplier: Math.max(.000001, Number($('drop-multiplier').value) || 1),
+      equipped: Game.state.inv.equipped
+    };
+  }
+  function drawEnemy() {
+    var enemy = currentEnemy();
+    if (!enemy) return;
+    Game.assets.drawToDom($('enemy-canvas'), enemy.presentation.spriteId, 'idle0');
+    $('enemy-name').textContent = Game.i18n.t(enemy.identity.nameKey);
+    $('enemy-source').textContent = sourceLabel($('source').value) +
+      ' · ' + (enemy.legacy && enemy.legacy.tier ? 'T' + enemy.legacy.tier : 'SPECIAL');
+  }
+  function drawBlankDrop(canvas) {
+    var context = canvas.getContext('2d');
+    context.imageSmoothingEnabled = false;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#2d352f';
+    var unit = Math.max(2, Math.floor(canvas.width / 16));
+    var x = Math.floor(canvas.width / 2 - unit * 1.5);
+    var y = Math.floor(canvas.height / 2 - unit * 4);
+    for (var index = 0; index < 6; index++) {
+      context.fillRect(x + (index % 2) * unit * 2, y + index * unit * 1.4, unit, unit);
+    }
+  }
+  function dropDecision(inspected) {
+    return inspected.trace.decisions.filter(function (entry) { return entry.stage === 'drop'; })[0];
+  }
+  function formatProbability(value) { return (Math.max(0, value) * 100).toFixed(2).replace(/\.00$/, '') + '%'; }
+  function renderObservation(latest) {
+    drawEnemy();
+    var preview = Game.loot.inspectPlan(observationContext(), observationState || Game.loot.defaultState());
+    var decision = latest ? latest.decision : dropDecision(preview);
+    var threshold = decision && Number(decision.threshold) || 0;
+    var observed = observationKills ? observationDropKills / observationKills : 0;
+    var misses = observationState ? observationState.eligibleMisses : 0;
+    var pityLimit = Game.content.get('lootTable', 'equipment.standard').equipmentPity;
+    $('theoretical-rate').textContent = formatProbability(threshold);
+    $('observed-rate').textContent = formatProbability(observed);
+    $('pity-progress').textContent = misses + ' / ' + pityLimit;
+    $('observed-items').textContent = String(observationItems);
+    $('threshold-label').textContent = 'P(drop) ' + formatProbability(threshold);
+    $('probability-threshold').style.width = Math.min(100, threshold * 100) + '%';
+    $('observed-meter-fill').style.width = Math.min(100, observed * 100) + '%';
+    var roll = latest && latest.decision.roll;
+    $('roll-label').textContent = roll === null || roll === undefined ? 'ROLL --' : 'ROLL ' + Number(roll).toFixed(4);
+    $('probability-roll').style.display = roll === null || roll === undefined ? 'none' : 'block';
+    $('probability-roll').style.left = Math.min(99.5, Math.max(0, Number(roll) * 100)) + '%';
+    $('probability-track').setAttribute('aria-label', tr('trackAria', {
+      threshold: formatProbability(threshold), roll: roll === null || roll === undefined ? '--' : Number(roll).toFixed(4)
+    }));
+    $('observatory-summary').textContent = tr('observatorySummary', {
+      kills: observationKills, dropKills: observationDropKills, items: observationItems,
+      expected: formatProbability(threshold), observed: formatProbability(observed)
+    });
+    var burst = $('drop-burst');
+    burst.classList.toggle('visible', !!latest);
+    burst.classList.toggle('miss', !!latest && !latest.items.length);
+    if (latest) {
+      $('latest-outcome').textContent = tr(latest.items.length ? (latest.decision.reason === 'equipment-pity' ? 'pityDrop' : 'drop') : 'miss');
+      $('latest-item').textContent = latest.items.length ? itemName(latest.items[0]) : tr('noItem');
+      if (latest.items.length) Game.equipmentVisuals.drawToDom($('latest-drop'), latest.items[0]);
+      else drawBlankDrop($('latest-drop'));
+    } else {
+      $('latest-outcome').textContent = tr('ready');
+      $('latest-item').textContent = tr('readyHint');
+      drawBlankDrop($('latest-drop'));
+    }
+    renderKillHistory();
+  }
+  function renderKillHistory() {
+    var root = $('kill-history');
+    root.innerHTML = '';
+    observationRecords.slice(-10).forEach(function (record) {
+      var card = document.createElement('article');
+      card.className = 'kill-record' + (record.items.length ? ' drop' : '') +
+        (record.decision.reason === 'equipment-pity' ? ' pity' : '');
+      var canvas = document.createElement('canvas'); canvas.width = 40; canvas.height = 40;
+      var title = document.createElement('strong'); title.textContent = '#' + record.kill;
+      var result = document.createElement('span');
+      result.textContent = record.items.length ? tr('historyDrop', { count: record.items.length }) : tr('historyMiss');
+      if (record.items.length) Game.equipmentVisuals.drawToDom(canvas, record.items[0], { size: 'mini' });
+      else drawBlankDrop(canvas);
+      card.appendChild(canvas); card.appendChild(title); card.appendChild(result); root.appendChild(card);
+    });
+  }
+  function resetObservation() {
+    observationState = Game.loot.defaultState();
+    observationRecords = [];
+    observationKills = 0;
+    observationDropKills = 0;
+    observationItems = 0;
+    $('drop-burst').classList.remove('visible');
+    renderObservation(null);
+  }
+  function resolveKills(count) {
+    var latest = null;
+    for (var index = 0; index < count; index++) {
+      var inspected = Game.loot.inspectPlan(observationContext(), observationState);
+      var decision = dropDecision(inspected);
+      observationState = inspected.plan.nextState;
+      observationKills++;
+      if (inspected.plan.items.length) observationDropKills++;
+      observationItems += inspected.plan.items.length;
+      latest = { kill: observationKills, decision: decision, items: inspected.plan.items };
+      observationRecords.push(latest);
+    }
+    var stage = $('enemy-stage');
+    stage.classList.remove('resolving');
+    void stage.offsetWidth;
+    stage.classList.add('resolving');
+    renderObservation(latest);
+  }
+  function selectEnemy() {
+    var enemy = currentEnemy();
+    if (enemy && enemy.legacy && enemy.legacy.tier) $('tier').value = enemy.legacy.tier;
+    $('source').value = sourceForEnemy(enemy);
+    resetObservation();
   }
   function itemName(item) { return Game.ui.itemName(item); }
   function itemCard(item) {
@@ -272,6 +432,7 @@
         worldSeed: worldSeed, expeditionIndex: 0, sourceType: sourceType,
         sourceId: 'loot-lab:' + sourceType, classId: classId,
         playerLevel: level, tier: tier, regionId: 'grassland',
+        dropMultiplier: Math.max(.000001, Number($('drop-multiplier').value) || 1),
         equipped: Game.state.inv.equipped
       }, state);
       state = plan.nextState;
@@ -288,15 +449,18 @@
   function relabelDynamic() {
     var previousSource = $('source').value;
     var previousClass = $('class').value;
+    var previousEnemy = $('enemy').value;
     populateControls();
     if (sources.indexOf(previousSource) >= 0) $('source').value = previousSource;
     if (Game.content.has('class', previousClass)) $('class').value = previousClass;
+    if (hostileUnits.some(function (entry) { return entry.id === previousEnemy; })) $('enemy').value = previousEnemy;
     if (lastItems.length) {
       renderDistribution(Number($('samples').value), Game.state.inv.loot);
       buildLoadout();
     }
     resolveCrit();
     auditPools();
+    renderObservation(observationRecords[observationRecords.length - 1] || null);
   }
 
   DemoI18n.init();
@@ -304,6 +468,16 @@
   setupRuntime();
   populateControls();
   $('run').addEventListener('click', runBatch);
+  $('enemy').addEventListener('change', selectEnemy);
+  $('source').addEventListener('change', resetObservation);
+  $('drop-multiplier').addEventListener('change', resetObservation);
+  $('seed').addEventListener('change', resetObservation);
+  $('class').addEventListener('change', resetObservation);
+  $('level').addEventListener('change', resetObservation);
+  $('tier').addEventListener('change', resetObservation);
+  $('kill-one').addEventListener('click', function () { resolveKills(1); });
+  $('kill-ten').addEventListener('click', function () { resolveKills(10); });
+  $('reset-kills').addEventListener('click', resetObservation);
   $('reforge-lock').addEventListener('change', renderQuote);
   $('reforge').addEventListener('click', executeReforge);
   $('resolve-crit').addEventListener('click', resolveCrit);
@@ -311,6 +485,24 @@
     Game.i18n.setLocale(locale());
     relabelDynamic();
   });
+  var initialEnemy = currentEnemy();
+  if (!(new URLSearchParams(location.search)).has('source')) $('source').value = sourceForEnemy(initialEnemy);
+  drawEnemy();
+  resetObservation();
   runBatch();
   resolveCrit();
+  window.LootLab = {
+    resetObservation: resetObservation,
+    resolveKills: resolveKills,
+    snapshot: function () {
+      var latest = observationRecords[observationRecords.length - 1] || null;
+      return {
+        enemyId: currentEnemy() && currentEnemy().id, sourceType: $('source').value,
+        kills: observationKills, dropKills: observationDropKills, itemCount: observationItems,
+        pityMisses: observationState && observationState.eligibleMisses,
+        latest: latest && { kill: latest.kill, reason: latest.decision.reason,
+          roll: latest.decision.roll, threshold: latest.decision.threshold, itemCount: latest.items.length }
+      };
+    }
+  };
 })();
