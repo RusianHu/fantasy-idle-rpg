@@ -35,7 +35,7 @@
 | **掉落与环境** | 普通战斗装备/药水以像素实体落地并自动拾取，支持 24 件/60 秒保底回收和关闭开关即时入包；八区共 40 种资源定义，每区生成 16–22 个节点并使用独立 16-bit 世界精灵与持久冷却。合法移动可发现普通/稀有探索宝箱；普通箱仍可能成为噬宝匣。巢穴固定箱无 TTL、不参与噬宝匣、每轮仅领取一次，按中段/深区发放金币、区域材料和受控装备概率且不掉魔晶石 |
 | 区域推进 | 新档按经典八区顺序推进；`RoutePlan` 保存稳定主线拓扑。揭雾、地标、资源、奇物、生态和 Boss 门卫共同构成准备度；Boss 仅在本轮门卫清除后生成。Boss 挑战失败进入 60 秒重试且不结束远征，已清门卫不重生；首杀仍解锁下一地区并发一次发现奖励，重复远征只发正常战斗奖励 |
 | **最终通关** | 路线末区 Boss 首杀触发最终击杀演出与六句逐字后日谈，随后展示通关摘要（职业等级、累计游玩、总讨伐、Boss 击杀、世界种子）；演出期间暂停战斗、刷怪、世界时间、增益与统计，关闭后从已保存的后日谈或摘要恢复，完整结局每档只播放一次；可继续最终区域挂机或确认后重开新档，续玩战败仍适用魔王城失守规则 |
-| 装备与掉落 | 武器/头部/身体/足部/饰品五槽；17 个职业可穿戴底材、5 档稀有度、24 条槽位白名单普通词条与 16 条唯一传奇构筑效果。所有战斗、宝箱、巢穴、Boss、离线、远征、商店和行商来源统一走 seeded `Game.loot`，持久化装备/稀有度保底和槽位 drought；营地可锁一条普通词条后原子重铸，其余属性保留 |
+| 装备与掉落 | 武器/头部/身体/足部/饰品五槽各 8 个通用底材，共 40 个；另有 5 档稀有度、24 条槽位白名单普通词条与 16 条唯一传奇构筑效果。所有战斗、宝箱、巢穴、Boss、离线、远征、商店和行商来源统一走 seeded `Game.loot`，持久化装备/稀有度保底和槽位 drought；营地可锁一条普通词条后原子重铸。正式 UI 与地面掉落共用确定性 Canvas 像素渲染器：实例 UID/来源 Seed 固定 20×20 主图及 10×10 地面语义图，底材/职业决定轮廓，词缀族决定纹样，重铸只更新纹样，传奇使用双帧 |
 | 技能与 Talent | 五职业各有独立基础 Action Kit、资源和自动轮转；原 30 个稳定技能 ID 迁移为 V2 权威 Talent。被动等级进入 StatBlock Modifier，主动等级生成 Actor 私有 Ability/Status 视图，技能点成本、解锁和上限均读取 Talent Card，逐点产生真实收益 |
 | **自动养成** | 自动 Talent 加点与智能换装默认开启；五槽各保留当前件与静态前 8 候选，宽度 32 beam search 后对前 8 构筑使用正式 `CombatEstimator` 和固定 seeds `[11,29,47]`。浏览器按 4ms 时间片增量执行，槽位可独立锁定，至少提升 0.1% 才提交 |
 | 商店 / 交易 | 世界摊位、交易域 HUD 按钮与背包入口共用统一交易面板；购买能力取决于实时世界坐标，仅当前地图营地安全半径内开放，域外提供「返回当前营地」、浏览中跨出边界即时锁定商品；目录按地点/分区动态生成，含补给、装备、强化、素材兑换与收购；支持临时动态交易域接口 |
@@ -69,7 +69,7 @@ css/style.css         像素 JRPG UI（FF/DQ 式双线边框面板）
 assets/fonts/         Fusion Pixel 12px 中文像素字体（woff2）
 assets/sprite-source/ 采集物与探索宝箱的生成式母版及运行时预览
 assets/sprites/       可独立复用的透明运行时 PNG（exploration/ 按稳定 ID 拆分）
-tech-demos/           八个双语生产 QA 工作台，含 Actor/战斗、地图、Hazard、导航、天气、行商、视觉与 Loot Lab
+tech-demos/           九个双语生产 QA 工作台，含 Actor/战斗、地图、Hazard、导航、天气、行商、视觉及两类装备 Lab
 docs/content-authoring/ Actor 内容契约、示例与新增流程
 docs/tooling/          本地开发代理与工具操作参考
 js/
@@ -181,6 +181,8 @@ node tests\v2-runtime.test.js
 node tests\equipment-content.test.js
 node tests\equipment-generation.test.js
 node tests\equipment-auto-equip.test.js
+node tests\equipment-trace.test.js
+node tests\roguelike-equipment-lab.test.js
 node tests\equipment-migration.test.js
 node tests\critical-math.test.js
 node tests\unit-state.test.js
@@ -207,15 +209,17 @@ node tests\weather-climate-browser-smoke.test.js
 node tests\visual-catalog.test.js
 node tests\render-gallery-contract.test.js
 node tests\render-gallery-browser-smoke.test.js
+node tests\roguelike-equipment-browser-smoke.test.js
 node tests\browser-smoke.js
 node tests\cache-version.test.js
+node tools\capture-equipment-contact-sheet.js
 ```
 
-除 `action-bubble-demo.test.js`、`weather-climate-browser-smoke.test.js`、`render-gallery-browser-smoke.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
+除 `action-bubble-demo.test.js`、`weather-climate-browser-smoke.test.js`、`render-gallery-browser-smoke.test.js`、`roguelike-equipment-browser-smoke.test.js` 与 `browser-smoke.js` 外，上述命令可直接运行。浏览器用例执行前需在另一终端运行 `python -m http.server 4176`；测试默认读取 `http://127.0.0.1:4176/`，也可用 `FIRPG_URL` 覆盖。
 
-测试链同时保护旧世界与 V2：v4 独立覆盖八区 1,600 张完整巢穴布局和 5,000 个快速种子，v3 继续覆盖同规模黄金矩阵，另有 384 次双向长途行程。内容链验证双 VM/schema/引用/i18n/正式资产、74 个 Actor，以及 17/24/16 装备内容合同；运行时覆盖 v1→v19、seeded 掉落/保底/重铸/迁移、分层暴击、防御、Proc、Population/SpawnLease、Hazard、行商、五职业门卫与 Boss 平衡及 4,000 组样本。
+测试链同时保护旧世界与 V2：v4 独立覆盖八区 1,600 张完整巢穴布局和 5,000 个快速种子，v3 继续覆盖同规模黄金矩阵，另有 384 次双向长途行程。内容链验证双 VM/schema/引用/i18n/正式资产、74 个 Actor，以及 40/24/16 装备内容合同和 40 个视觉配置；运行时覆盖 v1→v19、seeded 掉落/保底/重铸/迁移、程序化装备像素、分层暴击、防御、Proc、Population/SpawnLease、Hazard、行商、五职业门卫与 Boss 平衡及 4,000 组样本。
 
-**当前浏览器回归状态**：完整验收目标是正式入口和八个工作台的移动/桌面中英文、减少动态、44px 触控与无横向溢出。`browser-smoke.js` 覆盖正式入口及主要世界工作台，Render Gallery 与 Weather 各有独立烟测；Loot Lab 作为 v19 装备/暴击的生产链诊断入口，与 `tests/equipment-*.test.js` 和 `tests/critical-math.test.js` 共同保护。
+**当前浏览器回归状态**：完整验收目标是正式入口和九个工作台的移动/桌面中英文、减少动态、44px 触控与无横向溢出。`browser-smoke.js` 覆盖正式入口、Hub 及主要世界工作台，Render Gallery、Weather 与 Roguelike 装备机制 Lab 各有独立烟测；Loot Lab 保留大样本分布、重铸、多阶暴击和非法池审计，新装备 Lab 负责生产 Trace、程序化像素外观与静态效果/构筑差值，并与 `tests/equipment-*.test.js` 共同保护。
 
 ---
 

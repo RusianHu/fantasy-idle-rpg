@@ -320,14 +320,15 @@
     });
     root.appendChild(subs);
 
-    if (invSub === 'bag') renderBag(root);
-    else renderShop(root);
+    if (invSub === 'bag') return renderBag(root);
+    return renderShop(root);
   };
 
   function renderBag(root) {
     var t = Game.i18n.t, fmt = Game.i18n.fmtNum;
     var s = Game.state;
     var inv = s.inv;
+    var visualCleanups = [];
 
     // 智能换装快捷开关
     var autoRow = U.el('div', 'card automation-card', '<div class="row"><div class="grow">' +
@@ -351,13 +352,18 @@
       var cls = 'inv-slot' + (item ? ' r' + item.rar : '');
       var wrap = U.el('div', 'equip-slot-wrap' + (inv.lockedSlots[slotId] ? ' locked' : ''));
       var el = U.el('button', cls,
-        '<canvas width="28" height="28" data-icon="' + slotDef.icon + '"></canvas>' +
+        '<canvas width="40" height="40"' +
+        (item && Game.equipmentVisuals ? ' data-equipment-visual="true"' : ' data-icon="' + slotDef.icon + '"') +
+        '></canvas>' +
         '<span class="slot-label">' + (item ? UI.itemName(item) : t('slot.' + slotId)) + '</span>');
       el.setAttribute('aria-label', item
         ? UI.itemName(item) + ' · ' + t('ui.equippedTag')
         : t('slot.' + slotId));
       if (item) {
         el.addEventListener('click', function () { Game.ui.modals.itemDetail(item); });
+        if (Game.equipmentVisuals) {
+          visualCleanups.push(Game.equipmentVisuals.bind(el.querySelector('canvas'), item));
+        }
       }
       var locked = !!inv.lockedSlots[slotId];
       var lockBtn = U.el('button', 'slot-lock-btn' + (locked ? ' on' : ''),
@@ -459,19 +465,25 @@
     }
     items.forEach(function (item) {
       var slot = U.el('button', 'inv-slot r' + item.rar + (Game.inv.isEquipped(item.uid) ? ' equipped' : ''),
-        '<canvas width="30" height="30" data-icon="' + UI.itemIcon(item) + '"></canvas>' +
+        '<canvas width="40" height="40"' +
+        (Game.equipmentVisuals ? ' data-equipment-visual="true"' : ' data-icon="' + UI.itemIcon(item) + '"') +
+        '></canvas>' +
         '<span class="ilvl">' + item.ilvl + '</span>');
       slot.setAttribute('data-uid', item.uid);
       slot.setAttribute('aria-label',
         UI.itemName(item) + ' · ' + t('rarity.r' + item.rar) + ' · ' + t('ui.itemLevel', { lv: item.ilvl }) +
         (Game.inv.isEquipped(item.uid) ? ' · ' + t('ui.equippedTag') : ''));
       slot.addEventListener('click', function () { Game.ui.modals.itemDetail(item); });
+      if (Game.equipmentVisuals) {
+        visualCleanups.push(Game.equipmentVisuals.bind(slot.querySelector('canvas'), item));
+      }
       grid.appendChild(slot);
     });
     root.appendChild(grid);
+    return function () { visualCleanups.forEach(function (cleanup) { cleanup(); }); };
   }
 
   function renderShop(root) {
-    UI.trade.render(root, { embedded: true });
+    return UI.trade.render(root, { embedded: true });
   }
 })();

@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "cadb7b0ac128abf8b128f6a246aeb1b133e5e18dcd64ded908deb46bce64872a",
+  "sourceSetHash": "969346a95e89d0b7305cf469ea691d54546a7645b31b2a2af8ca7ead9888c85a",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -183,7 +183,7 @@
     {
       "path": "js/data/packs/rules/equipment.pack.js",
       "kind": "pack",
-      "sha256": "83e8ca2226513f5c5122459cb69ff0d7515816dc2987cee2d24801045947ee72"
+      "sha256": "2918a0601aedab62284acd8526b1d2406d15ce5811d184de26b46f2e18fe9c13"
     },
     {
       "path": "js/data/packs/world/actors.pack.js",
@@ -300,7 +300,7 @@
     },
     {
       "id": "core.equipment",
-      "version": "1.0.0"
+      "version": "1.1.0"
     },
     {
       "id": "job.cleric",
@@ -439,6 +439,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "d280def3"
+  "contentFingerprint": "64f1b81e"
 });
 })();

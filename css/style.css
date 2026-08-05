@@ -5,7 +5,7 @@
 
 @font-face {
   font-family: 'FusionPixel';
-  src: url('../assets/fonts/fusion-pixel.woff2?v=20260804.1') format('woff2');
+  src: url('../assets/fonts/fusion-pixel.woff2?v=20260805.2') format('woff2');
   font-display: swap;
 }
 
@@ -1656,6 +1656,8 @@ html[lang="en"] .camp-action-label { font-size: 9px; }
   padding: 0;
 }
 .inv-slot canvas { width: 78%; height: 78%; }
+[data-equipment-visual] { image-rendering: pixelated; }
+.item-detail-icon [data-equipment-visual] { width: 60px; height: 60px; display: block; margin: 0 auto 8px; }
 .inv-slot.r0 { border-color: #3d3d46; }
 .inv-slot.r1 { border-color: #2f6a35; }
 .inv-slot.r2 { border-color: #2a5286; }

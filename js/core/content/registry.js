@@ -907,6 +907,17 @@
     if (type === 'actorArchetype' && S.categories.indexOf(def.category) < 0) {
       issue(issues, 'actor-category', { type: type, id: def.id, path: 'category' });
     }
+    if (type === 'itemVisualProfile') {
+      var visualLists = { silhouetteVariants: 3, partSets: 4, trimSets: 4, miniFeatures: 2 };
+      Object.keys(visualLists).forEach(function (field) {
+        if (!Array.isArray(def[field]) || def[field].length < visualLists[field]) {
+          issue(issues, 'equipment-visual-profile', { type: type, id: def.id, path: field });
+        }
+      });
+      if (typeof def.family !== 'string' || !def.family) {
+        issue(issues, 'equipment-visual-profile', { type: type, id: def.id, path: 'family' });
+      }
+    }
     if (type === 'ability' && ['action', 'reaction'].indexOf(def.kind) < 0) {
       issue(issues, 'ability-kind', { type: type, id: def.id, path: 'kind' });
     }

@@ -2103,6 +2103,38 @@ async function run() {
         }
       }
 
+      // Production equipment visuals in formal inventory, equipped strip, detail modal and world loot.
+      const gear = Game.loot.generateEquipment({
+        seed: 0x7e9a11, uid: 'eq:browser-smoke:visual', classId: Game.state.player.classId,
+        itemLevel: Math.max(12, Game.state.player.level), slotId: 'weapon', rarityId: 'legendary',
+        regionId: Game.state.world.region, sourceType: 'browser-smoke'
+      });
+      Game.inv.addItem(gear, { silent: true });
+      Game.inv.equip(gear.uid);
+      const countPixels = (canvas) => {
+        if (!canvas) return 0;
+        const data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+        let count = 0;
+        for (let at = 3; at < data.length; at += 4) if (data[at]) count++;
+        return count;
+      };
+      const inventoryProbe = document.createElement('div');
+      const inventoryCleanup = Game.ui.panels.inv(inventoryProbe);
+      const formalEquipmentCanvases = Array.from(inventoryProbe.querySelectorAll('[data-equipment-visual]'));
+      const formalInventoryVisuals = formalEquipmentCanvases.length >= 2 &&
+        formalEquipmentCanvases.every((canvas) => countPixels(canvas) > 10);
+      if (inventoryCleanup) inventoryCleanup();
+      Game.ui.modals.itemDetail(gear);
+      const detailCanvas = document.querySelector('.item-detail-icon [data-equipment-visual]');
+      const formalDetailVisual = countPixels(detailCanvas) > 10;
+      const detailMask = detailCanvas && detailCanvas.closest('.modal-mask');
+      if (detailMask) detailMask.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const groundProbe = document.createElement('canvas');
+      groundProbe.width = 20; groundProbe.height = 20;
+      Game.equipmentVisuals.drawWorld(groundProbe.getContext('2d'), gear, 10, 15,
+        { time: 0, reducedMotion: true });
+      const formalGroundVisual = countPixels(groundProbe) > 5;
+
       // Proximity and click pickup paths plus switch-off reclamation.
       const potBeforePickup = Game.inv.potionCount('potion_small');
       W.spawnGroundLoot({ category: 'potion', id: 'potion_small', count: 1 }, hero.x, hero.y, { source: 'combat' });
@@ -2357,6 +2389,7 @@ async function run() {
 
       return {
         proximityPicked, clickPickupOrdered, clickPicked, switchReclaimed,
+        formalInventoryVisuals, formalDetailVisual, formalGroundVisual,
         gatherCompleted, gatherInterrupted, chestOpened,
         tradeApproachOrdered, tradeHudVisible, unifiedTradeOpen,
         tradePauseActive, tradeAutoMovePaused, tradePauseDiagnostics, tradePauseReleasedOnTab,
@@ -2374,6 +2407,9 @@ async function run() {
     assert.equal(v111Checks.clickPickupOrdered, true);
     assert.equal(v111Checks.clickPicked, true);
     assert.equal(v111Checks.switchReclaimed, true);
+    assert.equal(v111Checks.formalInventoryVisuals, true);
+    assert.equal(v111Checks.formalDetailVisual, true);
+    assert.equal(v111Checks.formalGroundVisual, true);
     assert.equal(v111Checks.gatherCompleted, true);
     assert.equal(v111Checks.gatherInterrupted, true);
     assert.equal(v111Checks.chestOpened, true);
@@ -3562,13 +3598,16 @@ async function run() {
       linksCarryLocale: Array.from(document.querySelectorAll('[data-demo-link]')).every((link) =>
         new URL(link.href).searchParams.get('lang') === 'en'),
       hasLootLab: !!document.querySelector('a[href*="loot-lab/loot-lab.html"]'),
+      hasRoguelikeEquipmentLab: !!document.querySelector('a[href*="roguelike-equipment/roguelike-equipment.html"]'),
       title: document.querySelector('h1')?.textContent,
       controlsTouchable: Array.from(document.querySelectorAll('.hub-actions a, .hub-actions select, .demo-grid a'))
         .every((el) => el.getBoundingClientRect().height >= 44),
       noHorizontalOverflow: document.documentElement.scrollWidth <= innerWidth
     }))()`);
-    assert.equal(demoHub.cards, 8, 'technical demo hub exposes every current workbench');
+    assert.equal(demoHub.cards, 9, 'technical demo hub exposes every current workbench');
     assert.equal(demoHub.hasLootLab, true, 'technical demo hub exposes the production Loot Lab');
+    assert.equal(demoHub.hasRoguelikeEquipmentLab, true,
+      'technical demo hub exposes the Roguelike Equipment Mechanics & Render Lab');
     assert.equal(demoHub.linksCarryLocale, true, 'demo hub preserves the selected locale');
     assert.equal(demoHub.title, 'Technical Demo Hub');
     assert.equal(demoHub.controlsTouchable, true);

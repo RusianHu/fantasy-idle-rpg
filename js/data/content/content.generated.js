@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "cadb7b0ac128abf8b128f6a246aeb1b133e5e18dcd64ded908deb46bce64872a",
+  "sourceSetHash": "969346a95e89d0b7305cf469ea691d54546a7645b31b2a2af8ca7ead9888c85a",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -183,7 +183,7 @@
     {
       "path": "js/data/packs/rules/equipment.pack.js",
       "kind": "pack",
-      "sha256": "83e8ca2226513f5c5122459cb69ff0d7515816dc2987cee2d24801045947ee72"
+      "sha256": "2918a0601aedab62284acd8526b1d2406d15ce5811d184de26b46f2e18fe9c13"
     },
     {
       "path": "js/data/packs/world/actors.pack.js",
@@ -300,7 +300,7 @@
     },
     {
       "id": "core.equipment",
-      "version": "1.0.0"
+      "version": "1.1.0"
     },
     {
       "id": "job.cleric",
@@ -439,7 +439,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "d280def3"
+  "contentFingerprint": "64f1b81e"
 });
 })();
 /* source: js/data/packs/guardians/factory.support.js */
@@ -4906,11 +4906,23 @@ window.Game.contentSupport.installAll();
   function range(stat, kind, min, max, operation) {
     return { stat: stat, phase: 'equipmentFlat', operation: operation || 'add', roll: { kind: kind, min: min, max: max } };
   }
-  function base(id, slotId, modifiers, zh, en) {
+  function base(id, slotId, modifiers, zh, en, family) {
     return {
       id: id, slotId: slotId, implicitModifiers: modifiers,
+      visualProfileId: 'visual.' + id,
       presentation: { nameKey: 'equipment.base.' + id.replace('.', '_') + '.name' },
-      _zh: zh, _en: en
+      _zh: zh, _en: en, _visualFamily: family || id.split('.')[1]
+    };
+  }
+  function visualProfile(entry) {
+    var mini = {
+      weapon: ['shaft', 'head'], head: ['crown', 'face'], body: ['shoulders', 'core'],
+      feet: ['left', 'right'], accessory: ['loop', 'center']
+    }[entry.slotId];
+    return {
+      id: entry.visualProfileId, slotId: entry.slotId, family: entry._visualFamily,
+      silhouetteVariants: [0, 1, 2], partSets: [0, 1, 2, 3], trimSets: [0, 1, 2, 3],
+      miniFeatures: mini
     };
   }
   function affix(id, family, weight, slots, modifiers, zh, en) {
@@ -4928,7 +4940,8 @@ window.Game.contentSupport.installAll();
       uniqueEquipped: true,
       presentation: {
         nameKey: 'equipment.affix.' + id.replace('.', '_') + '.name',
-        descKey: 'equipment.affix.' + id.replace('.', '_') + '.desc'
+        descKey: 'equipment.affix.' + id.replace('.', '_') + '.desc',
+        visualMotif: id.replace('legendary.', '')
       },
       _zh: zh, _en: en, _zhDesc: zhDesc, _enDesc: enDesc
     };
@@ -4939,20 +4952,45 @@ window.Game.contentSupport.installAll();
     base('weapon.duelist', 'weapon', [budget('classPower', .82), fixed('critChance', .03)], '决斗武器', 'Duelist Weapon'),
     base('weapon.executioner', 'weapon', [budget('classPower', .96), fixed('critMultiplier', .10)], '处刑武器', 'Executioner Weapon'),
     base('weapon.channeler', 'weapon', [budget('classPower', .78), fixed('resourceRegen', .08), fixed('healingPower', .08, 'addPct')], '导能武器', 'Channeling Weapon'),
+    base('weapon.bulwark', 'weapon', [budget('classPower', .74), budget('maxHp', .30), budget('armor', .08)], '守壁武器', 'Bulwark Weapon'),
+    base('weapon.tempest', 'weapon', [budget('classPower', .76), fixed('haste', .05, 'addPct'), fixed('moveSpeed', .03, 'addPct')], '风暴武器', 'Tempest Weapon'),
+    base('weapon.reclaimer', 'weapon', [budget('classPower', .74), fixed('lifesteal', .015), fixed('resourceRegen', .06)], '回生武器', 'Reclaimer Weapon'),
+    base('weapon.seeker', 'weapon', [budget('classPower', .72), fixed('accuracy', .03), fixed('dropMultiplier', .06)], '寻路武器', 'Seeker Weapon'),
     base('head.greathelm', 'head', [budget('maxHp', .55), budget('armor', .10)], '重盔', 'Greathelm'),
     base('head.mystic_hood', 'head', [budget('maxHp', .45), budget('ward', .11)], '秘法兜帽', 'Mystic Hood'),
     base('head.scout_cowl', 'head', [budget('maxHp', .42), fixed('haste', .04, 'addPct')], '斥候兜帽', 'Scout Cowl'),
+    base('head.chain_coif', 'head', [budget('maxHp', .50), budget('armor', .055), budget('ward', .055)], '链甲头巾', 'Chain Coif'),
+    base('head.war_mask', 'head', [budget('maxHp', .38), budget('classPower', .15), fixed('critChance', .02)], '战争面具', 'War Mask'),
+    base('head.arcane_circlet', 'head', [budget('maxHp', .40), budget('ward', .07), fixed('statusPotency', .06)], '奥术冠环', 'Arcane Circlet'),
+    base('head.oracle_veil', 'head', [budget('maxHp', .42), fixed('healingPower', .07, 'addPct'), fixed('shieldPower', .05, 'addPct')], '神谕面纱', 'Oracle Veil'),
+    base('head.fortune_cap', 'head', [budget('maxHp', .40), fixed('dropMultiplier', .05), fixed('rarityLuck', .04)], '寻宝帽', 'Fortune Cap'),
     base('body.plate', 'body', [budget('maxHp', 2.20), budget('armor', .24)], '板甲', 'Plate Armor'),
     base('body.vestment', 'body', [budget('maxHp', 1.85), budget('ward', .25)], '法衣', 'Mystic Vestment'),
     base('body.brigandine', 'body', [budget('maxHp', 1.90), budget('armor', .12), budget('ward', .12)], '混合甲', 'Brigandine'),
+    base('body.scale', 'body', [budget('maxHp', 2), budget('armor', .18), fixed('tenacity', .04)], '鳞甲', 'Scale Armor'),
+    base('body.leathers', 'body', [budget('maxHp', 1.75), budget('armor', .07), fixed('dodgeChance', .025), fixed('moveSpeed', .03, 'addPct')], '轻皮甲', 'Leathers'),
+    base('body.battlerobe', 'body', [budget('maxHp', 1.72), budget('ward', .17), budget('classPower', .18)], '战法袍', 'Battlerobe'),
+    base('body.sanctified_mail', 'body', [budget('maxHp', 1.90), budget('armor', .08), budget('ward', .10), fixed('healingPower', .07, 'addPct')], '圣化锁甲', 'Sanctified Mail'),
+    base('body.traveler_coat', 'body', [budget('maxHp', 1.75), budget('armor', .08), budget('ward', .08), fixed('goldMultiplier', .05), fixed('dropMultiplier', .04)], '旅者大衣', 'Traveler Coat'),
     base('feet.greaves', 'feet', [budget('maxHp', .45), budget('armor', .07), fixed('tenacity', .05)], '胫甲', 'Greaves'),
     base('feet.swift_boots', 'feet', [budget('maxHp', .38), fixed('dodgeChance', .025), fixed('moveSpeed', .04, 'addPct')], '迅捷靴', 'Swift Boots'),
     base('feet.pilgrim_steps', 'feet', [budget('maxHp', .40), fixed('cooldownRate', .04, 'addPct'), fixed('resourceRegen', .05)], '朝圣鞋', 'Pilgrim Steps'),
+    base('feet.sabatons', 'feet', [budget('maxHp', .43), budget('armor', .06), fixed('moveSpeed', .025, 'addPct')], '铠靴', 'Sabatons'),
+    base('feet.shadow_treads', 'feet', [budget('maxHp', .34), fixed('dodgeChance', .035), fixed('critChance', .02)], '影行靴', 'Shadow Treads'),
+    base('feet.arcane_sandals', 'feet', [budget('maxHp', .36), budget('ward', .07), fixed('resourceRegen', .06)], '奥术凉鞋', 'Arcane Sandals'),
+    base('feet.war_boots', 'feet', [budget('maxHp', .41), fixed('tenacity', .07), fixed('haste', .025, 'addPct')], '战靴', 'War Boots'),
+    base('feet.trail_shoes', 'feet', [budget('maxHp', .34), fixed('moveSpeed', .06, 'addPct'), fixed('dropMultiplier', .04)], '逐迹鞋', 'Trail Shoes'),
     base('accessory.signet', 'accessory', [budget('classPower', .22), fixed('critChance', .02)], '印戒', 'Signet'),
     base('accessory.talisman', 'accessory', [budget('maxHp', .80), fixed('healingPower', .06, 'addPct'), fixed('shieldPower', .06, 'addPct')], '护符', 'Talisman'),
     base('accessory.hourglass', 'accessory', [budget('maxHp', .45), fixed('haste', .03, 'addPct'), fixed('cooldownRate', .03, 'addPct')], '沙漏', 'Hourglass'),
-    base('accessory.compass', 'accessory', [budget('maxHp', .40), fixed('goldMultiplier', .06), fixed('rarityLuck', .05)], '罗盘', 'Compass')
+    base('accessory.compass', 'accessory', [budget('maxHp', .40), fixed('goldMultiplier', .06), fixed('rarityLuck', .05)], '罗盘', 'Compass'),
+    base('accessory.amulet', 'accessory', [budget('classPower', .18), budget('maxHp', .45)], '项链', 'Amulet'),
+    base('accessory.brooch', 'accessory', [budget('maxHp', .55), budget('armor', .05), budget('ward', .05), fixed('damageReduction', .012)], '胸针', 'Brooch'),
+    base('accessory.prayer_beads', 'accessory', [budget('maxHp', .50), fixed('healingPower', .08, 'addPct'), fixed('resourceRegen', .07)], '祈祷珠', 'Prayer Beads'),
+    base('accessory.lantern', 'accessory', [budget('maxHp', .38), fixed('dropMultiplier', .07), fixed('expMultiplier', .05)], '提灯', 'Lantern')
   ];
+  var visualProfiles = bases.map(visualProfile);
+  bases.forEach(function (entry) { delete entry._visualFamily; });
 
   var normal = [
     affix('normal.power', 'offense', 100, ['weapon', 'accessory'], [range('classPower', 'budgetRange', .14, .22)], '强能', 'Empowered'),
@@ -5041,7 +5079,7 @@ window.Game.contentSupport.installAll();
   });
 
   Game.content.registerPack({
-    id: 'core.equipment', version: '1.0.0', schemaVersion: 1,
+    id: 'core.equipment', version: '1.1.0', schemaVersion: 1,
     sourceFile: 'js/data/packs/rules/equipment.pack.js',
     requires: [{ id: 'core.combat', range: '^2.0.0' }],
     locales: {
@@ -5056,6 +5094,7 @@ window.Game.contentSupport.installAll();
         { id: 'feet', order: 3, icon: 'icon_skill_swift' },
         { id: 'accessory', order: 4, icon: 'icon_ring' }
       ],
+      itemVisualProfile: visualProfiles,
       itemBase: bases,
       itemRarity: [
         { id: 'common', rank: 0, implicitMultiplier: 1, normalAffixCount: 0, sellMultiplier: .6 },

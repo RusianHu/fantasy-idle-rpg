@@ -95,6 +95,12 @@ async function run() {
       const unitTab = tabs.find((tab) => tab.getAttribute('data-category') === 'unit');
       if (unitTab) unitTab.click();
       const unitTabCount = document.querySelectorAll('.asset-card').length;
+      const equipment = snapshot.items.filter((item) => item.kind === 'equipment');
+      const equipmentTab = document.querySelector('#category-tabs [data-category="equipment"]');
+      if (equipmentTab) equipmentTab.click();
+      const equipmentTabCount = document.querySelectorAll('.asset-card').length;
+      if (equipment[0]) RenderGalleryLab.select(equipment[0].key);
+      const equipmentNonZero = pixelCount(document.getElementById('inspect-canvas')) > 0;
       if (sample) {
         RenderGalleryLab.select(sample.key);
         const motion = document.getElementById('motion-select');
@@ -111,6 +117,18 @@ async function run() {
       const previewSamples = {};
       const reducedBeforePreview = document.getElementById('reduced-motion').checked;
       RenderGalleryLab.setReducedMotion(false);
+      const legendaryEquipment = equipment.find((item) => item.legendaryId);
+      let legendaryEquipmentAnimated = false;
+      if (legendaryEquipment) {
+        RenderGalleryLab.select(legendaryEquipment.key);
+        const firstFrame = document.createElement('canvas');
+        const secondFrame = document.createElement('canvas');
+        firstFrame.width = secondFrame.width = 60;
+        firstFrame.height = secondFrame.height = 60;
+        Game.equipmentVisuals.drawToDom(firstFrame, legendaryEquipment.item, { phase: 1 });
+        Game.equipmentVisuals.drawToDom(secondFrame, legendaryEquipment.item, { phase: 2 });
+        legendaryEquipmentAnimated = firstFrame.toDataURL() !== secondFrame.toDataURL();
+      }
       for (const item of [fx, particle, bubble]) {
         if (!item) continue;
         RenderGalleryLab.select(item.key);
@@ -148,6 +166,9 @@ async function run() {
         categoryTabHeight,
         assetCardH3: document.querySelector('.asset-card h3') !== null,
         unitTabCount,
+        equipmentTabCount,
+        equipmentNonZero,
+        legendaryEquipmentAnimated,
         metrics,
         compareCards: compareCanvases.length,
         compareNonZero,
@@ -181,6 +202,9 @@ async function run() {
     assert.equal(english.snapshot.issues, 0, 'visual catalog has no missing or placeholder issues');
     assert.ok(english.unitCount > 0 && english.matrix);
     assert.ok(english.categoryTabs > 1 && english.unitTabCount > 0);
+    assert.equal(english.equipmentTabCount, 88);
+    assert.equal(english.equipmentNonZero, true);
+    assert.equal(english.legendaryEquipmentAnimated, true);
     assert.ok(english.categoryTabHeight >= 44, 'category tabs meet the touch target');
     assert.equal(english.assetCardH3, false, 'asset cards use semantic spans instead of nested headings');
     assert.ok(english.metrics.animatedCards <= 96);

@@ -610,7 +610,9 @@
       var html = '<h3 class="rar-r' + rarityRank + '">' + U.esc(Game.ui.itemName(item)) + '</h3>' +
         '<div class="modal-body">' +
         '<div class="item-detail-icon">' +
-        '<canvas width="40" height="40" data-icon="' + Game.ui.itemIcon(item) + '"></canvas></div>' +
+        '<canvas width="60" height="60"' +
+        (Game.equipmentVisuals ? ' data-equipment-visual="true"' : ' data-icon="' + Game.ui.itemIcon(item) + '"') +
+        '></canvas></div>' +
         '<div class="item-detail-meta rar-r' + rarityRank + '">' +
         t('rarity.r' + rarityRank) + ' · ' + t('ui.itemLevel', { lv: itemLevel }) +
         (isEquipped ? ' · ' + t('ui.equippedTag') : '') + '</div>' +
@@ -694,8 +696,12 @@
       btns.appendChild(btnEquip);
       c.appendChild(btns);
 
-      var api = M.show(c);
+      var visualCleanup = function () {};
+      var api = M.show(c, { onClose: function () { visualCleanup(); } });
       Game.ui.renderIcons(c);
+      if (Game.equipmentVisuals) {
+        visualCleanup = Game.equipmentVisuals.bind(c.querySelector('[data-equipment-visual]'), item);
+      }
 
       if (reforgeButton) reforgeButton.addEventListener('click', function () {
         var result = Game.reforge.execute(item.uid, selectedLockId);

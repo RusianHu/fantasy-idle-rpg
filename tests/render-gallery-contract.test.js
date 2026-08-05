@@ -12,6 +12,7 @@ const css = read('tech-demos/render-gallery/render-gallery.css');
 const messages = read('tech-demos/demo-i18n.js');
 
 assert.match(html, /js\/render\/visual_catalog\.js\?v=/, 'Render Gallery loads the production visual catalog');
+assert.match(html, /js\/render\/equipment_visuals\.js\?v=/, 'Render Gallery loads production equipment visuals');
 assert.match(script, /Game\.content\.finalize\(\{ strict: true \}\)/);
 assert.match(script, /Game\.visualCatalog\.snapshot/);
 assert.match(script, /item\.motion/);
@@ -21,6 +22,8 @@ assert.match(script, /Game\.assets\.resolveMotion\(item\.spriteId/);
 assert.match(script, /Game\.fx\.preview/);
 assert.match(script, /Game\.particles\.preview/);
 assert.match(script, /Game\.render\.drawBubblePreview/);
+assert.match(script, /item\.kind === 'equipment'/);
+assert.match(script, /Game\.equipmentVisuals\.drawToDom/);
 assert.match(script, /categoryIds\(\)/);
 assert.match(script, /IntersectionObserver/);
 assert.match(script, /animatedCardButtons/);
@@ -53,7 +56,7 @@ for (const staleRuntime of ['systems/terrain', 'systems/terrain_v3', 'systems/te
 for (const stale of ['drawThemePreview', 'stageInterval', 'stagePaintCount', 'parseSeed', 'hex32', 'Game.terrain.generate', 'Game.terrain.mount']) {
   assert.doesNotMatch(script, new RegExp(stale.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `Render Gallery removed stale map logic: ${stale}`);
 }
-for (const key of ['visual.title', 'visual.subtitle', 'visual.categoryTabsHint', 'visual.native', 'visual.derived', 'visual.fallback', 'visual.hurt', 'visual.defeat', 'visual.previewMode', 'visual.previewProduction', 'visual.previewAdapted', 'visual.previewCatalog', 'visual.previewWindow', 'visual.previewPopout', 'visual.previewScale', 'visual.previewBackdrop', 'visual.previewSpeed', 'visual.previewGrid', 'visual.previewGuides', 'visual.timeline', 'visual.timeReadout', 'visual.compareAdd', 'visual.compareClear', 'visual.compareTitle', 'visual.compareHint', 'visual.compareCount', 'visual.controlsAria', 'hub.visual.title', 'hub.visual.desc']) {
+for (const key of ['visual.title', 'visual.subtitle', 'visual.categoryTabsHint', 'visual.category.equipment', 'visual.native', 'visual.derived', 'visual.fallback', 'visual.hurt', 'visual.defeat', 'visual.previewMode', 'visual.previewProduction', 'visual.previewAdapted', 'visual.previewCatalog', 'visual.previewWindow', 'visual.previewPopout', 'visual.previewScale', 'visual.previewBackdrop', 'visual.previewSpeed', 'visual.previewGrid', 'visual.previewGuides', 'visual.timeline', 'visual.timeReadout', 'visual.compareAdd', 'visual.compareClear', 'visual.compareTitle', 'visual.compareHint', 'visual.compareCount', 'visual.controlsAria', 'hub.visual.title', 'hub.visual.desc']) {
   assert.ok((messages.match(new RegExp("'" + key.replace(/[.*+?^${}()|[\\]\\]/g, '\\\\$&') + "'\\s*:", 'g')) || []).length >= 2,
     `${key} is bilingual`);
 }

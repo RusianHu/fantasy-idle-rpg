@@ -43,15 +43,55 @@
     if (!Number.isFinite(value)) return 0;
     return percent ? +value.toFixed(3) : Math.max(1, Math.round(value));
   }
-  function weightedChoice(rows, random, weightFor) {
-    var total = rows.reduce(function (sum, row) { return sum + Math.max(0, weightFor(row)); }, 0);
+  function traceContext(value) {
+    var out = {};
+    Object.keys(value || {}).forEach(function (key) {
+      if (typeof value[key] === 'function') return;
+      out[key] = clone(value[key]);
+    });
+    return out;
+  }
+  function createTrace(context, stateBefore) {
+    return {
+      schemaVersion: 1,
+      seed: null,
+      context: traceContext(context || {}),
+      stateBefore: stateBefore === undefined ? null : clone(stateBefore),
+      stateAfter: null,
+      decisions: []
+    };
+  }
+  function addDecision(trace, entry) {
+    if (!trace) return;
+    trace.decisions.push(Object.assign({
+      stage: '', key: '', roll: null, threshold: null,
+      candidates: [], selected: null, reason: null, values: {}
+    }, entry || {}));
+  }
+  function weightedChoice(rows, random, weightFor, trace, meta) {
+    var weights = rows.map(function (row) { return Math.max(0, weightFor(row)); });
+    var total = weights.reduce(function (sum, weight) { return sum + weight; }, 0);
+    var selected = rows[0] || null;
+    var rawRoll = null;
     if (!(total > 0)) return rows[0] || null;
-    var roll = random() * total;
+    rawRoll = random();
+    var roll = rawRoll * total;
     for (var i = 0; i < rows.length; i++) {
-      roll -= Math.max(0, weightFor(rows[i]));
-      if (roll <= 0) return rows[i];
+      roll -= weights[i];
+      if (roll <= 0) { selected = rows[i]; break; }
     }
-    return rows[rows.length - 1] || null;
+    if (roll > 0) selected = rows[rows.length - 1] || null;
+    meta = meta || {};
+    addDecision(trace, {
+      stage: meta.stage || 'weighted-choice', key: meta.key || '',
+      roll: rawRoll, threshold: total,
+      candidates: rows.map(function (row, index) {
+        return { id: meta.idFor ? meta.idFor(row) : row && row.id || String(row), weight: weights[index] };
+      }),
+      selected: selected && (meta.idFor ? meta.idFor(selected) : selected.id || String(selected)),
+      reason: meta.reason || 'weighted', values: meta.values || {}
+    });
+    return selected;
   }
   function expandStat(stat, classId) {
     if (stat === 'classPower') {
@@ -61,25 +101,56 @@
     if (stat === 'haste') return ['gcdSpeed', 'castSpeed', 'autoAttackSpeed'];
     return [stat];
   }
-  function rolledValue(modifier, itemLevel, rarity, random, implicit) {
+  function rolledValue(modifier, itemLevel, rarity, random, implicit, trace, meta) {
     var roll = modifier.roll || {};
     var kind = roll.kind || 'fixed';
-    var value;
+    var value, valueRoll = null, implicitRoll = null;
     if (kind === 'budget') value = budget(itemLevel) * (Number(roll.coefficient) || 0);
-    else if (kind === 'budgetRange') value = budget(itemLevel) *
-      (Number(roll.min) + random() * (Number(roll.max) - Number(roll.min)));
-    else if (kind === 'range') value = Number(roll.min) + random() * (Number(roll.max) - Number(roll.min));
+    else if (kind === 'budgetRange') {
+      valueRoll = random();
+      value = budget(itemLevel) *
+        (Number(roll.min) + valueRoll * (Number(roll.max) - Number(roll.min)));
+    } else if (kind === 'range') {
+      valueRoll = random();
+      value = Number(roll.min) + valueRoll * (Number(roll.max) - Number(roll.min));
+    }
     else value = Number(roll.value) || 0;
     if (implicit) {
       if (kind === 'budget') value *= Number(rarity.implicitMultiplier) || 1;
-      value *= .9 + random() * .2;
+      implicitRoll = random();
+      value *= .9 + implicitRoll * .2;
     }
-    return quantize(value, kind === 'range' || kind === 'fixed' && Math.abs(value) < 1);
+    var result = quantize(value, kind === 'range' || kind === 'fixed' && Math.abs(value) < 1);
+    meta = meta || {};
+    addDecision(trace, {
+      stage: implicit ? 'implicit-roll' : 'affix-roll',
+      key: meta.key || modifier.stat || '', roll: valueRoll,
+      selected: result, reason: kind,
+      values: {
+        definitionId: meta.definitionId || null, modifierIndex: meta.modifierIndex,
+        stat: modifier.stat, operation: modifier.operation || 'add', kind: kind,
+        valueRoll: valueRoll, implicitRoll: implicitRoll, itemLevel: itemLevel,
+        rarityId: rarity.id, result: result
+      }
+    });
+    return result;
   }
-  function rollDefinition(definition, itemLevel, rarity, random, implicit) {
-    return (definition.implicitModifiers || definition.modifiers || []).map(function (modifier) {
-      if (Number.isFinite(modifier.value)) return Number(modifier.value);
-      return rolledValue(modifier, itemLevel, rarity, random, implicit);
+  function rollDefinition(definition, itemLevel, rarity, random, implicit, trace, keyPrefix) {
+    return (definition.implicitModifiers || definition.modifiers || []).map(function (modifier, index) {
+      if (Number.isFinite(modifier.value)) {
+        addDecision(trace, {
+          stage: implicit ? 'implicit-roll' : 'affix-roll',
+          key: (keyPrefix || definition.id) + ':' + index,
+          selected: Number(modifier.value), reason: 'fixed-value',
+          values: { definitionId: definition.id, modifierIndex: index, stat: modifier.stat,
+            operation: modifier.operation || 'add', result: Number(modifier.value) }
+        });
+        return Number(modifier.value);
+      }
+      return rolledValue(modifier, itemLevel, rarity, random, implicit, trace, {
+        key: (keyPrefix || definition.id) + ':' + index,
+        definitionId: definition.id, modifierIndex: index
+      });
     });
   }
   function compileRolledModifiers(definition, values, classId, sourcePrefix) {
@@ -309,7 +380,7 @@
     }
   };
 
-  function chooseRarity(context, random, minimumRank) {
+  function chooseRarity(context, random, minimumRank, trace, keyPrefix) {
     var table = Game.content.get('lootTable', 'equipment.standard');
     var luck = Math.max(0, Number(context.rarityLuck) || 0);
     var rows = RARITY_IDS.map(function (id, rank) {
@@ -317,10 +388,19 @@
     }).filter(function (row) { return row.rank >= minimumRank; });
     return weightedChoice(rows, random, function (row) {
       return row.weight * Math.exp(row.rank * luck);
+    }, trace, {
+      stage: 'rarity', key: (keyPrefix || 'item') + '.rarity',
+      idFor: function (row) { return row.id; }, values: { minimumRank: minimumRank, rarityLuck: luck }
     }).id;
   }
-  function chooseSlot(context, random) {
-    if (context.slotId && SLOT_IDS.indexOf(context.slotId) >= 0) return context.slotId;
+  function chooseSlot(context, random, trace, keyPrefix) {
+    if (context.slotId && SLOT_IDS.indexOf(context.slotId) >= 0) {
+      addDecision(trace, {
+        stage: 'slot', key: (keyPrefix || 'item') + '.slot', selected: context.slotId,
+        reason: 'forced', values: { slotDrought: clone(context.slotDrought || {}) }
+      });
+      return context.slotId;
+    }
     var equipped = context.equipped || Game.state && Game.state.inv.equipped || {};
     var drought = context.slotDrought || {};
     var levels = SLOT_IDS.map(function (slot) {
@@ -332,9 +412,13 @@
     return weightedChoice(SLOT_IDS, random, function (slot) {
       return (equipped[slot] ? 1 : 3) * (weak[slot] ? 1.5 : 1) *
         (1 + Math.min(1, .1 * Math.max(0, Number(drought[slot]) || 0)));
+    }, trace, {
+      stage: 'slot', key: (keyPrefix || 'item') + '.slot',
+      idFor: function (slot) { return slot; },
+      values: { weakSlots: Object.keys(weak), slotDrought: clone(drought) }
     });
   }
-  function chooseAffixes(base, rarity, itemLevel, random, poolId, uid, excludedIds) {
+  function chooseAffixes(base, rarity, itemLevel, random, poolId, uid, excludedIds, trace, keyPrefix) {
     var pool = Game.content.get('itemAffixPool', poolId);
     excludedIds = excludedIds || [];
     var candidates = (pool.affixIds || []).map(function (id) {
@@ -350,16 +434,119 @@
         return (familyCounts[def.family] || 0) < (pool.familyLimits[def.family] || Infinity);
       });
       if (!valid.length) break;
-      var picked = weightedChoice(valid, random, function (def) { return def.weight; });
+      addDecision(trace, {
+        stage: 'affix-filter',
+        key: (keyPrefix || 'item') + '.' + poolId + '.' + selected.length + '.filter',
+        candidates: candidates.map(function (def) {
+          return {
+            id: def.id, family: def.family, weight: Number(def.weight) || 0,
+            eligible: valid.indexOf(def) >= 0,
+            excludedReason: valid.indexOf(def) >= 0 ? null : 'family-limit'
+          };
+        }),
+        selected: null, reason: 'slot-and-family',
+        values: { familyCounts: clone(familyCounts), familyLimits: clone(pool.familyLimits) }
+      });
+      var picked = weightedChoice(valid, random, function (def) { return def.weight; }, trace, {
+        stage: poolId === 'equipment.legendary' ? 'legendary-affix' : 'normal-affix',
+        key: (keyPrefix || 'item') + '.' + poolId + '.' + selected.length,
+        idFor: function (def) { return def.id; },
+        values: { familyCounts: clone(familyCounts), familyLimits: clone(pool.familyLimits) }
+      });
       candidates.splice(candidates.indexOf(picked), 1);
       familyCounts[picked.family] = (familyCounts[picked.family] || 0) + 1;
       selected.push({
         instanceId: uid + ':' + (poolId === 'equipment.legendary' ? 'l' : 'a') + selected.length,
         definitionId: picked.id,
-        values: { rolls: rollDefinition(picked, itemLevel, rarity, random, false) }
+        values: { rolls: rollDefinition(picked, itemLevel, rarity, random, false, trace,
+          (keyPrefix || 'item') + '.' + picked.id) }
       });
     }
     return selected;
+  }
+
+  function generateEquipmentInternal(context, trace, keyPrefix) {
+    context = context || {};
+    keyPrefix = keyPrefix || 'item';
+    var seed = Number.isFinite(context.seed) ? Number(context.seed) >>> 0 : hashSeed([
+      context.worldSeed || 0, context.sourceType || 'loot', context.sourceId || '',
+      context.ordinal || 0, context.classId || ''
+    ].join('|'));
+    var random = typeof context.rng === 'function' ? context.rng : rngFor(seed);
+    var classId = context.classId || Game.state && Game.state.player.classId || 'fighter';
+    var slotId = chooseSlot(context, random, trace, keyPrefix);
+    var bases = Game.content.all('itemBase').filter(function (def) {
+      return def.slotId === slotId && (!def.classIds.length || def.classIds.indexOf(classId) >= 0);
+    });
+    var baseRoll = null;
+    var base;
+    if (context.baseId) {
+      base = Game.content.get('itemBase', context.baseId);
+      addDecision(trace, {
+        stage: 'base', key: keyPrefix + '.base',
+        candidates: bases.map(function (def) { return { id: def.id, eligible: def.id === context.baseId }; }),
+        selected: base && base.id || context.baseId, reason: 'forced'
+      });
+    } else {
+      baseRoll = random();
+      base = bases[Math.floor(baseRoll * bases.length)];
+      addDecision(trace, {
+        stage: 'base', key: keyPrefix + '.base', roll: baseRoll, threshold: bases.length,
+        candidates: bases.map(function (def) { return { id: def.id, weight: 1 }; }),
+        selected: base && base.id, reason: 'uniform'
+      });
+    }
+    if (!base || base.slotId !== slotId) throw new Error('[Loot] no usable base for ' + slotId);
+    var itemLevel = Math.max(1, Math.round(context.itemLevel || context.ilvl || 1));
+    var minimumRank = Game.util.clamp(context.minimumRank === undefined ?
+      (context.rarMin === undefined ? 0 : context.rarMin) : context.minimumRank, 0, 4);
+    var forcedRarity = context.rarityId || (context.rar !== undefined ? RARITY_IDS[context.rar] : null);
+    var rarityId = forcedRarity || chooseRarity(context, random, minimumRank, trace, keyPrefix);
+    if (forcedRarity) addDecision(trace, {
+      stage: 'rarity', key: keyPrefix + '.rarity', selected: rarityId, reason: 'forced',
+      values: { minimumRank: minimumRank, rarityLuck: Math.max(0, Number(context.rarityLuck) || 0) }
+    });
+    var rarity = Game.content.get('itemRarity', rarityId);
+    var origin = Object.assign({
+      sourceType: context.sourceType || 'loot', sourceId: context.sourceId || null,
+      regionId: context.regionId || Game.state && Game.state.world.region || null,
+      tier: Math.max(1, context.tier | 0 || 1), ordinal: Math.max(0, context.ordinal | 0),
+      seed: seed, materialId: null
+    }, context.origin || {});
+    var materials = REGION_MATERIALS[origin.regionId] || [];
+    var materialRoll = null;
+    if (!origin.materialId) {
+      materialRoll = random();
+      origin.materialId = materials[Math.floor(materialRoll * Math.max(1, materials.length))] || null;
+    }
+    addDecision(trace, {
+      stage: 'material', key: keyPrefix + '.material', roll: materialRoll,
+      candidates: materials.map(function (id) { return { id: id, weight: 1 }; }),
+      selected: origin.materialId, reason: context.origin && context.origin.materialId ? 'forced' : 'uniform'
+    });
+    var uid = context.uid || 'eq:' + ('00000000' + Game.util.fnv1a([
+      seed, origin.sourceType, origin.sourceId, origin.ordinal, base.id, classId
+    ].join('|'))).slice(-8);
+    var implicitValues = rollDefinition(base, itemLevel, rarity, random, true, trace, keyPrefix + '.implicit');
+    var item = {
+      schemaVersion: 2, generationVersion: 1, uid: uid,
+      baseId: base.id, classId: classId, itemLevel: itemLevel, rarityId: rarityId,
+      contentFingerprint: Game.content.fingerprint(), origin: origin,
+      implicitRolls: implicitValues.map(function (value, index) {
+        return { definitionId: base.id + ':' + index, values: { value: value } };
+      }),
+      affixes: [], reforge: { count: 0, lockedAffixInstanceId: null }
+    };
+    item.affixes = chooseAffixes(base, rarity, itemLevel, random,
+      'equipment.normal', uid, null, trace, keyPrefix);
+    item.affixes = item.affixes.concat(chooseAffixes(base, rarity, itemLevel, random,
+      'equipment.legendary', uid, null, trace, keyPrefix));
+    addDecision(trace, {
+      stage: 'item-complete', key: keyPrefix, selected: uid, reason: 'generated',
+      values: { seed: seed, classId: classId, slotId: slotId, baseId: base.id,
+        rarityId: rarityId, itemLevel: itemLevel, affixCount: item.affixes.length }
+    });
+    return Equipment.normalizeCompatibility(item);
   }
 
   var Loot = Game.loot = {
@@ -367,112 +554,26 @@
     defaultState: defaultLootState,
     normalizeState: normalizeLootState,
     generateEquipment: function (context) {
+      return generateEquipmentInternal(context || {}, null, 'item');
+    },
+    inspectGeneration: function (context) {
       context = context || {};
-      var seed = Number.isFinite(context.seed) ? Number(context.seed) >>> 0 : hashSeed([
-        context.worldSeed || 0, context.sourceType || 'loot', context.sourceId || '',
-        context.ordinal || 0, context.classId || ''
-      ].join('|'));
-      var random = typeof context.rng === 'function' ? context.rng : rngFor(seed);
-      var classId = context.classId || Game.state && Game.state.player.classId || 'fighter';
-      var slotId = chooseSlot(context, random);
-      var bases = Game.content.all('itemBase').filter(function (def) {
-        return def.slotId === slotId && (!def.classIds.length || def.classIds.indexOf(classId) >= 0);
-      });
-      var base = context.baseId ? Game.content.get('itemBase', context.baseId) :
-        bases[Math.floor(random() * bases.length)];
-      if (!base || base.slotId !== slotId) throw new Error('[Loot] no usable base for ' + slotId);
-      var itemLevel = Math.max(1, Math.round(context.itemLevel || context.ilvl || 1));
-      var minimumRank = Game.util.clamp(context.minimumRank === undefined ?
-        (context.rarMin === undefined ? 0 : context.rarMin) : context.minimumRank, 0, 4);
-      var rarityId = context.rarityId || (context.rar !== undefined ? RARITY_IDS[context.rar] : null) ||
-        chooseRarity(context, random, minimumRank);
-      var rarity = Game.content.get('itemRarity', rarityId);
-      var origin = Object.assign({
-        sourceType: context.sourceType || 'loot', sourceId: context.sourceId || null,
-        regionId: context.regionId || Game.state && Game.state.world.region || null,
-        tier: Math.max(1, context.tier | 0 || 1), ordinal: Math.max(0, context.ordinal | 0),
-        seed: seed, materialId: null
-      }, context.origin || {});
-      var materials = REGION_MATERIALS[origin.regionId] || [];
-      origin.materialId = origin.materialId || materials[Math.floor(random() * Math.max(1, materials.length))] || null;
-      var uid = context.uid || 'eq:' + ('00000000' + Game.util.fnv1a([
-        seed, origin.sourceType, origin.sourceId, origin.ordinal, base.id, classId
-      ].join('|'))).slice(-8);
-      var implicitValues = rollDefinition(base, itemLevel, rarity, random, true);
-      var item = {
-        schemaVersion: 2, generationVersion: 1, uid: uid,
-        baseId: base.id, classId: classId, itemLevel: itemLevel, rarityId: rarityId,
-        contentFingerprint: Game.content.fingerprint(), origin: origin,
-        implicitRolls: implicitValues.map(function (value, index) {
-          return { definitionId: base.id + ':' + index, values: { value: value } };
-        }),
-        affixes: [], reforge: { count: 0, lockedAffixInstanceId: null }
-      };
-      item.affixes = chooseAffixes(base, rarity, itemLevel, random, 'equipment.normal', uid);
-      item.affixes = item.affixes.concat(chooseAffixes(base, rarity, itemLevel, random, 'equipment.legendary', uid));
-      return Equipment.normalizeCompatibility(item);
+      var trace = createTrace(context);
+      var item = generateEquipmentInternal(context, trace, 'item');
+      trace.seed = item.origin.seed;
+      return { item: item, trace: trace };
     },
     plan: function (context, stateValue) {
+      return planInternal(context, stateValue, null);
+    },
+    inspectPlan: function (context, stateValue) {
       context = context || {};
-      var state = normalizeLootState(stateValue);
-      var table = Game.content.get('lootTable', 'equipment.standard');
-      var sourceType = context.sourceType || 'regular';
-      var sourceKey = sourceType + ':' + (context.sourceId || sourceType);
-      var ordinal = state.sourceOrdinals[sourceKey] || 0;
-      state.sourceOrdinals[sourceKey] = ordinal + 1;
-      var seed = hashSeed([
-        context.worldSeed || Game.state && Game.state.world.worldSeed || 0,
-        context.expeditionIndex || 0, sourceKey, ordinal,
-        context.classId || Game.state && Game.state.player.classId || '',
-        Game.content.fingerprint()
-      ].join('|'));
-      var random = rngFor(seed);
-      var baseChance = Number(table.equipmentChance[sourceType]);
-      if (!Number.isFinite(baseChance)) baseChance = 0;
-      var dropMultiplier = Math.max(0, Number(context.dropMultiplier) || 1);
-      var chance = 1 - Math.pow(1 - baseChance, dropMultiplier);
-      var eligible = context.eligible !== false && baseChance > 0 && baseChance < 1;
-      var dropped = context.forceDrop === true || random() < chance ||
-        eligible && state.eligibleMisses >= table.equipmentPity - 1;
-      if (eligible) state.eligibleMisses = dropped ? 0 : state.eligibleMisses + 1;
-      var items = [];
-      if (dropped) {
-        var sourceMinimum = ['boss', 'rareChest', 'mimic', 'expedition'].indexOf(sourceType) >= 0
-          ? 2 : 0;
-        var minRank = Math.max(sourceMinimum, context.minimumRank | 0);
-        if (state.dropsSinceLegendary >= table.legendaryPity - 1) minRank = 4;
-        else if (state.dropsSinceEpic >= table.epicPity - 1) minRank = Math.max(minRank, 3);
-        var playerLevel = Math.max(1, context.playerLevel || context.itemLevel ||
-          Game.state && Game.state.player.level || 1);
-        var sourceBonus = sourceType === 'boss' ? 2 :
-          ['rare', 'guardian', 'chest', 'rareChest', 'mimic', 'expedition', 'nestShallow', 'nestDeep']
-            .indexOf(sourceType) >= 0 ? 1 : 0;
-        var levelDelta = sourceBonus ? sourceBonus :
-          weightedChoice([-1, 0, 1], random, function (value) {
-            return value === 0 ? 50 : 25;
-          });
-        var itemLevel = context.itemLevel === undefined
-          ? Math.max(1, playerLevel + levelDelta)
-          : Math.max(1, context.itemLevel | 0);
-        var requests = [{ minimumRank: minRank }];
-        if (sourceType === 'boss' && random() < .35) requests.push({ minimumRank: 2 });
-        if (sourceType === 'boss' && context.firstKill) requests.push({ minimumRank: 3 });
-        requests.forEach(function (request, dropIndex) {
-          var item = Loot.generateEquipment(Object.assign({}, context, request, {
-            seed: hashSeed([seed, 'item', dropIndex, Game.content.fingerprint()].join('|')),
-            itemLevel: itemLevel, ordinal: ordinal * 3 + dropIndex,
-            slotDrought: state.slotDrought
-          }));
-          items.push(item);
-          var rank = rarityRank(item);
-          state.dropsSinceEpic = rank >= 3 ? 0 : state.dropsSinceEpic + 1;
-          state.dropsSinceLegendary = rank >= 4 ? 0 : state.dropsSinceLegendary + 1;
-          SLOT_IDS.forEach(function (slot) {
-            state.slotDrought[slot] = slot === slotOf(item) ? 0 : state.slotDrought[slot] + 1;
-          });
-        });
-      }
-      return { seed: seed, sourceType: sourceType, ordinal: ordinal, items: items, nextState: state };
+      var before = normalizeLootState(stateValue);
+      var trace = createTrace(context, before);
+      var plan = planInternal(context, stateValue, trace);
+      trace.seed = plan.seed;
+      trace.stateAfter = clone(plan.nextState);
+      return { plan: plan, trace: trace };
     },
     commit: function (plan, opts) {
       if (!plan || !Game.state) return [];
@@ -499,6 +600,93 @@
       return (plan.items || []).slice();
     }
   };
+
+  function planInternal(context, stateValue, trace) {
+      context = context || {};
+      var state = normalizeLootState(stateValue);
+      var table = Game.content.get('lootTable', 'equipment.standard');
+      var sourceType = context.sourceType || 'regular';
+      var sourceKey = sourceType + ':' + (context.sourceId || sourceType);
+      var ordinal = state.sourceOrdinals[sourceKey] || 0;
+      state.sourceOrdinals[sourceKey] = ordinal + 1;
+      var seed = hashSeed([
+        context.worldSeed || Game.state && Game.state.world.worldSeed || 0,
+        context.expeditionIndex || 0, sourceKey, ordinal,
+        context.classId || Game.state && Game.state.player.classId || '',
+        Game.content.fingerprint()
+      ].join('|'));
+      var random = rngFor(seed);
+      var baseChance = Number(table.equipmentChance[sourceType]);
+      if (!Number.isFinite(baseChance)) baseChance = 0;
+      var dropMultiplier = Math.max(0, Number(context.dropMultiplier) || 1);
+      var chance = 1 - Math.pow(1 - baseChance, dropMultiplier);
+      var eligible = context.eligible !== false && baseChance > 0 && baseChance < 1;
+      var dropRoll = null;
+      var chanceHit = false;
+      if (context.forceDrop !== true) {
+        dropRoll = random();
+        chanceHit = dropRoll < chance;
+      }
+      var pityHit = eligible && state.eligibleMisses >= table.equipmentPity - 1;
+      var dropped = context.forceDrop === true || chanceHit || pityHit;
+      addDecision(trace, {
+        stage: 'drop', key: sourceKey + ':' + ordinal, roll: dropRoll, threshold: chance,
+        candidates: [{ id: 'drop', weight: chance }, { id: 'miss', weight: Math.max(0, 1 - chance) }],
+        selected: dropped ? 'drop' : 'miss',
+        reason: context.forceDrop === true ? 'forced' : chanceHit ? 'chance' : pityHit ? 'equipment-pity' : 'miss',
+        values: { baseChance: baseChance, dropMultiplier: dropMultiplier, effectiveChance: chance,
+          eligible: eligible, eligibleMissesBefore: state.eligibleMisses,
+          equipmentPity: table.equipmentPity }
+      });
+      if (eligible) state.eligibleMisses = dropped ? 0 : state.eligibleMisses + 1;
+      var items = [];
+      if (dropped) {
+        var sourceMinimum = ['boss', 'rareChest', 'mimic', 'expedition'].indexOf(sourceType) >= 0
+          ? 2 : 0;
+        var minRank = Math.max(sourceMinimum, context.minimumRank | 0);
+        if (state.dropsSinceLegendary >= table.legendaryPity - 1) minRank = 4;
+        else if (state.dropsSinceEpic >= table.epicPity - 1) minRank = Math.max(minRank, 3);
+        addDecision(trace, {
+          stage: 'pity', key: sourceKey + ':' + ordinal + '.rarity-floor', selected: minRank,
+          reason: state.dropsSinceLegendary >= table.legendaryPity - 1 ? 'legendary-pity' :
+            state.dropsSinceEpic >= table.epicPity - 1 ? 'epic-pity' :
+              sourceMinimum ? 'source-minimum' : 'none',
+          values: { sourceMinimum: sourceMinimum, requestedMinimum: context.minimumRank | 0,
+            dropsSinceEpic: state.dropsSinceEpic, dropsSinceLegendary: state.dropsSinceLegendary,
+            epicPity: table.epicPity, legendaryPity: table.legendaryPity }
+        });
+        var playerLevel = Math.max(1, context.playerLevel || context.itemLevel ||
+          Game.state && Game.state.player.level || 1);
+        var sourceBonus = sourceType === 'boss' ? 2 :
+          ['rare', 'guardian', 'chest', 'rareChest', 'mimic', 'expedition', 'nestShallow', 'nestDeep']
+            .indexOf(sourceType) >= 0 ? 1 : 0;
+        var levelDelta = sourceBonus ? sourceBonus :
+          weightedChoice([-1, 0, 1], random, function (value) {
+            return value === 0 ? 50 : 25;
+          });
+        var itemLevel = context.itemLevel === undefined
+          ? Math.max(1, playerLevel + levelDelta)
+          : Math.max(1, context.itemLevel | 0);
+        var requests = [{ minimumRank: minRank }];
+        if (sourceType === 'boss' && random() < .35) requests.push({ minimumRank: 2 });
+        if (sourceType === 'boss' && context.firstKill) requests.push({ minimumRank: 3 });
+        requests.forEach(function (request, dropIndex) {
+          var item = generateEquipmentInternal(Object.assign({}, context, request, {
+            seed: hashSeed([seed, 'item', dropIndex, Game.content.fingerprint()].join('|')),
+            itemLevel: itemLevel, ordinal: ordinal * 3 + dropIndex,
+            slotDrought: state.slotDrought
+          }), trace, 'item.' + dropIndex);
+          items.push(item);
+          var rank = rarityRank(item);
+          state.dropsSinceEpic = rank >= 3 ? 0 : state.dropsSinceEpic + 1;
+          state.dropsSinceLegendary = rank >= 4 ? 0 : state.dropsSinceLegendary + 1;
+          SLOT_IDS.forEach(function (slot) {
+            state.slotDrought[slot] = slot === slotOf(item) ? 0 : state.slotDrought[slot] + 1;
+          });
+        });
+      }
+      return { seed: seed, sourceType: sourceType, ordinal: ordinal, items: items, nextState: state };
+  }
 
   Game.reforge = {
     quote: function (item, lockId) {

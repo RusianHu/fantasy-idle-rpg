@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111412">
+<meta name="build-id" content="20260805.2">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23111412'/%3E%3Cpath d='M7 1h2v3h2v2h2v8H3V6h2V4h2V1z' fill='%23d4b65f'/%3E%3Cpath d='M6 8h4v4H6z' fill='%23111412'/%3E%3C/svg%3E">
+<title data-demo-page-title="gearLab.pageTitle">Roguelike 装备机制与渲染 Lab · 幻境远征</title>
+<link rel="stylesheet" href="roguelike-equipment.css?v=20260805.2">
+</head>
+<body>
+<main class="lab-shell">
+  <header class="lab-header">
+    <div>
+      <p class="eyebrow">FANTASY IDLE RPG / EQUIPMENT TRACE / QA</p>
+      <h1 data-demo-i18n="gearLab.title">Roguelike 装备机制与渲染 Lab</h1>
+      <p class="subtitle" data-demo-i18n="gearLab.subtitle">追踪生产掉落、装备生成、程序化像素外观与静态效果编译。</p>
+    </div>
+    <nav class="header-actions">
+      <label><span data-demo-i18n="common.language">语言</span>
+        <select data-demo-locale><option value="zh-CN">简体中文</option><option value="en">English</option></select>
+      </label>
+      <a href="../index.html" data-demo-i18n="common.demoHub">演示中心</a>
+      <a href="../../index.html" data-demo-i18n="common.backGame">返回游戏</a>
+    </nav>
+  </header>
+
+  <section class="contract-band">
+    <div><span data-demo-i18n="gearLab.contract">诊断契约</span><strong>TRACE V1 / 5 SLOTS / 40 BASES / 24 AFFIXES / 16 EFFECTS</strong></div>
+    <div><span data-demo-i18n="common.build">构建</span><strong id="build-id">20260805.2</strong></div>
+  </section>
+
+  <section class="scenario-bar" aria-label="Scenario controls">
+    <label><span data-demo-i18n="common.seed">世界种子</span><input id="seed" value="1234ABCD" maxlength="8"></label>
+    <label><span data-demo-i18n="gearLab.class">职业</span><select id="class"></select></label>
+    <label><span data-demo-i18n="gearLab.level">角色等级</span><input id="level" type="number" min="1" max="200" value="32"></label>
+    <label><span data-demo-i18n="gearLab.tier">区域阶位</span><input id="tier" type="number" min="1" max="8" value="4"></label>
+    <label><span data-demo-i18n="gearLab.source">掉落来源</span><select id="source"></select></label>
+    <label><span data-demo-i18n="gearLab.samples">样本数</span><input id="samples" type="number" min="1" max="10000" value="1000"></label>
+  </section>
+
+  <nav class="lab-tabs" role="tablist" data-demo-i18n-aria="gearLab.tabsAria">
+    <button id="tab-drop" type="button" role="tab" aria-selected="true" aria-controls="panel-drop" data-tab="drop" data-demo-i18n="gearLab.tabDrop">掉落实验</button>
+    <button id="tab-generation" type="button" role="tab" aria-selected="false" aria-controls="panel-generation" data-tab="generation" data-demo-i18n="gearLab.tabGeneration">生成显微镜</button>
+    <button id="tab-effects" type="button" role="tab" aria-selected="false" aria-controls="panel-effects" data-tab="effects" data-demo-i18n="gearLab.tabEffects">效果检查器</button>
+  </nav>
+
+  <section id="panel-drop" class="tab-panel" role="tabpanel" aria-labelledby="tab-drop">
+    <section class="tool-band experiment-controls">
+      <div class="section-head">
+        <div><p class="eyebrow">BASELINE / OVERRIDE</p><h2 data-demo-i18n="gearLab.dropControls">实验覆盖</h2></div>
+        <div class="command-row">
+          <button id="run-one" type="button" data-demo-i18n="gearLab.runOne">运行一次</button>
+          <button id="run-batch" class="primary" type="button" data-demo-i18n="gearLab.runBatch">运行批量</button>
+          <button id="reset-overrides" type="button" data-demo-i18n="gearLab.resetOverrides">重置覆盖</button>
+        </div>
+      </div>
+      <div class="control-grid experiment-grid">
+        <label><span data-demo-i18n="gearLab.dropMultiplier">掉率倍率</span><input id="drop-multiplier" type="number" min="0" max="10" step="0.1" value="1"></label>
+        <label><span data-demo-i18n="gearLab.rarityLuck">稀有度幸运</span><input id="rarity-luck" type="number" min="0" max="3" step="0.05" value="0"></label>
+        <label><span data-demo-i18n="gearLab.minimumRarity">最低稀有度</span><select id="minimum-rank"></select></label>
+        <label><span data-demo-i18n="gearLab.candidates">候选数</span><input id="candidate-count" type="number" min="1" max="4" value="1"></label>
+        <label><span data-demo-i18n="gearLab.equipmentPity">未出装备计数</span><input id="pity-equipment" type="number" min="0" max="9" value="0"></label>
+        <label><span data-demo-i18n="gearLab.epicPity">未出史诗计数</span><input id="pity-epic" type="number" min="0" max="11" value="0"></label>
+        <label><span data-demo-i18n="gearLab.legendaryPity">未出传奇计数</span><input id="pity-legendary" type="number" min="0" max="39" value="0"></label>
+        <label><span data-demo-i18n="gearLab.droughtWeapon">武器空窗</span><input id="drought-weapon" type="number" min="0" max="99" value="0"></label>
+        <label><span data-demo-i18n="gearLab.droughtHead">头部空窗</span><input id="drought-head" type="number" min="0" max="99" value="0"></label>
+        <label><span data-demo-i18n="gearLab.droughtBody">身体空窗</span><input id="drought-body" type="number" min="0" max="99" value="0"></label>
+        <label><span data-demo-i18n="gearLab.droughtFeet">足部空窗</span><input id="drought-feet" type="number" min="0" max="99" value="0"></label>
+        <label><span data-demo-i18n="gearLab.droughtAccessory">饰品空窗</span><input id="drought-accessory" type="number" min="0" max="99" value="0"></label>
+      </div>
+    </section>
+
+    <section class="compare-grid">
+      <section class="result-column" aria-labelledby="baseline-title">
+        <div class="section-head"><div><p class="eyebrow">PRODUCTION</p><h2 id="baseline-title" data-demo-i18n="gearLab.baseline">生产基线</h2></div><strong id="baseline-summary"></strong></div>
+        <div id="baseline-meters" class="meter-groups"></div>
+        <div id="baseline-pity" class="pity-line"></div>
+      </section>
+      <section class="result-column" aria-labelledby="experiment-title">
+        <div class="section-head"><div><p class="eyebrow">EXPERIMENT</p><h2 id="experiment-title" data-demo-i18n="gearLab.experiment">实验组</h2></div><strong id="experiment-summary"></strong></div>
+        <div id="experiment-meters" class="meter-groups"></div>
+        <div id="experiment-pity" class="pity-line"></div>
+      </section>
+    </section>
+
+    <section class="drop-detail-grid">
+      <section class="tool-band">
+        <div class="section-head"><div><p class="eyebrow">RECENT ITEMS</p><h2 data-demo-i18n="gearLab.results">可检查结果</h2></div><span id="result-count"></span></div>
+        <div id="drop-results" class="drop-results"></div>
+      </section>
+      <section class="tool-band trace-panel">
+        <div class="section-head"><div><p class="eyebrow">RNG TRACE</p><h2 data-demo-i18n="gearLab.dropTrace">掉落判定 Trace</h2></div><span id="trace-seed"></span></div>
+        <ol id="drop-trace" class="trace-list"></ol>
+      </section>
+    </section>
+  </section>
+
+  <section id="panel-generation" class="tab-panel" role="tabpanel" aria-labelledby="tab-generation" hidden>
+    <section class="tool-band">
+      <div class="section-head">
+        <div><p class="eyebrow">SEEDED GENERATOR</p><h2 data-demo-i18n="gearLab.generatorControls">生成约束</h2></div>
+        <button id="generate-item" class="primary" type="button" data-demo-i18n="gearLab.generate">生成装备</button>
+      </div>
+      <div class="control-grid generator-grid">
+        <label><span data-demo-i18n="gearLab.itemSeed">装备 Seed</span><input id="item-seed" value="C0FFEE12" maxlength="8"></label>
+        <label><span data-demo-i18n="gearLab.itemLevel">物品等级</span><input id="item-level" type="number" min="1" max="200" value="32"></label>
+        <label><span data-demo-i18n="gearLab.slotLock">槽位约束</span><select id="slot-lock"></select></label>
+        <label><span data-demo-i18n="gearLab.baseLock">底材约束</span><select id="base-lock"></select></label>
+        <label><span data-demo-i18n="gearLab.rarityLock">稀有度约束</span><select id="rarity-lock"></select></label>
+      </div>
+    </section>
+
+    <section class="generator-workspace">
+      <section class="preview-column">
+        <div class="section-head"><div><p class="eyebrow">SEMANTIC PIXEL BUILD</p><h2 data-demo-i18n="gearLab.visualPreview">程序化外观</h2></div><strong id="preview-asset-id"></strong></div>
+        <div class="preview-stage"><canvas id="gear-preview" width="160" height="160" aria-label="Generated equipment preview"></canvas></div>
+        <div class="scale-control" role="group" data-demo-i18n-aria="gearLab.scaleAria">
+          <button type="button" data-scale="1">1×</button><button type="button" data-scale="2">2×</button>
+          <button type="button" data-scale="4" class="active">4×</button><button type="button" data-scale="8">8×</button>
+        </div>
+        <div class="layer-toggles">
+          <label><input id="layer-outline" type="checkbox" checked><span data-demo-i18n="gearLab.layerOutline">轮廓</span></label>
+          <label><input id="layer-material" type="checkbox" checked><span data-demo-i18n="gearLab.layerMaterial">材质色</span></label>
+          <label><input id="layer-affixes" type="checkbox" checked><span data-demo-i18n="gearLab.layerAffixes">词缀纹样</span></label>
+          <label><input id="layer-legendary" type="checkbox" checked><span data-demo-i18n="gearLab.layerLegendary">传奇层</span></label>
+          <label><input id="reduced-motion" type="checkbox"><span data-demo-i18n="gearLab.reducedMotion">减少动态</span></label>
+        </div>
+        <dl id="visual-descriptor" class="descriptor-grid"></dl>
+      </section>
+
+      <section class="microscope-column">
+        <div class="section-head"><div><p class="eyebrow">ADJACENT SEEDS</p><h2 data-demo-i18n="gearLab.variantWall">相邻 Seed 变体</h2></div></div>
+        <div id="variant-wall" class="variant-wall"></div>
+        <div class="section-head trace-title"><div><p class="eyebrow">DECISION PIPELINE</p><h2 data-demo-i18n="gearLab.generationTrace">生成 Trace</h2></div></div>
+        <ol id="generation-trace" class="trace-list generation-trace"></ol>
+      </section>
+    </section>
+  </section>
+
+  <section id="panel-effects" class="tab-panel" role="tabpanel" aria-labelledby="tab-effects" hidden>
+    <section class="effects-workspace">
+      <section class="selected-item-column">
+        <div class="section-head"><div><p class="eyebrow">AUTHORITATIVE INSTANCE</p><h2 data-demo-i18n="gearLab.currentItem">当前装备</h2></div><button id="preview-equip" class="primary" type="button" data-demo-i18n="gearLab.previewEquip">预览到槽位</button></div>
+        <div id="selected-item"></div>
+        <div class="fingerprint"><span data-demo-i18n="gearLab.fingerprint">内容指纹</span><code id="fingerprint"></code></div>
+        <div class="section-head compact"><div><p class="eyebrow">FIVE SLOTS</p><h2 data-demo-i18n="gearLab.loadout">临时五槽</h2></div></div>
+        <div id="loadout" class="loadout"></div>
+      </section>
+
+      <section class="compiled-column">
+        <div class="section-head"><div><p class="eyebrow">LEDGER MODIFIERS</p><h2 data-demo-i18n="gearLab.modifiers">编译 Modifier</h2></div><strong id="modifier-count"></strong></div>
+        <div class="table-wrap"><table><thead><tr><th>Source</th><th>Stat</th><th>Phase</th><th>Operation</th><th>Value</th></tr></thead><tbody id="modifier-table"></tbody></table></div>
+        <div class="section-head compact"><div><p class="eyebrow">STATBLOCK DELTA</p><h2 data-demo-i18n="gearLab.buildDelta">构筑属性差值</h2></div></div>
+        <div class="table-wrap"><table><thead><tr><th data-demo-i18n="gearLab.stat">属性</th><th data-demo-i18n="gearLab.before">替换前</th><th data-demo-i18n="gearLab.after">替换后</th><th data-demo-i18n="gearLab.delta">变化</th></tr></thead><tbody id="build-delta"></tbody></table></div>
+      </section>
+    </section>
+    <section class="tool-band effect-flow-band">
+      <div class="section-head"><div><p class="eyebrow">EFFECT PROFILE</p><h2 data-demo-i18n="gearLab.effectFlow">传奇效果静态流程</h2></div></div>
+      <div id="effect-flow" class="effect-flow"></div>
+    </section>
+  </section>
+
+  <div id="lab-status" class="sr-status" role="status" aria-live="polite"></div>
+</main>
+
+<script src="../../js/core/utils.js?v=20260805.2"></script>
+<script src="../../js/core/eventbus.js?v=20260805.2"></script>
+<script src="../../js/core/registry.js?v=20260805.2"></script>
+<script src="../../js/i18n/i18n.js?v=20260805.2"></script>
+<script src="../../js/i18n/zh-CN.js?v=20260805.2"></script>
+<script src="../../js/i18n/en.js?v=20260805.2"></script>
+<script src="../../js/i18n/combat-v2-zh-CN.js?v=20260805.2"></script>
+<script src="../../js/i18n/combat-v2-en.js?v=20260805.2"></script>
+<script src="../../js/core/assets.js?v=20260805.2"></script>
+<script src="../../js/data/formulas.js?v=20260805.2"></script>
+<script src="../../js/sprites/palettes.js?v=20260805.2"></script>
+<script src="../../js/sprites/hero.js?v=20260805.2"></script>
+<script src="../../js/sprites/monsters_a.js?v=20260805.2"></script>
+<script src="../../js/sprites/monsters_b.js?v=20260805.2"></script>
+<script src="../../js/sprites/monsters_expansion.js?v=20260805.2"></script>
+<script src="../../js/sprites/monsters_guards.js?v=20260805.2"></script>
+<script src="../../js/sprites/props.js?v=20260805.2"></script>
+<script src="../../js/data/items.js?v=20260805.2"></script>
+<script src="../../js/data/skills.js?v=20260805.2"></script>
+<script src="../../js/core/content/rules.js?v=20260805.2"></script>
+<script src="../../js/core/content/schemas.js?v=20260805.2"></script>
+<script src="../../js/core/content/compiler.js?v=20260805.2"></script>
+<script src="../../js/core/content/audit.js?v=20260805.2"></script>
+<script src="../../js/core/content/registry.js?v=20260805.2"></script>
+<script src="../../js/core/content/support.js?v=20260805.2"></script>
+<script src="../../js/data/content/content.generated.js?v=20260805.2"></script>
+<script>window.ROGUELIKE_EQUIPMENT_CONTENT_AUDIT = Game.content.finalize({ strict: true });</script>
+<script src="../../js/systems/equipment.js?v=20260805.2"></script>
+<script src="../../js/render/equipment_visuals.js?v=20260805.2"></script>
+<script src="../../js/ui/panels_main.js?v=20260805.2"></script>
+<script src="../demo-i18n.js?v=20260805.2"></script>
+<script src="roguelike-equipment.js?v=20260805.2"></script>
+</body>
+</html>

@@ -31,14 +31,10 @@ invalidMutation((item) => { item.affixes[1].definitionId = item.affixes[0].defin
 invalidMutation((item) => { item.affixes[0].values.rolls[0] = 1e9; },
   'out-of-range stored rolls must be rejected');
 invalidMutation((item) => {
-  const offense = item.affixes.filter((roll) =>
-    Game.content.get('itemAffix', roll.definitionId).family === 'offense');
-  if (offense.length < 2) {
-    item.affixes[0].definitionId = 'normal.power';
-    item.affixes[0].values.rolls = [Math.round(Game.equipment.budget(item.itemLevel) * .18)];
-    item.affixes[1].definitionId = 'normal.crit_chance';
-    item.affixes[1].values.rolls = [.04];
-  }
+  item.affixes[0].definitionId = 'normal.power';
+  item.affixes[0].values.rolls = [Math.round(Game.equipment.budget(item.itemLevel) * .18)];
+  item.affixes[1].definitionId = 'normal.crit_chance';
+  item.affixes[1].values.rolls = [.04];
   item.affixes[2].definitionId = 'normal.crit_damage';
   item.affixes[2].values.rolls = [.12];
 }, 'family limits must be enforced');

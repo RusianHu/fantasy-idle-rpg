@@ -7,7 +7,7 @@
     'stat', 'statProfile', 'damageType', 'resistanceProfile', 'resource',
     'resourceProfile', 'faction', 'combatRules', 'renderProfile',
     'actorArchetype', 'class', 'equipmentProfile', 'talentTree', 'talent',
-    'itemSlot', 'itemBase', 'itemRarity', 'itemAffix', 'itemAffixPool',
+    'itemSlot', 'itemVisualProfile', 'itemBase', 'itemRarity', 'itemAffix', 'itemAffixPool',
     'lootTable', 'reforgeProfile', 'effectProfile',
     'ability', 'trait', 'status', 'aiProfile', 'tacticsProfile',
     'evaluationProfile', 'rewardProfile', 'encounterProfile',
@@ -30,7 +30,8 @@
       'equipmentProfileId', 'primaryPowerStat', 'baseStats', 'growth'
     ],
     itemSlot: ['id', 'order', 'icon'],
-    itemBase: ['id', 'slotId', 'implicitModifiers'],
+    itemVisualProfile: ['id', 'slotId', 'family', 'silhouetteVariants', 'partSets', 'trimSets', 'miniFeatures'],
+    itemBase: ['id', 'slotId', 'visualProfileId', 'implicitModifiers'],
     itemRarity: ['id', 'rank', 'implicitMultiplier', 'normalAffixCount'],
     itemAffix: ['id', 'kind', 'family', 'weight'],
     itemAffixPool: ['id', 'affixIds', 'familyLimits'],
@@ -92,7 +93,8 @@
       evaluationProfileId: 'evaluationProfile'
     },
     equipmentProfile: { slots: 'itemSlot' },
-    itemBase: { slotId: 'itemSlot', classIds: 'class' },
+    itemVisualProfile: { slotId: 'itemSlot' },
+    itemBase: { slotId: 'itemSlot', visualProfileId: 'itemVisualProfile', classIds: 'class' },
     itemAffix: { effectProfileId: 'effectProfile' },
     itemAffixPool: { affixIds: 'itemAffix' },
     talentTree: { talentIds: 'talent' },
@@ -137,6 +139,9 @@
       weaponAppearance: null, statDots: {}
     },
     itemSlot: { schemaVersion: 1, tags: [] },
+    itemVisualProfile: {
+      schemaVersion: 1, silhouetteVariants: [], partSets: [], trimSets: [], miniFeatures: []
+    },
     itemBase: {
       schemaVersion: 1, tags: [], classIds: [], implicitModifiers: [],
       presentation: {}

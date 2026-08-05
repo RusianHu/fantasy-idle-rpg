@@ -211,7 +211,12 @@
       });
       card.appendChild(button);
       root.appendChild(card);
-      Game.assets.drawToDom(card.querySelector('canvas'), offer.icon, 'icon');
+      if (offer.kind === 'gear' && Game.equipmentVisuals) {
+        card.querySelector('canvas').setAttribute('data-equipment-visual', 'true');
+        Game.equipmentVisuals.drawToDom(card.querySelector('canvas'), offer.item, { reducedMotion: true });
+      } else {
+        Game.assets.drawToDom(card.querySelector('canvas'), offer.icon, 'icon');
+      }
     });
   }
   function renderLedger() {

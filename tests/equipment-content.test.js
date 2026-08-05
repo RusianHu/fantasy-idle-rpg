@@ -12,7 +12,12 @@ const legendary = affixes.filter((entry) => entry.kind === 'legendary');
 
 assert.deepEqual(Array.from(slots.map((entry) => entry.id)),
   ['weapon', 'head', 'body', 'feet', 'accessory']);
-assert.equal(bases.length, 17);
+assert.equal(bases.length, 40);
+assert.equal(Game.content.all('itemVisualProfile').length, 40);
+for (const slot of slots) {
+  assert.equal(bases.filter((entry) => entry.slotId === slot.id).length, 8,
+    `${slot.id} has exactly eight item bases`);
+}
 assert.equal(normal.length, 24);
 assert.equal(legendary.length, 16);
 assert.equal(Game.content.all('itemRarity').length, 5);
@@ -67,4 +72,4 @@ for (let rarity = 0; rarity < 5; rarity++) {
   }
 }
 
-console.log('Equipment content tests passed: 5 slots, 17 bases, 24 normal affixes and 16 legendary effects.');
+console.log('Equipment content tests passed: 5 slots, 40 bases, 40 visual profiles, 24 normal affixes and 16 legendary effects.');

@@ -45,6 +45,8 @@ for (const file of [
 for (const file of ['js/render/effects.js', 'js/render/particles.js', 'js/systems/action_bubbles.js']) {
   vm.runInContext(read(file), sandbox, { filename: file });
 }
+vm.runInContext(read('js/systems/equipment.js'), sandbox, { filename: 'js/systems/equipment.js' });
+vm.runInContext(read('js/render/equipment_visuals.js'), sandbox, { filename: 'js/render/equipment_visuals.js' });
 vm.runInContext(read('js/render/visual_catalog.js'), sandbox, { filename: 'js/render/visual_catalog.js' });
 
 const Game = sandbox.Game;
@@ -58,6 +60,10 @@ assert.ok(snapshot.totalItems > snapshot.totalAssets, 'catalog includes non-asse
 assert.ok(snapshot.counts.unit > 0, 'unit assets are classified');
 assert.ok(snapshot.counts.terrain > 0, 'terrain materials are classified');
 assert.ok(snapshot.counts.ui > 0, 'UI assets are classified');
+const equipmentItems = snapshot.items.filter((item) => item.kind === 'equipment');
+assert.equal(snapshot.counts.equipment, 88, 'catalog includes every procedural equipment form');
+assert.equal(equipmentItems.filter((item) => item.legendaryId).length, 16);
+assert.equal(new Set(equipmentItems.filter((item) => !item.legendaryId).map((item) => item.baseId)).size, 40);
 assert.ok(snapshot.items.some((item) => item.key === 'fx:banner'), 'FX catalog discovers exposed visual methods');
 const previewItems = snapshot.items.filter((item) => ['effect', 'particle', 'bubble'].includes(item.kind));
 assert.ok(previewItems.length > 0 && previewItems.every((item) => item.preview && item.preview.mode), 'effect entries expose an explicit preview mode');
@@ -113,4 +119,4 @@ for (const id of assetIds.slice(0, 12)) {
   }
 }
 
-console.log(`Visual catalog contract OK (${snapshot.totalAssets} assets, ${snapshot.totalItems} entries, ${unitAssets.length} unit visuals).`);
+console.log(`Visual catalog contract OK (${snapshot.totalAssets} assets, ${snapshot.totalItems} entries, ${unitAssets.length} unit visuals, ${equipmentItems.length} equipment visuals).`);

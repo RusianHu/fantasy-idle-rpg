@@ -118,9 +118,13 @@
       buyCopy = '<canvas width="14" height="14" data-icon="' + curIcon + '"></canvas>' + fmt(price);
     }
     var copy = offerPresentation(def);
+    var gearVisual = def.kind === 'gear' && def.item && Game.equipmentVisuals;
+    var iconMarkup = gearVisual
+      ? '<canvas width="40" height="40" data-equipment-visual="true"></canvas>'
+      : '<canvas width="30" height="30" data-icon="' + def.icon + '"></canvas>';
     var card = U.el('div', 'card trade-offer' + (locked ? ' trade-offer-locked' : ''),
       '<div class="row">' +
-      '<canvas width="30" height="30" data-icon="' + def.icon + '"></canvas>' +
+      iconMarkup +
       '<div class="grow"><div class="name">' + U.esc(copy.name) + owned + '</div>' +
       '<div class="desc">' + U.esc(copy.desc) + '</div>' +
       (def.kind === 'exchange'
@@ -154,6 +158,9 @@
       }
     });
     root.appendChild(card);
+    return gearVisual
+      ? Game.equipmentVisuals.bind(card.querySelector('[data-equipment-visual]'), def.item)
+      : function () {};
   }
 
   function renderMerchantStatus(root, targetArea, active, locked) {
@@ -340,6 +347,7 @@
     render: function (root, opts) {
       opts = opts || {};
       var t = Game.i18n.t;
+      var visualCleanups = [];
       var context = Game.trade.current();
       var targetArea = Game.trade.areaById(
         opts.areaId || openedAreaId || (context.nearest && context.nearest.id)
@@ -393,7 +401,7 @@
 
       if (!targetArea) {
         root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.tradeNoArea') + '</div>'));
-        return;
+        return function () {};
       }
 
       var browseContext = active ? context : {
@@ -422,7 +430,7 @@
         sections.sell = [];
         order.push('sell');
       }
-      if (!order.length) return;
+      if (!order.length) return function () {};
       if (!selectedSection || order.indexOf(selectedSection) < 0) selectedSection = order[0];
 
       var tabs = U.el('div', 'trade-section-tabs');
@@ -444,17 +452,18 @@
         renderSell(root, locked);
       } else {
         var offers = sections[selectedSection] || [];
-        for (var i = 0; i < offers.length; i++) renderOffer(root, offers[i], locked);
+        for (var i = 0; i < offers.length; i++) visualCleanups.push(renderOffer(root, offers[i], locked));
         if (!offers.length) {
           root.appendChild(U.el('div', 'card', '<div class="desc">' + t('ui.tradeNoOffers') + '</div>'));
         }
       }
       UI.renderIcons(root);
+      return function () { visualCleanups.forEach(function (cleanup) { cleanup(); }); };
     }
   };
 
   UI.panels.trade = function (root) {
-    TradeUI.render(root, { embedded: false, areaId: openedAreaId });
+    return TradeUI.render(root, { embedded: false, areaId: openedAreaId });
   };
 
   bus.on('trade:contextChanged', function () {

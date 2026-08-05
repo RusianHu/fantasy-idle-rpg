@@ -318,7 +318,9 @@
       var assets = assetItems(refs);
       var effects = effectItems();
       var materials = materialItems(regions);
-      var items = assets.concat(materials, effects);
+      var equipment = Game.equipmentVisuals && Game.equipmentVisuals.catalog
+        ? Game.equipmentVisuals.catalog() : [];
+      var items = assets.concat(materials, effects, equipment);
       var issues = missingRefs.map(function (item) {
         var issue = clone(item);
         delete issue.key;

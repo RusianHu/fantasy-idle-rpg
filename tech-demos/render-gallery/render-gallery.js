@@ -94,6 +94,11 @@
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (item.kind === 'asset') {
       paintSpriteCanvas(canvas, item, frame || 'idle0', motion, options);
+    } else if (item.kind === 'equipment' && Game.equipmentVisuals) {
+      Game.equipmentVisuals.drawToDom(canvas, item.item, {
+        phase: item.legendaryId && !reducedMotion ? Math.floor(previewTime / .48) % 2 + 1 : 0,
+        reducedMotion: reducedMotion
+      });
     } else if (item.kind === 'map-icon' && Game.mapIcons) {
       Game.mapIcons.drawToDom(canvas, item.id);
     } else if (item.kind === 'material') {
@@ -127,7 +132,8 @@
   }
   function isAnimatedItem(item) {
     var flags = item && item.flags || {};
-    return !!(item && item.kind === 'asset' && (item.motion || flags.sway || flags.bob || flags.flicker));
+    return !!(item && ((item.kind === 'asset' && (item.motion || flags.sway || flags.bob || flags.flicker)) ||
+      (item.kind === 'equipment' && item.legendaryId)));
   }
   function shouldAnimatePreview(item) {
     return !!(item && (isAnimatedItem(item) || item.preview));

@@ -230,7 +230,7 @@
     var normal = affixes.filter(function (entry) { return entry.kind === 'normal'; });
     var legendary = affixes.filter(function (entry) { return entry.kind === 'legendary'; });
     check(LOOT_CONTENT_AUDIT && LOOT_CONTENT_AUDIT.ok, 'strict content audit');
-    check(bases.length === 17, 'itemBase count = ' + bases.length + ' / 17');
+    check(bases.length === 40, 'itemBase count = ' + bases.length + ' / 40');
     check(normal.length === 24, 'normal affix count = ' + normal.length + ' / 24');
     check(legendary.length === 16, 'legendary count = ' + legendary.length + ' / 16');
     Game.content.all('itemAffixPool').forEach(function (pool) {

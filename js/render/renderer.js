@@ -1337,6 +1337,11 @@
         );
         ctx.fillStyle = '#e8edf2';
         ctx.fillRect(Math.round(loot.x - 1), Math.round(y - (largePotion ? 10 : 9)), 3, 2);
+      } else if (Game.equipmentVisuals && loot.drop.item) {
+        Game.equipmentVisuals.drawWorld(ctx, loot.drop.item, loot.x, y, {
+          time: t,
+          reducedMotion: !motion
+        });
       } else {
         var slot = loot.drop.item && loot.drop.item.base;
         if (slot === 'weapon') {
