@@ -32,14 +32,14 @@ const groundManifest = Game.GROUND_DECORATION_SPRITES;
 
 assert.ok(groundManifest, 'ground-decoration asset manifest is loaded');
 assert.equal(Object.keys(groundManifest.regions).length, 8);
-assert.equal(Object.keys(groundManifest.assets).length, 48);
-assert.equal(new Set(Object.keys(groundManifest.assets)).size, 48);
+assert.equal(Object.keys(groundManifest.assets).length, 72);
+assert.equal(new Set(Object.keys(groundManifest.assets)).size, 72);
 
 for (const region of regions) {
   const themedGroundDecor = (region.terrain.deco || [])
     .filter((definition) => definition.v3Only);
-  assert.equal(themedGroundDecor.length, 6,
-    `${region.id} registers exactly six new v3 ground decorations`);
+  assert.equal(themedGroundDecor.length, 9,
+    `${region.id} registers exactly nine v3 ground decorations`);
   assert.deepEqual(
     Array.from(groundManifest.regions[region.id]),
     Array.from(themedGroundDecor, (definition) => definition.sprite),

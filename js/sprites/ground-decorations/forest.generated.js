@@ -116,4 +116,63 @@
     }
   });
 
+  D({
+    id: "deco_forest_brambles",
+    source: {"path": "assets/sprite-source/ground-decorations/forest/deco_forest_brambles.png", "sha256": "b45cd4b91b0073a18d325a38a2bd88de2e07b1e2db3f68b434845f3c5774bcc3", "png": "assets/sprites/ground-decorations/forest/deco_forest_brambles.png"},
+    pal: {"a": "#64734d", "b": "#4b5d3a", "c": "#3c5031", "d": "#36472c", "e": "#2e3d27"},
+    anchor: { x: 8, y: 7 },
+    frames: {
+      idle0: [
+        "....abcd........",
+        "....ccdcba......",
+        "..abde.eebda....",
+        "..ddd.aacbccbb..",
+        "aadeabcdeeededbb",
+        "adecaaccaeedadee",
+        "baaaadebbbbbcbce",
+        "aacadecabbbbdbbc"
+      ]
+    }
+  });
+
+  D({
+    id: "deco_forest_snail_shell",
+    source: {"path": "assets/sprite-source/ground-decorations/forest/deco_forest_snail_shell.png", "sha256": "49baa2f3a8b7eb431fbd4d964e4cc23ac1157c9d5353ad1ae1f322e206efcfe3", "png": "assets/sprites/ground-decorations/forest/deco_forest_snail_shell.png"},
+    pal: {"a": "#bca98b", "b": "#8a6d4f", "c": "#9c876b", "d": "#774d2b", "e": "#5d3d22"},
+    anchor: { x: 6, y: 7 },
+    frames: {
+      idle0: [
+        "....aaaaa....",
+        "...bcccaacc..",
+        "..cbcaabacc..",
+        ".dbbcbcbbedd.",
+        "dddcbcbbedded",
+        "dddeeeeedeeee",
+        ".deddedeeddde",
+        "..dbeedddd..."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_forest_moths",
+    source: {"path": "assets/sprite-source/ground-decorations/forest/deco_forest_moths.png", "sha256": "48282e5a46db655675436db41c43c1c6e8fbf01780ad4abc57002a7c4abb4bf9", "png": "assets/sprites/ground-decorations/forest/deco_forest_moths.png"},
+    pal: {"a": "#e3fbf2", "b": "#d7f5ed", "c": "#b9e6df", "d": "#a9d8d4", "e": "#7bafaf"},
+    anchor: { x: 6, y: 9 },
+    frames: {
+      idle0: [
+        "a..aba......",
+        "cb.bdc.a..aa",
+        "ddddc..cbccc",
+        ".ceec..ddddb",
+        ".d......eedd",
+        "....a....ed.",
+        "...cba.a....",
+        "...dddbda...",
+        "...adedd....",
+        "....eec....."
+      ]
+    }
+  });
+
 })();

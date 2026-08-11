@@ -114,4 +114,68 @@
     }
   });
 
+  D({
+    id: "deco_skyruins_astrolabe",
+    source: {"path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_astrolabe.png", "sha256": "55e50d867fbf6068ad61e304db6944e1048b8f3af823ccd09c26f3fff89d66b3", "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_astrolabe.png"},
+    pal: {"a": "#a28b4a", "b": "#c09c48", "c": "#917637", "d": "#725624", "e": "#523c19"},
+    anchor: { x: 6, y: 10 },
+    frames: {
+      idle0: [
+        "..aaaabc....",
+        ".aaccccac...",
+        "cadedceedc..",
+        "aa..eab.eed.",
+        "db...bbbade.",
+        "dabadaaceedd",
+        "ecceeedb..ed",
+        ".ecc..db..dd",
+        ".eedbcdaacde",
+        "...edcaccad.",
+        "....eeeddd.."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_skyruins_amphora_shards",
+    source: {"path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_amphora_shards.png", "sha256": "025aabe5f6328af771498d04838fd112fa8596bd372699c62c3e7456ffc5efa7", "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_amphora_shards.png"},
+    pal: {"a": "#bebea8", "b": "#808375", "c": "#e5e1cc", "d": "#9aaaad", "e": "#c0cbc8"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        ".aaaa..........",
+        "abbbba.........",
+        "aaaaabbba......",
+        "aaaacabbba.....",
+        "dcccccdbdd.cca.",
+        "eeeeededd.dacce",
+        "dddeddabb.ddeac",
+        ".ddddbb.cedbda.",
+        ".......dddd...."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_skyruins_golden_wing",
+    source: {"path": "assets/sprite-source/ground-decorations/skyruins/deco_skyruins_golden_wing.png", "sha256": "df5ef84ccd44776ddab33aebd9de9591ad54b7563055f536016d45bc272d156d", "png": "assets/sprites/ground-decorations/skyruins/deco_skyruins_golden_wing.png"},
+    pal: {"a": "#d4c36a", "b": "#e6d777", "c": "#857646", "d": "#b49f54", "e": "#d8ddcc"},
+    anchor: { x: 5, y: 10 },
+    frames: {
+      idle0: [
+        "abaa.......",
+        ".cdabb.....",
+        "..caaaba...",
+        ".badddad...",
+        ".cdaaddd...",
+        "..ddddcdb..",
+        "eedaaaacdee",
+        "eeeccdccdee",
+        "aeeeeeeeedc",
+        ".dcdeeeddcc",
+        "....cdccc.."
+      ]
+    }
+  });
+
 })();

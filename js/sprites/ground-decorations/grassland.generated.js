@@ -111,4 +111,68 @@
     }
   });
 
+  D({
+    id: "deco_grassland_horseshoe",
+    source: {"path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_horseshoe.png", "sha256": "74684456556fdd3552e1c2af9d0fa48f5d15ce2471c21fd711b2a7291f38152f", "png": "assets/sprites/ground-decorations/grassland/deco_grassland_horseshoe.png"},
+    pal: {"a": "#6a6a68", "b": "#757b6c", "c": "#878779", "d": "#b29667", "e": "#4f4e4c"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        "...abccccaa...",
+        "..cdcbbbacca..",
+        ".ccccbaaabbba.",
+        "acecaeeeeeacae",
+        "bcceeebbaeabae",
+        "aaaeedebbaabae",
+        "eccebdddbaabae",
+        "ecaaaddddccaee",
+        ".caaeddddecae."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_grassland_stepping_stones",
+    source: {"path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_stepping_stones.png", "sha256": "69a67e6c3c043bf484e6db91b638597dc00e96960f2bb444051b6fe54e4a2237", "png": "assets/sprites/ground-decorations/grassland/deco_grassland_stepping_stones.png"},
+    pal: {"a": "#ded2b5", "b": "#dcd0b3", "c": "#67973f", "d": "#cec2a2", "e": "#a29973"},
+    anchor: { x: 5, y: 10 },
+    frames: {
+      idle0: [
+        ".aaab......",
+        "cdbdec.....",
+        "cceecc.....",
+        "...bbbb....",
+        ".ebbaabdc..",
+        ".ceddddcc..",
+        "..ceeee....",
+        "....bbaab..",
+        "...dbaaaad.",
+        "...ceddddec",
+        "...cceeeec."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_grassland_bluebells",
+    source: {"path": "assets/sprite-source/ground-decorations/grassland/deco_grassland_bluebells.png", "sha256": "8ff1e5a3492fa519903eec6e8812c5ac29db4fb9f0428dbcf0b648e1448e5ac7", "png": "assets/sprites/ground-decorations/grassland/deco_grassland_bluebells.png"},
+    pal: {"a": "#4f804f", "b": "#4a6b81", "c": "#669842", "d": "#3b4b6d", "e": "#82b070"},
+    anchor: { x: 5, y: 10 },
+    frames: {
+      idle0: [
+        "....aab...",
+        "...cabbb..",
+        "...cdbeb..",
+        "..cc.dbb..",
+        ".bdaa.ac..",
+        "bebdaadbbb",
+        "bebdaadbeb",
+        "..d.ca.bbb",
+        "..cccaaa..",
+        ".ccccacec.",
+        "..acaaca.."
+      ]
+    }
+  });
+
 })();

@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_BUNDLE_META = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "969346a95e89d0b7305cf469ea691d54546a7645b31b2a2af8ca7ead9888c85a",
+  "sourceSetHash": "56080cd5f48ab96370f10798717180492e54e85d890787ea1117d230fe503f10",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -123,7 +123,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "7d46e3440340a29a0bd3bbe9e12a183b4515d0b8a8b054adf6471fa08d7e7608"
+      "sha256": "c414ec1728c45620c32bbc8765ece6e36dd5e1136480574c39b3121de7f4d008"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -439,7 +439,7 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "64f1b81e"
+  "contentFingerprint": "28afe671"
 });
 })();
 /* source: js/data/packs/guardians/factory.support.js */
@@ -717,7 +717,10 @@
           { sprite: 'deco_grassland_dandelions', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.grassland.dandelions' },
           { sprite: 'deco_grassland_burrow', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.grassland.burrow' },
           { sprite: 'deco_grassland_fallen_branch', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.grassland.fallenBranch' },
-          { sprite: 'deco_grassland_fairy_ring', count: 4, placement: 'ground', v3Only: true, shadow: false, glow: { color: '#c8f0b0', r: 9 }, nameKey: 'decor.grassland.fairyRing' }
+          { sprite: 'deco_grassland_fairy_ring', count: 4, placement: 'ground', v3Only: true, shadow: false, glow: { color: '#c8f0b0', r: 9 }, nameKey: 'decor.grassland.fairyRing' },
+          { sprite: 'deco_grassland_horseshoe', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.grassland.horseshoe' },
+          { sprite: 'deco_grassland_stepping_stones', count: 3, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.grassland.steppingStones' },
+          { sprite: 'deco_grassland_bluebells', count: 3, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.grassland.bluebells' }
         ],
         tufts: 150,
         tuftColors: ['#3d8232', '#8ad06a'],
@@ -754,7 +757,10 @@
           { sprite: 'deco_forest_cones_acorns', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.forest.conesAcorns' },
           { sprite: 'deco_forest_root_knot', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.forest.rootKnot' },
           { sprite: 'deco_forest_leaf_pile', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.forest.leafPile' },
-          { sprite: 'deco_forest_fern_stones', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.forest.fernStones' }
+          { sprite: 'deco_forest_fern_stones', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.forest.fernStones' },
+          { sprite: 'deco_forest_brambles', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.forest.brambles' },
+          { sprite: 'deco_forest_snail_shell', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.forest.snailShell' },
+          { sprite: 'deco_forest_moths', count: 3, placement: 'ground', v3Only: true, bob: true, shadow: false, glow: { color: '#b8f4ee', r: 8 }, nameKey: 'decor.forest.moths' }
         ],
         tufts: 120,
         tuftColors: ['#2f6b28', '#6fae5a'],
@@ -792,7 +798,10 @@
           { sprite: 'deco_mine_discarded_pick', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.mine.discardedPick' },
           { sprite: 'deco_mine_lantern', count: 4, placement: 'ground', v3Only: true, flicker: true, glow: { color: '#f2b94e', r: 12 }, nameKey: 'decor.mine.lantern' },
           { sprite: 'deco_mine_timber_scraps', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.mine.timberScraps' },
-          { sprite: 'deco_mine_copper_rubble', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.mine.copperRubble' }
+          { sprite: 'deco_mine_copper_rubble', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.mine.copperRubble' },
+          { sprite: 'deco_mine_cart_wheel', count: 3, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.mine.cartWheel' },
+          { sprite: 'deco_mine_dynamite', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.mine.dynamite' },
+          { sprite: 'deco_mine_ore_sack', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.mine.oreSack' }
         ],
         tufts: 0
       },
@@ -826,7 +835,10 @@
           { sprite: 'deco_graveyard_chain_coil', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.graveyard.chainCoil' },
           { sprite: 'deco_graveyard_urn_shards', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.graveyard.urnShards' },
           { sprite: 'deco_graveyard_ectoplasm', count: 4, placement: 'ground', v3Only: true, shadow: false, bob: true, glow: { color: '#78dca8', r: 12 }, nameKey: 'decor.graveyard.ectoplasm' },
-          { sprite: 'deco_graveyard_fresh_mound', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.graveyard.freshMound' }
+          { sprite: 'deco_graveyard_fresh_mound', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.graveyard.freshMound' },
+          { sprite: 'deco_graveyard_grave_coins', count: 3, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.graveyard.graveCoins' },
+          { sprite: 'deco_graveyard_bone_hand', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.graveyard.boneHand' },
+          { sprite: 'deco_graveyard_raven_feathers', count: 3, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.graveyard.ravenFeathers' }
         ],
         tufts: 46,
         tuftColors: ['#4c543e', '#7a8560'],
@@ -863,7 +875,10 @@
           { sprite: 'deco_snowpass_frost_shrub', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.snowpass.frostShrub' },
           { sprite: 'deco_snowpass_trail_cairn', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.snowpass.trailCairn' },
           { sprite: 'deco_snowpass_frozen_puddle', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.snowpass.frozenPuddle' },
-          { sprite: 'deco_snowpass_broken_sled', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.snowpass.brokenSled' }
+          { sprite: 'deco_snowpass_broken_sled', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.snowpass.brokenSled' },
+          { sprite: 'deco_snowpass_wolf_tracks', count: 3, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.snowpass.wolfTracks' },
+          { sprite: 'deco_snowpass_frozen_rope', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.snowpass.frozenRope' },
+          { sprite: 'deco_snowpass_trail_pennant', count: 3, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.snowpass.trailPennant' }
         ],
         tufts: 0
       },
@@ -895,7 +910,10 @@
           { sprite: 'deco_lavacave_lava_crust', count: 4, placement: 'ground', v3Only: true, shadow: false, glow: { color: '#dc5424', r: 9 }, nameKey: 'decor.lavacave.lavaCrust' },
           { sprite: 'deco_lavacave_basalt_shards', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.lavacave.basaltShards' },
           { sprite: 'deco_lavacave_scorched_bones', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.lavacave.scorchedBones' },
-          { sprite: 'deco_lavacave_ash_mound', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.lavacave.ashMound' }
+          { sprite: 'deco_lavacave_ash_mound', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.lavacave.ashMound' },
+          { sprite: 'deco_lavacave_fire_geode', count: 3, placement: 'ground', v3Only: true, glow: { color: '#f07030', r: 10 }, nameKey: 'decor.lavacave.fireGeode' },
+          { sprite: 'deco_lavacave_iron_grate', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.lavacave.ironGrate' },
+          { sprite: 'deco_lavacave_molten_tracks', count: 3, placement: 'ground', v3Only: true, shadow: false, glow: { color: '#f05a28', r: 9 }, nameKey: 'decor.lavacave.moltenTracks' }
         ],
         tufts: 0
       },
@@ -929,7 +947,10 @@
           { sprite: 'deco_skyruins_marble_rubble', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.skyruins.marbleRubble' },
           { sprite: 'deco_skyruins_aether_motes', count: 4, placement: 'ground', v3Only: true, bob: true, shadow: false, glow: { color: '#52d9ee', r: 13 }, nameKey: 'decor.skyruins.aetherMotes' },
           { sprite: 'deco_skyruins_cloud_grass', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.skyruins.cloudGrass' },
-          { sprite: 'deco_skyruins_mosaic', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.skyruins.mosaic' }
+          { sprite: 'deco_skyruins_mosaic', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.skyruins.mosaic' },
+          { sprite: 'deco_skyruins_astrolabe', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.skyruins.astrolabe' },
+          { sprite: 'deco_skyruins_amphora_shards', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.skyruins.amphoraShards' },
+          { sprite: 'deco_skyruins_golden_wing', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.skyruins.goldenWing' }
         ],
         tufts: 64,
         tuftColors: ['#5f8c5f', '#a0cca0'],
@@ -967,7 +988,10 @@
           { sprite: 'deco_darkcastle_banner_scrap', count: 4, placement: 'ground', v3Only: true, sway: true, nameKey: 'decor.darkcastle.bannerScrap' },
           { sprite: 'deco_darkcastle_claw_marks', count: 4, placement: 'ground', v3Only: true, shadow: false, nameKey: 'decor.darkcastle.clawMarks' },
           { sprite: 'deco_darkcastle_purple_fungus', count: 4, placement: 'ground', v3Only: true, glow: { color: '#a252bd', r: 10 }, nameKey: 'decor.darkcastle.purpleFungus' },
-          { sprite: 'deco_darkcastle_gargoyle_fragment', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.darkcastle.gargoyleFragment' }
+          { sprite: 'deco_darkcastle_gargoyle_fragment', count: 4, placement: 'ground', v3Only: true, nameKey: 'decor.darkcastle.gargoyleFragment' },
+          { sprite: 'deco_darkcastle_broken_chalice', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.darkcastle.brokenChalice' },
+          { sprite: 'deco_darkcastle_bone_candelabrum', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.darkcastle.boneCandelabrum' },
+          { sprite: 'deco_darkcastle_thorn_crown', count: 3, placement: 'ground', v3Only: true, nameKey: 'decor.darkcastle.thornCrown' }
         ],
         tufts: 30,
         tuftColors: ['#43265f', '#8a56c0']
@@ -1131,6 +1155,21 @@
       pattern: 'ring', clusters: [2, 4], members: [4, 7], radius: [24, 48],
       fieldScale: 360, solitaryRate: 0.18
     },
+    deco_grassland_horseshoe: {
+      pattern: 'scatter', anchor: 'route', anchorRange: [24, 118],
+      clusters: [2, 4], members: [1, 3], radius: [42, 92],
+      fieldScale: 310, solitaryRate: 0.42
+    },
+    deco_grassland_stepping_stones: {
+      pattern: 'trail', anchor: 'route', anchorRange: [10, 62],
+      clusters: [3, 5], members: [3, 6], radius: [52, 112], aspect: 0.14,
+      fieldScale: 360, solitaryRate: 0.04
+    },
+    deco_grassland_bluebells: {
+      pattern: 'edgeBand', anchor: 'blocker-edge', anchorRange: [20, 92],
+      clusters: [4, 7], members: [3, 7], radius: [30, 72], aspect: 0.38,
+      fieldScale: 210, solitaryRate: 0.08
+    },
 
     deco_forest_mossy_log: {
       pattern: 'line', anchor: 'blocker-edge', anchorRange: [22, 82],
@@ -1161,6 +1200,21 @@
       pattern: 'edgeBand', anchor: 'blocker-edge', anchorRange: [18, 74],
       clusters: [4, 7], members: [3, 7], radius: [30, 72], aspect: 0.38,
       fieldScale: 190, solitaryRate: 0.08
+    },
+    deco_forest_brambles: {
+      pattern: 'edgeBand', anchor: 'blocker-edge', anchorRange: [8, 58],
+      clusters: [4, 7], members: [3, 7], radius: [30, 70], aspect: 0.32,
+      fieldScale: 190, solitaryRate: 0.06
+    },
+    deco_forest_snail_shell: {
+      pattern: 'scatter', anchor: 'parent', parent: 'deco_forest_mossy_log',
+      anchorRange: [10, 58], clusters: [2, 4], members: [1, 3],
+      radius: [26, 62], fieldScale: 250, solitaryRate: 0.38
+    },
+    deco_forest_moths: {
+      pattern: 'arc', anchor: 'parent', parent: 'deco_forest_red_shrooms',
+      anchorRange: [18, 78], clusters: [3, 5], members: [2, 5],
+      radius: [30, 70], fieldScale: 260, solitaryRate: 0.12
     },
 
     deco_mine_broken_rail: {
@@ -1193,6 +1247,21 @@
       clusters: [3, 6], members: [3, 7], radius: [28, 68], aspect: 0.36,
       fieldScale: 180, solitaryRate: 0.1
     },
+    deco_mine_cart_wheel: {
+      pattern: 'line', anchor: 'parent', parent: 'deco_mine_broken_rail',
+      anchorRange: [8, 56], clusters: [2, 4], members: [1, 3],
+      radius: [34, 76], aspect: 0.16, fieldScale: 300, solitaryRate: 0.36
+    },
+    deco_mine_dynamite: {
+      pattern: 'scatter', anchor: 'route', anchorRange: [30, 124],
+      clusters: [2, 4], members: [1, 3], radius: [38, 86],
+      fieldScale: 330, solitaryRate: 0.44
+    },
+    deco_mine_ore_sack: {
+      pattern: 'row', anchor: 'route', anchorRange: [18, 76],
+      clusters: [2, 4], members: [2, 4], radius: [42, 88], aspect: 0.2,
+      fieldScale: 300, solitaryRate: 0.22
+    },
 
     deco_graveyard_cracked_slab: {
       pattern: 'row', anchor: 'route', anchorRange: [42, 132],
@@ -1223,6 +1292,21 @@
       pattern: 'row', anchor: 'route', anchorRange: [48, 138],
       clusters: [3, 5], members: [3, 7], radius: [46, 98], aspect: 0.22,
       fieldScale: 300, solitaryRate: 0.06
+    },
+    deco_graveyard_grave_coins: {
+      pattern: 'ring', anchor: 'parent', parent: 'deco_graveyard_cracked_slab',
+      anchorRange: [10, 54], clusters: [2, 4], members: [2, 5],
+      radius: [24, 52], fieldScale: 270, solitaryRate: 0.18
+    },
+    deco_graveyard_bone_hand: {
+      pattern: 'scatter', anchor: 'parent', parent: 'deco_graveyard_fresh_mound',
+      anchorRange: [8, 48], clusters: [2, 4], members: [1, 3],
+      radius: [30, 64], fieldScale: 300, solitaryRate: 0.36
+    },
+    deco_graveyard_raven_feathers: {
+      pattern: 'trail', anchor: 'route', anchorRange: [26, 112],
+      clusters: [3, 5], members: [2, 5], radius: [40, 92], aspect: 0.2,
+      fieldScale: 320, solitaryRate: 0.2
     },
 
     deco_snowpass_ice_spikes: {
@@ -1255,6 +1339,21 @@
       clusters: [2, 4], members: [1, 3], radius: [46, 96], aspect: 0.18,
       fieldScale: 340, solitaryRate: 0.46
     },
+    deco_snowpass_wolf_tracks: {
+      pattern: 'trail', anchor: 'route', anchorRange: [16, 74],
+      clusters: [3, 5], members: [3, 7], radius: [58, 124], aspect: 0.12,
+      fieldScale: 380, solitaryRate: 0.04
+    },
+    deco_snowpass_frozen_rope: {
+      pattern: 'scatter', anchor: 'parent', parent: 'deco_snowpass_broken_sled',
+      anchorRange: [8, 52], clusters: [2, 4], members: [1, 3],
+      radius: [34, 72], fieldScale: 300, solitaryRate: 0.38
+    },
+    deco_snowpass_trail_pennant: {
+      pattern: 'row', anchor: 'route', anchorRange: [18, 68],
+      clusters: [3, 5], members: [1, 3], radius: [60, 126], aspect: 0.1,
+      fieldScale: 390, solitaryRate: 0.42
+    },
 
     deco_lavacave_ember_vent: {
       pattern: 'edgeBand', anchor: 'lava-edge', anchorRange: [8, 62],
@@ -1285,6 +1384,21 @@
       pattern: 'arc', anchor: 'parent', parent: 'deco_lavacave_ember_vent',
       anchorRange: [12, 72], clusters: [3, 6], members: [3, 7],
       radius: [28, 68], fieldScale: 220, solitaryRate: 0.08
+    },
+    deco_lavacave_fire_geode: {
+      pattern: 'edgeBand', anchor: 'lava-edge', anchorRange: [14, 82],
+      clusters: [3, 6], members: [2, 5], radius: [30, 70], aspect: 0.34,
+      fieldScale: 210, solitaryRate: 0.12
+    },
+    deco_lavacave_iron_grate: {
+      pattern: 'line', anchor: 'route', anchorRange: [22, 88],
+      clusters: [2, 4], members: [1, 3], radius: [44, 92], aspect: 0.18,
+      fieldScale: 330, solitaryRate: 0.4
+    },
+    deco_lavacave_molten_tracks: {
+      pattern: 'trail', anchor: 'lava-edge', anchorRange: [8, 58],
+      clusters: [3, 5], members: [3, 6], radius: [46, 98], aspect: 0.14,
+      fieldScale: 340, solitaryRate: 0.06
     },
 
     deco_skyruins_rune_tile: {
@@ -1317,6 +1431,21 @@
       clusters: [3, 5], members: [3, 7], radius: [46, 96], aspect: 0.2,
       fieldScale: 300, solitaryRate: 0.05
     },
+    deco_skyruins_astrolabe: {
+      pattern: 'scatter', anchor: 'landmark', anchorRange: [34, 146],
+      clusters: [2, 4], members: [1, 3], radius: [46, 102],
+      fieldScale: 350, solitaryRate: 0.42
+    },
+    deco_skyruins_amphora_shards: {
+      pattern: 'blob', anchor: 'parent', parent: 'deco_skyruins_marble_rubble',
+      anchorRange: [8, 52], clusters: [3, 5], members: [2, 5],
+      radius: [24, 56], fieldScale: 220, solitaryRate: 0.14
+    },
+    deco_skyruins_golden_wing: {
+      pattern: 'arc', anchor: 'landmark', anchorRange: [28, 128],
+      clusters: [2, 4], members: [1, 4], radius: [40, 90],
+      fieldScale: 330, solitaryRate: 0.34
+    },
 
     deco_darkcastle_ritual_rune: {
       pattern: 'ring', anchor: 'landmark', anchorRange: [38, 154],
@@ -1347,6 +1476,21 @@
       pattern: 'scatter', anchor: 'landmark', anchorRange: [38, 156],
       clusters: [2, 4], members: [1, 4], radius: [46, 104],
       fieldScale: 350, solitaryRate: 0.36
+    },
+    deco_darkcastle_broken_chalice: {
+      pattern: 'scatter', anchor: 'parent', parent: 'deco_darkcastle_ritual_rune',
+      anchorRange: [12, 62], clusters: [2, 4], members: [1, 3],
+      radius: [30, 68], fieldScale: 310, solitaryRate: 0.38
+    },
+    deco_darkcastle_bone_candelabrum: {
+      pattern: 'row', anchor: 'landmark', anchorRange: [24, 106],
+      clusters: [3, 5], members: [2, 5], radius: [42, 92], aspect: 0.18,
+      fieldScale: 300, solitaryRate: 0.18
+    },
+    deco_darkcastle_thorn_crown: {
+      pattern: 'ring', anchor: 'landmark', anchorRange: [34, 142],
+      clusters: [2, 4], members: [3, 6], radius: [30, 66],
+      fieldScale: 360, solitaryRate: 0.08
     }
   };
 

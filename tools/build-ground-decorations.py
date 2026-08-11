@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Build independently replaceable ground-decoration assets.
 
-The 48 transparent PNGs under assets/sprite-source/ground-decorations are the
+The 72 transparent PNGs under assets/sprite-source/ground-decorations are the
 authoritative pixel sources. This builder preserves their stable IDs, emits
 one production PNG per source, and compiles the images into the synchronous
 character-grid sprite format used by the game runtime.
@@ -39,6 +39,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "burrow",
             "fallen_branch",
             "fairy_ring",
+            "horseshoe",
+            "stepping_stones",
+            "bluebells",
         ),
     ),
     (
@@ -50,6 +53,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "root_knot",
             "leaf_pile",
             "fern_stones",
+            "brambles",
+            "snail_shell",
+            "moths",
         ),
     ),
     (
@@ -61,6 +67,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "lantern",
             "timber_scraps",
             "copper_rubble",
+            "cart_wheel",
+            "dynamite",
+            "ore_sack",
         ),
     ),
     (
@@ -72,6 +81,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "urn_shards",
             "ectoplasm",
             "fresh_mound",
+            "grave_coins",
+            "bone_hand",
+            "raven_feathers",
         ),
     ),
     (
@@ -83,6 +95,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "trail_cairn",
             "frozen_puddle",
             "broken_sled",
+            "wolf_tracks",
+            "frozen_rope",
+            "trail_pennant",
         ),
     ),
     (
@@ -94,6 +109,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "basalt_shards",
             "scorched_bones",
             "ash_mound",
+            "fire_geode",
+            "iron_grate",
+            "molten_tracks",
         ),
     ),
     (
@@ -105,6 +123,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "aether_motes",
             "cloud_grass",
             "mosaic",
+            "astrolabe",
+            "amphora_shards",
+            "golden_wing",
         ),
     ),
     (
@@ -116,6 +137,9 @@ REGIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
             "claw_marks",
             "purple_fungus",
             "gargoyle_fragment",
+            "broken_chalice",
+            "bone_candelabrum",
+            "thorn_crown",
         ),
     ),
 )
@@ -256,7 +280,7 @@ def build_region_js(region: str, assets: list[dict[str, Any]]) -> str:
 def make_preview(runtime_images: list[tuple[str, Image.Image]]) -> Image.Image:
     scale = 4
     cell_width, cell_height = 80, 64
-    columns, rows = 6, len(REGIONS)
+    columns, rows = 9, len(REGIONS)
     preview = Image.new(
         "RGBA",
         (columns * cell_width, rows * cell_height),
@@ -333,7 +357,7 @@ def expected_outputs() -> dict[Path, bytes]:
         ).encode("utf-8")
 
     manifest = {
-        "version": 1,
+        "version": 2,
         "pipeline": "independent-transparent-png-to-character-grid",
         "sourceRoot": relative(SOURCE_ROOT),
         "outputRoot": relative(OUTPUT_ROOT),
@@ -379,6 +403,7 @@ def main() -> int:
         help="verify that all generated outputs match their independent sources",
     )
     args = parser.parse_args()
+    asset_count = sum(len(suffixes) for _, suffixes in REGIONS)
     verify_source_set()
     outputs = expected_outputs()
     mismatches = [
@@ -392,14 +417,18 @@ def main() -> int:
             for path in mismatches:
                 print(f"  {path}")
             return 1
-        print("Ground-decoration assets are current: 48 sources, 48 PNGs, 8 modules.")
+        print(
+            "Ground-decoration assets are current: "
+            f"{asset_count} sources, {asset_count} PNGs, {len(REGIONS)} modules."
+        )
         return 0
     for path, content in outputs.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
     print(
         "Built ground-decoration assets: "
-        "48 independent sources -> 48 PNGs + 8 runtime modules + manifest."
+        f"{asset_count} independent sources -> {asset_count} PNGs + "
+        f"{len(REGIONS)} runtime modules + manifest."
     )
     return 0
 

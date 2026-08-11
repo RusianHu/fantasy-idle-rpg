@@ -112,4 +112,64 @@
     }
   });
 
+  D({
+    id: "deco_graveyard_grave_coins",
+    source: {"path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_grave_coins.png", "sha256": "128c084e228fcab2adf8b015f09228b857073f26558609a99f035ae99b2703e3", "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_grave_coins.png"},
+    pal: {"a": "#6e767f", "b": "#80878c", "c": "#979c9e", "d": "#8d9393", "e": "#4b5660"},
+    anchor: { x: 7, y: 7 },
+    frames: {
+      idle0: [
+        "..abbbcdaaa...",
+        ".ebbdcdddbcaa.",
+        "acddbdaaadbdbe",
+        "bbcaddbeddcbcb",
+        "ecabaaebddabca",
+        "eecbabdbaabaee",
+        ".eaaababcaaee.",
+        "..eeeeeeeeee.."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_graveyard_bone_hand",
+    source: {"path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_bone_hand.png", "sha256": "7b483bfdef2c0f8404409d0c3472fa7456e0693b22bfebe61c2f493fd44ad1d2", "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_bone_hand.png"},
+    pal: {"a": "#bec1c1", "b": "#a4a7a8", "c": "#8f9293", "d": "#636567", "e": "#373638"},
+    anchor: { x: 4, y: 10 },
+    frames: {
+      idle0: [
+        "...aaab..",
+        "..acbcaa.",
+        "..cccacc.",
+        ".abccccb.",
+        ".bcbcccdb",
+        ".bcaccd..",
+        "...ccc...",
+        "...bcde..",
+        "eeecbdee.",
+        "eeeddeeee",
+        "eeeeeeeee"
+      ]
+    }
+  });
+
+  D({
+    id: "deco_graveyard_raven_feathers",
+    source: {"path": "assets/sprite-source/ground-decorations/graveyard/deco_graveyard_raven_feathers.png", "sha256": "854e90c18b04194f6557ed9b592e5c7b263e13134c3732b1317a3a16676d5cdd", "png": "assets/sprites/ground-decorations/graveyard/deco_graveyard_raven_feathers.png"},
+    pal: {"a": "#454747", "b": "#837f81", "c": "#7b7678", "d": "#8a8787", "e": "#5f5f5f"},
+    anchor: { x: 7, y: 7 },
+    frames: {
+      idle0: [
+        ".....aaabc.....",
+        "..bddeeebdcaa..",
+        ".cdcdcaeeeaaab.",
+        ".dbbaeeaaceabb.",
+        "cdccaaaaaeacbdd",
+        "dcbbcaaaeaebcdc",
+        "..ecbbeaaebde..",
+        "...cccdcbbbb..."
+      ]
+    }
+  });
+
 })();

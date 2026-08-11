@@ -116,4 +116,62 @@
     }
   });
 
+  D({
+    id: "deco_mine_cart_wheel",
+    source: {"path": "assets/sprite-source/ground-decorations/mine/deco_mine_cart_wheel.png", "sha256": "412dc96b14d3e065a63cd6c566c32f819eae677f05506ec59e5a5dd2a6be2157", "png": "assets/sprites/ground-decorations/mine/deco_mine_cart_wheel.png"},
+    pal: {"a": "#95511d", "b": "#73411e", "c": "#5c341a", "d": "#37251b", "e": "#6c5841"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        "....aaaab......",
+        "..baabccbc.....",
+        ".cabdcbddbd....",
+        "bacccaddcbd....",
+        "bbcceebabbd....",
+        "bddbeeccaddc...",
+        "bcccbdcacdbaeee",
+        "cbcdbbacdddbaee",
+        ".cbaacdd..dddce"
+      ]
+    }
+  });
+
+  D({
+    id: "deco_mine_dynamite",
+    source: {"path": "assets/sprite-source/ground-decorations/mine/deco_mine_dynamite.png", "sha256": "da45865378ad99d94caaa20ff2449f554371f89b7f460ca820d891cc1f3dd950", "png": "assets/sprites/ground-decorations/mine/deco_mine_dynamite.png"},
+    pal: {"a": "#662c13", "b": "#98552c", "c": "#903414", "d": "#9d4620", "e": "#a86e3f"},
+    anchor: { x: 6, y: 7 },
+    frames: {
+      idle0: [
+        "......abbaa..",
+        "....bbbbcddc.",
+        "..ddddeeedda.",
+        ".addeedebacdc",
+        "acdcdcaaeeddc",
+        "acccdeddebaca",
+        "adccabdcaaa..",
+        "..acccaaa...."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_mine_ore_sack",
+    source: {"path": "assets/sprite-source/ground-decorations/mine/deco_mine_ore_sack.png", "sha256": "bcca0276dcb10c5dc834e9a90fc4bc72195961011c4b939db7bcb48cf38f520e", "png": "assets/sprites/ground-decorations/mine/deco_mine_ore_sack.png"},
+    pal: {"a": "#ae8f68", "b": "#bf9f74", "c": "#8d775a", "d": "#6d5942", "e": "#342b2a"},
+    anchor: { x: 7, y: 7 },
+    frames: {
+      idle0: [
+        "...ababacc....",
+        ".babbbbbbba...",
+        "daddcbababac..",
+        "cceeedaaaaccd.",
+        "adcdeeedaccddc",
+        "dcceedceecdddd",
+        "ddeeecdeecddd.",
+        "eeeeeeeedcc..."
+      ]
+    }
+  });
+
 })();

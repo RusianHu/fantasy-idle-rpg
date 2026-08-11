@@ -421,35 +421,43 @@
     decor: {
       grassland: {
         clover: '三叶草簇', wildWheat: '野麦穗', dandelions: '蒲公英簇',
-        burrow: '兔穴', fallenBranch: '落枝', fairyRing: '妖精菇环'
+        burrow: '兔穴', fallenBranch: '落枝', fairyRing: '妖精菇环',
+        horseshoe: '半埋马蹄铁', steppingStones: '踏脚石', bluebells: '风铃草簇'
       },
       forest: {
         mossyLog: '苔藓倒木', redShrooms: '红伞菌簇', conesAcorns: '松果与橡果',
-        rootKnot: '盘根树结', leafPile: '落叶堆', fernStones: '蕨叶石丛'
+        rootKnot: '盘根树结', leafPile: '落叶堆', fernStones: '蕨叶石丛',
+        brambles: '荆棘丛', snailShell: '空蜗牛壳', moths: '苍白蛾群'
       },
       mine: {
         brokenRail: '断裂矿轨', coalPile: '煤块堆', discardedPick: '废弃矿镐',
-        lantern: '矿灯', timberScraps: '坑木碎料', copperRubble: '铜矿碎石'
+        lantern: '矿灯', timberScraps: '坑木碎料', copperRubble: '铜矿碎石',
+        cartWheel: '锈蚀矿车轮', dynamite: '炸药捆', oreSack: '破损矿袋'
       },
       graveyard: {
         crackedSlab: '开裂墓板', wiltedFlowers: '枯萎祭花', chainCoil: '锈链盘',
-        urnShards: '骨灰瓮碎片', ectoplasm: '灵质水洼', freshMound: '新土坟丘'
+        urnShards: '骨灰瓮碎片', ectoplasm: '灵质水洼', freshMound: '新土坟丘',
+        graveCoins: '墓葬银币', boneHand: '出土骨手', ravenFeathers: '渡鸦羽毛'
       },
       snowpass: {
         iceSpikes: '冰刺簇', snowBones: '覆雪残骨', frostShrub: '霜灌木',
-        trailCairn: '路标石堆', frozenPuddle: '冻结水洼', brokenSled: '断裂雪橇'
+        trailCairn: '路标石堆', frozenPuddle: '冻结水洼', brokenSled: '断裂雪橇',
+        wolfTracks: '雪地狼迹', frozenRope: '冰封绳圈', trailPennant: '破损路旗'
       },
       lavacave: {
         emberVent: '余烬喷口', sulfurCrystals: '硫晶簇', lavaCrust: '熔岩结壳',
-        basaltShards: '玄武岩碎锥', scorchedBones: '焦黑残骨', ashMound: '火山灰堆'
+        basaltShards: '玄武岩碎锥', scorchedBones: '焦黑残骨', ashMound: '火山灰堆',
+        fireGeode: '火蛋白石晶洞', ironGrate: '焦黑铁栅', moltenTracks: '熔火足迹'
       },
       skyruins: {
         runeTile: '发光符文砖', gearFragment: '古代齿轮残片', marbleRubble: '云岩碎块',
-        aetherMotes: '以太浮光', cloudGrass: '云绒草', mosaic: '青金马赛克'
+        aetherMotes: '以太浮光', cloudGrass: '云绒草', mosaic: '青金马赛克',
+        astrolabe: '残破星盘', amphoraShards: '陶罐碎片', goldenWing: '金翼残片'
       },
       darkcastle: {
         ritualRune: '猩红仪式纹', ironChain: '铁链盘', bannerScrap: '黑旗残布',
-        clawMarks: '恶魔爪痕', purpleFungus: '紫瘴菌簇', gargoyleFragment: '石像鬼残片'
+        clawMarks: '恶魔爪痕', purpleFungus: '紫瘴菌簇', gargoyleFragment: '石像鬼残片',
+        brokenChalice: '破碎仪式杯', boneCandelabrum: '骨质烛台', thornCrown: '黑铁棘冠'
       }
     },
 

@@ -3,7 +3,7 @@
   'use strict';
   window.Game.CONTENT_MANIFEST = Object.freeze({
   "schemaVersion": 1,
-  "sourceSetHash": "969346a95e89d0b7305cf469ea691d54546a7645b31b2a2af8ca7ead9888c85a",
+  "sourceSetHash": "56080cd5f48ab96370f10798717180492e54e85d890787ea1117d230fe503f10",
   "sources": [
     {
       "path": "js/data/packs/guardians/badger_brambleback.pack.js",
@@ -123,7 +123,7 @@
     {
       "path": "js/data/packs/regions/catalog.support.js",
       "kind": "support",
-      "sha256": "7d46e3440340a29a0bd3bbe9e12a183b4515d0b8a8b054adf6471fa08d7e7608"
+      "sha256": "c414ec1728c45620c32bbc8765ece6e36dd5e1136480574c39b3121de7f4d008"
     },
     {
       "path": "js/data/packs/regions/darkcastle.pack.js",
@@ -439,6 +439,6 @@
       "version": "1.0.0"
     }
   ],
-  "contentFingerprint": "64f1b81e"
+  "contentFingerprint": "28afe671"
 });
 })();

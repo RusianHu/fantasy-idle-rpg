@@ -114,4 +114,64 @@
     }
   });
 
+  D({
+    id: "deco_darkcastle_broken_chalice",
+    source: {"path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_broken_chalice.png", "sha256": "ca66f9788919a4d294e99831cf128f6017b960e8bcbd5a2941101039934f4490", "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_broken_chalice.png"},
+    pal: {"a": "#473144", "b": "#564354", "c": "#5e525e", "d": "#72656f", "e": "#2f2635"},
+    anchor: { x: 7, y: 7 },
+    frames: {
+      idle0: [
+        ".......abccbc..",
+        "dda...bdddeeb..",
+        "dccaebdddbeebc.",
+        "dabcaabbcbeeada",
+        "beeeeeaaccaabc.",
+        "bae..eaaabdabd.",
+        ".ae...eeeeaccab",
+        "...........eaad"
+      ]
+    }
+  });
+
+  D({
+    id: "deco_darkcastle_bone_candelabrum",
+    source: {"path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_bone_candelabrum.png", "sha256": "b33f2a13391f3e5f73aa79b1c88a277e2e842936c9ef88ec58ce48a9b8ea9c47", "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_bone_candelabrum.png"},
+    pal: {"a": "#a6977e", "b": "#d0c1a2", "c": "#4e394a", "d": "#26132e", "e": "#431634"},
+    anchor: { x: 6, y: 9 },
+    frames: {
+      idle0: [
+        ".....aab....",
+        ".....bab....",
+        "bbbaabba.b..",
+        "abbccaaccbaa",
+        "cccdeccd.bbc",
+        "eedd.eddeccd",
+        "eedeeedd.edd",
+        "ecedeccdeedd",
+        "eddeeeeeeeed",
+        "...deeeddedd"
+      ]
+    }
+  });
+
+  D({
+    id: "deco_darkcastle_thorn_crown",
+    source: {"path": "assets/sprite-source/ground-decorations/darkcastle/deco_darkcastle_thorn_crown.png", "sha256": "782604f644ad5c7e7aca1cdc1a786b349c24113d9826c2d0d0c1b5781a50cdc2", "png": "assets/sprites/ground-decorations/darkcastle/deco_darkcastle_thorn_crown.png"},
+    pal: {"a": "#826f68", "b": "#40343b", "c": "#53454a", "d": "#31252f", "e": "#201920"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        ".......a.......",
+        "....a..ab......",
+        ".a.bcdebedcca..",
+        ".abeedeeeebdd..",
+        "cdcecabbbacebd.",
+        "cbebccdbbabdedc",
+        "eccdedededeedde",
+        ".ddccbbbcbbccd.",
+        "...edeeeddede.."
+      ]
+    }
+  });
+
 })();

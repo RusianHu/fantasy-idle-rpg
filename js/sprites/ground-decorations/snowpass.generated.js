@@ -114,4 +114,65 @@
     }
   });
 
+  D({
+    id: "deco_snowpass_wolf_tracks",
+    source: {"path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_wolf_tracks.png", "sha256": "54eb15fc2a4542fc1966643e1490efd4d78d862da2066bab6cb59b706719ccef", "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_wolf_tracks.png"},
+    pal: {"a": "#f5fcfd", "b": "#ecf7fb", "c": "#d3e4f1", "d": "#f7fdfe", "e": "#aac1d7"},
+    anchor: { x: 5, y: 10 },
+    frames: {
+      idle0: [
+        "..abcda....",
+        ".bcecdbac..",
+        "bdaecaace..",
+        "cdabeedba..",
+        "ecbdecddbc.",
+        "adaabccbadb",
+        "bdddaeedabc",
+        "ebababbcace",
+        "ecccadcecdb",
+        "..ecddbeabe",
+        "...eccccce."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_snowpass_frozen_rope",
+    source: {"path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_frozen_rope.png", "sha256": "c75b45823b1b9509538bca0a1fa561a93ef63352d927dda1be29ca4b6e8cddb9", "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_frozen_rope.png"},
+    pal: {"a": "#6b4138", "b": "#c4d8e5", "c": "#8f433a", "d": "#847e87", "e": "#a4b2c1"},
+    anchor: { x: 7, y: 7 },
+    frames: {
+      idle0: [
+        ".....aabbbbb...",
+        "..accccdedbbbb.",
+        ".cceeccccaddebb",
+        "debeddaaaaaccdd",
+        "dbeeaaaaaaaeeca",
+        "adeeecccccadaca",
+        "acaaedcccdadda.",
+        "..beaacccadeed."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_snowpass_trail_pennant",
+    source: {"path": "assets/sprite-source/ground-decorations/snowpass/deco_snowpass_trail_pennant.png", "sha256": "8482996ab942e9d93f1adabb58226eacfd9f5ee644b668b7d24fff8b17270727", "png": "assets/sprites/ground-decorations/snowpass/deco_snowpass_trail_pennant.png"},
+    pal: {"a": "#9cafb9", "b": "#775f47", "c": "#6d2a26", "d": "#a92d2e", "e": "#dceaf2"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        "abaa...........",
+        "bbabc..........",
+        "ccbdddc........",
+        ".cdddcdddd.....",
+        ".ccccccddddddc.",
+        "..ccbccddddcc..",
+        ".eebbbcbadddddd",
+        "eaeebaaeaa..ccd",
+        ".eeaeeeaaee...."
+      ]
+    }
+  });
+
 })();

@@ -112,4 +112,64 @@
     }
   });
 
+  D({
+    id: "deco_lavacave_fire_geode",
+    source: {"path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_fire_geode.png", "sha256": "27930bc05bbd590b9b64b1d61388cd45e69e8d4c766fa5691843d6b59efd548a", "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_fire_geode.png"},
+    pal: {"a": "#231c27", "b": "#39282e", "c": "#543e40", "d": "#844a34", "e": "#c36829"},
+    anchor: { x: 7, y: 8 },
+    frames: {
+      idle0: [
+        "..aab....ccb...",
+        ".bbcde..ccdcaa.",
+        "abcdeeecdecdcaa",
+        "bcccddeeeecccbb",
+        "bbcbcdeeeebcccb",
+        "accbcceeeecccba",
+        "abbbbccdedbdbaa",
+        ".aaabbbcdbbbaa.",
+        "..aaaaaaaabaa.."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_lavacave_iron_grate",
+    source: {"path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_iron_grate.png", "sha256": "56d5a577ab622320b12e52a8a2a57e0897742c6a97b9b7789c3172a59e9600fb", "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_iron_grate.png"},
+    pal: {"a": "#564847", "b": "#483d3f", "c": "#795944", "d": "#2c232b", "e": "#402d2f"},
+    anchor: { x: 8, y: 7 },
+    frames: {
+      idle0: [
+        "......a..bc.....",
+        "ba....bcabacd...",
+        "ecaaacbaabdaa...",
+        "dacedbadbbcdaba.",
+        ".daaddabbaaedeed",
+        "eadbeeeaddadecce",
+        "ddeeccebaedebed.",
+        "..ddeeddeb..d..."
+      ]
+    }
+  });
+
+  D({
+    id: "deco_lavacave_molten_tracks",
+    source: {"path": "assets/sprite-source/ground-decorations/lavacave/deco_lavacave_molten_tracks.png", "sha256": "c858b493045345fd5d9e21193f497a5510338aba6b26aef11113c443ef625471", "png": "assets/sprites/ground-decorations/lavacave/deco_lavacave_molten_tracks.png"},
+    pal: {"a": "#6f4540", "b": "#46353c", "c": "#cb592a", "d": "#693936", "e": "#ef8523"},
+    anchor: { x: 7, y: 9 },
+    frames: {
+      idle0: [
+        "..abbbabb.....",
+        ".bbbccbadbba..",
+        ".badccaecddbb.",
+        "bdecbddadcedbb",
+        "bbaddcccdddccb",
+        "abbceeceecdddb",
+        "bbbaeeeeeecbab",
+        "bbbbaeeeecbab.",
+        "..bbbdacdbbb..",
+        "...bbbabbbb..."
+      ]
+    }
+  });
+
 })();

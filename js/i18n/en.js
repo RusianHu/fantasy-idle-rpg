@@ -424,35 +424,43 @@
     decor: {
       grassland: {
         clover: 'Clover Patch', wildWheat: 'Wild Wheat', dandelions: 'Dandelion Cluster',
-        burrow: 'Rabbit Burrow', fallenBranch: 'Fallen Branch', fairyRing: 'Fairy Ring'
+        burrow: 'Rabbit Burrow', fallenBranch: 'Fallen Branch', fairyRing: 'Fairy Ring',
+        horseshoe: 'Buried Horseshoe', steppingStones: 'Stepping Stones', bluebells: 'Bluebell Cluster'
       },
       forest: {
         mossyLog: 'Mossy Fallen Log', redShrooms: 'Red Mushroom Cluster', conesAcorns: 'Cones and Acorns',
-        rootKnot: 'Exposed Root Knot', leafPile: 'Fallen Leaf Pile', fernStones: 'Fern and Stone Patch'
+        rootKnot: 'Exposed Root Knot', leafPile: 'Fallen Leaf Pile', fernStones: 'Fern and Stone Patch',
+        brambles: 'Thorny Brambles', snailShell: 'Empty Snail Shell', moths: 'Pale Moth Swarm'
       },
       mine: {
         brokenRail: 'Broken Mine Rail', coalPile: 'Coal Pile', discardedPick: 'Discarded Pickaxe',
-        lantern: 'Mining Lantern', timberScraps: 'Splintered Timbers', copperRubble: 'Copper Ore Rubble'
+        lantern: 'Mining Lantern', timberScraps: 'Splintered Timbers', copperRubble: 'Copper Ore Rubble',
+        cartWheel: 'Rusted Cart Wheel', dynamite: 'Dynamite Bundle', oreSack: 'Torn Ore Sack'
       },
       graveyard: {
         crackedSlab: 'Cracked Grave Slab', wiltedFlowers: 'Wilted Grave Flowers', chainCoil: 'Rusty Chain Coil',
-        urnShards: 'Funeral Urn Shards', ectoplasm: 'Ectoplasm Puddle', freshMound: 'Fresh Grave Mound'
+        urnShards: 'Funeral Urn Shards', ectoplasm: 'Ectoplasm Puddle', freshMound: 'Fresh Grave Mound',
+        graveCoins: 'Grave Coins', boneHand: 'Unearthed Bone Hand', ravenFeathers: 'Raven Feathers'
       },
       snowpass: {
         iceSpikes: 'Ice Spike Cluster', snowBones: 'Snow-covered Bones', frostShrub: 'Frost Shrub',
-        trailCairn: 'Trail Cairn', frozenPuddle: 'Frozen Puddle', brokenSled: 'Broken Sled'
+        trailCairn: 'Trail Cairn', frozenPuddle: 'Frozen Puddle', brokenSled: 'Broken Sled',
+        wolfTracks: 'Wolf Tracks', frozenRope: 'Icebound Rope', trailPennant: 'Torn Trail Pennant'
       },
       lavacave: {
         emberVent: 'Ember Vent', sulfurCrystals: 'Sulfur Crystal Cluster', lavaCrust: 'Cooled Lava Crust',
-        basaltShards: 'Basalt Shard Pile', scorchedBones: 'Scorched Bones', ashMound: 'Ash Mound'
+        basaltShards: 'Basalt Shard Pile', scorchedBones: 'Scorched Bones', ashMound: 'Ash Mound',
+        fireGeode: 'Fire-opal Geode', ironGrate: 'Charred Iron Grate', moltenTracks: 'Molten Tracks'
       },
       skyruins: {
         runeTile: 'Glowing Rune Tile', gearFragment: 'Ancient Gear Fragment', marbleRubble: 'Sky-marble Rubble',
-        aetherMotes: 'Aether Motes', cloudGrass: 'Cloud Grass', mosaic: 'Azure-gold Mosaic'
+        aetherMotes: 'Aether Motes', cloudGrass: 'Cloud Grass', mosaic: 'Azure-gold Mosaic',
+        astrolabe: 'Broken Astrolabe', amphoraShards: 'Amphora Shards', goldenWing: 'Golden Wing Fragment'
       },
       darkcastle: {
         ritualRune: 'Crimson Ritual Rune', ironChain: 'Iron Chain Coil', bannerScrap: 'Torn Black Banner',
-        clawMarks: 'Demon Claw Marks', purpleFungus: 'Purple Miasma Fungus', gargoyleFragment: 'Gargoyle Fragment'
+        clawMarks: 'Demon Claw Marks', purpleFungus: 'Purple Miasma Fungus', gargoyleFragment: 'Gargoyle Fragment',
+        brokenChalice: 'Broken Ritual Chalice', boneCandelabrum: 'Bone Candelabrum', thornCrown: 'Black Thorn Crown'
       }
     },
 
