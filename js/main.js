@@ -9,6 +9,10 @@
   var U = Game.util;
 
   function loadFont() {
+    if (Game.platform && Game.platform.font && Game.platform.font.loadFusionPixel) {
+      Game.platform.font.loadFusionPixel(Game.BUILD_ID).catch(function () { /* 字体缺失：回退系统字体 */ });
+      return;
+    }
     if (!window.FontFace) return;
     try {
       var fontUrl = 'assets/fonts/fusion-pixel.woff2?v=' + encodeURIComponent(Game.BUILD_ID);

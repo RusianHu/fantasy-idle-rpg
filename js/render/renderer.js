@@ -74,7 +74,9 @@
   }
 
   function stageCanvasPoint(clientX, clientY) {
-    var rect = canvas.getBoundingClientRect();
+    var rect = Game.platform && Game.platform.canvas && Game.platform.canvas.getCachedRect
+      ? Game.platform.canvas.getCachedRect(canvas)
+      : canvas.getBoundingClientRect();
     return { x: clientX - rect.left, y: clientY - rect.top };
   }
 
@@ -140,8 +142,7 @@
   }
 
   function buildVignette() {
-    vignetteC = document.createElement('canvas');
-    vignetteC.width = cw; vignetteC.height = ch;
+    vignetteC = U.createRenderCanvas(cw, ch);
     var g = vignetteC.getContext('2d');
     var grad = g.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.42, cw / 2, ch / 2, Math.max(cw, ch) * 0.72);
     grad.addColorStop(0, 'rgba(8,6,24,0)');
@@ -169,8 +170,7 @@
   /* ================= 视差条带生成器 ================= */
   function genLayer(layer, region, seed) {
     var h = 120;
-    var c = document.createElement('canvas');
-    c.width = SW; c.height = h;
+    var c = U.createRenderCanvas(SW, h);
     var g = c.getContext('2d');
     var rng = U.seededRng(seed);
     var i, x, y, w2;
@@ -722,9 +722,7 @@
         typeof document === 'undefined' || !document.createElement) return;
     var width = Math.max(1, Math.ceil(layout.world.w));
     var height = Math.max(1, Math.ceil(layout.world.h));
-    var ground = document.createElement('canvas');
-    ground.width = width;
-    ground.height = height;
+    var ground = U.createRenderCanvas(width, height);
     var groundCtx = ground.getContext('2d');
     if (!groundCtx) return;
     groundCtx.imageSmoothingEnabled = false;
@@ -740,6 +738,9 @@
       canvas = el;
       ctx = canvas.getContext('2d');
       R.resize();
+      if (Game.platform && Game.platform.canvas && Game.platform.canvas.refreshRect) {
+        Game.platform.canvas.refreshRect(canvas);
+      }
       window.addEventListener('resize', R.resize);
       // 点击/触摸交互：点怪=锁定目标，点地=移动指令，点营地=扎营/拔营
       canvas.addEventListener('click', function (e) {
@@ -747,7 +748,9 @@
           e.preventDefault();
           return;
         }
-        var rect = canvas.getBoundingClientRect();
+        var rect = Game.platform && Game.platform.canvas && Game.platform.canvas.getCachedRect
+          ? Game.platform.canvas.getCachedRect(canvas)
+          : canvas.getBoundingClientRect();
         var pt = R.screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
         if (Game.world && Game.world.handleTap) Game.world.handleTap(pt.x, pt.y);
       });
@@ -764,6 +767,7 @@
         }
       }, { passive: false });
       canvas.addEventListener('pointerdown', function (e) {
+        if (Game.isMiniprogram) return;
         if (e.pointerType !== 'touch' || !stageInputAllowed() || stagePointerOrder.length >= 2) return;
         stagePointers[e.pointerId] = {
           x: e.clientX, y: e.clientY,
@@ -775,6 +779,7 @@
         if (stagePointerOrder.length === 2) beginStagePinch();
       });
       canvas.addEventListener('pointermove', function (e) {
+        if (Game.isMiniprogram) return;
         var pointer = stagePointers[e.pointerId];
         if (!pointer) return;
         pointer.x = e.clientX;
@@ -796,9 +801,50 @@
           midpoint.x, midpoint.y, stagePinch.anchor
         );
       });
-      canvas.addEventListener('pointerup', function (e) { removeStagePointer(e.pointerId, false); });
-      canvas.addEventListener('pointercancel', function (e) { removeStagePointer(e.pointerId, true); });
-      canvas.addEventListener('lostpointercapture', function (e) { removeStagePointer(e.pointerId, true); });
+      canvas.addEventListener('pointerup', function (e) { if (!Game.isMiniprogram) removeStagePointer(e.pointerId, false); });
+      canvas.addEventListener('pointercancel', function (e) { if (!Game.isMiniprogram) removeStagePointer(e.pointerId, true); });
+      canvas.addEventListener('lostpointercapture', function (e) { if (!Game.isMiniprogram) removeStagePointer(e.pointerId, true); });
+      if (Game.isMiniprogram) {
+        function touchPoint(touch) {
+          return { x: touch.clientX, y: touch.clientY, startX: touch.clientX, startY: touch.clientY, moved: false };
+        }
+        canvas.addEventListener('touchstart', function (e) {
+          if (!stageInputAllowed()) return;
+          var touches = e.touches || [];
+          for (var i = 0; i < touches.length && stagePointerOrder.length < 2; i++) {
+            var touch = touches[i], id = 'touch:' + touch.identifier;
+            if (stagePointers[id]) continue;
+            stagePointers[id] = touchPoint(touch);
+            stagePointerOrder.push(id);
+          }
+          if (stagePointerOrder.length === 2) beginStagePinch();
+        }, { passive: true });
+        canvas.addEventListener('touchmove', function (e) {
+          var touches = e.touches || [];
+          for (var i = 0; i < touches.length; i++) {
+            var touch = touches[i], pointer = stagePointers['touch:' + touch.identifier];
+            if (!pointer) continue;
+            pointer.x = touch.clientX; pointer.y = touch.clientY;
+            if (Math.sqrt(Math.pow(pointer.x - pointer.startX, 2) + Math.pow(pointer.y - pointer.startY, 2)) > TAP_MOVE_THRESHOLD) {
+              pointer.moved = true; markStageGesture();
+            }
+          }
+          if (stagePointerOrder.length < 2) return;
+          if (!stagePinch) beginStagePinch();
+          var pair = stagePointerPair();
+          if (!pair[0] || !pair[1]) return;
+          var dx = pair[1].x - pair[0].x, dy = pair[1].y - pair[0].y;
+          var midpoint = stageCanvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+          setStageViewScale(stagePinch.scale * Math.sqrt(dx * dx + dy * dy) / stagePinch.distance,
+            midpoint.x, midpoint.y, stagePinch.anchor);
+        }, { passive: true });
+        function finishTouches(e, cancelled) {
+          var changed = e.changedTouches || [];
+          for (var i = 0; i < changed.length; i++) removeStagePointer('touch:' + changed[i].identifier, cancelled);
+        }
+        canvas.addEventListener('touchend', function (e) { finishTouches(e, false); }, { passive: true });
+        canvas.addEventListener('touchcancel', function (e) { finishTouches(e, true); }, { passive: true });
+      }
     },
 
     /** 屏幕坐标（CSS px，相对画布）→ 世界坐标 */
@@ -819,6 +865,9 @@
       canvas.style.height = ch + 'px';
       viewOffset.x = 0; viewOffset.y = 0; viewOffsetHold = 0;
       vignetteC = null;
+      if (canvas && Game.platform && Game.platform.canvas && Game.platform.canvas.refreshRect) {
+        Game.platform.canvas.refreshRect(canvas);
+      }
     },
 
     snapCamera: function (x, y) {

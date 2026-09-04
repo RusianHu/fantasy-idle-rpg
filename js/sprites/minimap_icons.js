@@ -248,9 +248,7 @@
     var def = defs[type];
     if (!def || typeof document === 'undefined') return null;
     var size = dimensions(def);
-    var canvas = document.createElement('canvas');
-    canvas.width = size.w + 2;
-    canvas.height = size.h + 2;
+    var canvas = Game.util.createRenderCanvas(size.w + 2, size.h + 2);
     var ctx = canvas.getContext('2d');
     var solid = [];
     var x, y;

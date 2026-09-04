@@ -69,7 +69,15 @@
 
   function clear(canvas) {
     if (!canvas) return;
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    var ctx = canvas.getContext('2d');
+    if (!ctx) {
+      var platform = Game.platform && Game.platform.canvas;
+      if (platform && platform.prepareDom) {
+        platform.prepareDom(canvas).then(function () { if (canvas.parentNode) clear(canvas); });
+      }
+      return;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.removeAttribute('aria-label');
     canvas.removeAttribute('data-actor-id');
     canvas.removeAttribute('data-portrait-source');
@@ -82,6 +90,16 @@
     if (!canvas) return null;
     if (!actor) {
       clear(canvas);
+      return null;
+    }
+    if (!canvas.getContext('2d')) {
+      var platform = Game.platform && Game.platform.canvas;
+      if (platform && platform.prepareDom) {
+        var generation = canvas.__firpgPortraitGeneration = (canvas.__firpgPortraitGeneration || 0) + 1;
+        platform.prepareDom(canvas).then(function () {
+          if (canvas.parentNode && canvas.__firpgPortraitGeneration === generation) draw(canvas, actor, label);
+        });
+      }
       return null;
     }
     var source = resolve(actor);

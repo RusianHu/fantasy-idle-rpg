@@ -107,7 +107,11 @@
       helper.select();
       try { document.execCommand('copy'); } catch (e) {}
       document.body.removeChild(helper);
-      if (navigator.clipboard) navigator.clipboard.writeText(seedHex).catch(function () {});
+      if (Game.platform && Game.platform.clipboard && Game.platform.clipboard.writeText) {
+        Game.platform.clipboard.writeText(seedHex);
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(seedHex).catch(function () {});
+      }
       Game.ui.modals.toast(t('ui.seedCopied', { seed: seedHex }));
     });
     root.appendChild(seedRow);
@@ -157,8 +161,7 @@
         mapCard.appendChild(controls);
         root.appendChild(mapCard);
 
-        var base = document.createElement('canvas');
-        base.width = 660; base.height = 396;
+        var base = U.createRenderCanvas(660, 396);
         var view = { zoom: 1, x: 0, y: 0 };
         var pointers = Object.create(null);
         var pointerOrder = [];
@@ -303,7 +306,9 @@
           liveFrame = requestAnimationFrame(liveTick);
         }
         function canvasPoint(clientX, clientY) {
-          var rect = canvas.getBoundingClientRect();
+          var rect = Game.platform && Game.platform.canvas && Game.platform.canvas.getCachedRect
+            ? Game.platform.canvas.getCachedRect(canvas)
+            : canvas.getBoundingClientRect();
           return {
             x: (clientX - rect.left) / (rect.width || 1) * canvas.width,
             y: (clientY - rect.top) / (rect.height || 1) * canvas.height
@@ -381,6 +386,7 @@
           }
         }, { passive: false });
         canvas.addEventListener('pointerdown', function (e) {
+          if (Game.isMiniprogram) return;
           if ((e.pointerType === 'mouse' && e.button !== 0) || pointerOrder.length >= 2) return;
           pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
           pointerOrder.push(e.pointerId);
@@ -388,6 +394,7 @@
           if (pointerOrder.length === 2) beginPinch();
         });
         canvas.addEventListener('pointermove', function (e) {
+          if (Game.isMiniprogram) return;
           var pointer = pointers[e.pointerId];
           if (!pointer) return;
           var dx = e.clientX - pointer.x, dy = e.clientY - pointer.y;
@@ -405,18 +412,73 @@
           setZoom(pinch.zoom * Math.sqrt(pdx * pdx + pdy * pdy) / pinch.distance,
             midpoint.x, midpoint.y, pinch.anchor);
         });
-        canvas.addEventListener('pointerup', function (e) { removePointer(e.pointerId); });
-        canvas.addEventListener('pointercancel', function (e) { removePointer(e.pointerId); });
-        canvas.addEventListener('lostpointercapture', function (e) { removePointer(e.pointerId); });
-        paintBase();
-        draw();
-        lastBasePaint = performance.now();
-        lastHeroPaint = lastBasePaint;
-        document.addEventListener('visibilitychange', onVisibilityChange);
-        if (!document.hidden) {
-          subscribe();
-          liveFrame = requestAnimationFrame(liveTick);
+        canvas.addEventListener('pointerup', function (e) { if (!Game.isMiniprogram) removePointer(e.pointerId); });
+        canvas.addEventListener('pointercancel', function (e) { if (!Game.isMiniprogram) removePointer(e.pointerId); });
+        canvas.addEventListener('lostpointercapture', function (e) { if (!Game.isMiniprogram) removePointer(e.pointerId); });
+        if (Game.isMiniprogram) {
+          // 微信端没有 Pointer Events：touchstart/move/end 映射到既有的拖动与双指缩放逻辑。
+          canvas.addEventListener('touchstart', function (e) {
+            var touches = e.touches || [];
+            for (var i = 0; i < touches.length && pointerOrder.length < 2; i++) {
+              var touch = touches[i], id = 'touch:' + touch.identifier;
+              if (pointers[id]) continue;
+              pointers[id] = { x: touch.clientX, y: touch.clientY };
+              pointerOrder.push(id);
+            }
+            if (pointerOrder.length === 2) beginPinch();
+          }, { passive: true });
+          canvas.addEventListener('touchmove', function (e) {
+            var touches = e.touches || [];
+            for (var i = 0; i < touches.length; i++) {
+              var touch = touches[i], pointer = pointers['touch:' + touch.identifier];
+              if (!pointer) continue;
+              var dx = touch.clientX - pointer.x, dy = touch.clientY - pointer.y;
+              pointer.x = touch.clientX; pointer.y = touch.clientY;
+              if (pointerOrder.length === 1) {
+                view.x -= dx / (canvas.clientWidth || 1) * base.width / view.zoom;
+                view.y -= dy / (canvas.clientHeight || 1) * base.height / view.zoom;
+                draw();
+                return;
+              }
+            }
+            if (pointerOrder.length < 2) return;
+            if (!pinch) beginPinch();
+            var pair = pointerPair();
+            var pdx = pair[1].x - pair[0].x, pdy = pair[1].y - pair[0].y;
+            var midpoint = canvasPoint((pair[0].x + pair[1].x) / 2, (pair[0].y + pair[1].y) / 2);
+            setZoom(pinch.zoom * Math.sqrt(pdx * pdx + pdy * pdy) / pinch.distance,
+              midpoint.x, midpoint.y, pinch.anchor);
+          }, { passive: true });
+          var finishMapTouches = function (e) {
+            var changed = e.changedTouches || [];
+            for (var i = 0; i < changed.length; i++) removePointer('touch:' + changed[i].identifier);
+          };
+          canvas.addEventListener('touchend', finishMapTouches, { passive: true });
+          canvas.addEventListener('touchcancel', finishMapTouches, { passive: true });
         }
+        var prepareMapCanvas = Game.platform && Game.platform.canvas && Game.platform.canvas.prepareDom;
+        var startMap = function () {
+          if (stopped || !canvas.parentNode) return;
+          paintBase();
+          draw();
+          lastBasePaint = performance.now();
+          lastHeroPaint = lastBasePaint;
+          if (Game.platform && Game.platform.canvas && Game.platform.canvas.refreshRect) {
+            Game.platform.canvas.refreshRect(canvas);
+          }
+          if (!document.hidden) {
+            subscribe();
+            liveFrame = requestAnimationFrame(liveTick);
+          }
+        };
+        if (prepareMapCanvas) {
+          prepareMapCanvas(canvas).then(startMap).catch(function (error) {
+            console.warn('[Explore] map canvas prepare failed', error);
+          });
+        } else {
+          startMap();
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange);
         mapCleanup = cleanup;
       } else {
         var codex = U.el('section', 'exploration-codex');
@@ -528,18 +590,40 @@
         '<button class="btn small go-btn">' + t('ui.goRegion') + '</button>' +
         '</div>');
 
-      // 区域缩略图：天空 + 地表 + 点缀
+      root.appendChild(card);
+
+      // 区域缩略图：天空 + 地表 + 点缀。微信端画布须先异步 prepare 才能拿到 2d 上下文。
       var tc = card.querySelector('.region-thumb');
       var g = tc.getContext('2d');
-      var grad = g.createLinearGradient(0, 0, 0, 10);
-      grad.addColorStop(0, r.skyTop); grad.addColorStop(1, r.skyBottom);
-      g.fillStyle = grad; g.fillRect(0, 0, 26, 10);
-      g.fillStyle = r.terrain.base.colors[0]; g.fillRect(0, 10, 26, 16);
-      g.fillStyle = r.terrain.base.colors[1];
-      for (var i = 0; i < 14; i++) g.fillRect((i * 7) % 26, 10 + (i * 5) % 16, 2, 2);
-      if (r.terrain.patches[0]) {
-        g.fillStyle = r.terrain.patches[0].colors[0];
-        g.fillRect(4, 16, 7, 5); g.fillRect(16, 20, 6, 4);
+      if (!g && Game.platform && Game.platform.canvas && Game.platform.canvas.prepareDom) {
+        (function (thumb, regionDef) {
+          Game.platform.canvas.prepareDom(thumb).then(function () {
+            if (!thumb.parentNode) return;
+            var context = thumb.getContext('2d');
+            if (!context) return;
+            var gradient = context.createLinearGradient(0, 0, 0, 10);
+            gradient.addColorStop(0, regionDef.skyTop); gradient.addColorStop(1, regionDef.skyBottom);
+            context.fillStyle = gradient; context.fillRect(0, 0, 26, 10);
+            context.fillStyle = regionDef.terrain.base.colors[0]; context.fillRect(0, 10, 26, 16);
+            context.fillStyle = regionDef.terrain.base.colors[1];
+            for (var j = 0; j < 14; j++) context.fillRect((j * 7) % 26, 10 + (j * 5) % 16, 2, 2);
+            if (regionDef.terrain.patches[0]) {
+              context.fillStyle = regionDef.terrain.patches[0].colors[0];
+              context.fillRect(4, 16, 7, 5); context.fillRect(16, 20, 6, 4);
+            }
+          });
+        })(tc, r);
+      } else if (g) {
+        var grad = g.createLinearGradient(0, 0, 0, 10);
+        grad.addColorStop(0, r.skyTop); grad.addColorStop(1, r.skyBottom);
+        g.fillStyle = grad; g.fillRect(0, 0, 26, 10);
+        g.fillStyle = r.terrain.base.colors[0]; g.fillRect(0, 10, 26, 16);
+        g.fillStyle = r.terrain.base.colors[1];
+        for (var i = 0; i < 14; i++) g.fillRect((i * 7) % 26, 10 + (i * 5) % 16, 2, 2);
+        if (r.terrain.patches[0]) {
+          g.fillStyle = r.terrain.patches[0].colors[0];
+          g.fillRect(4, 16, 7, 5); g.fillRect(16, 20, 6, 4);
+        }
       }
 
       var btn = card.querySelector('.go-btn');
@@ -549,7 +633,6 @@
           Game.ui.tabs.open('battle', true);
         }
       });
-      root.appendChild(card);
     });
     return mapCleanup;
   };
@@ -727,14 +810,18 @@
       ta.value = b64;
       ta.select();
       try { document.execCommand('copy'); } catch (e) {}
-      if (navigator.clipboard) navigator.clipboard.writeText(b64).catch(function () {});
+      if (Game.platform && Game.platform.clipboard && Game.platform.clipboard.writeText) {
+        Game.platform.clipboard.writeText(b64);
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(b64).catch(function () {});
+      }
       Game.ui.modals.toast(t('settings.exported'));
     });
     rowBtns.appendChild(btnExport);
 
     var btnFile = U.el('button', 'btn small', t('settings.exportFile'));
     btnFile.addEventListener('click', function () { Game.save.exportFile(); });
-    rowBtns.appendChild(btnFile);
+    if (!Game.isMiniprogram) rowBtns.appendChild(btnFile);
 
     var btnImport = U.el('button', 'btn small gold', t('settings.importBtn'));
     btnImport.addEventListener('click', function () {
@@ -747,26 +834,28 @@
     });
     rowBtns.appendChild(btnImport);
 
-    var fileWrap = U.el('label', 'btn small', t('settings.importFile'));
-    var fileInput = U.el('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.json,application/json';
-    fileInput.style.display = 'none';
-    fileInput.addEventListener('change', function () {
-      var f = fileInput.files[0];
-      if (!f) return;
-      var reader = new FileReader();
-      reader.onload = function () {
-        Game.ui.modals.confirm(t('settings.importConfirm'), function () {
-          var r = Game.save.importFileText(String(reader.result));
-          Game.ui.modals.toast(r.ok ? t('settings.importOk') : t('settings.importBad'), r.ok ? '' : 'warn');
-        });
-      };
-      reader.readAsText(f);
-      fileInput.value = '';
-    });
-    fileWrap.appendChild(fileInput);
-    rowBtns.appendChild(fileWrap);
+    if (!Game.isMiniprogram) {
+      var fileWrap = U.el('label', 'btn small', t('settings.importFile'));
+      var fileInput = U.el('input');
+      fileInput.type = 'file';
+      fileInput.accept = '.json,application/json';
+      fileInput.style.display = 'none';
+      fileInput.addEventListener('change', function () {
+        var f = fileInput.files[0];
+        if (!f) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          Game.ui.modals.confirm(t('settings.importConfirm'), function () {
+            var r = Game.save.importFileText(String(reader.result));
+            Game.ui.modals.toast(r.ok ? t('settings.importOk') : t('settings.importBad'), r.ok ? '' : 'warn');
+          });
+        };
+        reader.readAsText(f);
+        fileInput.value = '';
+      });
+      fileWrap.appendChild(fileInput);
+      rowBtns.appendChild(fileWrap);
+    }
 
     root.appendChild(rowBtns);
 

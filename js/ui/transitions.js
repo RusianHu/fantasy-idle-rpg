@@ -134,6 +134,13 @@
         if (e.target.closest && e.target.closest('button')) return;
         if (Game.transitions) Game.transitions.fastForward();
       });
+      if (Game.isMiniprogram) {
+        // 微信端不派发 Pointer Events：用 touchstart 保留“点按跳过转场”。
+        root.addEventListener('touchstart', function (e) {
+          if (e.target && e.target.closest && e.target.closest('button')) return;
+          if (Game.transitions) Game.transitions.fastForward();
+        }, { passive: true });
+      }
       bus.on('locale:changed', function () {
         if (lastSnapshot) UI.transitions.render(lastSnapshot);
       });

@@ -303,8 +303,7 @@
   }
 
   function bakeChunk(layout, chunk) {
-    var c = document.createElement('canvas');
-    c.width = chunk.w; c.height = chunk.h;
+    var c = U.createRenderCanvas(chunk.w, chunk.h);
     var ctx = c.getContext('2d');
     ctx.imageSmoothingEnabled = false;
     var cell = layout.cell;

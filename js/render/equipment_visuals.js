@@ -328,9 +328,7 @@
   }
 
   function makeCanvas(size) {
-    var canvas = document.createElement('canvas');
-    canvas.width = size; canvas.height = size;
-    return canvas;
+    return U.createRenderCanvas(size, size);
   }
   function paint(points, descriptor, size, options) {
     options = options || {};
@@ -438,8 +436,21 @@
 
   function drawToDom(target, item, options) {
     options = options || {};
+    if (!target) return null;
     var result = renderFrame(item, options), source = result.canvas;
     var ctx = target.getContext('2d');
+    var platform = Game.platform && Game.platform.canvas;
+    if (!ctx && platform && platform.prepareDom) {
+      var generation = target.__firpgEquipmentGeneration = (target.__firpgEquipmentGeneration || 0) + 1;
+      platform.prepareDom(target).then(function () {
+        if (!target.parentNode || target.__firpgEquipmentGeneration !== generation) return;
+        drawToDom(target, item, options);
+      }).catch(function (error) {
+        console.warn('[EquipmentVisuals] DOM canvas prepare failed', error);
+      });
+      return null;
+    }
+    if (!ctx) return null;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, target.width, target.height);
     var scale = Math.max(1, Math.floor(Math.min(target.width / source.width, target.height / source.height)));
@@ -473,7 +484,10 @@
   function bind(target, item, options) {
     options = options || {};
     var result = drawToDom(target, item, options);
-    if (!result.descriptor.legendaryId || !motionEnabled(options)) return function () {};
+    // 微信端画布未 prepare 时 drawToDom 返回 null 并在完成后补绘；
+    // 此时仍用 descriptorFor 判定是否需要注册动画绑定。
+    var descriptor = result ? result.descriptor : descriptorFor(item);
+    if (!descriptor || !descriptor.legendaryId || !motionEnabled(options)) return function () {};
     var binding = { canvas: target, item: item, options: options, disposed: false };
     bindings.push(binding);
     scheduleAnimation();

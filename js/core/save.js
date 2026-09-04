@@ -21,6 +21,25 @@
   // 后才开启本局持久化。加载到的迁移档即使尚待补选职业也必须允许保存。
   var persistenceStarted = false;
 
+  function storageGet(key) {
+    if (Game.platform && Game.platform.storage && Game.platform.storage.getItem) {
+      return Game.platform.storage.getItem(key);
+    }
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+  function storageSet(key, value) {
+    if (Game.platform && Game.platform.storage && Game.platform.storage.setItem) {
+      return Game.platform.storage.setItem(key, value);
+    }
+    try { localStorage.setItem(key, value); return true; } catch (e) { return false; }
+  }
+  function storageRemove(key) {
+    if (Game.platform && Game.platform.storage && Game.platform.storage.removeItem) {
+      return Game.platform.storage.removeItem(key);
+    }
+    try { localStorage.removeItem(key); return true; } catch (e) { return false; }
+  }
+
   /* 版本迁移流水线：旧存档逐版本升级 */
   var MIGRATIONS = [
     {
@@ -845,8 +864,7 @@
       bus.emit('save:before', { reason: reason });
       try {
         var json = JSON.stringify(S.serialize());
-        localStorage.setItem(KEY, json);
-        localStorage.setItem(KEY_BAK, json);
+        if (!storageSet(KEY, json) || !storageSet(KEY_BAK, json)) throw new Error('storage write failed');
         bus.emit('save:after', { reason: reason });
         return true;
       } catch (e) {
@@ -858,12 +876,12 @@
     /** 读档：主档损坏自动回退备份档 */
     load: function () {
       var raw = null, data = null;
-      try { raw = localStorage.getItem(KEY); } catch (e) {}
+      raw = storageGet(KEY);
       if (raw) {
         try { data = JSON.parse(raw); } catch (e) { data = null; }
       }
       if (!validSaveShape(data)) {
-        try { raw = localStorage.getItem(KEY_BAK); } catch (e) {}
+        raw = storageGet(KEY_BAK);
         if (raw) {
           try { data = JSON.parse(raw); } catch (e) { data = null; }
           if (data) console.warn('[Save] 主档损坏，已从备份档恢复');
@@ -1173,11 +1191,13 @@
       hardResetting = true;
       persistenceStarted = false;
       lastLoadedTs = 0;
-      try {
-        localStorage.removeItem(KEY);
-        localStorage.removeItem(KEY_BAK);
-      } catch (e) {}
-      location.reload();
+      storageRemove(KEY);
+      storageRemove(KEY_BAK);
+      if (Game.platform && Game.platform.navigation && Game.platform.navigation.reload) {
+        Game.platform.navigation.reload();
+      } else {
+        location.reload();
+      }
       return true;
     }
   };

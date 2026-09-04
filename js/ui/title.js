@@ -93,7 +93,6 @@
         '</div>' +
         '</div>';
       document.getElementById('app').appendChild(titleRoot);
-      T._drawEntryCrest(titleRoot.querySelector('.entry-crest'));
 
       var slotsRoot = titleRoot.querySelector('.title-slots');
       titleSlots.forEach(function (slot) {
@@ -138,7 +137,6 @@
           wrap.appendChild(deleteButton);
         }
         slotsRoot.appendChild(wrap);
-        T._drawSlotPortrait(button.querySelector('canvas'), slot);
       });
 
       var newGame = titleRoot.querySelector('.title-new-game');
@@ -168,7 +166,20 @@
       });
 
       T._refreshTitleCopy();
-      T._runTitleScene();
+      var prepare = Game.platform && Game.platform.canvas && Game.platform.canvas.prepareTree;
+      var drawTitleCanvases = function () {
+        if (!titleRoot || !titleRoot.parentNode) return;
+        T._drawEntryCrest(titleRoot.querySelector('.entry-crest'));
+        titleSlots.forEach(function (slot) {
+          var button = titleRoot.querySelector('[data-slot-id="' + slot.id + '"]');
+          if (button) T._drawSlotPortrait(button.querySelector('canvas'), slot);
+        });
+        T._runTitleScene();
+      };
+      if (prepare) prepare(titleRoot).then(drawTitleCanvases).catch(function (error) {
+        console.warn('[Title] Canvas prepare failed', error);
+      });
+      else drawTitleCanvases();
     },
 
     setArchiveOpen: function (open, moveFocus) {
@@ -449,7 +460,7 @@
       var cv = titleRoot.querySelector('#title-canvas');
       var wrap = titleRoot;
       var g = cv.getContext('2d');
-      var pixelVista = document.createElement('canvas');
+      var pixelVista = U.createRenderCanvas(1, 1);
       var pg = pixelVista.getContext('2d');
       var embers = [];
       var fireflies = [];
@@ -1304,8 +1315,7 @@
       document.getElementById('app').appendChild(csRoot);
 
       var cv = csRoot.querySelector('.cs-canvas');
-      var g = cv.getContext('2d');
-      g.imageSmoothingEnabled = false;
+      var g = null;
 
       function renderInfo() {
         var cls = classes[idx];
@@ -1375,7 +1385,7 @@
       var t0 = performance.now();
       var DIRS = ['d', 'r', 'u', 'l'];
       function anim(now) {
-        if (!csRoot) return;
+        if (!csRoot || !g) return;
         var tt = (now - t0) / 1000;
         var cls = classes[idx];
         var cycle = tt % 10;
@@ -1401,8 +1411,19 @@
           fr.width * S, fr.height * S);
         csRaf = requestAnimationFrame(anim);
       }
-      renderInfo();
-      csRaf = requestAnimationFrame(anim);
+      var prepareClassCanvas = Game.platform && Game.platform.canvas && Game.platform.canvas.prepareTree;
+      var startClassPreview = function () {
+        if (!csRoot || !csRoot.parentNode) return;
+        g = cv.getContext('2d');
+        if (!g) return;
+        g.imageSmoothingEnabled = false;
+        renderInfo();
+        csRaf = requestAnimationFrame(anim);
+      };
+      if (prepareClassCanvas) prepareClassCanvas(csRoot).then(startClassPreview).catch(function (error) {
+        console.warn('[Title] class canvas prepare failed', error);
+      });
+      else startClassPreview();
     }
   };
 })();

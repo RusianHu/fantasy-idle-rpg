@@ -13,9 +13,7 @@
   T.bake = function (region, layout) {
     var w = layout.world.w, h = layout.world.h;
     var rng = U.seededRng(layout.seeds.details);
-    var c = document.createElement('canvas');
-    c.width = w;
-    c.height = h;
+    var c = U.createRenderCanvas(w, h);
     var ctx = c.getContext('2d');
     var gx, gy, idx;
 

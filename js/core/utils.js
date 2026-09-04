@@ -6,7 +6,7 @@
 
   var Game = window.Game = window.Game || {};
   Game.VERSION = '2.0.0';
-  Game.BUILD_ID = '20260805.3';
+  Game.BUILD_ID = '20260904.1';
   Game.SAVE_VERSION = 19;
 
   var U = Game.util = {};
@@ -63,6 +63,21 @@
   U.setUidBase = function (n) { if (n > _uid) _uid = n; };
 
   U.now = function () { return Date.now(); };
+
+  /**
+   * 创建纯渲染用 Canvas。微信端优先使用离屏 Canvas，避免把缓存
+   * 错建成 Kbone 可见 DOM Canvas。见：
+   * https://developers.weixin.qq.com/miniprogram/dev/api/canvas/wx.createOffscreenCanvas.html
+   */
+  U.createRenderCanvas = function (width, height) {
+    var platform = Game.platform && Game.platform.canvas;
+    var canvas = platform && platform.createOffscreen
+      ? platform.createOffscreen(width, height)
+      : document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    return canvas;
+  };
 
   /** Canvas 动效统一降级开关；业务逻辑与静态可读状态不受影响。 */
   U.motionEnabled = function () {

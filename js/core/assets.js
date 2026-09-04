@@ -19,9 +19,7 @@
   var OUTLINE = '#16122b';
 
   function makeCanvas(w, h) {
-    var c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    return c;
+    return U.createRenderCanvas(w, h);
   }
 
   function remember(id) {
@@ -396,8 +394,21 @@
 
     /** 将某帧绘制到 DOM canvas（背包图标等），整数倍缩放居中 */
     drawToDom: function (canvasEl, id, frameName) {
-      var f = A.frame(id, frameName || 'icon');
+      if (!canvasEl) return null;
+      var platform = Game.platform && Game.platform.canvas;
       var ctx = canvasEl.getContext('2d');
+      if (!ctx && platform && platform.prepareDom) {
+        var generation = canvasEl.__firpgDrawGeneration = (canvasEl.__firpgDrawGeneration || 0) + 1;
+        platform.prepareDom(canvasEl).then(function () {
+          if (!canvasEl.parentNode || canvasEl.__firpgDrawGeneration !== generation) return;
+          A.drawToDom(canvasEl, id, frameName);
+        }).catch(function (error) {
+          console.warn('[Assets] DOM canvas prepare failed', error);
+        });
+        return null;
+      }
+      if (!ctx) return null;
+      var f = A.frame(id, frameName || 'icon');
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
       var k = Math.max(1, Math.floor(Math.min(canvasEl.width / f.width, canvasEl.height / f.height)));

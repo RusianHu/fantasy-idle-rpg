@@ -12,8 +12,7 @@
   var TREE_PAD = 5;
 
   function mk(w, h) {
-    var c = document.createElement('canvas');
-    c.width = w; c.height = h;
+    var c = U.createRenderCanvas(w, h);
     c.getContext('2d', { willReadFrequently: true });
     return c;
   }
