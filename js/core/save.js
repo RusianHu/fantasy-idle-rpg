@@ -1073,6 +1073,28 @@
         }
         else st.player.gold += 50;
       }
+      // Imported saves must obey the same hard inventory boundary as runtime
+      // drops. Preserve every referenced equipped item first, then retain the
+      // remaining items in stable save order. Duplicate UIDs are rejected so
+      // byUid/equipment pointers stay deterministic.
+      var equippedUids = {};
+      Object.keys(st.roster.actors).forEach(function (actorRecordId) {
+        var equipment = st.roster.actors[actorRecordId].loadout.equipment;
+        Object.keys(equipment).forEach(function (slot) {
+          if (equipment[slot]) equippedUids[equipment[slot]] = true;
+        });
+      });
+      var uniqueItems = [], seenItemUids = {};
+      validItems.forEach(function (item) {
+        if (!item.uid || seenItemUids[item.uid]) return;
+        seenItemUids[item.uid] = true;
+        uniqueItems.push(item);
+      });
+      if (uniqueItems.length > Game.inv.CAP) {
+        validItems = uniqueItems.filter(function (item) { return equippedUids[item.uid]; })
+          .concat(uniqueItems.filter(function (item) { return !equippedUids[item.uid]; }))
+          .slice(0, Game.inv.CAP);
+      } else validItems = uniqueItems;
       st.inv.items = validItems;
       Object.keys(st.roster.actors).forEach(function (actorRecordId) {
         var loadout = st.roster.actors[actorRecordId].loadout;
