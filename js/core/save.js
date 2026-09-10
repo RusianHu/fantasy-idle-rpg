@@ -468,7 +468,7 @@
   ];
 
   function validSaveShape(data) {
-    return !!(data && typeof data.v === 'number' &&
+    return !!(data && Number.isInteger(data.v) && data.v >= 1 && data.v <= Game.SAVE_VERSION &&
       (data.player || data.roster && data.roster.actors));
   }
 
