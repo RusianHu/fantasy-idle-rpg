@@ -22,6 +22,11 @@ for (const scenario of ['normal', 'boss', 'third', 'final-normal', 'final-boss']
     assert.equal(host.Game.transitions.snapshot().phase, saveAt, 'saving must not skip the live ceremony');
     const fresh = bootWorldRuntime({ save: pending.save });
     assert.equal(fresh.Game.transitions.snapshot().phase, 'land', 'cold recovery resumes at camp landing');
+    assert.equal(fresh.Game.world.hero.dead, true, 'pending recovery restores canonical defeat state');
+    fresh.Game.transitions.update(.45);
+    assert.equal(fresh.Game.transitions.snapshot().phase, 'recover');
+    assert.equal(fresh.Game.world.hero.hp, 0, 'exact start of the recovery curve');
+    assert.equal(fresh.Game.units.assertInvariant(fresh.Game.world.hero), true);
     assert.equal(fresh.Game.state.meta.stats.deaths, pending.expectedDeaths, 'cold boot does not recount death');
     fresh.pump(130);
     assert.equal(fresh.Game.transitions.snapshot(), null);

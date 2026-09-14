@@ -447,6 +447,12 @@
       var recovery = Game.state.world.deathRecovery;
       if (!recovery && (vitals ? vitals.hp > 0 : Game.state.player.hp > 0)) return false;
       if (Game.ending && Game.ending.isPending && Game.ending.isPending()) return false;
+      // A saved recovery may have positive HP (including the rise phase).
+      // Reestablish canonical defeated/action/vitals state before replaying the
+      // recovery curve from zero; this does not emit or recount a world death.
+      if (recovery && Game.units && currentHero()) {
+        Game.units.defeat(currentHero(), { source: 'death-restore' });
+      }
       return T.startDeath(Object.assign({}, recovery, { restored: true }));
     },
 
