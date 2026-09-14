@@ -73,7 +73,7 @@
     Game.transitions.init();
     Game.auto.init();
     Game.loop.init();
-    if (!isNew && Game.player.hasClass() && Game.state.player.hp <= 0) {
+    if (!isNew && Game.player.hasClass()) {
       Game.transitions.restoreZeroHp();
     }
 

@@ -192,6 +192,7 @@
             regions: {}
           },
           finalRegionLocked: false,
+          deathRecovery: null,
           deathsRow: 0
         },
         meta: {

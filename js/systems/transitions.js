@@ -409,12 +409,12 @@
         phase: 'down',
         elapsed: 0,
         duration: DEATH_TIME.down,
-        fromRid: Game.state.world.region,
+        fromRid: opts.fromRid || Game.state.world.region,
         fallbackRid: opts.fallbackRid || null,
         byBoss: !!opts.byBoss,
         restored: !!opts.restored,
         finalRegionLost: !!opts.finalRegionLost,
-        arrivalMode: Game.world.controlMode() === 'manual' ? 'rest' : 'battle',
+        arrivalMode: opts.arrivalMode || (Game.world.controlMode() === 'manual' ? 'rest' : 'battle'),
         deathX: hero.x,
         deathY: hero.y,
         landed: false,
@@ -423,6 +423,7 @@
         pulseStep: 0,
         reduced: effectsReduced()
       };
+      Game.state.world.deathRecovery = null;
       clearStageNotices();
       if (ui() && ui().show) ui().show(T.snapshot());
       if (Game.fx && !active.reduced) {
@@ -442,9 +443,18 @@
 
     restoreZeroHp: function () {
       var vitals = Game.units && Game.units.playerSnapshot();
-      if (!Game.state || (vitals ? vitals.hp > 0 : Game.state.player.hp > 0) || active) return false;
+      if (!Game.state || active) return false;
+      var recovery = Game.state.world.deathRecovery;
+      if (!recovery && (vitals ? vitals.hp > 0 : Game.state.player.hp > 0)) return false;
       if (Game.ending && Game.ending.isPending && Game.ending.isPending()) return false;
-      return T.startDeath({ restored: true });
+      return T.startDeath(Object.assign({}, recovery, { restored: true }));
+    },
+
+    deathRecovery: function () {
+      if (!active || active.kind !== 'death') return Game.state.world.deathRecovery || null;
+      return { fromRid: active.fromRid, fallbackRid: active.fallbackRid,
+        byBoss: active.byBoss, finalRegionLost: active.finalRegionLost,
+        arrivalMode: active.arrivalMode };
     },
 
     departNow: function () {

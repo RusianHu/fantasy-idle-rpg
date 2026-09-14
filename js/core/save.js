@@ -846,6 +846,10 @@
           social: st.world.social,
           merchants: st.world.merchants,
           finalRegionLocked: !!st.world.finalRegionLocked,
+          // Preserve the committed death transaction, not transient actors or
+          // animation time. A cold start resumes safely at the camp landing.
+          deathRecovery: Game.transitions && Game.transitions.deathRecovery
+            ? Game.transitions.deathRecovery() : st.world.deathRecovery || null,
           deathsRow: st.world.deathsRow
         },
         meta: st.meta
@@ -1011,6 +1015,18 @@
         Game.routes.mainlineRegionOrder(st.world.routePlan)
       );
       st.world.finalRegionLocked = !!st.world.finalRegionLocked;
+      var recovery = data.world && data.world.deathRecovery;
+      var fromIndex = recovery && st.world.regionOrder.indexOf(recovery.fromRid);
+      var previous = fromIndex > 0 ? st.world.regionOrder[fromIndex - 1] : null;
+      st.world.deathRecovery = recovery && typeof recovery === 'object' && fromIndex >= 0 &&
+        (recovery.fallbackRid === null || recovery.fallbackRid === previous) &&
+        (st.world.region === recovery.fromRid || st.world.region === recovery.fallbackRid)
+        ? { fromRid: recovery.fromRid, fallbackRid: recovery.fallbackRid,
+          byBoss: recovery.byBoss === true,
+          finalRegionLost: recovery.finalRegionLost === true &&
+            fromIndex === st.world.regionOrder.length - 1 && st.world.finalRegionLocked,
+          arrivalMode: recovery.arrivalMode === 'battle' ? 'battle' : 'rest' }
+        : null;
       U.merge(st.meta, data.meta || {});
       st.meta.completedAt = Number.isFinite(st.meta.completedAt) && st.meta.completedAt > 0
         ? st.meta.completedAt

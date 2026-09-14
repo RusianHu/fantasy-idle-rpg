@@ -22,6 +22,9 @@
   var LEASH_ENTRY_MARGIN = 8;
   var moveKeys = {};
   var controlsBound = false;
+  // World death settlement is distinct from the actor's defeated/dead state.
+  // Claim it before callbacks can reenter through encounter/loot events.
+  var deathHandledHero = null;
 
   var W = Game.world = {
     region: null,       // 区域定义
@@ -305,6 +308,7 @@
 
       Game.parties.create({ id: 'party-player', maxMembers: 4 });
       var hero = W.hero = W.makeHero();
+      deathHandledHero = null;
       hero.x = W.layout.camp.x + 30;
       hero.y = W.layout.camp.y + 26;
       W.entities.push(hero);
@@ -1001,8 +1005,12 @@
 
     onHeroDeath: function () {
       var hero = W.hero;
-      if (hero.state === 'dead' || hero.state === 'recover' ||
+      if (!hero || deathHandledHero === hero || hero.state === 'recover' ||
           (Game.transitions && Game.transitions.isActive())) return;
+      // Ignore delayed defeat notifications after revival. In V2 the actor
+      // has already been marked dead before actor:defeated reaches the world.
+      if ((Game.units ? Game.units.vitals(hero).hp : Game.state.player.hp) > 0) return;
+      deathHandledHero = hero;
       var byBoss = !!W.bossEnt;
       var fallbackRid = null;
       var finalRegionLost = !!(
@@ -1302,11 +1310,12 @@
         var id = event && event.targetActorIds && event.targetActorIds[0];
         var actor = id && Game.actors.get(id);
         if (!actor) return;
-        if (actor.actorRecordId === Game.state.roster.primaryActorId) W.onHeroDeath();
+        if (actor === W.hero && actor.actorRecordId === Game.state.roster.primaryActorId) W.onHeroDeath();
         else if (actor.worldSpawnProfileId || actor.category === 'monster' || actor.category === 'summon') {
           W.onEntityKilled(actor, event.sourceActorId && Game.actors.get(event.sourceActorId));
         }
       });
+      bus.on('player:revived', function () { deathHandledHero = null; });
       bus.on('encounter:ended', function (event) {
         if (!W.hero || !W.hero.components.vitals) return;
         if (Game.units) Game.units.commit(W.hero);
@@ -1632,6 +1641,7 @@
         if (hero.recoverT <= 0) {
           if (Game.units) Game.units.restore(hero, { source: 'recover' });
           else Game.state.player.hp = hero.maxHp;
+          deathHandledHero = null;
           hero.state = sw.mode === 'rest' ? 'goCamp' : 'idle';
         }
         return;
