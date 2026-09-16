@@ -1325,7 +1325,11 @@
         W.hero.moveOrder = null;
         if (Game.nav) Game.nav.clear(W.hero);
         var reason = event && event.payload && event.payload.reason || 'ended';
+        // A lethal final-boss action can open the ending before this same
+        // tick settles the encounter. Settlement must not steal scene ownership.
         var safeToPlan = Game.state.world.mode === 'battle' &&
+          !(Game.transitions && Game.transitions.isActive()) &&
+          !(Game.ending && Game.ending.isActive()) &&
           W.hero.state !== 'dead' && W.hero.state !== 'recover' &&
           ['travel', 'region-change', 'reset', 'removed', 'boss-failed'].indexOf(reason) < 0;
         if (safeToPlan && W.controlMode() === 'auto' &&
